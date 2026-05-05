@@ -46,9 +46,9 @@ views:
             secondary: >
               {{ now().strftime('%A, %d. %B %Y · %H:%M') }} ·
               {{ states('sensor.weather_temperature') | default('–') }} °C ·
-              {{ states('weather.home') | replace('_',' ') | title }}
+              {{ states('weather.forecast_home') | replace('_',' ') | title }}
             icon: >
-              {% set s = states('weather.home') %}
+              {% set s = states('weather.forecast_home') %}
               {% if s == 'sunny' %}mdi:weather-sunny
               {% elif s == 'partlycloudy' %}mdi:weather-partly-cloudy
               {% elif s == 'cloudy' %}mdi:weather-cloudy
@@ -286,7 +286,7 @@ views:
               - type: custom:mushroom-title-card
                 title: Wetter
               - type: weather-forecast
-                entity: weather.home
+                entity: weather.forecast_home
                 forecast_type: daily
                 show_current: false
                 show_forecast: true
