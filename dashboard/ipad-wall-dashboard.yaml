@@ -1,0 +1,357 @@
+# =============================================================================
+#  Home Assistant Wand-Dashboard für iPad (Querformat 1024x768 / 2160x1620)
+# -----------------------------------------------------------------------------
+#  Einbinden:
+#    1. Datei nach /config/dashboards/ipad-wall-dashboard.yaml kopieren
+#    2. In configuration.yaml ergänzen:
+#
+#       lovelace:
+#         mode: storage
+#         dashboards:
+#           ipad-wall:
+#             mode: yaml
+#             title: Wand
+#             icon: mdi:tablet-dashboard
+#             show_in_sidebar: true
+#             filename: dashboards/ipad-wall-dashboard.yaml
+#
+#    3. Empfohlene Custom-Cards via HACS installieren:
+#       - mushroom            (https://github.com/piitaya/lovelace-mushroom)
+#       - mini-graph-card     (https://github.com/kalkih/mini-graph-card)
+#       - button-card         (https://github.com/custom-cards/button-card)
+#       - weather-card        (https://github.com/bramkragten/weather-card)
+#       - auto-entities       (https://github.com/thomasloven/lovelace-auto-entities)
+#       - layout-card         (https://github.com/thomasloven/lovelace-layout-card)
+#
+#  Entitäten ggf. an die eigene Installation anpassen (siehe Kommentare).
+# =============================================================================
+
+title: Zuhause
+views:
+  - title: Übersicht
+    path: home
+    icon: mdi:home-variant
+    theme: Mushroom
+    type: sections
+    max_columns: 4
+    sections:
+
+      # ────────────────────────────────────────────────────────────────────
+      # 1) Kopfzeile: Begrüßung, Anwesenheit, Uhrzeit
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set h = now().hour %}
+                  {% if h < 5 %}Gute Nacht
+                  {% elif h < 11 %}Guten Morgen
+                  {% elif h < 18 %}Guten Tag
+                  {% else %}Guten Abend{% endif %}
+                secondary: "{{ now().strftime('%A, %d. %B %Y · %H:%M') }}"
+                icon: mdi:home-heart
+                icon_color: amber
+                fill_container: true
+                multiline_secondary: true
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states('sensor.weather_temperature') | default('–') }} °C
+                secondary: "{{ states('weather.home') | replace('_',' ') | title }}"
+                icon: >
+                  {% set s = states('weather.home') %}
+                  {% if s == 'sunny' %}mdi:weather-sunny
+                  {% elif s == 'partlycloudy' %}mdi:weather-partly-cloudy
+                  {% elif s == 'cloudy' %}mdi:weather-cloudy
+                  {% elif s == 'rainy' %}mdi:weather-rainy
+                  {% elif s == 'pouring' %}mdi:weather-pouring
+                  {% elif s == 'snowy' %}mdi:weather-snowy
+                  {% elif s == 'lightning' %}mdi:weather-lightning
+                  {% elif s == 'fog' %}mdi:weather-fog
+                  {% else %}mdi:weather-cloudy{% endif %}
+                icon_color: light-blue
+                fill_container: true
+                tap_action:
+                  action: navigate
+                  navigation_path: /lovelace/weather
+
+      # ────────────────────────────────────────────────────────────────────
+      # 2) Anwesenheit (Personen)
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Wer ist zuhause?
+            icon: mdi:account-group
+          - type: custom:auto-entities
+            card:
+              type: custom:mushroom-chips-card
+              alignment: start
+            card_param: chips
+            filter:
+              include:
+                - domain: person
+                  options:
+                    type: entity
+                    icon_color: >
+                      {{ 'green' if states(entity) == 'home' else 'grey' }}
+                    content_info: name
+                    use_entity_picture: true
+                    tap_action:
+                      action: more-info
+
+      # ────────────────────────────────────────────────────────────────────
+      # 3) Briefkasten / Post
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Briefkasten
+            icon: mdi:mailbox
+          - type: custom:mushroom-template-card
+            primary: >
+              {% if is_state('binary_sensor.briefkasten', 'on') %}
+                Post ist da!
+              {% else %}
+                Kein Brief
+              {% endif %}
+            secondary: >
+              {% set t = states.binary_sensor.briefkasten.last_changed %}
+              Zuletzt: {{ relative_time(t) }}
+            icon: >
+              {{ 'mdi:mailbox-open-up' if is_state('binary_sensor.briefkasten','on')
+                 else 'mdi:mailbox-outline' }}
+            icon_color: >
+              {{ 'red' if is_state('binary_sensor.briefkasten','on') else 'disabled' }}
+            fill_container: true
+
+      # ────────────────────────────────────────────────────────────────────
+      # 4) Stromverbrauch
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Stromverbrauch
+            icon: mdi:lightning-bolt
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: sensor.power_consumption          # aktueller Verbrauch (W)
+                name: Aktuell
+                icon: mdi:flash
+                icon_color: yellow
+                fill_container: true
+              - type: custom:mushroom-entity-card
+                entity: sensor.energy_today               # heute (kWh)
+                name: Heute
+                icon: mdi:counter
+                icon_color: orange
+                fill_container: true
+              - type: custom:mushroom-entity-card
+                entity: sensor.energy_month               # Monat (kWh)
+                name: Monat
+                icon: mdi:calendar-month
+                icon_color: deep-orange
+                fill_container: true
+          - type: custom:mini-graph-card
+            entities:
+              - entity: sensor.power_consumption
+                name: Leistung
+                color: '#f39c12'
+            hours_to_show: 24
+            points_per_hour: 2
+            line_width: 2
+            smoothing: true
+            show:
+              labels: true
+              extrema: true
+
+      # ────────────────────────────────────────────────────────────────────
+      # 5) Lichter & Rollläden – schnelle Übersicht und Steuerung
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Licht & Beschattung
+            icon: mdi:lightbulb-group
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states.light
+                     | selectattr('state','eq','on') | list | count }}
+                  / {{ states.light | list | count }}
+                secondary: Lichter an
+                icon: mdi:lightbulb-on
+                icon_color: amber
+                fill_container: true
+                tap_action:
+                  action: call-service
+                  service: light.turn_off
+                  target:
+                    entity_id: all
+                hold_action:
+                  action: navigate
+                  navigation_path: /lovelace/lights
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states.cover
+                     | rejectattr('state','eq','closed') | list | count }}
+                  / {{ states.cover | list | count }}
+                secondary: Rollläden offen
+                icon: mdi:window-shutter-open
+                icon_color: blue
+                fill_container: true
+                tap_action:
+                  action: navigate
+                  navigation_path: /lovelace/covers
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set n = states.binary_sensor
+                     | selectattr('attributes.device_class','eq','window')
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ n }}
+                secondary: Fenster offen
+                icon: mdi:window-open-variant
+                icon_color: >
+                  {% set n = states.binary_sensor
+                     | selectattr('attributes.device_class','eq','window')
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ 'red' if n > 0 else 'disabled' }}
+                fill_container: true
+
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Aktive Lichter
+              show_header_toggle: true
+              state_color: true
+            filter:
+              include:
+                - domain: light
+                  state: 'on'
+            sort:
+              method: friendly_name
+            show_empty: false
+
+      # ────────────────────────────────────────────────────────────────────
+      # 6) Wetter
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Wetter
+            icon: mdi:weather-partly-cloudy
+          - type: weather-forecast
+            entity: weather.home
+            forecast_type: daily
+            show_current: true
+            show_forecast: true
+
+      # ────────────────────────────────────────────────────────────────────
+      # 7) Batterien – Geräte die einen Wechsel brauchen
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Batterie wechseln
+            icon: mdi:battery-alert
+          - type: custom:auto-entities
+            card:
+              type: entities
+              state_color: true
+              show_header_toggle: false
+            filter:
+              include:
+                - attributes:
+                    device_class: battery
+                  state: < 25
+                - entity_id: sensor.*_battery*
+                  state: < 25
+              exclude:
+                - state: unavailable
+                - state: unknown
+            sort:
+              method: state
+              numeric: true
+            show_empty: true
+            else:
+              - type: custom:mushroom-template-card
+                primary: Alle Batterien OK
+                secondary: Keine Geräte unter 25 %
+                icon: mdi:battery-check
+                icon_color: green
+
+      # ────────────────────────────────────────────────────────────────────
+      # 8) Sicherheit / Status
+      # ────────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        cards:
+          - type: heading
+            heading: Status
+            icon: mdi:shield-home
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set n = states.binary_sensor
+                     | selectattr('attributes.device_class','eq','door')
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ n }} offen
+                secondary: Türen
+                icon: mdi:door
+                icon_color: >
+                  {% set n = states.binary_sensor
+                     | selectattr('attributes.device_class','eq','door')
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ 'red' if n>0 else 'green' }}
+                fill_container: true
+
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.indoor_temperature') }} °C"
+                secondary: Innen
+                icon: mdi:thermometer
+                icon_color: orange
+                fill_container: true
+
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.indoor_humidity') }} %"
+                secondary: Luftfeuchte
+                icon: mdi:water-percent
+                icon_color: blue
+                fill_container: true
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set n = states.update
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ n }}
+                secondary: HA-Updates
+                icon: mdi:package-up
+                icon_color: >
+                  {% set n = states.update
+                     | selectattr('state','eq','on') | list | count %}
+                  {{ 'orange' if n>0 else 'disabled' }}
+                fill_container: true
+                tap_action:
+                  action: navigate
+                  navigation_path: /config/updates
+
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.waste_collection') | default('–') }}"
+                secondary: Nächste Abfuhr
+                icon: mdi:trash-can
+                icon_color: green
+                fill_container: true

@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>HA Wand-Dashboard – Vorschau</title>
+<meta name="viewport" content="width=1024, initial-scale=1" />
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<style>
+  :root{
+    --bg:#111418;
+    --bg2:#1a1f25;
+    --card:#1e242c;
+    --card2:#242b34;
+    --text:#e6ebf2;
+    --muted:#8b95a3;
+    --accent:#03a9f4;
+    --amber:#ffb74d;
+    --green:#66bb6a;
+    --red:#ef5350;
+    --orange:#ff9800;
+    --blue:#42a5f5;
+    --grey:#5b6573;
+    --radius:18px;
+    --gap:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text)}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+
+  /* iPad Rahmen */
+  .ipad{
+    width:1180px;
+    background:#0c0c0e;
+    border-radius:42px;
+    padding:22px;
+    box-shadow:0 30px 80px rgba(0,0,0,.7), inset 0 0 0 2px #2a2a2e;
+    position:relative;
+  }
+  .ipad::before,.ipad::after{
+    content:"";position:absolute;background:#1a1a1e;border-radius:50%;
+  }
+  .ipad::before{width:10px;height:10px;left:50%;top:10px;transform:translateX(-50%)}
+  .screen{
+    background:linear-gradient(160deg,#0f1418 0%,#141b22 100%);
+    border-radius:24px;
+    padding:18px;
+    aspect-ratio: 4 / 3;
+    overflow:hidden;
+  }
+
+  /* Grid */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:var(--gap);
+    height:100%;
+  }
+  .col-1{grid-column:span 1}
+  .col-2{grid-column:span 2}
+  .col-3{grid-column:span 3}
+  .col-4{grid-column:span 4}
+
+  .card{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 4px 14px rgba(0,0,0,.25);
+  }
+  .heading{
+    display:flex;align-items:center;gap:8px;
+    font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+    font-weight:600;
+  }
+  .heading i{font-size:16px}
+
+  /* Mushroom-Style Tile */
+  .tile{
+    display:flex;align-items:center;gap:12px;
+    background:var(--card2);
+    border-radius:14px;
+    padding:10px 12px;
+    flex:1;
+    min-width:0;
+  }
+  .tile .ic{
+    width:42px;height:42px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;flex-shrink:0;
+  }
+  .tile .txt{display:flex;flex-direction:column;min-width:0}
+  .tile .primary{font-weight:600;font-size:15px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .secondary{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .ic.amber{background:rgba(255,183,77,.15);color:var(--amber)}
+  .ic.blue{background:rgba(66,165,245,.15);color:var(--blue)}
+  .ic.green{background:rgba(102,187,106,.15);color:var(--green)}
+  .ic.red{background:rgba(239,83,80,.18);color:var(--red)}
+  .ic.orange{background:rgba(255,152,0,.18);color:var(--orange)}
+  .ic.grey{background:rgba(139,149,163,.15);color:var(--muted)}
+  .ic.yellow{background:rgba(255,235,59,.15);color:#ffeb3b}
+  .ic.purple{background:rgba(171,71,188,.18);color:#ce93d8}
+
+  .row{display:flex;gap:10px}
+
+  /* Kopfzeile */
+  .hero{
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(135deg,#1d2630 0%,#252f3b 100%);
+  }
+  .hero .greet{font-size:24px;font-weight:700}
+  .hero .date{color:var(--muted);font-size:13px;margin-top:2px}
+  .hero .weather{display:flex;align-items:center;gap:14px}
+  .hero .temp{font-size:42px;font-weight:300;line-height:1}
+  .hero .wicon{font-size:48px;color:var(--amber)}
+
+  /* Personen-Chips */
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{
+    display:flex;align-items:center;gap:8px;
+    background:var(--card2);border-radius:999px;padding:6px 12px 6px 6px;font-size:13px;
+  }
+  .chip .av{
+    width:28px;height:28px;border-radius:50%;
+    background:#37474f;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:12px;font-weight:600;
+    border:2px solid var(--grey);
+  }
+  .chip.home .av{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+  .chip.away{opacity:.55}
+
+  /* Big briefkasten card */
+  .mailbox{
+    background:linear-gradient(135deg,#3a1f1f 0%,#2a1818 100%);
+    align-items:flex-start;
+  }
+  .mailbox .ic{width:56px;height:56px;font-size:30px}
+  .mailbox .primary{font-size:20px}
+
+  /* Strom */
+  .energy-graph{
+    height:60px;
+    background:linear-gradient(180deg,rgba(243,156,18,.25) 0%,rgba(243,156,18,0) 100%);
+    border-radius:10px;
+    position:relative;
+    margin-top:auto;
+    overflow:hidden;
+  }
+  .energy-graph svg{width:100%;height:100%;display:block}
+
+  /* Mini-Tiles im Grid */
+  .mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .mini{
+    background:var(--card2);
+    border-radius:12px;
+    padding:10px;
+    text-align:center;
+  }
+  .mini .v{font-size:18px;font-weight:700}
+  .mini .l{font-size:11px;color:var(--muted);margin-top:2px}
+
+  /* Battery list */
+  .battery-row{
+    display:flex;align-items:center;gap:10px;padding:6px 0;
+    border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;
+  }
+  .battery-row:last-child{border-bottom:none}
+  .battery-row .name{flex:1}
+  .battery-row .bar{
+    width:80px;height:6px;background:#2c333d;border-radius:3px;overflow:hidden;
+  }
+  .battery-row .bar > div{height:100%}
+  .battery-row .pct{width:40px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* Wetter forecast */
+  .forecast{display:flex;justify-content:space-between;gap:6px;margin-top:6px}
+  .fc{flex:1;text-align:center;background:var(--card2);border-radius:10px;padding:8px 4px}
+  .fc .d{font-size:11px;color:var(--muted)}
+  .fc i{font-size:24px;display:block;margin:4px 0;color:var(--amber)}
+  .fc .t{font-size:12px}
+  .fc .t b{color:var(--text)}
+
+  /* Status row */
+  .status-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+</style>
+</head>
+<body>
+
+<div class="ipad">
+  <div class="screen">
+    <div class="grid">
+
+      <!-- Kopfzeile -->
+      <div class="card hero col-4" style="flex-direction:row">
+        <div>
+          <div class="greet">Guten Abend, Familie</div>
+          <div class="date">Dienstag, 5. Mai 2026 · 19:42</div>
+        </div>
+        <div class="weather">
+          <i class="mdi mdi-weather-partly-cloudy wicon"></i>
+          <div>
+            <div class="temp">17°</div>
+            <div class="date">Teils bewölkt · Berlin</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Personen -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-account-group"></i> Wer ist zuhause?</div>
+        <div class="chips">
+          <div class="chip home"><div class="av" style="background:#1976d2">MA</div>Marc</div>
+          <div class="chip home"><div class="av" style="background:#c2185b">AN</div>Anna</div>
+          <div class="chip away"><div class="av" style="background:#7b1fa2">LE</div>Lena</div>
+          <div class="chip home"><div class="av" style="background:#388e3c">TO</div>Tom</div>
+          <div class="chip away"><div class="av" style="background:#5d4037">OM</div>Oma</div>
+        </div>
+      </div>
+
+      <!-- Briefkasten -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-mailbox"></i> Briefkasten</div>
+        <div class="tile mailbox">
+          <div class="ic red"><i class="mdi mdi-mailbox-open-up"></i></div>
+          <div class="txt">
+            <div class="primary">Post ist da!</div>
+            <div class="secondary">Zuletzt: vor 2 Stunden</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strom -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-lightning-bolt"></i> Stromverbrauch</div>
+        <div class="mini-grid">
+          <div class="mini"><div class="v" style="color:var(--amber)">412 W</div><div class="l">Aktuell</div></div>
+          <div class="mini"><div class="v" style="color:var(--orange)">8,4 kWh</div><div class="l">Heute</div></div>
+          <div class="mini"><div class="v" style="color:#ff7043">142 kWh</div><div class="l">Mai</div></div>
+        </div>
+        <div class="energy-graph">
+          <svg viewBox="0 0 300 60" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="#f39c12" stop-opacity=".6"/>
+                <stop offset="1" stop-color="#f39c12" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,45 L15,40 L30,42 L45,30 L60,35 L75,20 L90,28 L105,15 L120,25 L135,10 L150,18 L165,30 L180,22 L195,35 L210,28 L225,40 L240,32 L255,38 L270,25 L285,30 L300,20 L300,60 L0,60 Z"
+                  fill="url(#g1)"/>
+            <path d="M0,45 L15,40 L30,42 L45,30 L60,35 L75,20 L90,28 L105,15 L120,25 L135,10 L150,18 L165,30 L180,22 L195,35 L210,28 L225,40 L240,32 L255,38 L270,25 L285,30 L300,20"
+                  fill="none" stroke="#f39c12" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Licht & Beschattung -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-lightbulb-group"></i> Licht & Beschattung</div>
+        <div class="row">
+          <div class="tile">
+            <div class="ic amber"><i class="mdi mdi-lightbulb-on"></i></div>
+            <div class="txt"><div class="primary">4 / 18</div><div class="secondary">Lichter an</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic blue"><i class="mdi mdi-window-shutter-open"></i></div>
+            <div class="txt"><div class="primary">7 / 12</div><div class="secondary">Rollläden offen</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic red"><i class="mdi mdi-window-open-variant"></i></div>
+            <div class="txt"><div class="primary">2</div><div class="secondary">Fenster offen</div></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Aktiv: Wohnzimmer · Küche · Flur · Bad</div>
+      </div>
+
+      <!-- Wetter -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-weather-partly-cloudy"></i> Wetter</div>
+        <div class="forecast">
+          <div class="fc"><div class="d">Mi</div><i class="mdi mdi-weather-sunny"></i><div class="t"><b>21°</b> 11°</div></div>
+          <div class="fc"><div class="d">Do</div><i class="mdi mdi-weather-partly-cloudy"></i><div class="t"><b>19°</b> 10°</div></div>
+          <div class="fc"><div class="d">Fr</div><i class="mdi mdi-weather-rainy" style="color:var(--blue)"></i><div class="t"><b>15°</b> 8°</div></div>
+          <div class="fc"><div class="d">Sa</div><i class="mdi mdi-weather-pouring" style="color:var(--blue)"></i><div class="t"><b>13°</b> 7°</div></div>
+          <div class="fc"><div class="d">So</div><i class="mdi mdi-weather-cloudy" style="color:var(--muted)"></i><div class="t"><b>16°</b> 9°</div></div>
+        </div>
+      </div>
+
+      <!-- Batterien -->
+      <div class="card col-2">
+        <div class="heading"><i class="mdi mdi-battery-alert"></i> Batterie wechseln</div>
+        <div class="battery-row">
+          <i class="mdi mdi-thermometer" style="color:var(--red)"></i>
+          <div class="name">Heizung Wohnzimmer</div>
+          <div class="bar"><div style="width:8%;background:var(--red)"></div></div>
+          <div class="pct">8%</div>
+        </div>
+        <div class="battery-row">
+          <i class="mdi mdi-door" style="color:var(--orange)"></i>
+          <div class="name">Türsensor Eingang</div>
+          <div class="bar"><div style="width:14%;background:var(--orange)"></div></div>
+          <div class="pct">14%</div>
+        </div>
+        <div class="battery-row">
+          <i class="mdi mdi-motion-sensor" style="color:var(--orange)"></i>
+          <div class="name">Bewegung Flur OG</div>
+          <div class="bar"><div style="width:19%;background:var(--orange)"></div></div>
+          <div class="pct">19%</div>
+        </div>
+        <div class="battery-row">
+          <i class="mdi mdi-remote" style="color:var(--amber)"></i>
+          <div class="name">Fernbedienung TV</div>
+          <div class="bar"><div style="width:23%;background:var(--amber)"></div></div>
+          <div class="pct">23%</div>
+        </div>
+      </div>
+
+      <!-- Status Row -->
+      <div class="card col-4">
+        <div class="heading"><i class="mdi mdi-shield-home"></i> Status</div>
+        <div class="status-row">
+          <div class="tile">
+            <div class="ic green"><i class="mdi mdi-door"></i></div>
+            <div class="txt"><div class="primary">0 offen</div><div class="secondary">Türen</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic orange"><i class="mdi mdi-thermometer"></i></div>
+            <div class="txt"><div class="primary">21,8 °C</div><div class="secondary">Innen</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic blue"><i class="mdi mdi-water-percent"></i></div>
+            <div class="txt"><div class="primary">47 %</div><div class="secondary">Luftfeuchte</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic orange"><i class="mdi mdi-package-up"></i></div>
+            <div class="txt"><div class="primary">3</div><div class="secondary">HA-Updates</div></div>
+          </div>
+          <div class="tile">
+            <div class="ic green"><i class="mdi mdi-trash-can"></i></div>
+            <div class="txt"><div class="primary">Bio – Do</div><div class="secondary">Nächste Abfuhr</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
