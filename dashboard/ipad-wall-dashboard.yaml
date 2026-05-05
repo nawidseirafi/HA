@@ -156,7 +156,7 @@ views:
                         max-width: 100% !important;
                       }
                     ha-card {
-                      {% if is_state('binary_sensor.briefkasten', 'on') %}
+                      {% if is_state('input_boolean.post_im_briefkasten', 'on') %}
                         background: linear-gradient(135deg, #ff4d4d, #ff0000);
                         color: white;
                         animation: pulse 2s infinite;
@@ -171,6 +171,29 @@ views:
                       50% { transform: scale(1.02); }
                       100% { transform: scale(1); }
                     }
+              # Button zum Zurücksetzen (nur sichtbar wenn Post da ist)
+              - type: custom:mushroom-chips-card
+                alignment: center
+                chips:
+                  - type: template
+                    icon: mdi:check-circle
+                    content: "✓ Geleert"
+                    icon_color: green
+                    tap_action:
+                      action: call-service
+                      service: input_boolean.turn_off
+                      target:
+                        entity_id: input_boolean.post_im_briefkasten
+                    card_mod:
+                      style: |
+                        ha-card {
+                          {% if is_state('input_boolean.post_im_briefkasten', 'on') %}
+                            opacity: 1;
+                          {% else %}
+                            opacity: 0.3;
+                            pointer-events: none;
+                          {% endif %}
+                        }
 
           # ─────────────────────────────────────────────────────────
           # 4) Stromverbrauch (6/12)

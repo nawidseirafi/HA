@@ -1,4 +1,5 @@
 
+input_boolean: !include input_booleans.yaml
 default_config:
 
 command_line:

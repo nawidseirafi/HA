@@ -1,0 +1,11 @@
+# ========================================================================
+# Input Booleans - Persistente Schalter für Home Assistant
+# ========================================================================
+
+# Briefkasten - Persistente Meldung wenn Post da ist
+post_im_briefkasten:
+  name: "Post im Briefkasten"
+  icon: mdi:mailbox-open-up
+  initial: off  # Startet mit "off"
+  # Dieser Status wird automatisch in der HA-DB persistiert
+  # und wird durch Seiten-Refresh nicht zurückgesetzt
