@@ -1,6 +1,16 @@
 # =============================================================================
 #  Home Assistant Wand-Dashboard für iPad (Querformat 1024x768 / 2160x1620)
 # -----------------------------------------------------------------------------
+#  Voraussetzungen (alle via HACS):
+#    - mushroom
+#    - mushroom-themes  (Theme „Mushroom" im Profil aktivieren)
+#    - mini-graph-card
+#    - auto-entities
+#    - button-card
+#    - layout-card
+#    - card-mod         (zwingend für das Mockup-Styling unten)
+#    - kiosk-mode       (optional, versteckt Sidebar am iPad)
+#
 #  Einbinden:
 #    1. Datei nach /config/dashboards/ipad-wall-dashboard.yaml kopieren
 #    2. In configuration.yaml ergänzen:
@@ -15,15 +25,8 @@
 #             show_in_sidebar: true
 #             filename: dashboards/ipad-wall-dashboard.yaml
 #
-#    3. Empfohlene Custom-Cards via HACS installieren:
-#       - mushroom            (https://github.com/piitaya/lovelace-mushroom)
-#       - mini-graph-card     (https://github.com/kalkih/mini-graph-card)
-#       - button-card         (https://github.com/custom-cards/button-card)
-#       - weather-card        (https://github.com/bramkragten/weather-card)
-#       - auto-entities       (https://github.com/thomasloven/lovelace-auto-entities)
-#       - layout-card         (https://github.com/thomasloven/lovelace-layout-card)
-#
-#  Entitäten ggf. an die eigene Installation anpassen (siehe Kommentare).
+#    3. ALLE entity-IDs an die eigene Installation anpassen
+#       (Briefkasten, Wetter, Strom-Sensoren, Innenklima, Abfuhr).
 # =============================================================================
 
 title: Zuhause
@@ -34,52 +37,53 @@ views:
     theme: Mushroom
     type: sections
     max_columns: 4
+    dense_section_placement: true
     sections:
 
       # ────────────────────────────────────────────────────────────────────
-      # 1) Kopfzeile: Begrüßung, Anwesenheit, Uhrzeit
+      # 1) Kopfzeile – Begrüßung + Wetter (volle Breite)
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 4
         cards:
-          - type: horizontal-stack
-            cards:
-              - type: custom:mushroom-template-card
-                primary: >
-                  {% set h = now().hour %}
-                  {% if h < 5 %}Gute Nacht
-                  {% elif h < 11 %}Guten Morgen
-                  {% elif h < 18 %}Guten Tag
-                  {% else %}Guten Abend{% endif %}
-                secondary: "{{ now().strftime('%A, %d. %B %Y · %H:%M') }}"
-                icon: mdi:home-heart
-                icon_color: amber
-                fill_container: true
-                multiline_secondary: true
-
-              - type: custom:mushroom-template-card
-                primary: >
-                  {{ states('sensor.weather_temperature') | default('–') }} °C
-                secondary: "{{ states('weather.home') | replace('_',' ') | title }}"
-                icon: >
-                  {% set s = states('weather.home') %}
-                  {% if s == 'sunny' %}mdi:weather-sunny
-                  {% elif s == 'partlycloudy' %}mdi:weather-partly-cloudy
-                  {% elif s == 'cloudy' %}mdi:weather-cloudy
-                  {% elif s == 'rainy' %}mdi:weather-rainy
-                  {% elif s == 'pouring' %}mdi:weather-pouring
-                  {% elif s == 'snowy' %}mdi:weather-snowy
-                  {% elif s == 'lightning' %}mdi:weather-lightning
-                  {% elif s == 'fog' %}mdi:weather-fog
-                  {% else %}mdi:weather-cloudy{% endif %}
-                icon_color: light-blue
-                fill_container: true
-                tap_action:
-                  action: navigate
-                  navigation_path: /lovelace/weather
+          - type: custom:mushroom-template-card
+            primary: >
+              {% set h = now().hour %}
+              {% if h < 5 %}Gute Nacht, Familie
+              {% elif h < 11 %}Guten Morgen, Familie
+              {% elif h < 18 %}Guten Tag, Familie
+              {% else %}Guten Abend, Familie{% endif %}
+            secondary: >
+              {{ now().strftime('%A, %d. %B %Y · %H:%M') }} ·
+              {{ states('sensor.weather_temperature') | default('–') }} °C ·
+              {{ states('weather.home') | replace('_',' ') | title }}
+            icon: >
+              {% set s = states('weather.home') %}
+              {% if s == 'sunny' %}mdi:weather-sunny
+              {% elif s == 'partlycloudy' %}mdi:weather-partly-cloudy
+              {% elif s == 'cloudy' %}mdi:weather-cloudy
+              {% elif s == 'rainy' %}mdi:weather-rainy
+              {% elif s == 'pouring' %}mdi:weather-pouring
+              {% elif s == 'snowy' %}mdi:weather-snowy
+              {% elif s == 'lightning' %}mdi:weather-lightning
+              {% elif s == 'fog' %}mdi:weather-fog
+              {% else %}mdi:weather-partly-cloudy{% endif %}
+            icon_color: amber
+            fill_container: true
+            multiline_secondary: true
+            card_mod:
+              style: |
+                ha-card {
+                  background: linear-gradient(135deg,#1d2630 0%,#252f3b 100%) !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                  padding: 6px 4px !important;
+                }
+                ha-card .primary { font-size: 22px !important; font-weight: 700 !important; }
+                ha-card .secondary { color: #8b95a3 !important; }
 
       # ────────────────────────────────────────────────────────────────────
-      # 2) Anwesenheit (Personen)
+      # 2) Personen-Chips
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -103,9 +107,18 @@ views:
                     use_entity_picture: true
                     tap_action:
                       action: more-info
+            card_mod:
+              style: |
+                ha-card {
+                  --chip-background: #242b34;
+                  --chip-border-radius: 999px;
+                  background: #1e242c !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                }
 
       # ────────────────────────────────────────────────────────────────────
-      # 3) Briefkasten / Post
+      # 3) Briefkasten – mit rotem Gradient wenn Post da ist
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -129,9 +142,19 @@ views:
             icon_color: >
               {{ 'red' if is_state('binary_sensor.briefkasten','on') else 'disabled' }}
             fill_container: true
+            card_mod:
+              style: |
+                ha-card {
+                  background: {{ 'linear-gradient(135deg,#3a1f1f 0%,#2a1818 100%)'
+                    if is_state('binary_sensor.briefkasten','on')
+                    else '#1e242c' }} !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                }
+                ha-card .primary { font-size: 20px !important; font-weight: 700 !important; }
 
       # ────────────────────────────────────────────────────────────────────
-      # 4) Stromverbrauch
+      # 4) Stromverbrauch – Mini-Tiles + Mini-Graph
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -139,26 +162,41 @@ views:
           - type: heading
             heading: Stromverbrauch
             icon: mdi:lightning-bolt
-          - type: horizontal-stack
+          - type: custom:layout-card
+            layout_type: custom:grid-layout
+            layout:
+              grid-template-columns: 1fr 1fr 1fr
+              grid-gap: 10px
             cards:
-              - type: custom:mushroom-entity-card
-                entity: sensor.power_consumption          # aktueller Verbrauch (W)
-                name: Aktuell
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.power_consumption') }} W"
+                secondary: Aktuell
                 icon: mdi:flash
-                icon_color: yellow
-                fill_container: true
-              - type: custom:mushroom-entity-card
-                entity: sensor.energy_today               # heute (kWh)
-                name: Heute
+                icon_color: amber
+                card_mod: &mini_tile
+                  style: |
+                    ha-card {
+                      background: #242b34 !important;
+                      border-radius: 12px !important;
+                      border: none !important;
+                      text-align: center;
+                    }
+                    ha-card .primary { font-size: 18px !important; font-weight: 700 !important; }
+                    ha-card .secondary { font-size: 11px !important; }
+                    .container { justify-content: center !important; }
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.energy_today') }} kWh"
+                secondary: Heute
                 icon: mdi:counter
                 icon_color: orange
-                fill_container: true
-              - type: custom:mushroom-entity-card
-                entity: sensor.energy_month               # Monat (kWh)
-                name: Monat
+                card_mod: *mini_tile
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.energy_month') }} kWh"
+                secondary: "{{ now().strftime('%B') }}"
                 icon: mdi:calendar-month
                 icon_color: deep-orange
-                fill_container: true
+                card_mod: *mini_tile
+
           - type: custom:mini-graph-card
             entities:
               - entity: sensor.power_consumption
@@ -168,12 +206,26 @@ views:
             points_per_hour: 2
             line_width: 2
             smoothing: true
+            height: 60
             show:
-              labels: true
-              extrema: true
+              labels: false
+              extrema: false
+              name: false
+              icon: false
+              state: false
+              legend: false
+            card_mod:
+              style: |
+                ha-card {
+                  background: linear-gradient(180deg,rgba(243,156,18,.18) 0%,rgba(243,156,18,0) 100%) !important;
+                  border-radius: 10px !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  padding: 0 !important;
+                }
 
       # ────────────────────────────────────────────────────────────────────
-      # 5) Lichter & Rollläden – schnelle Übersicht und Steuerung
+      # 5) Lichter & Beschattung
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -185,8 +237,7 @@ views:
             cards:
               - type: custom:mushroom-template-card
                 primary: >
-                  {{ states.light
-                     | selectattr('state','eq','on') | list | count }}
+                  {{ states.light | selectattr('state','eq','on') | list | count }}
                   / {{ states.light | list | count }}
                 secondary: Lichter an
                 icon: mdi:lightbulb-on
@@ -200,11 +251,16 @@ views:
                 hold_action:
                   action: navigate
                   navigation_path: /lovelace/lights
-
+                card_mod: &inner_tile
+                  style: |
+                    ha-card {
+                      background: #242b34 !important;
+                      border-radius: 14px !important;
+                      border: none !important;
+                    }
               - type: custom:mushroom-template-card
                 primary: >
-                  {{ states.cover
-                     | rejectattr('state','eq','closed') | list | count }}
+                  {{ states.cover | rejectattr('state','eq','closed') | list | count }}
                   / {{ states.cover | list | count }}
                 secondary: Rollläden offen
                 icon: mdi:window-shutter-open
@@ -213,13 +269,12 @@ views:
                 tap_action:
                   action: navigate
                   navigation_path: /lovelace/covers
-
+                card_mod: *inner_tile
               - type: custom:mushroom-template-card
                 primary: >
-                  {% set n = states.binary_sensor
+                  {{ states.binary_sensor
                      | selectattr('attributes.device_class','eq','window')
-                     | selectattr('state','eq','on') | list | count %}
-                  {{ n }}
+                     | selectattr('state','eq','on') | list | count }}
                 secondary: Fenster offen
                 icon: mdi:window-open-variant
                 icon_color: >
@@ -228,23 +283,10 @@ views:
                      | selectattr('state','eq','on') | list | count %}
                   {{ 'red' if n > 0 else 'disabled' }}
                 fill_container: true
-
-          - type: custom:auto-entities
-            card:
-              type: entities
-              title: Aktive Lichter
-              show_header_toggle: true
-              state_color: true
-            filter:
-              include:
-                - domain: light
-                  state: 'on'
-            sort:
-              method: friendly_name
-            show_empty: false
+                card_mod: *inner_tile
 
       # ────────────────────────────────────────────────────────────────────
-      # 6) Wetter
+      # 6) Wetter – Forecast
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -255,11 +297,19 @@ views:
           - type: weather-forecast
             entity: weather.home
             forecast_type: daily
-            show_current: true
+            show_current: false
             show_forecast: true
+            card_mod:
+              style: |
+                ha-card {
+                  background: #1e242c !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
 
       # ────────────────────────────────────────────────────────────────────
-      # 7) Batterien – Geräte die einen Wechsel brauchen
+      # 7) Batterien – Liste mit Balken
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -292,9 +342,17 @@ views:
                 secondary: Keine Geräte unter 25 %
                 icon: mdi:battery-check
                 icon_color: green
+            card_mod:
+              style: |
+                ha-card {
+                  background: #1e242c !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
 
       # ────────────────────────────────────────────────────────────────────
-      # 8) Sicherheit / Status
+      # 8) Status – volle Breite, 5 Kacheln
       # ────────────────────────────────────────────────────────────────────
       - type: grid
         column_span: 4
@@ -302,7 +360,11 @@ views:
           - type: heading
             heading: Status
             icon: mdi:shield-home
-          - type: horizontal-stack
+          - type: custom:layout-card
+            layout_type: custom:grid-layout
+            layout:
+              grid-template-columns: repeat(5, 1fr)
+              grid-gap: 10px
             cards:
               - type: custom:mushroom-template-card
                 primary: >
@@ -318,26 +380,24 @@ views:
                      | selectattr('state','eq','on') | list | count %}
                   {{ 'red' if n>0 else 'green' }}
                 fill_container: true
-
+                card_mod: *inner_tile
               - type: custom:mushroom-template-card
                 primary: "{{ states('sensor.indoor_temperature') }} °C"
                 secondary: Innen
                 icon: mdi:thermometer
                 icon_color: orange
                 fill_container: true
-
+                card_mod: *inner_tile
               - type: custom:mushroom-template-card
                 primary: "{{ states('sensor.indoor_humidity') }} %"
                 secondary: Luftfeuchte
                 icon: mdi:water-percent
                 icon_color: blue
                 fill_container: true
-
+                card_mod: *inner_tile
               - type: custom:mushroom-template-card
                 primary: >
-                  {% set n = states.update
-                     | selectattr('state','eq','on') | list | count %}
-                  {{ n }}
+                  {{ states.update | selectattr('state','eq','on') | list | count }}
                 secondary: HA-Updates
                 icon: mdi:package-up
                 icon_color: >
@@ -348,10 +408,11 @@ views:
                 tap_action:
                   action: navigate
                   navigation_path: /config/updates
-
+                card_mod: *inner_tile
               - type: custom:mushroom-template-card
                 primary: "{{ states('sensor.waste_collection') | default('–') }}"
                 secondary: Nächste Abfuhr
                 icon: mdi:trash-can
                 icon_color: green
                 fill_container: true
+                card_mod: *inner_tile
