@@ -1,0 +1,31 @@
+
+default_config:
+
+shell_command:
+  mywellness_prepare: "/usr/local/bin/python3 /config/mywellness.py prepare"
+  mywellness_book: "/usr/local/bin/python3 /config/mywellness.py book"
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+climate:
+  - platform: intesishome
+    username: nawid.seirafi@gmail.com
+    password: Ap4321Ril#
+    device: airconwithme
+template:
+- switch:
+  - turn_on:
+    - entity_id:
+      - input_boolean.dummy_switch
+      action: input_boolean.turn_on
+    - entity_id:
+      - input_boolean.dummy_switch
+      action: input_boolean.turn_off
+    turn_off:
+    - entity_id:
+      - input_boolean.dummy_switch
+      action: input_boolean.turn_off
+    default_entity_id: switch.dummy
+    state: '{{ is_state(''input_boolean.dummy_switch'', ''on'') }}'
+    name: dummy
