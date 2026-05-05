@@ -1,0 +1,35 @@
+# Template Sensoren für Abfall - extrahieren die JSON-Attribute
+template:
+  - sensor:
+      - name: "Abfall nächste Art"
+        unique_id: abfall_nachste_art
+        state: >
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {{ next['type'] if next else 'unknown' }}
+        availability: >
+          {{ state_attr('sensor.abfall_naechster_termin', 'next') != none }}
+
+      - name: "Abfall nächstes Datum"
+        unique_id: abfall_nachstes_datum
+        state: >
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {{ next['date_de'] if next else 'unknown' }}
+        availability: >
+          {{ state_attr('sensor.abfall_naechster_termin', 'next') != none }}
+
+      - name: "Abfall Tage bis Abholung"
+        unique_id: abfall_tage_bis_abholung
+        unit_of_measurement: "Tage"
+        state: >
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {{ next['days_until'] if next else 'unknown' }}
+        availability: >
+          {{ state_attr('sensor.abfall_naechster_termin', 'next') != none }}
+
+      - name: "Abfall Zeitstempel"
+        unique_id: abfall_zeitstempel
+        state: >
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {{ next['timestamp'] if next else 'unknown' }}
+        availability: >
+          {{ state_attr('sensor.abfall_naechster_termin', 'next') != none }}

@@ -116,34 +116,61 @@ views:
               grid-column: span 6
             cards:
               - type: custom:mushroom-title-card
-                title: Briefkasten
+                title: 📬 Briefkasten
               - type: custom:mushroom-template-card
-                primary: >
-                  {% if is_state('binary_sensor.briefkasten', 'on') %}
-                    Post ist da!
-                  {% else %}
-                    Kein Brief
-                  {% endif %}
-                secondary: >
-                  {% set t = states.binary_sensor.briefkasten.last_changed %}
-                  Zuletzt: {{ relative_time(t) }}
-                icon: >
-                  {{ 'mdi:mailbox-open-up' if is_state('binary_sensor.briefkasten','on')
-                     else 'mdi:mailbox-outline' }}
-                icon_color: >
-                  {{ 'red' if is_state('binary_sensor.briefkasten','on') else 'disabled' }}
+                entity: input_boolean.post_im_briefkasten
+                layout: horizontal
                 fill_container: true
+                primary: |
+                  {% if is_state(entity, 'on') %}
+                    📬 Post ist da!
+                  {% else %}
+                    📭 Keine Post
+                  {% endif %}
+                secondary: |
+                  {% if is_state(entity, 'on') %}
+                    Bitte Briefkasten leeren
+                  {% else %}
+                    Alles ruhig
+                  {% endif %}
+                icon: |
+                  {% if is_state(entity, 'on') %}
+                    mdi:mailbox
+                  {% else %}
+                    mdi:mailbox-outline
+                  {% endif %}
+                icon_color: |
+                  {% if is_state(entity, 'on') %}
+                    red
+                  {% else %}
+                    green
+                  {% endif %}
+                tap_action:
+                  action: more-info
                 card_mod:
                   style: |
+                    hui-masonry-view, hui-grid-view {
+                        max-width: 100% !important;
+                      }
+                      .column {
+                        max-width: 100% !important;
+                      }
                     ha-card {
-                      background: {{ 'linear-gradient(135deg,#3a1f1f 0%,#2a1818 100%)'
-                        if is_state('binary_sensor.briefkasten','on')
-                        else '#1e242c' }} !important;
-                      border-radius: 18px !important;
-                      border: none !important;
-                      padding: 14px !important;
+                      {% if is_state('binary_sensor.briefkasten', 'on') %}
+                        background: linear-gradient(135deg, #ff4d4d, #ff0000);
+                        color: white;
+                        animation: pulse 2s infinite;
+                      {% else %}
+                        background: linear-gradient(135deg, #2e7d32, #43a047);
+                        color: white;
+                      {% endif %}
+                      border-radius: 16px;
                     }
-                    ha-card .primary { font-size: 20px !important; font-weight: 700 !important; }
+                    @keyframes pulse {
+                      0% { transform: scale(1); }
+                      50% { transform: scale(1.02); }
+                      100% { transform: scale(1); }
+                    }
 
           # ─────────────────────────────────────────────────────────
           # 4) Stromverbrauch (6/12)
@@ -307,32 +334,158 @@ views:
               grid-column: span 6
             cards:
               - type: custom:mushroom-title-card
-                title: Batterie wechseln
+                title: 🔋 Batterie Status
               - type: custom:auto-entities
+                card_param: cards
                 card:
-                  type: entities
-                  state_color: true
-                  show_header_toggle: false
+                  type: grid
+                  columns: 1
+                  square: false
                 filter:
                   include:
-                    - attributes:
-                        device_class: battery
-                      state: < 25
-                    - entity_id: sensor.*_battery*
-                      state: < 25
+                    - entity_id: "*battery*"
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') }}"
+                        secondary: "Akkustand: {{ states(entity) }} %"
+                        icon: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 10 %} mdi:battery-alert-variant-outline
+                          {% elif b <= 25 %} mdi:battery-20
+                          {% elif b <= 50 %} mdi:battery-50
+                          {% elif b <= 75 %} mdi:battery-70
+                          {% else %} mdi:battery-check
+                          {% endif %}
+                        icon_color: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 15 %} red
+                          {% elif b <= 30 %} deep-orange
+                          {% elif b <= 60 %} amber
+                          {% else %} green
+                          {% endif %}
+                        tap_action:
+                          action: more-info
+                    - entity_id: "*batterie*"
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') }}"
+                        secondary: "Akkustand: {{ states(entity) }} %"
+                        icon: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 10 %} mdi:battery-alert-variant-outline
+                          {% elif b <= 25 %} mdi:battery-20
+                          {% elif b <= 50 %} mdi:battery-50
+                          {% elif b <= 75 %} mdi:battery-70
+                          {% else %} mdi:battery-check
+                          {% endif %}
+                        icon_color: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 15 %} red
+                          {% elif b <= 30 %} deep-orange
+                          {% elif b <= 60 %} amber
+                          {% else %} green
+                          {% endif %}
+                        tap_action:
+                          action: more-info
                   exclude:
                     - state: unavailable
                     - state: unknown
                 sort:
                   method: state
                   numeric: true
-                show_empty: true
-                else:
-                  - type: custom:mushroom-template-card
-                    primary: Alle Batterien OK
-                    secondary: Keine Geräte unter 25 %
-                    icon: mdi:battery-check
-                    icon_color: green
+                  count: 1
+              - type: custom:expander-card
+                title: Weitere Batterien
+                clear: true
+                cards:
+                  - type: custom:auto-entities
+                    card_param: cards
+                    card:
+                      type: grid
+                      columns: 1
+                      square: false
+                    filter:
+                      include:
+                        - entity_id: "*battery*"
+                          options:
+                            type: custom:mushroom-template-card
+                            layout: horizontal
+                            fill_container: true
+                            primary: "{{ state_attr(entity, 'friendly_name') }}"
+                            secondary: "Akkustand: {{ states(entity) }} %"
+                            icon: |
+                              {% set b = states(entity) | int(0) %}
+                              {% if b <= 10 %} mdi:battery-alert-variant-outline
+                              {% elif b <= 25 %} mdi:battery-20
+                              {% elif b <= 50 %} mdi:battery-50
+                              {% elif b <= 75 %} mdi:battery-70
+                              {% else %} mdi:battery-check
+                              {% endif %}
+                            icon_color: |
+                              {% set b = states(entity) | int(0) %}
+                              {% if b <= 15 %} red
+                              {% elif b <= 30 %} deep-orange
+                              {% elif b <= 60 %} amber
+                              {% else %} green
+                              {% endif %}
+                            tap_action:
+                              action: more-info
+                        - entity_id: "*batterie*"
+                          options:
+                            type: custom:mushroom-template-card
+                            layout: horizontal
+                            fill_container: true
+                            primary: "{{ state_attr(entity, 'friendly_name') }}"
+                            secondary: "Akkustand: {{ states(entity) }} %"
+                            icon: |
+                              {% set b = states(entity) | int(0) %}
+                              {% if b <= 10 %} mdi:battery-alert-variant-outline
+                              {% elif b <= 25 %} mdi:battery-20
+                              {% elif b <= 50 %} mdi:battery-50
+                              {% elif b <= 75 %} mdi:battery-70
+                              {% else %} mdi:battery-check
+                              {% endif %}
+                            icon_color: |
+                              {% set b = states(entity) | int(0) %}
+                              {% if b <= 15 %} red
+                              {% elif b <= 30 %} deep-orange
+                              {% elif b <= 60 %} amber
+                              {% else %} green
+                              {% endif %}
+                            tap_action:
+                              action: more-info
+                      exclude:
+                        - state: unavailable
+                        - state: unknown
+                    sort:
+                      method: state
+                      numeric: true
+                      first: 1
+
+          # ─────────────────────────────────────────────────────────
+          # 7b) Abfall (6/12)
+          # ─────────────────────────────────────────────────────────
+          - type: vertical-stack
+            view_layout:
+              grid-column: span 6
+            cards:
+              - type: custom:mushroom-title-card
+                title: 🗑️ Abfallwirtschaft
+              - type: custom:mushroom-template-card
+                entity: sensor.abfall_nachster_termin
+                primary: "{{ states('sensor.abfall_nachste_art') }}"
+                secondary: >-
+                  {{ states('sensor.abfall_nachstes_datum') }} · in {{
+                  states('sensor.abfall_tage_bis_abholung') }} Tagen
+                icon: mdi:trash-can
+                layout: vertical
+                fill_container: true
+                tap_action:
+                  action: more-info
                 card_mod:
                   style: |
                     ha-card {
@@ -340,6 +493,7 @@ views:
                       border-radius: 18px !important;
                       border: none !important;
                       box-shadow: none !important;
+                      padding: 14px !important;
                     }
 
           # ─────────────────────────────────────────────────────────

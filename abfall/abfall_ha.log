@@ -1,0 +1,45 @@
+[2026-05-05 22:34:14,487] [DEBUG] 🚀 Logs werden geschrieben zu: /config/scripts/abfall_ha.log
+[2026-05-05 22:51:46,781] [INFO] ================================================================================
+[2026-05-05 22:51:46,781] [INFO] 🚀 SKRIPT START - Python 3.14.2 (main, Dec 10 2025, 18:55:40) [GCC 14.2.0]
+[2026-05-05 22:51:46,781] [INFO] 📁 Script Location: /config/scripts/abfall_ha_api.py
+[2026-05-05 22:51:46,781] [INFO] 📝 Log File: /config/scripts/abfall_ha.log
+[2026-05-05 22:51:46,782] [INFO] ================================================================================
+[2026-05-05 22:51:46,828] [DEBUG] ✅ Alle Imports erfolgreich
+[2026-05-05 22:51:46,829] [INFO] ============================================================
+[2026-05-05 22:51:46,829] [INFO] 🚀 START: Abfall-API Skript aufgerufen
+[2026-05-05 22:51:46,829] [INFO] ============================================================
+[2026-05-05 22:51:46,832] [DEBUG] 📋 Parser erstellt
+[2026-05-05 22:51:46,832] [INFO] ✅ Argumente geparst:
+[2026-05-05 22:51:46,833] [INFO]    Days: 60, Limit: 20
+[2026-05-05 22:51:46,833] [INFO]    PLIST: /config/scripts/abfall.plist
+[2026-05-05 22:51:46,833] [DEBUG] ✅ abfall.plist ist aktuell (Jahr 2026)
+[2026-05-05 22:51:46,833] [INFO] 📂 Nutze lokale Datei: /config/scripts/abfall.plist
+[2026-05-05 22:51:46,842] [INFO] 🔄 Verarbeite Termine...
+[2026-05-05 22:51:46,842] [DEBUG] 📊 Daten: 84 Termine gefunden, 16 Kategorien
+[2026-05-05 22:51:46,844] [DEBUG] ✅ 23 Termine in den nächsten 60 Tagen gefunden
+[2026-05-05 22:51:46,844] [DEBUG]    Nächster: Bioabfall am 08.05.2026
+[2026-05-05 22:51:46,844] [INFO] ✅ Erfolgreich: state='Fr. 08.05., Bioabfall' (23 Termine)
+[2026-05-05 22:51:46,845] [DEBUG] 📤 JSON Output (8894 bytes)
+[2026-05-05 22:51:46,845] [INFO] ============================================================
+[2026-05-05 23:01:56,275] [INFO] ================================================================================
+[2026-05-05 23:01:56,275] [INFO] 🚀 SKRIPT START - Python 3.14.2 (main, Dec 10 2025, 18:55:40) [GCC 14.2.0]
+[2026-05-05 23:01:56,275] [INFO] 📁 Script Location: /config/scripts/abfall_ha_api.py
+[2026-05-05 23:01:56,276] [INFO] 📝 Log File: /config/scripts/abfall_ha.log
+[2026-05-05 23:01:56,276] [INFO] ================================================================================
+[2026-05-05 23:01:56,324] [DEBUG] ✅ Alle Imports erfolgreich
+[2026-05-05 23:01:56,325] [INFO] ============================================================
+[2026-05-05 23:01:56,325] [INFO] 🚀 START: Abfall-API Skript aufgerufen
+[2026-05-05 23:01:56,325] [INFO] ============================================================
+[2026-05-05 23:01:56,328] [DEBUG] 📋 Parser erstellt
+[2026-05-05 23:01:56,329] [INFO] ✅ Argumente geparst:
+[2026-05-05 23:01:56,329] [INFO]    Days: 60, Limit: 20
+[2026-05-05 23:01:56,329] [INFO]    PLIST: /config/scripts/abfall.plist
+[2026-05-05 23:01:56,330] [DEBUG] ✅ abfall.plist ist aktuell (Jahr 2026)
+[2026-05-05 23:01:56,330] [INFO] 📂 Nutze lokale Datei: /config/scripts/abfall.plist
+[2026-05-05 23:01:56,339] [INFO] 🔄 Verarbeite Termine...
+[2026-05-05 23:01:56,340] [DEBUG] 📊 Daten: 84 Termine gefunden, 16 Kategorien
+[2026-05-05 23:01:56,341] [DEBUG] ✅ 23 Termine in den nächsten 60 Tagen gefunden
+[2026-05-05 23:01:56,341] [DEBUG]    Nächster: Bioabfall am 08.05.2026
+[2026-05-05 23:01:56,342] [INFO] ✅ Erfolgreich: state='Fr. 08.05., Bioabfall' (23 Termine)
+[2026-05-05 23:01:56,342] [DEBUG] 📤 JSON Output (8894 bytes)
+[2026-05-05 23:01:56,342] [INFO] ============================================================
