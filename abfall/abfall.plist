@@ -1,0 +1,4194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+<key>internalurls</key>
+<array>
+<string>www.remondis-entsorgung.de</string></array>
+<key>categories</key>
+<array>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-28-v0</string>
+ <key>name</key>
+ <string><![CDATA[Bioabfall]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/bio2.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-28-v1</string>
+ <key>name</key>
+ <string><![CDATA[Bioabfall (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/bio2.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-53-v0</string>
+ <key>name</key>
+ <string><![CDATA[Papier]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/papier_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-53-v1</string>
+ <key>name</key>
+ <string><![CDATA[Papier (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/papier_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-17-v0</string>
+ <key>name</key>
+ <string><![CDATA[Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/gs_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-17-v1</string>
+ <key>name</key>
+ <string><![CDATA[Gelber Sack (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/gs_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-3449-v0</string>
+ <key>name</key>
+ <string><![CDATA[Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/icon_elektrogeraete_hg.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-3449-v1</string>
+ <key>name</key>
+ <string><![CDATA[Metall- & E-Schrott (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/icon_elektrogeraete_hg.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-3452-v0</string>
+ <key>name</key>
+ <string><![CDATA[Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/rest_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-3452-v1</string>
+ <key>name</key>
+ <string><![CDATA[Restabfall 4-wöchentlich (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/rest_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-102-v0</string>
+ <key>name</key>
+ <string><![CDATA[Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/icon_sperrmuell_hg.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-102-v1</string>
+ <key>name</key>
+ <string><![CDATA[Sperrabfall (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/icon_sperrmuell_hg.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#007d34]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-1094-v0</string>
+ <key>name</key>
+ <string><![CDATA[Weihnachtsbaum]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/weihnachtsbaum3_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#007d34]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-1094-v1</string>
+ <key>name</key>
+ <string><![CDATA[Weihnachtsbaum (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/weihnachtsbaum3_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-2263-v0</string>
+ <key>name</key>
+ <string><![CDATA[Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/rest_1.png]]></string>
+</dict>
+<dict>
+ <key>code</key>
+ <string></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>description</key>
+ <string></string>
+ <key>id</key>
+ <string>9617-2263-v1</string>
+ <key>name</key>
+ <string><![CDATA[Restabfall 14-tägig (verlegt)]]></string>
+ <key>subtitle</key>
+ <string></string>
+
+ <key>icon_high_url</key>
+ <string><![CDATA[https://app.abfallplus.de/media/landkreise/landkreis9617/icons/rest_1.png]]></string>
+</dict></array>
+<key>locations</key>
+<array>
+<dict>
+ <key>city</key>
+ <string><![CDATA[Stadt X]]></string>
+ <key>id</key>
+ <string>247011496</string>
+ <key>lat</key>
+ <string></string>
+ <key>lng</key>
+ <string></string>
+ <key>street</key>
+ <string><![CDATA[Strasse 1]]></string>
+ <key>zip</key>
+ <string></string>
+</dict></array>
+<key>dates</key>
+<array>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-07T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-08T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 08.05., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260508_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-07T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-08T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 08.05., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260508_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-102-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-11T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-12T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Di. 12.05., Sperrabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260512_247011496_102</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 16.05., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260516_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 16.05., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260516_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 16.05., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260516_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-21T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-22T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 22.05., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20260522_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-21T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-22T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 22.05., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260522_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-29T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-30T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 30.05., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260530_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-29T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-30T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 30.05., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260530_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-05-29T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-05-30T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 30.05., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260530_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-05T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-06T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 06.06., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260606_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-05T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-06T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Sa. 06.06., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260606_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-11T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-12T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 12.06., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260612_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-11T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-12T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 12.06., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260612_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-11T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-12T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 12.06., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260612_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-18T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-19T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 19.06., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20260619_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-18T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-19T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 19.06., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260619_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-25T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-26T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 26.06., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260626_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-25T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-26T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 26.06., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260626_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-06-25T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-06-26T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 26.06., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260626_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-02T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-03T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 03.07., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260703_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-02T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-03T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 03.07., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260703_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-09T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-10T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 10.07., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260710_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-09T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-10T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 10.07., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260710_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-16T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-17T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 17.07., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20260717_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-16T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-17T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 17.07., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260717_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-16T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-17T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 17.07., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260717_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-23T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-24T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 24.07., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260724_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-23T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-24T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 24.07., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260724_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-23T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-24T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 24.07., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260724_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-102-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-27T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-28T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Di. 28.07., Sperrabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260728_247011496_102</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-07-30T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-07-31T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 31.07., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260731_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-06T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-07T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 07.08., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260807_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-06T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-07T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 07.08., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260807_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-13T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-14T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 14.08., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20260814_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-13T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-14T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 14.08., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260814_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-13T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-14T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 14.08., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260814_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-20T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-21T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 21.08., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260821_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-20T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-21T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 21.08., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260821_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-20T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-21T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 21.08., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260821_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-27T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-28T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 28.08., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260828_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-08-27T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-08-28T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 28.08., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260828_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-03T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-04T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 04.09., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260904_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-03T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-04T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 04.09., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260904_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-10T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-11T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.09., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20260911_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-10T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-11T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.09., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260911_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-10T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-11T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.09., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20260911_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-17T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-18T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 18.09., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260918_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-17T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-18T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 18.09., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260918_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-17T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-18T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 18.09., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20260918_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-24T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-25T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 25.09., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20260925_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-09-24T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-09-25T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 25.09., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20260925_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-01T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-02T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 02.10., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261002_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-01T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-02T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 02.10., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261002_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-08T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-09T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 09.10., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20261009_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-08T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-09T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 09.10., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261009_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 16.10., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261016_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 16.10., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261016_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 16.10., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261016_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-15T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-16T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 16.10., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20261016_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-22T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-23T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 23.10., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20261023_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-22T19:30:00+02:00</string>
+<key>pickup_date</key>
+<string>2026-10-23T01:00:00+02:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 23.10., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261023_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-102-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-26T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-10-27T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Di. 27.10., Sperrabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20261027_247011496_102</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-29T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-10-30T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 30.10., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261030_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-10-29T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-10-30T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 30.10., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261030_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-05T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-06T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 06.11., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20261106_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-05T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-06T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 06.11., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261106_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-12T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-13T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 13.11., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261113_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-12T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-13T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 13.11., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261113_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-12T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-13T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 13.11., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261113_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-12T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-13T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 13.11., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20261113_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-19T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-20T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 20.11., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20261120_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-19T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-20T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 20.11., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261120_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-26T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-27T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 27.11., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261127_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-11-26T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-11-27T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 27.11., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261127_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-53-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-03T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-04T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 04.12., Papier]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#006297]]></string>
+<key>uuid</key>
+<string>247_20261204_247011496_53</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-03T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-04T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 04.12., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261204_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-10T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-11T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.12., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261211_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3452-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-10T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-11T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.12., Restabfall 4-wöchentlich]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261211_247011496_3452</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-3449-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-10T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-11T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 11.12., Metall- & E-Schrott]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#000000]]></string>
+<key>uuid</key>
+<string>247_20261211_247011496_3449</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-17-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-17T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-18T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 18.12., Gelber Sack]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#fbb800]]></string>
+<key>uuid</key>
+<string>247_20261218_247011496_17</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-28-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-17T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-18T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Fr. 18.12., Bioabfall]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#cf4e12]]></string>
+<key>uuid</key>
+<string>247_20261218_247011496_28</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict>
+<dict>
+<key>category_id</key>
+<string>9617-2263-v0</string>
+<key>location_id</key>
+<string>247011496</string>
+<key>notification_date</key>
+<string>2026-12-23T19:30:00+01:00</string>
+<key>pickup_date</key>
+<string>2026-12-24T01:00:00+01:00</string>
+<key>description</key>
+<string></string>
+<key>widget_title</key>
+<string><![CDATA[Do. 24.12., Restabfall 14-tägig]]></string>
+<key>widget_subtitle</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+<key>widget_color</key>
+<string><![CDATA[#747783]]></string>
+<key>uuid</key>
+<string>247_20261224_247011496_2263</string>
+<key>notification_message</key>
+<string><![CDATA[Strasse 1, Stadt X]]></string>
+</dict></array>
+<key>lastchanged</key>
+<string>2026-05-04T14:43:25+02:00</string>
+<key>timestamp</key>
+<string>2026-05-05T15:00:06+02:00</string>
+<key>version</key>
+<string>1.0</string>
+<key>home</key>
+<array>
+<dict>
+<key>type</key>
+<string>today</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_heute.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_heute_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_heute_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_heute_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>today</string>
+</dict>
+<dict>
+<key>type</key>
+<string>tomorrow</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_02_morgen.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_02_morgen_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_02_morgen_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_02_morgen_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>tomorrow</string>
+</dict>
+<dict>
+<key>type</key>
+<string>week</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_03_woche.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_03_woche_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_03_woche_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_03_woche_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>week</string>
+</dict>
+<dict>
+<key>type</key>
+<string>month</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_04_monat.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_04_monat_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_monat_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_01_monat_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>month</string>
+</dict>
+<dict>
+<key>type</key>
+<string>all</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_05_alle.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_05_alle_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_05_alle_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_05_alle_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>all</string>
+</dict>
+<dict>
+<key>type</key>
+<string>settings</string>
+<key>icon_low_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_06_einstellungen.png?arc=1.13</string>
+<key>icon_high_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_06_einstellungen_x2.png?arc=1.13</string>
+<key>icon_xhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_06_einstellungen_x3.png?arc=1.13</string>
+<key>icon_xxhigh_url</key>
+<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_icon_06_einstellungen_x4.png?arc=1.13</string>
+<key>menu_id</key>
+<string>settings</string>
+</dict></array>
+<key>start</key>
+<array>
+<dict>
+		<key>title</key>
+		<string><![CDATA[Abfall ABC]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/?arc=1.13</string>
+		<key>type</key>
+		<string>website</string>
+		<key>url</key>
+		<string><![CDATA[https://app.abfallplus.de/module/extern?url_dialog=https%3A%2F%2Fwww.remondis-entsorgung.de%2Fabfallarten%2Fuebersicht%2F]]></string>
+		<key>site_url</key>
+		<string><![CDATA[https://app.abfallplus.de/module/extern?url_dialog=https%3A%2F%2Fwww.remondis-entsorgung.de%2Fabfallarten%2Fuebersicht%2F]]></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>menu_id</key>
+		<string>abfallabc</string>
+		<key>item_id</key>
+		<string>6983</string>
+	</dict>
+<dict>
+		<key>title</key>
+		<string><![CDATA[Standorte]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6984.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6984_x2.png?arc=1.13</string>
+		<key>icon_xhigh_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6984_x3.png?arc=1.13</string>
+		<key>icon_xxhigh_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6984_x4.png?arc=1.13</string>
+		<key>icon_low_url_dark</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_dark_6984.png?arc=1.13</string>
+		<key>icon_high_url_dark</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_dark_6984_x2.png?arc=1.13</string>
+		<key>type</key>
+		<string>nav</string>
+		<key>url</key>
+		<string><![CDATA[https://app.abfallplus.de/content.xml?id=6984&apptitle=Standorte]]></string>
+		<key>site_url</key>
+		<string></string>
+		<key>nav_url</key>
+		<string><![CDATA[https://app.abfallplus.de/content.xml?id=6984&apptitle=Standorte]]></string>
+		<key>item_id</key>
+		<string>6984</string>
+	</dict>
+<dict>
+		<key>title</key>
+		<string><![CDATA[Containershop]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6985.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6985_x2.png?arc=1.13</string>
+		<key>icon_xhigh_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6985_x3.png?arc=1.13</string>
+		<key>icon_xxhigh_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_6985_x4.png?arc=1.13</string>
+		<key>icon_low_url_dark</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_dark_6985.png?arc=1.13</string>
+		<key>icon_high_url_dark</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/app_icon_dark_6985_x2.png?arc=1.13</string>
+		<key>type</key>
+		<string>website</string>
+		<key>url</key>
+		<string><![CDATA[https://app.abfallplus.de/module/extern?url_dialog=https%3A%2F%2Fremondis-shop.de%2F]]></string>
+		<key>site_url</key>
+		<string><![CDATA[https://app.abfallplus.de/module/extern?url_dialog=https%3A%2F%2Fremondis-shop.de%2F]]></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>item_id</key>
+		<string>6985</string>
+	</dict>
+<dict>
+		<key>screen_id</key>
+		<string>tabs</string>
+		<key>title</key>
+		<string><![CDATA[Home]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_dark.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/home_dark.png?arc=1.13</string>
+		<key>type</key>
+		<string>screen</string>
+		<key>screen_id_ref</key>
+		<string></string>
+		<key>url</key>
+		<string></string>
+		<key>site_url</key>
+		<string></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>item_id</key>
+		<string>6987</string>
+	</dict>
+<dict>
+		<key>screen_id</key>
+		<string>default</string>
+		<key>title</key>
+		<string><![CDATA[Home]]></string>
+		<key>type</key>
+		<string>screen</string>
+		<key>url</key>
+		<string></string>
+	</dict>
+<dict>
+		<key>screen_id</key>
+		<string>tabs</string>
+		<key>title</key>
+		<string><![CDATA[Termine]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/date_and_appointment_dark.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/date_and_appointment_dark.png?arc=1.13</string>
+		<key>type</key>
+		<string>abfallwecker</string>
+		<key>url</key>
+		<string><![CDATA[ignored]]></string>
+		<key>site_url</key>
+		<string><![CDATA[ignored]]></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>menu_id</key>
+		<string>termine</string>
+		<key>item_id</key>
+		<string>6988</string>
+	</dict>
+<dict>
+		<key>screen_id</key>
+		<string>tabs</string>
+		<key>title</key>
+		<string><![CDATA[Kontakt]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/contact_dark.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/contact_dark.png?arc=1.13</string>
+		<key>type</key>
+		<string>website</string>
+		<key>url</key>
+		<string><![CDATA[https://app.abfallplus.de/kontakt/?noheader=1&titel=Kontakt&apptitle=Kontakt]]></string>
+		<key>site_url</key>
+		<string><![CDATA[https://app.abfallplus.de/kontakt/?noheader=1&titel=Kontakt&apptitle=Kontakt]]></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>item_id</key>
+		<string>6989</string>
+	</dict>
+<dict>
+		<key>screen_id</key>
+		<string>tabs</string>
+		<key>title</key>
+		<string><![CDATA[Einstellungen]]></string>
+		<key>icon_low_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/setting_dark.png?arc=1.13</string>
+		<key>icon_high_url</key>
+		<string>https://app.abfallplus.de/media/landkreise/landkreis9617/icons/setting_dark.png?arc=1.13</string>
+		<key>type</key>
+		<string>settings</string>
+		<key>url</key>
+		<string><![CDATA[https://app.abfallplus.de/einstellungen/]]></string>
+		<key>site_url</key>
+		<string><![CDATA[https://app.abfallplus.de/einstellungen/]]></string>
+		<key>nav_url</key>
+		<string></string>
+		<key>menu_id</key>
+		<string>einstellungen</string>
+		<key>item_id</key>
+		<string>6990</string>
+	</dict></array>
+<key>config</key>
+<dict>
+	<key>revision</key>
+	<string>1.13144</string>
+	<key>ios</key>
+	<dict>
+		<key>base_color</key>
+		<string>#e2001a</string>
+		<key>use_push_notifications</key>
+		<string>1</string>
+		<key>widget_show_entries_for_today</key>
+		<string>1</string>
+		<key>widget_max_number_of_entries</key>
+		<string>4</string>
+
+		<key>base_color_dark</key>
+		<string>#000000</string>
+
+	</dict>
+	<key>android</key>
+	<dict>
+		<key>base_start_color</key>
+		<string>#e2001a</string>
+		<key>base_end_color</key>
+		<string>#e2001a</string>
+		
+		<key>use_gcm</key>
+		<string>1</string>
+	</dict>
+	<key>common</key>
+	<dict>
+		<key>use_black_icons</key>
+		<string>0</string>
+		<key>logo_position_top</key>
+		<string>0</string>
+		<key>title</key>
+		<string><![CDATA[RE:MINDER]]></string>
+		<key>logo_background_color</key>
+		<string>#97BF0D</string>
+		<key>calendar_mode_disabled</key>
+		<string>0</string>
+		<key>calendar_mode_default</key>
+		<string>0</string>
+		
+		
+		<key>start_screen_elements_background_color</key>
+		<string>#ffffff</string>
+		
+		<key>date_details_category_label</key>
+		<string><![CDATA[Abfallart]]></string>
+		<key>url_impressum</key>
+		<string><![CDATA[https://app.abfallplus.de/impressum/]]></string>
+		<key>dates_menu_screen_disabled</key>
+		<string>1</string>
+		<key>foreground_color</key>
+		<string>#ffffff</string>
+		<key>default_notification_title</key>
+		<string>Achtung, nicht vergessen:</string>
+		<key>start_screen_url</key>
+		<string><![CDATA[https://app.abfallplus.de/module/widget-startscreen/?timeout=5]]></string>
+		<key>start_screen_widgets</key>
+		<array>
+            <string>start_screen_banner_1</string>
+            <string>start_screen_abc</string>
+            <string>start_screen_menu</string>
+            <string>start_screen_appointments</string>
+            <string>start_screen_news</string>
+            <string>start_screen_banner_2</string>
+        </array>
+		<key>start_screen_news</key>
+		<string>1</string>
+		<key>start_screen_banner</key>
+		<string><![CDATA[[{"image":"https:\/\/app.abfallplus.de\/media\/landkreise\/landkreis9617\/icons\/remondis_light_1.png","image_dark":"https:\/\/app.abfallplus.de\/media\/landkreise\/landkreis9617\/icons\/remondis_dark_1.png","position":"top"}]]]></string>
+		<key>button_background_color</key>
+		<string>#e2001a</string>
+		<key>button_text_color</key>
+		<string>#ffffff</string>
+		<key>foreground_color_dark</key>
+		<string>#e2001a</string>
+		<key>start_screen_background_color_dark</key>
+		<string>#000000</string>
+		<key>start_screen_elements_background_color_dark</key>
+		<string>#1e1e1e</string>
+		<key>start_screen_text_color_dark</key>
+		<string>#ffffff</string>
+		<key>content_screen_background_color_dark</key>
+		<string>#000000</string>
+		<key>menu_item_text_color_dark</key>
+		<string>#ffffff</string>
+
+
+		<key>server_timeout</key>
+		<string>30</string>
+		<key>server_timeout_launch</key>
+		<string>5</string>
+		<key>texts</key>
+		<dict>
+		</dict>
+	</dict>
+</dict>
+<key>widget</key>
+<dict>
+<key>entries</key>
+<array>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 08.05., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260508_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 08.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260508_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 12.05., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260512_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 22.05., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260522_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 22.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260522_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 06.06., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260606_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 06.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260606_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 19.06., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260619_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 19.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260619_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 03.07., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260703_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 03.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260703_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 10.07., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260710_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 10.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260710_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 28.07., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260728_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 31.07., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260731_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 07.08., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260807_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 07.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260807_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 28.08., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260828_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 28.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260828_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.09., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260904_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260904_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 25.09., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260925_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 25.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260925_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 02.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261002_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 02.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261002_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 09.10., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261009_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 09.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261009_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 23.10., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261023_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 23.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261023_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 27.10., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261027_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 30.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261030_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 30.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261030_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 06.11., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261106_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 06.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261106_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 20.11., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261120_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 20.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261120_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 27.11., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261127_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 27.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261127_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.12., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261204_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.12., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261204_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.12., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261218_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.12., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261218_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Do. 24.12., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261224_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 08.05., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260508_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 08.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260508_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 12.05., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260512_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 16.05., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260516_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 22.05., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260522_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 22.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260522_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 30.05., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260530_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 06.06., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260606_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Sa. 06.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260606_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 12.06., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260612_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 19.06., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260619_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 19.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260619_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 26.06., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260626_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 03.07., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260703_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 03.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260703_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 10.07., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260710_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 10.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260710_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 17.07., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260717_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 24.07., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260724_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 28.07., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260728_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 31.07., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260731_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 07.08., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260807_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 07.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260807_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 14.08., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260814_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 21.08., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260821_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 28.08., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260828_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 28.08., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260828_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.09., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260904_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260904_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.09., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20260911_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.09., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20260918_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 25.09., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20260925_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 25.09., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20260925_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 02.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261002_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 02.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261002_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 09.10., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261009_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 09.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261009_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 16.10., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261016_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 23.10., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261023_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 23.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261023_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Di. 27.10., Sperrabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261027_247011496_102</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 30.10., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261030_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 30.10., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261030_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 06.11., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261106_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 06.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261106_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 13.11., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261113_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 20.11., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261120_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 20.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261120_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 27.11., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261127_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 27.11., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261127_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.12., Papier]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#006297]]></string>
+ <key>uuid</key>
+ <string>247_20261204_247011496_53</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 04.12., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261204_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_2263</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Restabfall 4-wöchentlich]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_3452</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 11.12., Metall- & E-Schrott]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#000000]]></string>
+ <key>uuid</key>
+ <string>247_20261211_247011496_3449</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.12., Gelber Sack]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#fbb800]]></string>
+ <key>uuid</key>
+ <string>247_20261218_247011496_17</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Fr. 18.12., Bioabfall]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#cf4e12]]></string>
+ <key>uuid</key>
+ <string>247_20261218_247011496_28</string>
+</dict>
+<dict>
+ <key>title</key>
+ <string><![CDATA[Do. 24.12., Restabfall 14-tägig]]></string>
+ <key>subtitle</key>
+ <string><![CDATA[Strasse 1, Stadt X]]></string>
+ <key>color</key>
+ <string><![CDATA[#747783]]></string>
+ <key>uuid</key>
+ <string>247_20261224_247011496_2263</string>
+</dict></array>
+</dict></dict></plist>
