@@ -28,6 +28,7 @@ logger.info(f"=" * 80)
 
 # Jetzt die restlichen Imports
 import argparse
+import gzip
 import json
 import os
 import plistlib
@@ -98,6 +99,7 @@ def download_structure_zip(
         "accept": "*/*",
         "content-type": "application/x-www-form-urlencoded",
         "accept-language": "de-DE,de;q=0.9",
+        "accept-encoding": "gzip, deflate",  # Brotli NOT decoded by urllib!
         "user-agent": user_agent,
         "cookie": build_cookie(app_id, client),
     }
@@ -105,7 +107,22 @@ def download_structure_zip(
         request = urllib.request.Request(url, data=data, headers=headers, method="POST")
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
-            logger.debug(f"✅ ZIP erfolgreich heruntergeladen ({len(raw)} bytes)")
+            logger.debug(f"📥 Raw bytes empfangen: {len(raw)} bytes, Anfang: {raw[:10].hex()}")
+            
+            # Dekomprimiere gzip/deflate wenn nötig
+            # gzip header: 1f 8b
+            # deflate: 78 9c oder 78 01
+            if raw.startswith(b'\x1f\x8b'):
+                logger.debug("🔓 Dekomprimiere gzip...")
+                raw = gzip.decompress(raw)
+                logger.debug(f"   Nach Dekompression: {len(raw)} bytes")
+            elif raw.startswith(b'\x78\x9c') or raw.startswith(b'\x78\x01'):
+                logger.debug("🔓 Dekomprimiere deflate...")
+                import zlib
+                raw = zlib.decompress(raw)
+                logger.debug(f"   Nach Dekompression: {len(raw)} bytes")
+            
+            logger.debug(f"✅ Download erfolgreich ({len(raw)} bytes)")
             return raw
     except Exception as e:
         logger.error(f"❌ Fehler beim Download: {e}")
@@ -119,26 +136,38 @@ def plist_from_zip(raw_zip: bytes) -> Tuple[Dict[str, Any], str]:
 
 def load_plist_from_zip_bytes(raw_zip: bytes) -> Tuple[Dict[str, Any], str]:
     logger.debug(f"📦 Entpacke ZIP ({len(raw_zip)} bytes)...")
-    with tempfile.NamedTemporaryFile() as tmp:
-        tmp.write(raw_zip)
-        tmp.flush()
-        with zipfile.ZipFile(tmp.name, "r") as zf:
-            names = zf.namelist()
-            logger.debug(f"   ZIP enthält {len(names)} Dateien: {names}")
-            candidates = [
-                name for name in names
-                if name.lower().endswith((".plist", ".xml"))
-                and not name.endswith("/")
-            ]
-            if not candidates:
-                logger.error(f"❌ ZIP enthält keine .xml/.plist-Datei")
-                raise ValueError(f"ZIP enthält keine .xml/.plist-Datei. Dateien: {names}")
+    
+    # Prüfe ob es wirklich eine ZIP ist
+    if raw_zip.startswith(b'PK\x03\x04'):
+        logger.debug("   Format: ZIP erkannt")
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(raw_zip)
+            tmp.flush()
+            with zipfile.ZipFile(tmp.name, "r") as zf:
+                names = zf.namelist()
+                logger.debug(f"   ZIP enthält {len(names)} Dateien: {names}")
+                candidates = [
+                    name for name in names
+                    if name.lower().endswith((".plist", ".xml"))
+                    and not name.endswith("/")
+                ]
+                if not candidates:
+                    logger.error(f"❌ ZIP enthält keine .xml/.plist-Datei")
+                    raise ValueError(f"ZIP enthält keine .xml/.plist-Datei. Dateien: {names}")
 
-            # struktur.xml bevorzugen, sonst erste XML/PLIST.
-            candidates.sort(key=lambda n: ("struktur" not in n.lower(), n))
-            chosen = candidates[0]
-            logger.debug(f"✅ Nutze {chosen}")
-            return load_plist_bytes(zf.read(chosen)), chosen
+                # struktur.xml bevorzugen, sonst erste XML/PLIST.
+                candidates.sort(key=lambda n: ("struktur" not in n.lower(), n))
+                chosen = candidates[0]
+                logger.debug(f"✅ Nutze {chosen}")
+                return load_plist_bytes(zf.read(chosen)), chosen
+    
+    # Falls nicht ZIP, versuche direkt als XML/PLIST zu parsen
+    logger.debug("   Format: XML erkannt (nicht-ZIP)")
+    try:
+        return load_plist_bytes(raw_zip), "struktur.xml (direkt)"
+    except Exception as e:
+        logger.error(f"❌ Kann XML nicht parsen: {e}")
+        raise ValueError(f"Weder ZIP noch gültige XML/PLIST-Daten: {e}")
 
 
 def build_category_map(plist_data: Dict[str, Any]) -> Dict[Any, str]:

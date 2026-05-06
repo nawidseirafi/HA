@@ -1,45 +1,32 @@
-[2026-05-05 22:34:14,487] [DEBUG] 🚀 Logs werden geschrieben zu: /config/scripts/abfall_ha.log
-[2026-05-05 22:51:46,781] [INFO] ================================================================================
-[2026-05-05 22:51:46,781] [INFO] 🚀 SKRIPT START - Python 3.14.2 (main, Dec 10 2025, 18:55:40) [GCC 14.2.0]
-[2026-05-05 22:51:46,781] [INFO] 📁 Script Location: /config/scripts/abfall_ha_api.py
-[2026-05-05 22:51:46,781] [INFO] 📝 Log File: /config/scripts/abfall_ha.log
-[2026-05-05 22:51:46,782] [INFO] ================================================================================
-[2026-05-05 22:51:46,828] [DEBUG] ✅ Alle Imports erfolgreich
-[2026-05-05 22:51:46,829] [INFO] ============================================================
-[2026-05-05 22:51:46,829] [INFO] 🚀 START: Abfall-API Skript aufgerufen
-[2026-05-05 22:51:46,829] [INFO] ============================================================
-[2026-05-05 22:51:46,832] [DEBUG] 📋 Parser erstellt
-[2026-05-05 22:51:46,832] [INFO] ✅ Argumente geparst:
-[2026-05-05 22:51:46,833] [INFO]    Days: 60, Limit: 20
-[2026-05-05 22:51:46,833] [INFO]    PLIST: /config/scripts/abfall.plist
-[2026-05-05 22:51:46,833] [DEBUG] ✅ abfall.plist ist aktuell (Jahr 2026)
-[2026-05-05 22:51:46,833] [INFO] 📂 Nutze lokale Datei: /config/scripts/abfall.plist
-[2026-05-05 22:51:46,842] [INFO] 🔄 Verarbeite Termine...
-[2026-05-05 22:51:46,842] [DEBUG] 📊 Daten: 84 Termine gefunden, 16 Kategorien
-[2026-05-05 22:51:46,844] [DEBUG] ✅ 23 Termine in den nächsten 60 Tagen gefunden
-[2026-05-05 22:51:46,844] [DEBUG]    Nächster: Bioabfall am 08.05.2026
-[2026-05-05 22:51:46,844] [INFO] ✅ Erfolgreich: state='Fr. 08.05., Bioabfall' (23 Termine)
-[2026-05-05 22:51:46,845] [DEBUG] 📤 JSON Output (8894 bytes)
-[2026-05-05 22:51:46,845] [INFO] ============================================================
-[2026-05-05 23:01:56,275] [INFO] ================================================================================
-[2026-05-05 23:01:56,275] [INFO] 🚀 SKRIPT START - Python 3.14.2 (main, Dec 10 2025, 18:55:40) [GCC 14.2.0]
-[2026-05-05 23:01:56,275] [INFO] 📁 Script Location: /config/scripts/abfall_ha_api.py
-[2026-05-05 23:01:56,276] [INFO] 📝 Log File: /config/scripts/abfall_ha.log
-[2026-05-05 23:01:56,276] [INFO] ================================================================================
-[2026-05-05 23:01:56,324] [DEBUG] ✅ Alle Imports erfolgreich
-[2026-05-05 23:01:56,325] [INFO] ============================================================
-[2026-05-05 23:01:56,325] [INFO] 🚀 START: Abfall-API Skript aufgerufen
-[2026-05-05 23:01:56,325] [INFO] ============================================================
-[2026-05-05 23:01:56,328] [DEBUG] 📋 Parser erstellt
-[2026-05-05 23:01:56,329] [INFO] ✅ Argumente geparst:
-[2026-05-05 23:01:56,329] [INFO]    Days: 60, Limit: 20
-[2026-05-05 23:01:56,329] [INFO]    PLIST: /config/scripts/abfall.plist
-[2026-05-05 23:01:56,330] [DEBUG] ✅ abfall.plist ist aktuell (Jahr 2026)
-[2026-05-05 23:01:56,330] [INFO] 📂 Nutze lokale Datei: /config/scripts/abfall.plist
-[2026-05-05 23:01:56,339] [INFO] 🔄 Verarbeite Termine...
-[2026-05-05 23:01:56,340] [DEBUG] 📊 Daten: 84 Termine gefunden, 16 Kategorien
-[2026-05-05 23:01:56,341] [DEBUG] ✅ 23 Termine in den nächsten 60 Tagen gefunden
-[2026-05-05 23:01:56,341] [DEBUG]    Nächster: Bioabfall am 08.05.2026
-[2026-05-05 23:01:56,342] [INFO] ✅ Erfolgreich: state='Fr. 08.05., Bioabfall' (23 Termine)
-[2026-05-05 23:01:56,342] [DEBUG] 📤 JSON Output (8894 bytes)
-[2026-05-05 23:01:56,342] [INFO] ============================================================
+[2026-05-06 07:34:15,830] [INFO] ================================================================================
+[2026-05-06 07:34:15,830] [INFO] 🚀 SKRIPT START - Python 3.14.2 (main, Dec 10 2025, 18:55:40) [GCC 14.2.0]
+[2026-05-06 07:34:15,830] [INFO] 📁 Script Location: /config/scripts/abfall_ha_api.py
+[2026-05-06 07:34:15,830] [INFO] 📝 Log File: /config/scripts/abfall_ha.log
+[2026-05-06 07:34:15,830] [INFO] ================================================================================
+[2026-05-06 07:34:15,887] [DEBUG] ✅ Alle Imports erfolgreich
+[2026-05-06 07:34:15,887] [INFO] ============================================================
+[2026-05-06 07:34:15,887] [INFO] 🚀 START: Abfall-API Skript aufgerufen
+[2026-05-06 07:34:15,887] [INFO] ============================================================
+[2026-05-06 07:34:15,890] [DEBUG] 📋 Parser erstellt
+[2026-05-06 07:34:15,890] [INFO] ✅ Argumente geparst:
+[2026-05-06 07:34:15,890] [INFO]    Days: 60, Limit: 20
+[2026-05-06 07:34:15,890] [INFO]    PLIST: /config/scripts/abfall.plist
+[2026-05-06 07:34:15,890] [INFO] 📄 abfall.plist existiert nicht → wird erstellt
+[2026-05-06 07:34:15,891] [INFO] 🔄 Versuche Aktualisierung von der API...
+[2026-05-06 07:34:15,891] [INFO] 🌐 Lade abfall.plist von API...
+[2026-05-06 07:34:15,891] [DEBUG] 📥 ZIP wird heruntergeladen von https://app.abfallplus.de/struktur.xml.zip
+[2026-05-06 07:34:15,891] [DEBUG]    App-ID: de.remondis.rheinland, Client: MjQzMjg3RT...
+[2026-05-06 07:34:16,246] [DEBUG] 📥 Raw bytes empfangen: 5058 bytes, Anfang: 1f8b0800000000000203
+[2026-05-06 07:34:16,246] [DEBUG] 🔓 Dekomprimiere gzip...
+[2026-05-06 07:34:16,246] [DEBUG]    Nach Dekompression: 125149 bytes
+[2026-05-06 07:34:16,247] [DEBUG] ✅ Download erfolgreich (125149 bytes)
+[2026-05-06 07:34:16,247] [DEBUG] 📦 Entpacke ZIP (125149 bytes)...
+[2026-05-06 07:34:16,247] [DEBUG]    Format: XML erkannt (nicht-ZIP)
+[2026-05-06 07:34:16,262] [INFO] 💾 abfall.plist gespeichert: /config/scripts/abfall.plist
+[2026-05-06 07:34:16,262] [INFO] 🔄 Verarbeite Termine...
+[2026-05-06 07:34:16,262] [DEBUG] 📊 Daten: 84 Termine gefunden, 16 Kategorien
+[2026-05-06 07:34:16,264] [DEBUG] ✅ 23 Termine in den nächsten 60 Tagen gefunden
+[2026-05-06 07:34:16,264] [DEBUG]    Nächster: Bioabfall am 08.05.2026
+[2026-05-06 07:34:16,264] [INFO] ✅ Erfolgreich: state='Fr. 08.05., Bioabfall' (23 Termine)
+[2026-05-06 07:34:16,265] [DEBUG] 📤 JSON Output (9102 bytes)
+[2026-05-06 07:34:16,265] [INFO] ============================================================
