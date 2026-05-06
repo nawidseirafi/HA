@@ -110,7 +110,6 @@ views:
                       padding: 12px !important;
                     }
 
-
           # ─────────────────────────────────────────────────────────
           # 4) Stromverbrauch (6/12)
           # ─────────────────────────────────────────────────────────
@@ -229,16 +228,23 @@ views:
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
                     primary: >
-                      {{ states.binary_sensor
-                         | selectattr('attributes.device_class','eq','window')
-                         | selectattr('state','eq','on') | list | count }}
+                      {% set windows = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
+                          {% set windows.count = windows.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ windows.count }}
                     secondary: Fenster offen
                     icon: mdi:window-open-variant
                     icon_color: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','window')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ 'red' if n > 0 else 'disabled' }}
+                      {% set windows = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
+                          {% set windows.count = windows.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ 'red' if windows.count > 0 else 'disabled' }}
                     fill_container: true
                     card_mod: *inner_tile
 
@@ -423,29 +429,148 @@ views:
                 cards:
                   - type: custom:mushroom-template-card
                     primary: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','door')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ n }} offen
-                    secondary: Türen
-                    icon: mdi:door
-                    icon_color: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','door')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ 'red' if n>0 else 'green' }}
+                      {% set temps = namespace(values=[]) %}
+                      {% set hums = namespace(values=[]) %}
+
+                      {% for area in floor_areas('Basement') %}
+                        {% for entity_id in area_entities(area) %}
+
+                          {% set state = states(entity_id) %}
+
+                          {% if state not in ['unknown', 'unavailable', 'none'] %}
+
+                            {# Temperatur Sensoren #}
+                            {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+                              {% set val = state | float(none) %}
+                              {% if val is not none %}
+                                {% set temps.values = temps.values + [val] %}
+                              {% endif %}
+                            {% endif %}
+
+                            {# Luftfeuchtigkeit Sensoren #}
+                            {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+                              {% set val = state | float(none) %}
+                              {% if val is not none %}
+                                {% set hums.values = hums.values + [val] %}
+                              {% endif %}
+                            {% endif %}
+
+                            {# humidifier Temperatur #}
+                            {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+                            {% if h_temp is not none %}
+                              {% set temps.values = temps.values + [h_temp | float] %}
+                            {% endif %}
+
+                            {# humidifier Luftfeuchtigkeit #}
+                            {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+                            {% if h_hum is not none %}
+                              {% set hums.values = hums.values + [h_hum | float] %}
+                            {% endif %}
+
+                          {% endif %}
+
+                        {% endfor %}
+                      {% endfor %}
+
+                      {% set avg_temp =
+                        ((temps.values | sum) / (temps.values | length)) | round(1)
+                        if temps.values | length > 0 else '--'
+                      %}
+
+                      {% set avg_hum =
+                        ((hums.values | sum) / (hums.values | length)) | round(0)
+                        if hums.values | length > 0 else '--'
+                      %}
+
+                      {{ avg_temp }} °C · {{ avg_hum }} %
+
+                    secondary: Ø Keller
+                    icon: mdi:home-floor-b
+                    icon_color: teal
                     fill_container: true
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.indoor_temperature') }} °C"
-                    secondary: Innen
-                    icon: mdi:thermometer
-                    icon_color: orange
+                    primary: >
+                      {% set temps = namespace(values=[]) %}
+                      {% set hums = namespace(values=[]) %}
+
+                      {% for floor in floors() %}
+                        {% if floor != 'Basement' %}
+                          {% for area in floor_areas(floor) %}
+                            {% for entity_id in area_entities(area) %}
+
+                              {% set state = states(entity_id) %}
+
+                              {% if state not in ['unknown', 'unavailable', 'none'] %}
+
+                                {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+                                  {% set val = state | float(none) %}
+                                  {% if val is not none %}
+                                    {% set temps.values = temps.values + [val] %}
+                                  {% endif %}
+                                {% endif %}
+
+                                {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+                                  {% set val = state | float(none) %}
+                                  {% if val is not none %}
+                                    {% set hums.values = hums.values + [val] %}
+                                  {% endif %}
+                                {% endif %}
+
+                                {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+                                {% if h_temp is not none %}
+                                  {% set temps.values = temps.values + [h_temp | float] %}
+                                {% endif %}
+
+                                {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+                                {% if h_hum is not none %}
+                                  {% set hums.values = hums.values + [h_hum | float] %}
+                                {% endif %}
+
+                              {% endif %}
+
+                            {% endfor %}
+                          {% endfor %}
+                        {% endif %}
+                      {% endfor %}
+
+                      {% set avg_temp =
+                        ((temps.values | sum) / (temps.values | length)) | round(1)
+                        if temps.values | length > 0 else '--'
+                      %}
+
+                      {% set avg_hum =
+                        ((hums.values | sum) / (hums.values | length)) | round(0)
+                        if hums.values | length > 0 else '--'
+                      %}
+
+                      {{ avg_temp }} °C · {{ avg_hum }} %
+
+                    secondary: Ø Haus ohne Keller
+                    icon: mdi:home-thermometer-outline
+                    icon_color: green
                     fill_container: true
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.indoor_humidity') }} %"
-                    secondary: Luftfeuchte
+                    primary: >
+                      {% set hums = namespace(values=[]) %}
+                      {% for entity in states.sensor %}
+                        {% set entity_id = entity.entity_id %}
+                        {% set state = states(entity_id) %}
+                        {% if state_attr(entity_id, 'device_class') == 'humidity'
+                          and state not in ['unavailable', 'unknown', 'none'] %}
+                          {% set val = state | float(none) %}
+                          {% if val is not none %}
+                            {% set hums.values = hums.values + [val] %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                      {% if hums.values | length > 0 %}
+                        {{ ((hums.values | sum) / (hums.values | length)) | round(1) }} %
+                      {% else %}
+                        -- %
+                      {% endif %}
+                    secondary: Ø Luftfeuchtigkeit
                     icon: mdi:water-percent
                     icon_color: blue
                     fill_container: true

@@ -313,16 +313,23 @@ views:
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
                     primary: >
-                      {{ states.binary_sensor
-                         | selectattr('attributes.device_class','eq','window')
-                         | selectattr('state','eq','on') | list | count }}
+                      {% set windows = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
+                          {% set windows.count = windows.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ windows.count }}
                     secondary: Fenster offen
                     icon: mdi:window-open-variant
                     icon_color: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','window')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ 'red' if n > 0 else 'disabled' }}
+                      {% set windows = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
+                          {% set windows.count = windows.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ 'red' if windows.count > 0 else 'disabled' }}
                     fill_container: true
                     card_mod: *inner_tile
 
@@ -536,22 +543,42 @@ views:
                 cards:
                   - type: custom:mushroom-template-card
                     primary: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','door')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ n }} offen
+                      {% set doors = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'door' and states(entity_id) == 'on' %}
+                          {% set doors.count = doors.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ doors.count }} offen
                     secondary: Türen
                     icon: mdi:door
                     icon_color: >
-                      {% set n = states.binary_sensor
-                         | selectattr('attributes.device_class','eq','door')
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ 'red' if n>0 else 'green' }}
+                      {% set doors = namespace(count=0) %}
+                      {% for entity_id in states.binary_sensor %}
+                        {% if state_attr(entity_id, 'device_class') == 'door' and states(entity_id) == 'on' %}
+                          {% set doors.count = doors.count + 1 %}
+                        {% endif %}
+                      {% endfor %}
+                      {{ 'red' if doors.count>0 else 'green' }}
                     fill_container: true
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.indoor_temperature') }} °C"
-                    secondary: Innen
+                    primary: >
+                      {% set temps = namespace(values=[]) %}
+                      {% for entity_id in states.sensor %}
+                        {% if ('temperatur' in entity_id.lower() or state_attr(entity_id, 'device_class') == 'temperature') and states(entity_id) not in ['unavailable', 'unknown', 'none'] %}
+                          {% set val = states(entity_id) | float(None) %}
+                          {% if val is not none %}
+                            {% set temps.values = temps.values + [val] %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                      {% if temps.values %}
+                        {{ (temps.values | sum / temps.values | length) | round(1) }} °C
+                      {% else %}
+                        -- °C
+                      {% endif %}
+                    secondary: Ø Temperatur
                     icon: mdi:thermometer
                     icon_color: orange
                     fill_container: true
