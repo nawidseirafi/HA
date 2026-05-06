@@ -37,16 +37,18 @@ views:
           # 1) Hero – Kopfzeile (volle Breite)
           # ─────────────────────────────────────────────────────────
           - type: custom:mushroom-template-card
+            entity: weather.forecast_home
             primary: >
               {% set h = now().hour %}
-              {% if h < 5 %}Gute Nacht, Familie
-              {% elif h < 11 %}Guten Morgen, Familie
-              {% elif h < 18 %}Guten Tag, Familie
-              {% else %}Guten Abend, Familie{% endif %}
+              {% if h < 5 %}Gute Nacht, Nawid
+              {% elif h < 11 %}Guten Morgen, Nawid
+              {% elif h < 18 %}Guten Tag, Nawid
+              {% else %}Guten Abend, Nawid{% endif %}
             secondary: >
               {{ now().strftime('%A, %d. %B %Y · %H:%M') }} ·
-              {{ states('sensor.weather_temperature') | default('–') }} °C ·
-              {{ states('weather.forecast_home') | replace('_',' ') | title }}
+              {{ state_attr(entity, 'temperature') }} °C · {{ state_attr(entity,
+              'humidity') }} % Luftfeuchte
+              {{ states(entity) | replace('_',' ') | title }}
             icon: >
               {% set s = states('weather.forecast_home') %}
               {% if s == 'sunny' %}mdi:weather-sunny
@@ -108,92 +110,6 @@ views:
                       padding: 12px !important;
                     }
 
-          # ─────────────────────────────────────────────────────────
-          # 3) Briefkasten (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: 📬 Briefkasten
-              - type: custom:mushroom-template-card
-                entity: input_boolean.post_im_briefkasten
-                layout: horizontal
-                fill_container: true
-                primary: |
-                  {% if is_state(entity, 'on') %}
-                    📬 Post ist da!
-                  {% else %}
-                    📭 Keine Post
-                  {% endif %}
-                secondary: |
-                  {% if is_state(entity, 'on') %}
-                    Bitte Briefkasten leeren
-                  {% else %}
-                    Alles ruhig
-                  {% endif %}
-                icon: |
-                  {% if is_state(entity, 'on') %}
-                    mdi:mailbox
-                  {% else %}
-                    mdi:mailbox-outline
-                  {% endif %}
-                icon_color: |
-                  {% if is_state(entity, 'on') %}
-                    red
-                  {% else %}
-                    green
-                  {% endif %}
-                tap_action:
-                  action: more-info
-                card_mod:
-                  style: |
-                    hui-masonry-view, hui-grid-view {
-                        max-width: 100% !important;
-                      }
-                      .column {
-                        max-width: 100% !important;
-                      }
-                    ha-card {
-                      {% if is_state('input_boolean.post_im_briefkasten', 'on') %}
-                        background: linear-gradient(135deg, #ff4d4d, #ff0000);
-                        color: white;
-                        animation: pulse 2s infinite;
-                      {% else %}
-                        background: linear-gradient(135deg, #2e7d32, #43a047);
-                        color: white;
-                      {% endif %}
-                      border-radius: 16px;
-                    }
-                    @keyframes pulse {
-                      0% { transform: scale(1); }
-                      50% { transform: scale(1.02); }
-                      100% { transform: scale(1); }
-                    }
-              # Button zum Zurücksetzen (nur sichtbar wenn Post da ist)
-              - type: custom:mushroom-chips-card
-                alignment: center
-                chips:
-                  - type: template
-                    icon: mdi:check-circle
-                    content: "✓ Geleert"
-                    icon_color: green
-                    tap_action:
-                      action: call-service
-                      service: input_boolean.turn_off
-                      target:
-                        entity_id: input_boolean.post_im_briefkasten
-                    card_mod:
-                      style: |
-                        ha-card {
-                          {% if is_state('input_boolean.post_im_briefkasten', 'on') %}
-                            opacity: 1;
-                          {% else %}
-                            opacity: 0.3;
-                            pointer-events: none;
-                          {% endif %}
-                        }
 
           # ─────────────────────────────────────────────────────────
           # 4) Stromverbrauch (6/12)
@@ -489,35 +405,6 @@ views:
                       numeric: true
                       first: 1
 
-          # ─────────────────────────────────────────────────────────
-          # 7b) Abfall (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: 🗑️ Abfallwirtschaft
-              - type: custom:mushroom-template-card
-                entity: sensor.abfall_nachster_termin
-                primary: "{{ states('sensor.abfall_nachste_art') }}"
-                secondary: >-
-                  {{ states('sensor.abfall_nachstes_datum') }} · in {{
-                  states('sensor.abfall_tage_bis_abholung') }} Tagen
-                icon: mdi:trash-can
-                layout: vertical
-                fill_container: true
-                tap_action:
-                  action: more-info
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: #1e242c !important;
-                      border-radius: 18px !important;
-                      border: none !important;
-                      box-shadow: none !important;
-                      padding: 14px !important;
-                    }
 
           # ─────────────────────────────────────────────────────────
           # 8) Status (volle Breite, 5 Kacheln)
@@ -564,18 +451,34 @@ views:
                     fill_container: true
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
-                    primary: >
-                      {{ states.update | selectattr('state','eq','on') | list | count }}
-                    secondary: HA-Updates
-                    icon: mdi:package-up
-                    icon_color: >
-                      {% set n = states.update
-                         | selectattr('state','eq','on') | list | count %}
-                      {{ 'orange' if n>0 else 'disabled' }}
+                    entity: input_boolean.post_im_briefkasten
+                    primary: |
+                      {% if is_state(entity, 'on') %}
+                        📬 Post ist da!
+                      {% else %}
+                        📭 Keine Post
+                      {% endif %}
+                    secondary: |
+                      {% if is_state(entity, 'on') %}
+                        Bitte Briefkasten leeren
+                      {% else %}
+                        Alles ruhig
+                      {% endif %}
+                    icon: |
+                      {% if is_state(entity, 'on') %}
+                        mdi:mailbox
+                      {% else %}
+                        mdi:mailbox-outline
+                      {% endif %}
+                    icon_color: |
+                      {% if is_state(entity, 'on') %}
+                        red
+                      {% else %}
+                        green
+                      {% endif %}
                     fill_container: true
                     tap_action:
-                      action: navigate
-                      navigation_path: /config/updates
+                      action: more-info
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
                     entity: sensor.abfall_nachster_termin
