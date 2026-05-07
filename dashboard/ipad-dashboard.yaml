@@ -219,32 +219,46 @@ views:
                         }
                   - type: custom:mushroom-template-card
                     primary: >
-                      {{ states.cover | rejectattr('state','eq','closed') | list | count }}
-                      / {{ states.cover | list | count }}
-                    secondary: Rollläden offen
-                    icon: mdi:window-shutter-open
-                    icon_color: blue
-                    fill_container: true
-                    card_mod: *inner_tile
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {% set windows = namespace(count=0) %}
-                      {% for entity_id in states.binary_sensor %}
-                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
-                          {% set windows.count = windows.count + 1 %}
+                        {% set ns = namespace(open=0,total=0) %}
+                        {% for s in states.binary_sensor %}
+                          {% set dc = state_attr(s.entity_id, 'device_class') %}
+                          {% if dc in ['window', 'door', 'opening'] %}
+                            {% set ns.total = ns.total + 1 %}
+                            {% if is_state(s.entity_id, 'on') %}
+                              {% set ns.open = ns.open + 1 %}
+                            {% endif %}
+                          {% endif %}
+                        {% endfor %}
+                        {{ ns.open }}/{{ ns.total }}
+                    secondary: >
+                        {% set ns = namespace(open=0) %}
+                        {% for s in states.binary_sensor %}
+                          {% set dc = state_attr(s.entity_id, 'device_class') %}
+                    
+                          {% if dc in ['window', 'door', 'opening']
+                                and is_state(s.entity_id, 'on') %}
+                            {% set ns.open = ns.open + 1 %}
+                          {% endif %}
+                        {% endfor %}
+                        {% if ns.open == 0 %}
+                          Alle geschlossen
+                        {% elif ns.open == 1 %}
+                          1 Fenster/Tür offen
+                        {% else %}
+                          {{ ns.open }} Fenster/Türen offen
                         {% endif %}
-                      {% endfor %}
-                      {{ windows.count }}
-                    secondary: Fenster offen
                     icon: mdi:window-open-variant
                     icon_color: >
-                      {% set windows = namespace(count=0) %}
-                      {% for entity_id in states.binary_sensor %}
-                        {% if state_attr(entity_id, 'device_class') == 'window' and states(entity_id) == 'on' %}
-                          {% set windows.count = windows.count + 1 %}
-                        {% endif %}
-                      {% endfor %}
-                      {{ 'red' if windows.count > 0 else 'disabled' }}
+                        {% set ns = namespace(open=0) %}
+                        {% for s in states.binary_sensor %}
+                          {% set dc = state_attr(s.entity_id, 'device_class') %}
+                    
+                          {% if dc in ['window', 'door', 'opening']
+                                and is_state(s.entity_id, 'on') %}
+                            {% set ns.open = ns.open + 1 %}
+                          {% endif %}
+                        {% endfor %}
+                        {{ 'red' if ns.open > 0 else 'disabled' }}
                     fill_container: true
                     card_mod: *inner_tile
 
@@ -613,10 +627,11 @@ views:
                       action: more-info
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
+                    entity: sensor.abfall_uebersicht
                     primary: >
                       {% set ns = namespace(result='') %}
-                      {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-                      {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
+                      {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+                      {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
 
                       {% if next %}
                         {% set next_date = next.date %}
@@ -641,7 +656,7 @@ views:
                       {{ ns.result if ns.result else 'Keine Termine' }}
 
                     secondary: >
-                      {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
+                      {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
                       {% if next %}
                         {{ next.date_de }} · in {{ next.days_until }} Tagen
                       {% else %}
