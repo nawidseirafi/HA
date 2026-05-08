@@ -86,7 +86,8 @@ def get_appointments(plist_file_path: Path, days_ahead: int = 30) -> List[Dict[s
     categories = build_category_map(plist_data)
 
     now = datetime.now().astimezone()
-    until = now + timedelta(days=days_ahead)
+    today = now.date()
+    until_date = today + timedelta(days=days_ahead)
 
     upcoming: List[Dict[str, Any]] = []
 
@@ -105,7 +106,8 @@ def get_appointments(plist_file_path: Path, days_ahead: int = 30) -> List[Dict[s
         if pickup_date is None:
             continue
 
-        if not (now <= pickup_date <= until):
+        pickup_day = pickup_date.date()
+        if not (today <= pickup_day <= until_date):
             continue
 
         category_id = date_entry.get("category_id")
@@ -130,7 +132,7 @@ def get_appointments(plist_file_path: Path, days_ahead: int = 30) -> List[Dict[s
                 "title": title or waste_type,
                 "location": location,
                 "timestamp": pickup_date.isoformat(),
-                "days_until": max(0, (pickup_date.date() - now.date()).days),
+                "days_until": max(0, (pickup_day - today).days),
             }
         )
 

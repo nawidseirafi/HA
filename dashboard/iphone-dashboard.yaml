@@ -1,0 +1,373 @@
+views:
+  - title: Übersicht
+    path: uebersicht
+    icon: mdi:home
+    type: masonry
+    badges: []
+    cards:
+      - type: custom:mushroom-template-card
+        entity: weather.forecast_home
+        primary: >
+          {% set h = now().hour %}
+          {% if h < 5 %}
+            Gute Nacht, Nawid
+          {% elif h < 11 %}
+            Guten Morgen, Nawid
+          {% elif h < 18 %}
+            Guten Tag, Nawid
+          {% else %}
+            Guten Abend, Nawid
+          {% endif %}
+        secondary: >
+          {{ now().strftime('%A, %d. %B %Y · %H:%M') }} ·
+          {{ state_attr(entity, 'temperature') }} °C ·
+          {{ state_attr(entity, 'humidity') }} % Luftfeuchte ·
+          {{ states(entity) | replace('_',' ') | title }}
+        icon: >
+          {% set s = states('weather.forecast_home') %}
+          {% if s == 'sunny' %} mdi:weather-sunny
+          {% elif s == 'partlycloudy' %} mdi:weather-partly-cloudy
+          {% elif s == 'cloudy' %} mdi:weather-cloudy
+          {% elif s == 'rainy' %} mdi:weather-rainy
+          {% elif s == 'pouring' %} mdi:weather-pouring
+          {% elif s == 'snowy' %} mdi:weather-snowy
+          {% elif s == 'fog' %} mdi:weather-fog
+          {% else %} mdi:weather-partly-cloudy
+          {% endif %}
+        icon_color: amber
+        fill_container: true
+        multiline_secondary: true
+      # ─────────────────────────────────────────────────────────
+      # 2) Personen (6/12)
+      # ─────────────────────────────────────────────────────────
+      - type: vertical-stack
+        view_layout:
+          grid-column: span 6
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: custom:mushroom-chips-card
+              alignment: start
+            card_param: chips
+            filter:
+              include:
+                - domain: person
+                  options:
+                    type: entity
+                    icon_color: >
+                      {{ 'green' if states(entity) == 'home' else 'grey' }}
+                    content_info: name
+                    use_entity_picture: true
+                    tap_action:
+                      action: more-info
+            card_mod:
+              style: |
+                ha-card {
+                  background: #1e242c !important;
+                  border-radius: 18px !important;
+                  border: none !important;
+                  padding: 12px !important;
+                }
+      - type: custom:mushroom-template-card
+        entity: input_boolean.post_im_briefkasten
+        layout: horizontal
+        fill_container: true
+        primary: >
+          {% if is_state(entity, 'on') %}
+            📬 Post ist da!
+          {% else %}
+            📭 Keine Post
+          {% endif %}
+        secondary: >
+          {% if is_state(entity, 'on') %}
+            Bitte Briefkasten leeren
+          {% else %}
+            Alles ruhig
+          {% endif %}
+        icon: >
+          {% if is_state(entity, 'on') %}
+            mdi:mailbox
+          {% else %}
+            mdi:mailbox-outline
+          {% endif %}
+        icon_color: >
+          {% if is_state(entity, 'on') %}
+            red
+          {% else %}
+            green
+          {% endif %}
+        tap_action:
+          action: more-info
+      # ─────────────────────────────────────────────────────────
+      # 7) Abfall
+      # ─────────────────────────────────────────────────────────
+      - type: custom:mushroom-template-card
+        entity: sensor.abfall_naechster_termin
+        primary: >
+          {% set ns = namespace(result='') %}
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
+          {% if next %}
+            {% set next_date = next.date %}
+            {% for typ, item in data.items() %}
+              {% if item.date == next_date %}
+                {% if 'Bio' in typ %}
+                  {% set ns.result = ns.result ~ '🍃 Bio ' %}
+                {% elif 'Papier' in typ or 'Altpapier' in typ or 'Blaue' in typ %}
+                  {% set ns.result = ns.result ~ '▣ Papier ' %}
+                {% elif 'Gelb' in typ or 'Leicht' in typ %}
+                  {% set ns.result = ns.result ~ '♻ Gelb ' %}
+                {% elif 'Rest' in typ %}
+                  {% set ns.result = ns.result ~ '🗑 Rest ' %}
+                {% else %}
+                  {% set ns.result = ns.result ~ typ ~ '  ' %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ ns.result if ns.result else 'Keine Termine' }}
+        secondary: >
+          {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+          {% if next %}
+            {% set days = next.days_until | int %}
+            {% if days == 0 %}
+              {{ next.date_de }} · Heute
+            {% elif days == 1 %}
+              {{ next.date_de }} · Morgen
+            {% elif days == 2 %}
+              {{ next.date_de }} · Übermorgen
+            {% else %}
+              {{ next.date_de }} · in {{ days }} Tagen
+            {% endif %}
+          {% else %}
+            Kein Termin
+          {% endif %}
+        icon: mdi:trash-can-outline
+        icon_color: green
+
+      - type: custom:mushroom-template-card
+        primary: >
+          {% set temps = namespace(values=[]) %}
+          {% set hums = namespace(values=[]) %}
+          {% for area in floor_areas('Basement') %}
+            {% for entity_id in area_entities(area) %}
+              {% set state = states(entity_id) %}
+              {% if state not in ['unknown', 'unavailable', 'none'] %}
+                {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+                  {% set val = state | float(none) %}
+                  {% if val is not none %}
+                    {% set temps.values = temps.values + [val] %}
+                  {% endif %}
+                {% endif %}
+                {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+                  {% set val = state | float(none) %}
+                  {% if val is not none %}
+                    {% set hums.values = hums.values + [val] %}
+                  {% endif %}
+                {% endif %}
+                {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+                {% if h_temp is not none %}
+                  {% set temps.values = temps.values + [h_temp | float] %}
+                {% endif %}
+                {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+                {% if h_hum is not none %}
+                  {% set hums.values = hums.values + [h_hum | float] %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% set avg_temp = ((temps.values | sum) / (temps.values | length)) | round(1) if temps.values | length > 0 else '--' %}
+          {% set avg_hum = ((hums.values | sum) / (hums.values | length)) | round(0) if hums.values | length > 0 else '--' %}
+          {{ avg_temp }} °C · {{ avg_hum }} %
+        secondary: Ø Keller
+        icon: mdi:home-floor-b
+        icon_color: teal
+
+      - type: custom:mushroom-template-card
+        primary: >
+          {% set temps = namespace(values=[]) %}
+          {% set hums = namespace(values=[]) %}
+          {% for floor in floors() %}
+            {% if floor != 'Basement' %}
+              {% for area in floor_areas(floor) %}
+                {% for entity_id in area_entities(area) %}
+                  {% set state = states(entity_id) %}
+                  {% if state not in ['unknown', 'unavailable', 'none'] %}
+                    {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+                      {% set val = state | float(none) %}
+                      {% if val is not none %}
+                        {% set temps.values = temps.values + [val] %}
+                      {% endif %}
+                    {% endif %}
+                    {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+                      {% set val = state | float(none) %}
+                      {% if val is not none %}
+                        {% set hums.values = hums.values + [val] %}
+                      {% endif %}
+                    {% endif %}
+                    {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+                    {% if h_temp is not none %}
+                      {% set temps.values = temps.values + [h_temp | float] %}
+                    {% endif %}
+                    {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+                    {% if h_hum is not none %}
+                      {% set hums.values = hums.values + [h_hum | float] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+          {% set avg_temp = ((temps.values | sum) / (temps.values | length)) | round(1) if temps.values | length > 0 else '--' %}
+          {% set avg_hum = ((hums.values | sum) / (hums.values | length)) | round(0) if hums.values | length > 0 else '--' %}
+          {{ avg_temp }} °C · {{ avg_hum }} %
+        secondary: Ø Haus ohne Keller
+        icon: mdi:home-thermometer-outline
+        icon_color: green
+
+      - type: custom:mushroom-template-card
+        primary: >
+          {{ states.light | selectattr('state','eq','on') | list | count }} / {{ states.light | list | count }}
+        secondary: Lichter an
+        icon: mdi:lightbulb-on
+        icon_color: amber
+        fill_container: true
+        tap_action:
+          action: call-service
+          service: light.turn_off
+          target:
+            entity_id: all
+
+      - type: custom:mushroom-template-card
+        primary: >
+          {% set ns = namespace(open=0,total=0) %}
+          {% for s in states.binary_sensor %}
+            {% set dc = state_attr(s.entity_id, 'device_class') %}
+            {% if dc in ['window', 'door', 'opening'] %}
+              {% set ns.total = ns.total + 1 %}
+              {% if is_state(s.entity_id, 'on') %}
+                {% set ns.open = ns.open + 1 %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.open }}/{{ ns.total }}
+        secondary: >
+          {% set ns = namespace(open=0) %}
+          {% for s in states.binary_sensor %}
+            {% set dc = state_attr(s.entity_id, 'device_class') %}
+            {% if dc in ['window', 'door', 'opening'] and is_state(s.entity_id, 'on') %}
+              {% set ns.open = ns.open + 1 %}
+            {% endif %}
+          {% endfor %}
+          {% if ns.open == 0 %}
+            Alle geschlossen
+          {% elif ns.open == 1 %}
+            1 Fenster/Tür offen
+          {% else %}
+            {{ ns.open }} Fenster/Türen offen
+          {% endif %}
+        icon: mdi:window-open-variant
+        icon_color: >
+          {% set ns = namespace(open=0) %}
+          {% for s in states.binary_sensor %}
+            {% set dc = state_attr(s.entity_id, 'device_class') %}
+            {% if dc in ['window', 'door', 'opening'] and is_state(s.entity_id, 'on') %}
+              {% set ns.open = ns.open + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ 'red' if ns.open > 0 else 'disabled' }}
+        fill_container: true
+
+      # ─────────────────────────────────────────────────────────
+      # 7) Batterien
+      # ─────────────────────────────────────────────────────────
+      - type: vertical-stack
+        view_layout:
+          grid-column: span 6
+        cards:
+          - type: custom:expander-card
+            clear: true
+            title-card:
+              type: custom:auto-entities
+              card_param: cards
+              card:
+                type: grid
+                columns: 1
+                square: false
+              filter:
+                include:
+                  - domain: sensor
+                    attributes:
+                      device_class: battery
+                    options:
+                      type: custom:mushroom-template-card
+                      layout: horizontal
+                      fill_container: true
+                      primary: "{{ state_attr(entity, 'friendly_name') }}"
+                      secondary: "Akkustand: {{ states(entity) }} %"
+                      icon: |
+                        {% set b = states(entity) | int(0) %}
+                        {% if b <= 10 %} mdi:battery-alert-variant-outline
+                        {% elif b <= 25 %} mdi:battery-20
+                        {% elif b <= 50 %} mdi:battery-50
+                        {% elif b <= 75 %} mdi:battery-70
+                        {% else %} mdi:battery-check
+                        {% endif %}
+                      icon_color: |
+                        {% set b = states(entity) | int(0) %}
+                        {% if b <= 15 %} red
+                        {% elif b <= 30 %} deep-orange
+                        {% elif b <= 60 %} amber
+                        {% else %} green
+                        {% endif %}
+                exclude:
+                  - state: unavailable
+                  - state: unknown
+              sort:
+                method: state
+                numeric: true
+                reverse: false
+                count: 1
+
+            cards:
+              - type: custom:auto-entities
+                card_param: cards
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                filter:
+                  include:
+                    - domain: sensor
+                      attributes:
+                        device_class: battery
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') }}"
+                        secondary: "Akkustand: {{ states(entity) }} %"
+                        icon: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 10 %} mdi:battery-alert-variant-outline
+                          {% elif b <= 25 %} mdi:battery-20
+                          {% elif b <= 50 %} mdi:battery-50
+                          {% elif b <= 75 %} mdi:battery-70
+                          {% else %} mdi:battery-check
+                          {% endif %}
+                        icon_color: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 15 %} red
+                          {% elif b <= 30 %} deep-orange
+                          {% elif b <= 60 %} amber
+                          {% else %} green
+                          {% endif %}
+                        tap_action:
+                          action: more-info
+                  exclude:
+                    - state: unavailable
+                    - state: unknown
+                sort:
+                  method: state
+                  numeric: true
+                  reverse: false

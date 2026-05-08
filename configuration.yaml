@@ -6,7 +6,7 @@ command_line:
       name: "Abfall naechster Termin"
       unique_id: abfall_naechster_termin
       command: >
-        python3 /config/scripts/abfall_ha_api.py
+        python3 /config/scripts/abfall_ha.py
         --file /config/scripts/abfall.plist
         --days 60
         --limit 20
@@ -39,10 +39,17 @@ lovelace:
     dashboards:
         ipad-dashboard:
             mode: yaml
-            title: Wall
+            title: IPad
             icon: mdi:tablet
             show_in_sidebar: true
             filename: dashboards/ipad-dashboard.yaml
+        iphone-dashboard:
+            mode: yaml
+            title: iPhone
+            icon: mdi:phone
+            show_in_sidebar: true
+            filename: dashboards/iphone-dashboard.yaml
+
 template:
   - switch:
     - turn_on:
