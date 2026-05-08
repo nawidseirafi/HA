@@ -24,7 +24,7 @@ def parse_dt(value: str) -> Optional[datetime]:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone()
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except Exception:
         return None
 
@@ -64,6 +64,22 @@ def extract_waste_type(title: str, fallback: str = "Abfall") -> str:
     return title or fallback
 
 
+def normalize_waste_type(waste_type: str) -> str:
+    """Normalize provider-specific waste type names to stable Home Assistant keys."""
+    waste_type = clean_text(waste_type)
+
+    if waste_type.startswith("Restabfall") or waste_type in ("Restmüll", "Restmuell"):
+        return "Restabfall"
+    if waste_type in ("Biomüll", "Biomuell", "Bio"):
+        return "Bioabfall"
+    if waste_type in ("Gelbe Tonne", "Leichtverpackungen"):
+        return "Gelber Sack"
+    if waste_type in ("Papierabfall", "Altpapier", "Blaue Tonne"):
+        return "Papier"
+
+    return waste_type or "Abfall"
+
+
 def get_appointments(plist_file_path: Path, days_ahead: int = 30) -> List[Dict[str, Any]]:
     plist_data = load_plist(plist_file_path)
     dates = plist_data.get("dates", [])
@@ -99,7 +115,7 @@ def get_appointments(plist_file_path: Path, days_ahead: int = 30) -> List[Dict[s
         if not title:
             title = clean_text(date_entry.get("title"))
 
-        waste_type = category_name or extract_waste_type(title)
+        waste_type = normalize_waste_type(category_name or extract_waste_type(title))
         location = clean_text(date_entry.get("widget_subtitle") or date_entry.get("subtitle"))
 
         upcoming.append(

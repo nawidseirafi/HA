@@ -627,7 +627,7 @@ views:
                       action: more-info
                     card_mod: *inner_tile
                   - type: custom:mushroom-template-card
-                    entity: sensor.abfall_uebersicht
+                    entity: sensor.abfall_naechster_termin
                     primary: >
                       {% set ns = namespace(result='') %}
                       {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
@@ -658,7 +658,16 @@ views:
                     secondary: >
                       {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
                       {% if next %}
-                        {{ next.date_de }} · in {{ next.days_until }} Tagen
+                        {% set days = next.days_until | int %}
+                        {% if days == 0 %}
+                          {{ next.date_de }} · Heute
+                        {% elif days == 1 %}
+                          {{ next.date_de }} · Morgen
+                        {% elif days == 2 %}
+                          {{ next.date_de }} · Übermorgen
+                        {% else %}
+                          {{ next.date_de }} · in {{ days }} Tagen
+                        {% endif %}
                       {% else %}
                         Kein Termin
                       {% endif %}

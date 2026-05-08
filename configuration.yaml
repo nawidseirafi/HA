@@ -1,4 +1,3 @@
-
 input_boolean: !include input_booleans.yaml
 default_config:
 
@@ -63,25 +62,25 @@ template:
   - sensor:
       - name: "Abfall naechste Art"
         unique_id: abfall_naechste_art
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').type if state_attr('sensor.abfall_nachster_termin', 'next') else 'Keine Termine' }}"
+        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').type if state_attr('sensor.abfall_naechster_termin', 'next') else 'Keine Termine' }}"
       - name: "Abfall nächstes Datum"
         unique_id: abfall_naechstes_datum
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').date_de if state_attr('sensor.abfall_nachster_termin', 'next') else 'unbekannt' }}"
+        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').date_de if state_attr('sensor.abfall_naechster_termin', 'next') else 'unbekannt' }}"
       - name: "Abfall Tage bis Abholung"
         unique_id: abfall_tage_bis_abholung
         unit_of_measurement: "d"
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').days_until if state_attr('sensor.abfall_nachster_termin', 'next') else 0 }}"
+        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').days_until if state_attr('sensor.abfall_naechster_termin', 'next') else 0 }}"
       - name: "Abfall Restmüll"
         unique_id: abfall_restmuell
         state: >
           {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Restmüll') or data.get('Restmuell') or data.get('Restabfall') %}
+          {% set item = data.get('Restmüll') or data.get('Restmuell') or data.get('Restabfall') or data.get('Restabfall 14-tägig') or data.get('Restabfall 4-wöchentlich') %}
           {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
       - name: "Abfall Bio"
         unique_id: abfall_bio
         state: >
           {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Bioabfall') or data.get('Biomüll') or data.get('Bio') %}
+          {% set item = data.get('Bioabfall') or data.get('Biomüll') or data.get('Biomuell') or data.get('Bio') %}
           {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
       - name: "Abfall Gelber Sack"
         unique_id: abfall_gelber_sack
@@ -95,78 +94,3 @@ template:
           {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
           {% set item = data.get('Papier') or data.get('Papierabfall') or data.get('Altpapier') or data.get('Blaue Tonne') %}
           {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
-      - name: "Abfall Uebersicht"
-        unique_id: abfall_uebersicht
-        icon: mdi:trash-can-outline
-        state: >
-          {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-          {% if not next %}
-            Keine Termine
-          {% else %}
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set nd = next.date %}
-            {% set types = namespace(result='') %}
-            {% for typ, item in data.items() %}
-              {% if item.date == nd %}
-                {% if 'Bio' in typ %}{% set types.result = types.result ~ '🍃 Bio ' %}
-                {% elif 'Papier' in typ or 'Altpapier' in typ or 'Blaue' in typ %}{% set types.result = types.result ~ '📦 Papier ' %}
-                {% elif 'Gelb' in typ or 'Leicht' in typ %}{% set types.result = types.result ~ '♻️ Gelb ' %}
-                {% elif 'Rest' in typ %}{% set types.result = types.result ~ '🗑️ Rest ' %}
-                {% else %}{% set types.result = types.result ~ typ ~ ' ' %}{% endif %}
-              {% endif %}
-            {% endfor %}
-            {{ types.result.strip() }} · {{ next.date_de }} ({{ next.days_until }} d)
-          {% endif %}
-        attributes:
-          restmuell: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Restmüll') or data.get('Restmuell') or data.get('Restabfall') %}
-            {{ item['date_de'] ~ ' (' ~ item['days_until'] ~ ' d)' if item else 'Kein Termin' }}
-          restmuell_tage: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Restmüll') or data.get('Restmuell') or data.get('Restabfall') %}
-            {{ item['days_until'] if item else 999 }}
-          restmuell_emoji: "🗑️"
-          bio: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Bioabfall') or data.get('Biomüll') or data.get('Bio') %}
-            {{ item['date_de'] ~ ' (' ~ item['days_until'] ~ ' d)' if item else 'Kein Termin' }}
-          bio_tage: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Bioabfall') or data.get('Biomüll') or data.get('Bio') %}
-            {{ item['days_until'] if item else 999 }}
-          bio_emoji: "🍃"
-          gelber_sack: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Gelber Sack') or data.get('Gelbe Tonne') or data.get('Leichtverpackungen') %}
-            {{ item['date_de'] ~ ' (' ~ item['days_until'] ~ ' d)' if item else 'Kein Termin' }}
-          gelber_sack_tage: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Gelber Sack') or data.get('Gelbe Tonne') or data.get('Leichtverpackungen') %}
-            {{ item['days_until'] if item else 999 }}
-          gelber_sack_emoji: "♻️"
-          papier: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Papier') or data.get('Papierabfall') or data.get('Altpapier') or data.get('Blaue Tonne') %}
-            {{ item['date_de'] ~ ' (' ~ item['days_until'] ~ ' d)' if item else 'Kein Termin' }}
-          papier_tage: >
-            {% set data = state_attr('sensor.abfall_nachster_termin', 'next_by_type') or {} %}
-            {% set item = data.get('Papier') or data.get('Papierabfall') or data.get('Altpapier') or data.get('Blaue Tonne') %}
-            {{ item['days_until'] if item else 999 }}
-          papier_emoji: "📦"
-          naechster_typ: >
-            {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-            {{ next.type if next else 'Unbekannt' }}
-          naechstes_datum: >
-            {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-            {{ next.date_de if next else 'Unbekannt' }}
-          naechste_tage: >
-            {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-            {{ next.days_until if next else 999 }}
-          icon_color: >
-            {% set next = state_attr('sensor.abfall_nachster_termin', 'next') %}
-            {% if not next %}grey
-            {% elif next.days_until == 0 %}red
-            {% elif next.days_until == 1 %}orange
-            {% elif next.days_until <= 3 %}amber
-            {% else %}green{% endif %}
