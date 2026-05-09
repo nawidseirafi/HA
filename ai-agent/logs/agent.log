@@ -42,3 +42,43 @@
 2026-05-09 22:26:18,056 [INFO] LLM Provider: gemini
 2026-05-09 22:26:18,056 [INFO] LLM Model: gemini-2.5-flash
 2026-05-09 22:26:18,056 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}]}
+2026-05-09 22:27:35,987 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:27:36,192 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:28:30,346 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:28:30,735 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:29:14,854 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:29:17,063 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:29:17,066 [INFO] LLM Provider: gemini
+2026-05-09 22:29:17,067 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:29:17,067 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}]}
+2026-05-09 22:30:08,039 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:30:08,230 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:30:36,504 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:30:36,892 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:31:10,677 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:31:10,805 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:34:13,670 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:34:15,498 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:34:15,501 [INFO] LLM Provider: gemini
+2026-05-09 22:34:15,502 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:34:15,502 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on','entity_id': 'light.wohnzimmer'}]}
+2026-05-09 22:36:22,131 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:36:24,762 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:36:24,765 [INFO] LLM Provider: gemini
+2026-05-09 22:36:24,765 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:36:24,765 [INFO] LLM Antwort: {"actions": [{"type": "turn_on", "entity_id": "light.wohnzimmer"}]}
+2026-05-09 22:37:13,090 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:37:14,748 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:37:14,751 [INFO] LLM Provider: gemini
+2026-05-09 22:37:14,751 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:37:14,752 [INFO] LLM Antwort: {"actions": [{"type": "turn_on", "entity_id": "light.wohnzimmer"}]}
+2026-05-09 22:38:28,866 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:38:32,409 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:38:32,412 [INFO] LLM Provider: gemini
+2026-05-09 22:38:32,412 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:38:32,412 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}]}
+2026-05-09 22:38:40,546 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:38:43,266 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:38:43,269 [INFO] LLM Provider: gemini
+2026-05-09 22:38:43,269 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:38:43,269 [INFO] LLM Antwort: {"actions": [{"type": "turn_on", "entity_id": "light.wohnzimmer"}]}

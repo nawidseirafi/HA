@@ -1,5 +1,8 @@
 import logging
 from core.ha_client import HomeAssistantClient
+import warnings
+
+warnings.filterwarnings("ignore")
 
 logging.basicConfig(
     filename="logs/agent.log",

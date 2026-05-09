@@ -2,6 +2,9 @@ import yaml
 import logging
 from llm import create_llm_client
 
+import warnings
+
+warnings.filterwarnings("ignore")
 
 logging.basicConfig(
     filename="logs/agent.log",
