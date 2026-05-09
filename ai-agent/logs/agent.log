@@ -15,3 +15,30 @@
 2026-05-09 21:41:46,085 [INFO] LLM Provider: gemini
 2026-05-09 21:41:46,085 [INFO] LLM Model: gemini-2.5-flash
 2026-05-09 21:41:46,085 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on','entity_id': 'light.wohnzimmer'}]}
+2026-05-09 22:04:51,527 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:04:51,870 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 403 Forbidden"
+2026-05-09 22:10:26,101 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:10:26,517 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:11:53,028 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:11:53,158 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:15:07,210 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:15:07,331 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:16:11,193 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:16:11,526 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:20:57,045 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:20:57,615 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 400 Bad Request"
+2026-05-09 22:22:10,893 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:22:13,234 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:22:13,238 [INFO] LLM Provider: gemini
+2026-05-09 22:22:13,238 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:22:13,239 [INFO] LLM Antwort: {"actions": [{"type": "turn_on", "entity_id": "light.wohnzimmer"}]}
+2026-05-09 22:25:00,983 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:25:03,238 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:25:03,240 [INFO] LLM Provider: gemini
+2026-05-09 22:25:03,241 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:25:03,241 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}, {'type': 'turn_on', 'entity_id': 'light.flur'}]}
+2026-05-09 22:26:16,015 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 22:26:18,054 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 22:26:18,056 [INFO] LLM Provider: gemini
+2026-05-09 22:26:18,056 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 22:26:18,056 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}]}

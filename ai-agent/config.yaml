@@ -6,9 +6,9 @@ llm:
   provider: "gemini"
 
   gemini:
-    api_key: "AIzaSyDnvl2vfnTkGZ5_CinJteQD1dP4EXuuySA"
+    api_key: "${GEMINI_API_KEY}"
     model: "gemini-2.5-flash"
 
   openai:
-    api_key: "DEIN_OPENAI_API_KEY"
+    api_key: "${OPENAI_API_KEY}"
     model: "gpt-4.1-mini"
