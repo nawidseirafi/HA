@@ -1,0 +1,17 @@
+2026-05-02 19:43:40,860 [INFO] === HA Client Test gestartet ===
+2026-05-02 19:43:40,869 [INFO] Entities gefunden: 487
+2026-05-02 19:43:40,869 [INFO] update.home_assistant_supervisor_update = off
+2026-05-02 19:43:40,869 [INFO] update.home_assistant_core_update = off
+2026-05-02 19:43:40,869 [INFO] update.matter_server_update = off
+2026-05-02 19:43:40,869 [INFO] update.advanced_ssh_web_terminal_update = off
+2026-05-02 19:43:40,869 [INFO] update.file_editor_update = off
+2026-05-09 21:34:02,423 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 21:34:03,685 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 21:34:03,690 [INFO] LLM Provider: gemini
+2026-05-09 21:34:03,690 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 21:34:03,690 [INFO] LLM Antwort: Ja, ich bin bereit.
+2026-05-09 21:41:44,192 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-09 21:41:46,081 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-09 21:41:46,085 [INFO] LLM Provider: gemini
+2026-05-09 21:41:46,085 [INFO] LLM Model: gemini-2.5-flash
+2026-05-09 21:41:46,085 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on','entity_id': 'light.wohnzimmer'}]}

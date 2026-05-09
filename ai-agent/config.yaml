@@ -1,0 +1,14 @@
+home_assistant:
+  url: "http://192.168.178.159:8123"
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI3ZTEzNGQ3MTg0MDY0OGVjODI1MTZiMzE5YTI5ZGMzNyIsImlhdCI6MTc3NzcwMDAwOCwiZXhwIjoyMDkzMDYwMDA4fQ.10lZSyvgqa5bNU26YfPQ2IXiGTzbf9wb5heevOGdNVc"
+
+llm:
+  provider: "gemini"
+
+  gemini:
+    api_key: "AIzaSyDnvl2vfnTkGZ5_CinJteQD1dP4EXuuySA"
+    model: "gemini-2.5-flash"
+
+  openai:
+    api_key: "DEIN_OPENAI_API_KEY"
+    model: "gpt-4.1-mini"
