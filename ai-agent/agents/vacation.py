@@ -22,6 +22,12 @@ def main():
     llm = create_llm_client(config)
     ha = HomeAssistantClient()
 
+    vacation_mode = ha.get_state(
+        "input_boolean.vacation_mode"
+    )["state"] == "on"
+
+    logging.info(f"vacation_mode: {vacation_mode}")
+
     states = ha.get_states()
     logging.info(f"Entities gefunden: {len(states)}")
     for entity in states[:5]:

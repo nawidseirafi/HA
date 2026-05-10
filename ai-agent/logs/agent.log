@@ -14,3 +14,27 @@
 2026-05-10 20:05:23,113 [INFO] LLM Provider: gemini
 2026-05-10 20:05:23,113 [INFO] LLM Model: gemini-2.5-flash
 2026-05-10 20:05:23,113 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on','entity_id': 'light.wohnzimmer'}]}
+2026-05-10 20:47:42,525 [INFO] vacation_mode: True
+2026-05-10 20:47:42,555 [INFO] Entities gefunden: 618
+2026-05-10 20:47:42,555 [INFO] update.home_assistant_supervisor_update = off
+2026-05-10 20:47:42,555 [INFO] update.home_assistant_core_update = off
+2026-05-10 20:47:42,555 [INFO] update.home_assistant_operating_system_update = off
+2026-05-10 20:47:42,555 [INFO] update.matter_server_update = off
+2026-05-10 20:47:42,555 [INFO] update.advanced_ssh_web_terminal_update = off
+2026-05-10 20:47:42,555 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-10 20:47:43,980 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-10 20:47:43,982 [INFO] LLM Provider: gemini
+2026-05-10 20:47:43,982 [INFO] LLM Model: gemini-2.5-flash
+2026-05-10 20:47:43,982 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on','entity_id': 'light.wohnzimmer'}]}
+2026-05-10 20:47:59,943 [INFO] vacation_mode: False
+2026-05-10 20:47:59,968 [INFO] Entities gefunden: 618
+2026-05-10 20:47:59,968 [INFO] update.home_assistant_supervisor_update = off
+2026-05-10 20:47:59,968 [INFO] update.home_assistant_core_update = off
+2026-05-10 20:47:59,968 [INFO] update.home_assistant_operating_system_update = off
+2026-05-10 20:47:59,968 [INFO] update.matter_server_update = off
+2026-05-10 20:47:59,968 [INFO] update.advanced_ssh_web_terminal_update = off
+2026-05-10 20:47:59,968 [INFO] AFC is enabled with max remote calls: 10.
+2026-05-10 20:48:01,977 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-10 20:48:01,979 [INFO] LLM Provider: gemini
+2026-05-10 20:48:01,979 [INFO] LLM Model: gemini-2.5-flash
+2026-05-10 20:48:01,979 [INFO] LLM Antwort: {'actions': [{'type': 'turn_on', 'entity_id': 'light.wohnzimmer'}]}

@@ -278,6 +278,36 @@ views:
           {{ 'red' if ns.open > 0 else 'disabled' }}
         fill_container: true
 
+      - type: custom:mushroom-template-card
+        entity: input_boolean.vacation_mode
+        primary: >
+          {% if is_state(entity, 'on') %}
+            Urlaub aktiv
+          {% else %}
+            Zuhause-Modus
+          {% endif %}
+        secondary: >
+          {% if is_state(entity, 'on') %}
+            Anwesenheit wird simuliert
+          {% else %}
+            Normalbetrieb
+          {% endif %}
+        icon: >
+          {% if is_state(entity, 'on') %}
+            mdi:palm-tree
+          {% else %}
+            mdi:home
+          {% endif %}
+        icon_color: >
+          {% if is_state(entity, 'on') %}
+            green
+          {% else %}
+            blue
+          {% endif %}
+        tap_action:
+          action: toggle
+
+
       # ─────────────────────────────────────────────────────────
       # 7) Batterien
       # ─────────────────────────────────────────────────────────

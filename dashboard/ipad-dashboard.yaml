@@ -1,678 +1,494 @@
-# =============================================================================
-#  Home Assistant Wand-Dashboard für iPad (Querformat)
-# -----------------------------------------------------------------------------
-#  HACS-Voraussetzungen:
-#    - mushroom, mushroom-themes
-#    - mini-graph-card
-#    - auto-entities
-#    - layout-card
-#    - card-mod
-#  Entity-IDs an eigene Installation anpassen (Suchen/Ersetzen).
-# =============================================================================
-
-title: Zuhause
+title: iPad Home Dashboard
 views:
   - title: Übersicht
-    path: home
-    icon: mdi:home-variant
-    theme: Mushroom
-    panel: true        # <-- volle Breite, keine Sections
-    cards:
+    path: overview
+    icon: mdi:home
+    type: sections
+    max_columns: 4
+    badges: []
+    cards: []
 
-      # Ein einziger Container, der das gesamte Grid hält
-      - type: custom:layout-card
-        layout_type: custom:grid-layout
-        layout:
-          # 12-Spalten-Raster, nutzt den ganzen Bildschirm
-          grid-template-columns: repeat(12, 1fr)
-          grid-gap: 14px
-          grid-auto-flow: row dense
-          margin: 0
-          padding: 14px
-          # iPad-Querformat: keine künstliche Breitenbegrenzung
-          max-width: 100%
+    sections:
+      - type: grid
+        column_span: 4
         cards:
-
-          # ─────────────────────────────────────────────────────────
-          # 1) Hero – Kopfzeile (volle Breite)
-          # ─────────────────────────────────────────────────────────
-          - type: custom:mushroom-template-card
-            entity: weather.forecast_home
-            primary: >
-              {% set h = now().hour %}
-              {% if h < 5 %}Gute Nacht, Nawid
-              {% elif h < 11 %}Guten Morgen, Nawid
-              {% elif h < 18 %}Guten Tag, Nawid
-              {% else %}Guten Abend, Nawid{% endif %}
-            secondary: >
-              {{ now().strftime('%A, %d. %B %Y · %H:%M') }} ·
-              {{ state_attr(entity, 'temperature') }} °C · {{ state_attr(entity,
-              'humidity') }} % Luftfeuchte
-              {{ states(entity) | replace('_',' ') | title }}
-            icon: >
-              {% set s = states('weather.forecast_home') %}
-              {% if s == 'sunny' %}mdi:weather-sunny
-              {% elif s == 'partlycloudy' %}mdi:weather-partly-cloudy
-              {% elif s == 'cloudy' %}mdi:weather-cloudy
-              {% elif s == 'rainy' %}mdi:weather-rainy
-              {% elif s == 'pouring' %}mdi:weather-pouring
-              {% elif s == 'snowy' %}mdi:weather-snowy
-              {% elif s == 'fog' %}mdi:weather-fog
-              {% else %}mdi:weather-partly-cloudy{% endif %}
-            icon_color: amber
-            fill_container: true
-            multiline_secondary: true
-            view_layout:
-              grid-column: span 12
+          - type: markdown
+            content: |
+              # Guten Morgen, {{ user }} 👋
+              Alles im Blick. Alles unter Kontrolle.
             card_mod:
               style: |
                 ha-card {
-                  background: linear-gradient(135deg,#1d2630 0%,#252f3b 100%) !important;
-                  border-radius: 18px !important;
-                  border: none !important;
-                  padding: 10px 8px !important;
+                  background: transparent;
+                  box-shadow: none;
+                  color: white;
+                  padding: 8px 4px;
                 }
-                ha-card .primary { font-size: 24px !important; font-weight: 700 !important; }
-                ha-card .secondary { color: #8b95a3 !important; font-size: 13px !important; }
 
-          # ─────────────────────────────────────────────────────────
-          # 2) Personen (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
+      - type: grid
+        column_span: 4
+        cards:
+          - type: horizontal-stack
             cards:
-              - type: custom:mushroom-title-card
-                title: Wer ist zuhause?
-                subtitle: ""
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set temps = namespace(values=[]) %}
+                  {% set hums = namespace(values=[]) %}
+                  {% for floor in floors() %}
+                    {% for area in floor_areas(floor) %}
+                      {% for entity_id in area_entities(area) %}
+                        {% set state = states(entity_id) %}
+                        {% if state not in ['unknown', 'unavailable', 'none'] %}
+                          {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+                            {% set val = state | float(none) %}
+                            {% if val is not none %}
+                              {% set temps.values = temps.values + [val] %}
+                            {% endif %}
+                          {% endif %}
+                          {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+                            {% set val = state | float(none) %}
+                            {% if val is not none %}
+                              {% set hums.values = hums.values + [val] %}
+                            {% endif %}
+                          {% endif %}
+                          {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+                          {% if h_temp is not none %}
+                            {% set temps.values = temps.values + [h_temp | float] %}
+                          {% endif %}
+                          {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+                          {% if h_hum is not none %}
+                            {% set hums.values = hums.values + [h_hum | float] %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                    {% endfor %}
+                  {% endfor %}
+                  {% set avg_temp = ((temps.values | sum) / (temps.values | length)) | round(1) if temps.values | length > 0 else '--' %}
+                  {% set avg_hum = ((hums.values | sum) / (hums.values | length)) | round(0) if hums.values | length > 0 else '--' %}
+                  {{ avg_temp }} °C · {{ avg_hum }} %
+                secondary: Ø Hausklima
+                icon: mdi:home-thermometer-outline
+                icon_color: green
+                fill_container: true
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states.light | selectattr('state','eq','on') | list | count }} / {{ states.light | list | count }}
+                secondary: Lichter an
+                icon: mdi:lightbulb-on
+                icon_color: amber
+                fill_container: true
+                tap_action:
+                  action: call-service
+                  service: light.turn_off
+                  target:
+                    entity_id: all
+
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set ns = namespace(open=0,total=0) %}
+                  {% for s in states.binary_sensor %}
+                    {% set dc = state_attr(s.entity_id, 'device_class') %}
+                    {% if dc in ['window', 'door', 'opening'] %}
+                      {% set ns.total = ns.total + 1 %}
+                      {% if is_state(s.entity_id, 'on') %}
+                        {% set ns.open = ns.open + 1 %}
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ ns.open }}/{{ ns.total }}
+                secondary: >
+                  {% set ns = namespace(open=0) %}
+                  {% for s in states.binary_sensor %}
+                    {% set dc = state_attr(s.entity_id, 'device_class') %}
+                    {% if dc in ['window', 'door', 'opening'] and is_state(s.entity_id, 'on') %}
+                      {% set ns.open = ns.open + 1 %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if ns.open == 0 %}
+                    Alle geschlossen
+                  {% elif ns.open == 1 %}
+                    1 Fenster/Tür offen
+                  {% else %}
+                    {{ ns.open }} Fenster/Türen offen
+                  {% endif %}
+                icon: mdi:window-open-variant
+                icon_color: >
+                  {% set ns = namespace(open=0) %}
+                  {% for s in states.binary_sensor %}
+                    {% set dc = state_attr(s.entity_id, 'device_class') %}
+                    {% if dc in ['window', 'door', 'opening'] and is_state(s.entity_id, 'on') %}
+                      {% set ns.open = ns.open + 1 %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ 'red' if ns.open > 0 else 'disabled' }}
+                fill_container: true
+
+              - type: custom:mushroom-template-card
+                entity: input_boolean.post_im_briefkasten
+                layout: horizontal
+                fill_container: true
+                primary: >
+                  {% if is_state(entity, 'on') %}
+                    📬 Post ist da!
+                  {% else %}
+                    📭 Keine Post
+                  {% endif %}
+                secondary: >
+                  {% if is_state(entity, 'on') %}
+                    Bitte Briefkasten leeren
+                  {% else %}
+                    Alles ruhig
+                  {% endif %}
+                icon: >
+                  {% if is_state(entity, 'on') %}
+                    mdi:mailbox
+                  {% else %}
+                    mdi:mailbox-outline
+                  {% endif %}
+                icon_color: >
+                  {% if is_state(entity, 'on') %}
+                    red
+                  {% else %}
+                    green
+                  {% endif %}
+                tap_action:
+                  action: more-info
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: weather-forecast
+            entity: weather.forecast_home
+            name: Wetter
+            forecast_type: daily
+            show_forecast: true
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Favoriten
+            show_header_toggle: false
+            entities:
+              - entity: light.wohnzimmer # TODO: an echte Entity anpassen
+                name: Wohnzimmer Licht
+              - entity: light.kueche # TODO: an echte Entity anpassen
+                name: Küche Licht
+              - entity: light.terrasse # TODO: an echte Entity anpassen
+                name: Terrassenlicht
+              - entity: media_player.tv # TODO: an echte Entity anpassen
+                name: TV
+              - entity: switch.kaffeemaschine # TODO: an echte Entity anpassen
+                name: Kaffeemaschine
+              - entity: vacuum.saugroboter # TODO: an echte Entity anpassen
+                name: Saugroboter
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: custom:mini-graph-card
+            name: Energieverbrauch
+            icon: mdi:flash
+            entities:
+              - entity: sensor.energy_today # TODO: an echte Entity anpassen
+                name: Heute
+            hours_to_show: 24
+            points_per_hour: 1
+            show:
+              graph: bar
+              icon: true
+              name: true
+              state: true
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Räume
+            entities:
+              - entity: sensor.wohnzimmer_temperatur # TODO: an echte Entity anpassen
+                name: Wohnzimmer
+              - entity: sensor.kueche_temperatur # TODO: an echte Entity anpassen
+                name: Küche
+              - entity: sensor.schlafzimmer_temperatur # TODO: an echte Entity anpassen
+                name: Schlafzimmer
+              - entity: sensor.bad_temperatur # TODO: an echte Entity anpassen
+                name: Badezimmer
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: picture-glance
+            title: Eingang
+            camera_image: camera.eingang # TODO: an echte Kamera-Entity anpassen
+            camera_view: live
+            entities:
+              - binary_sensor.haustuer # TODO: an echte Entity anpassen
+              - light.eingang # TODO: an echte Entity anpassen
+          - type: picture-glance
+            title: Garten
+            camera_image: camera.garten # TODO: an echte Kamera-Entity anpassen
+            camera_view: live
+            entities:
+              - light.garten # TODO: an echte Entity anpassen
+              - binary_sensor.garten_bewegung # TODO: an echte Entity anpassen
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: calendar
+            title: Nächste Termine
+            entities:
+              - calendar.nawid
+              - calendar.familie
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Aktive Automationen
+            show_header_toggle: false
+            entities:
+              - entity: automation.guten_morgen # TODO: an echte Automation anpassen
+              - entity: automation.gute_nacht # TODO: an echte Automation anpassen
+              - entity: automation.bei_anwesenheit # TODO: an echte Automation anpassen
+              - entity: automation.bei_abwesenheit # TODO: an echte Automation anpassen
+              - entity: input_boolean.vacation_mode
+                name: Urlaubsmodus
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: entities
+            title: Benachrichtigungen
+            entities:
+              - entity: binary_sensor.haustuer # TODO: an echte Entity anpassen
+                name: Haustür
+              - entity: input_boolean.post_im_briefkasten
+                name: Briefkasten
+              - entity: update.home_assistant_core_update
+                name: Home Assistant Update
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: logbook
+            title: Verlauf
+            hours_to_show: 4
+            entities:
+              - light.wohnzimmer # TODO: an echte Entity anpassen
+              - light.kueche # TODO: an echte Entity anpassen
+              - input_boolean.post_im_briefkasten
+              - vacuum.saugroboter # TODO: an echte Entity anpassen
+              - switch.kaffeemaschine # TODO: an echte Entity anpassen
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: media-control
+            entity: media_player.spotify # TODO: an echte Entity anpassen
+
+      - type: grid
+        column_span: 1
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.abfall_naechster_termin
+            primary: >
+              {% set ns = namespace(result='') %}
+              {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+              {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
+              {% if next %}
+                {% set next_date = next.date %}
+                {% for typ, item in data.items() %}
+                  {% if item.date == next_date %}
+                    {% if 'Bio' in typ %}
+                      {% set ns.result = ns.result ~ '🍃 Bio ' %}
+                    {% elif 'Papier' in typ or 'Altpapier' in typ or 'Blaue' in typ %}
+                      {% set ns.result = ns.result ~ '▣ Papier ' %}
+                    {% elif 'Gelb' in typ or 'Leicht' in typ %}
+                      {% set ns.result = ns.result ~ '♻ Gelb ' %}
+                    {% elif 'Rest' in typ %}
+                      {% set ns.result = ns.result ~ '🗑 Rest ' %}
+                    {% else %}
+                      {% set ns.result = ns.result ~ typ ~ '  ' %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+              {{ ns.result if ns.result else 'Keine Termine' }}
+            secondary: >
+              {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
+              {% if next %}
+                {% set days = next.days_until | int %}
+                {% if days == 0 %}
+                  {{ next.date_de }} · Heute
+                {% elif days == 1 %}
+                  {{ next.date_de }} · Morgen
+                {% elif days == 2 %}
+                  {{ next.date_de }} · Übermorgen
+                {% else %}
+                  {{ next.date_de }} · in {{ days }} Tagen
+                {% endif %}
+              {% else %}
+                Kein Termin
+              {% endif %}
+            icon: mdi:trash-can-outline
+            icon_color: green
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:expander-card
+            clear: true
+            title-card:
+              type: custom:auto-entities
+              card_param: cards
+              card:
+                type: grid
+                columns: 1
+                square: false
+              filter:
+                include:
+                  - domain: sensor
+                    attributes:
+                      device_class: battery
+                    options:
+                      type: custom:mushroom-template-card
+                      layout: horizontal
+                      fill_container: true
+                      primary: "{{ state_attr(entity, 'friendly_name') }}"
+                      secondary: "Akkustand: {{ states(entity) }} %"
+                      icon: |
+                        {% set b = states(entity) | int(0) %}
+                        {% if b <= 10 %} mdi:battery-alert-variant-outline
+                        {% elif b <= 25 %} mdi:battery-20
+                        {% elif b <= 50 %} mdi:battery-50
+                        {% elif b <= 75 %} mdi:battery-70
+                        {% else %} mdi:battery-check
+                        {% endif %}
+                      icon_color: |
+                        {% set b = states(entity) | int(0) %}
+                        {% if b <= 15 %} red
+                        {% elif b <= 30 %} deep-orange
+                        {% elif b <= 60 %} amber
+                        {% else %} green
+                        {% endif %}
+                exclude:
+                  - state: unavailable
+                  - state: unknown
+              sort:
+                method: state
+                numeric: true
+                reverse: false
+                count: 1
+
+            cards:
               - type: custom:auto-entities
+                card_param: cards
                 card:
-                  type: custom:mushroom-chips-card
-                  alignment: start
-                card_param: chips
+                  type: grid
+                  columns: 1
+                  square: false
                 filter:
                   include:
-                    - domain: person
+                    - domain: sensor
+                      attributes:
+                        device_class: battery
                       options:
-                        type: entity
-                        icon_color: >
-                          {{ 'green' if states(entity) == 'home' else 'grey' }}
-                        content_info: name
-                        use_entity_picture: true
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') }}"
+                        secondary: "Akkustand: {{ states(entity) }} %"
+                        icon: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 10 %} mdi:battery-alert-variant-outline
+                          {% elif b <= 25 %} mdi:battery-20
+                          {% elif b <= 50 %} mdi:battery-50
+                          {% elif b <= 75 %} mdi:battery-70
+                          {% else %} mdi:battery-check
+                          {% endif %}
+                        icon_color: |
+                          {% set b = states(entity) | int(0) %}
+                          {% if b <= 15 %} red
+                          {% elif b <= 30 %} deep-orange
+                          {% elif b <= 60 %} amber
+                          {% else %} green
+                          {% endif %}
                         tap_action:
                           action: more-info
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: #1e242c !important;
-                      border-radius: 18px !important;
-                      border: none !important;
-                      padding: 12px !important;
-                    }
+                  exclude:
+                    - state: unavailable
+                    - state: unknown
+                sort:
+                  method: state
+                  numeric: true
+                  reverse: false
 
-          # ─────────────────────────────────────────────────────────
-          # 4) Stromverbrauch (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: Stromverbrauch
-              - type: custom:layout-card
-                layout_type: custom:grid-layout
-                layout:
-                  grid-template-columns: 1fr 1fr 1fr
-                  grid-gap: 10px
-                cards:
-                  - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.power_consumption') }} W"
-                    secondary: Aktuell
-                    icon: mdi:flash
-                    icon_color: amber
-                    card_mod: &mini_tile
-                      style: |
-                        ha-card {
-                          background: #242b34 !important;
-                          border-radius: 12px !important;
-                          border: none !important;
-                          text-align: center;
-                          padding: 8px !important;
-                        }
-                        ha-card .primary { font-size: 18px !important; font-weight: 700 !important; }
-                        ha-card .secondary { font-size: 11px !important; }
-                  - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.energy_today') }} kWh"
-                    secondary: Heute
-                    icon: mdi:counter
-                    icon_color: orange
-                    card_mod: *mini_tile
-                  - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.energy_month') }} kWh"
-                    secondary: "{{ now().strftime('%B') }}"
-                    icon: mdi:calendar-month
-                    icon_color: deep-orange
-                    card_mod: *mini_tile
-              - type: custom:mini-graph-card
-                entities:
-                  - entity: sensor.power_consumption
-                    name: Leistung
-                    color: '#f39c12'
-                hours_to_show: 24
-                points_per_hour: 2
-                line_width: 2
-                smoothing: true
-                height: 60
-                show:
-                  labels: false
-                  extrema: false
-                  name: false
-                  icon: false
-                  state: false
-                  legend: false
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: linear-gradient(180deg,rgba(243,156,18,.18) 0%,rgba(243,156,18,0) 100%) !important;
-                      border-radius: 12px !important;
-                      border: none !important;
-                      box-shadow: none !important;
-                      padding: 4px !important;
-                      margin-top: 8px;
-                    }
+  - title: Räume
+    path: rooms
+    icon: mdi:floor-plan
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: entities
+            title: Wohnzimmer
+            entities:
+              - light.wohnzimmer # TODO: an echte Entity anpassen
+              - media_player.tv # TODO: an echte Entity anpassen
+              - sensor.wohnzimmer_temperatur # TODO: an echte Entity anpassen
+              - cover.wohnzimmer # TODO: an echte Entity anpassen
 
-          # ─────────────────────────────────────────────────────────
-          # 5) Licht & Beschattung (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: Licht & Beschattung
-              - type: custom:layout-card
-                layout_type: custom:grid-layout
-                layout:
-                  grid-template-columns: 1fr 1fr 1fr
-                  grid-gap: 10px
-                cards:
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {{ states.light | selectattr('state','eq','on') | list | count }}
-                      / {{ states.light | list | count }}
-                    secondary: Lichter an
-                    icon: mdi:lightbulb-on
-                    icon_color: amber
-                    fill_container: true
-                    tap_action:
-                      action: call-service
-                      service: light.turn_off
-                      target:
-                        entity_id: all
-                    card_mod: &inner_tile
-                      style: |
-                        ha-card {
-                          background: #242b34 !important;
-                          border-radius: 14px !important;
-                          border: none !important;
-                          padding: 10px !important;
-                        }
-                  - type: custom:mushroom-template-card
-                    primary: >
-                        {% set ns = namespace(open=0,total=0) %}
-                        {% for s in states.binary_sensor %}
-                          {% set dc = state_attr(s.entity_id, 'device_class') %}
-                          {% if dc in ['window', 'door', 'opening'] %}
-                            {% set ns.total = ns.total + 1 %}
-                            {% if is_state(s.entity_id, 'on') %}
-                              {% set ns.open = ns.open + 1 %}
-                            {% endif %}
-                          {% endif %}
-                        {% endfor %}
-                        {{ ns.open }}/{{ ns.total }}
-                    secondary: >
-                        {% set ns = namespace(open=0) %}
-                        {% for s in states.binary_sensor %}
-                          {% set dc = state_attr(s.entity_id, 'device_class') %}
-                    
-                          {% if dc in ['window', 'door', 'opening']
-                                and is_state(s.entity_id, 'on') %}
-                            {% set ns.open = ns.open + 1 %}
-                          {% endif %}
-                        {% endfor %}
-                        {% if ns.open == 0 %}
-                          Alle geschlossen
-                        {% elif ns.open == 1 %}
-                          1 Fenster/Tür offen
-                        {% else %}
-                          {{ ns.open }} Fenster/Türen offen
-                        {% endif %}
-                    icon: mdi:window-open-variant
-                    icon_color: >
-                        {% set ns = namespace(open=0) %}
-                        {% for s in states.binary_sensor %}
-                          {% set dc = state_attr(s.entity_id, 'device_class') %}
-                    
-                          {% if dc in ['window', 'door', 'opening']
-                                and is_state(s.entity_id, 'on') %}
-                            {% set ns.open = ns.open + 1 %}
-                          {% endif %}
-                        {% endfor %}
-                        {{ 'red' if ns.open > 0 else 'disabled' }}
-                    fill_container: true
-                    card_mod: *inner_tile
+      - type: grid
+        cards:
+          - type: entities
+            title: Küche
+            entities:
+              - light.kueche # TODO: an echte Entity anpassen
+              - switch.kaffeemaschine # TODO: an echte Entity anpassen
+              - sensor.kueche_temperatur # TODO: an echte Entity anpassen
 
-          # ─────────────────────────────────────────────────────────
-          # 6) Wetter (6/12)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: Wetter
-              - type: weather-forecast
-                entity: weather.forecast_home
-                forecast_type: daily
-                show_current: false
-                show_forecast: true
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: #1e242c !important;
-                      border-radius: 18px !important;
-                      border: none !important;
-                      box-shadow: none !important;
-                    }
+      - type: grid
+        cards:
+          - type: entities
+            title: Schlafzimmer
+            entities:
+              - light.schlafzimmer # TODO: an echte Entity anpassen
+              - cover.schlafzimmer # TODO: an echte Entity anpassen
+              - sensor.schlafzimmer_temperatur # TODO: an echte Entity anpassen
 
-          # ─────────────────────────────────────────────────────────
-          # 7) Batterien
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 6
-            cards:
-              - type: custom:mushroom-title-card
-                title: 🔋 Batterie Status
+  - title: Agenten
+    path: agents
+    icon: mdi:robot
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: entities
+            title: AI Agenten
+            show_header_toggle: false
+            entities:
+              - entity: input_boolean.vacation_mode
+                name: Urlaubsmodus manuell
+              - entity: input_boolean.ai_agent_enabled # TODO: an echte Entity anpassen
+                name: AI Agent aktiv
+              - entity: sensor.ai_agent_status # TODO: an echte Entity anpassen
+                name: Agent Status
+              - entity: sensor.ai_agent_last_action # TODO: an echte Entity anpassen
+                name: Letzte Aktion
+              - entity: sensor.ai_agent_provider # TODO: an echte Entity anpassen
+                name: LLM Provider
 
-              - type: custom:expander-card
-                clear: true
-                title-card:
-                  type: custom:auto-entities
-                  card_param: cards
-                  card:
-                    type: grid
-                    columns: 1
-                    square: false
-                  filter:
-                    include:
-                      - domain: sensor
-                        attributes:
-                          device_class: battery
-                        options:
-                          type: custom:mushroom-template-card
-                          layout: horizontal
-                          fill_container: true
-                          primary: "{{ state_attr(entity, 'friendly_name') }}"
-                          secondary: "Akkustand: {{ states(entity) }} %"
-                          icon: |
-                            {% set b = states(entity) | int(0) %}
-                            {% if b <= 10 %} mdi:battery-alert-variant-outline
-                            {% elif b <= 25 %} mdi:battery-20
-                            {% elif b <= 50 %} mdi:battery-50
-                            {% elif b <= 75 %} mdi:battery-70
-                            {% else %} mdi:battery-check
-                            {% endif %}
-                          icon_color: |
-                            {% set b = states(entity) | int(0) %}
-                            {% if b <= 15 %} red
-                            {% elif b <= 30 %} deep-orange
-                            {% elif b <= 60 %} amber
-                            {% else %} green
-                            {% endif %}
-                    exclude:
-                      - state: unavailable
-                      - state: unknown
-                  sort:
-                    method: state
-                    numeric: true
-                    reverse: false
-                    count: 1
-
-                cards:
-                  - type: custom:auto-entities
-                    card_param: cards
-                    card:
-                      type: grid
-                      columns: 1
-                      square: false
-                    filter:
-                      include:
-                        - domain: sensor
-                          attributes:
-                            device_class: battery
-                          options:
-                            type: custom:mushroom-template-card
-                            layout: horizontal
-                            fill_container: true
-                            primary: "{{ state_attr(entity, 'friendly_name') }}"
-                            secondary: "Akkustand: {{ states(entity) }} %"
-                            icon: |
-                              {% set b = states(entity) | int(0) %}
-                              {% if b <= 10 %} mdi:battery-alert-variant-outline
-                              {% elif b <= 25 %} mdi:battery-20
-                              {% elif b <= 50 %} mdi:battery-50
-                              {% elif b <= 75 %} mdi:battery-70
-                              {% else %} mdi:battery-check
-                              {% endif %}
-                            icon_color: |
-                              {% set b = states(entity) | int(0) %}
-                              {% if b <= 15 %} red
-                              {% elif b <= 30 %} deep-orange
-                              {% elif b <= 60 %} amber
-                              {% else %} green
-                              {% endif %}
-                            tap_action:
-                              action: more-info
-                      exclude:
-                        - state: unavailable
-                        - state: unknown
-                    sort:
-                      method: state
-                      numeric: true
-                      reverse: false
-
-
-          # ─────────────────────────────────────────────────────────
-          # 8) Status (volle Breite, 5 Kacheln)
-          # ─────────────────────────────────────────────────────────
-          - type: vertical-stack
-            view_layout:
-              grid-column: span 12
-            cards:
-              - type: custom:mushroom-title-card
-                title: Status
-              - type: custom:layout-card
-                layout_type: custom:grid-layout
-                layout:
-                  grid-template-columns: repeat(5, 1fr)
-                  grid-gap: 10px
-                cards:
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {% set temps = namespace(values=[]) %}
-                      {% set hums = namespace(values=[]) %}
-
-                      {% for area in floor_areas('Basement') %}
-                        {% for entity_id in area_entities(area) %}
-
-                          {% set state = states(entity_id) %}
-
-                          {% if state not in ['unknown', 'unavailable', 'none'] %}
-
-                            {# Temperatur Sensoren #}
-                            {% if state_attr(entity_id, 'device_class') == 'temperature' %}
-                              {% set val = state | float(none) %}
-                              {% if val is not none %}
-                                {% set temps.values = temps.values + [val] %}
-                              {% endif %}
-                            {% endif %}
-
-                            {# Luftfeuchtigkeit Sensoren #}
-                            {% if state_attr(entity_id, 'device_class') == 'humidity' %}
-                              {% set val = state | float(none) %}
-                              {% if val is not none %}
-                                {% set hums.values = hums.values + [val] %}
-                              {% endif %}
-                            {% endif %}
-
-                            {# humidifier Temperatur #}
-                            {% set h_temp = state_attr(entity_id, 'current_temperature') %}
-                            {% if h_temp is not none %}
-                              {% set temps.values = temps.values + [h_temp | float] %}
-                            {% endif %}
-
-                            {# humidifier Luftfeuchtigkeit #}
-                            {% set h_hum = state_attr(entity_id, 'current_humidity') %}
-                            {% if h_hum is not none %}
-                              {% set hums.values = hums.values + [h_hum | float] %}
-                            {% endif %}
-
-                          {% endif %}
-
-                        {% endfor %}
-                      {% endfor %}
-
-                      {% set avg_temp =
-                        ((temps.values | sum) / (temps.values | length)) | round(1)
-                        if temps.values | length > 0 else '--'
-                      %}
-
-                      {% set avg_hum =
-                        ((hums.values | sum) / (hums.values | length)) | round(0)
-                        if hums.values | length > 0 else '--'
-                      %}
-
-                      {{ avg_temp }} °C · {{ avg_hum }} %
-
-                    secondary: Ø Keller
-                    icon: mdi:home-floor-b
-                    icon_color: teal
-                    fill_container: true
-                    card_mod: *inner_tile
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {% set temps = namespace(values=[]) %}
-                      {% set hums = namespace(values=[]) %}
-
-                      {% for floor in floors() %}
-                        {% if floor != 'Basement' %}
-                          {% for area in floor_areas(floor) %}
-                            {% for entity_id in area_entities(area) %}
-
-                              {% set state = states(entity_id) %}
-
-                              {% if state not in ['unknown', 'unavailable', 'none'] %}
-
-                                {% if state_attr(entity_id, 'device_class') == 'temperature' %}
-                                  {% set val = state | float(none) %}
-                                  {% if val is not none %}
-                                    {% set temps.values = temps.values + [val] %}
-                                  {% endif %}
-                                {% endif %}
-
-                                {% if state_attr(entity_id, 'device_class') == 'humidity' %}
-                                  {% set val = state | float(none) %}
-                                  {% if val is not none %}
-                                    {% set hums.values = hums.values + [val] %}
-                                  {% endif %}
-                                {% endif %}
-
-                                {% set h_temp = state_attr(entity_id, 'current_temperature') %}
-                                {% if h_temp is not none %}
-                                  {% set temps.values = temps.values + [h_temp | float] %}
-                                {% endif %}
-
-                                {% set h_hum = state_attr(entity_id, 'current_humidity') %}
-                                {% if h_hum is not none %}
-                                  {% set hums.values = hums.values + [h_hum | float] %}
-                                {% endif %}
-
-                              {% endif %}
-
-                            {% endfor %}
-                          {% endfor %}
-                        {% endif %}
-                      {% endfor %}
-
-                      {% set avg_temp =
-                        ((temps.values | sum) / (temps.values | length)) | round(1)
-                        if temps.values | length > 0 else '--'
-                      %}
-
-                      {% set avg_hum =
-                        ((hums.values | sum) / (hums.values | length)) | round(0)
-                        if hums.values | length > 0 else '--'
-                      %}
-
-                      {{ avg_temp }} °C · {{ avg_hum }} %
-
-                    secondary: Ø Haus ohne Keller
-                    icon: mdi:home-thermometer-outline
-                    icon_color: green
-                    fill_container: true
-                    card_mod: *inner_tile
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {% set ns = namespace(min=101, name='Keine Batterie gefunden') %}
-                      {% for entity in states.sensor %}
-                        {% set entity_id = entity.entity_id %}
-                        {% if entity.attributes.device_class | default('') == 'battery'
-                          and entity.state not in ['unknown', 'unavailable', 'none'] %}
-                          {% set b = entity.state | int(none) %}
-                          {% if b is not none and b < ns.min %}
-                            {% set ns.min = b %}
-                            {% set ns.name = state_attr(entity_id, 'friendly_name') | default(entity_id, true) %}
-                          {% endif %}
-                        {% endif %}
-                      {% endfor %}
-                      {% if ns.min < 101 %}
-                        {{ ns.min }} %
-                      {% else %}
-                        -- %
-                      {% endif %}
-                    secondary: >
-                      {% set ns = namespace(min=101, name='Keine Batterie gefunden') %}
-                      {% for entity in states.sensor %}
-                        {% if entity.attributes.device_class | default('') == 'battery'
-                          and entity.state not in ['unknown', 'unavailable', 'none'] %}
-                          {% set b = entity.state | int(101) %}
-                          {% if b < ns.min %}
-                            {% set ns.min = b %}
-                            {% set ns.name = entity.attributes.friendly_name | default(entity.entity_id, true) %}
-                          {% endif %}
-                        {% endif %}
-                      {% endfor %}
-                      {{ ns.name }}
-                    icon: >
-                      {% set ns = namespace(min=101) %}
-                      {% for entity in states.sensor %}
-                        {% if entity.attributes.device_class | default('') == 'battery'
-                          and entity.state not in ['unknown', 'unavailable', 'none'] %}
-                          {% set b = entity.state | int(none) %}
-                          {% if b is not none and b < ns.min %}
-                            {% set ns.min = b %}
-                          {% endif %}
-                        {% endif %}
-                      {% endfor %}
-
-                      {% if ns.min <= 10 %} mdi:battery-alert-variant-outline
-                      {% elif ns.min <= 25 %} mdi:battery-20
-                      {% elif ns.min <= 50 %} mdi:battery-50
-                      {% elif ns.min <= 75 %} mdi:battery-70
-                      {% else %} mdi:battery-check
-                      {% endif %}
-
-                    icon_color: >
-                      {% set ns = namespace(min=101) %}
-                      {% for entity in states.sensor %}
-                        {% if entity.attributes.device_class | default('') == 'battery'
-                          and entity.state not in ['unknown', 'unavailable', 'none'] %}
-                          {% set b = entity.state | int(none) %}
-                          {% if b is not none and b < ns.min %}
-                            {% set ns.min = b %}
-                          {% endif %}
-                        {% endif %}
-                      {% endfor %}
-
-                      {% if ns.min <= 15 %} red
-                      {% elif ns.min <= 30 %} deep-orange
-                      {% elif ns.min <= 60 %} amber
-                      {% else %} green
-                      {% endif %}
-
-                    fill_container: true
-                    tap_action:
-                      action: navigate
-                      navigation_path: /lovelace/batterien
-                    card_mod: *inner_tile
-                  - type: custom:mushroom-template-card
-                    entity: input_boolean.post_im_briefkasten
-                    primary: |
-                      {% if is_state(entity, 'on') %}
-                        📬 Post ist da!
-                      {% else %}
-                        📭 Keine Post
-                      {% endif %}
-                    secondary: |
-                      {% if is_state(entity, 'on') %}
-                        Bitte Briefkasten leeren
-                      {% else %}
-                        Alles ruhig
-                      {% endif %}
-                    icon: |
-                      {% if is_state(entity, 'on') %}
-                        mdi:mailbox
-                      {% else %}
-                        mdi:mailbox-outline
-                      {% endif %}
-                    icon_color: |
-                      {% if is_state(entity, 'on') %}
-                        red
-                      {% else %}
-                        green
-                      {% endif %}
-                    fill_container: true
-                    tap_action:
-                      action: more-info
-                    card_mod: *inner_tile
-                  - type: custom:mushroom-template-card
-                    entity: sensor.abfall_naechster_termin
-                    primary: >
-                      {% set ns = namespace(result='') %}
-                      {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
-                      {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-
-                      {% if next %}
-                        {% set next_date = next.date %}
-
-                        {% for typ, item in data.items() %}
-                          {% if item.date == next_date %}
-                            {% if 'Bio' in typ %}
-                              {% set ns.result = ns.result ~ '🍃 Bio ' %}
-                            {% elif 'Papier' in typ or 'Altpapier' in typ or 'Blaue' in typ %}
-                              {% set ns.result = ns.result ~ '▣ Papier ' %}
-                            {% elif 'Gelb' in typ or 'Leicht' in typ %}
-                              {% set ns.result = ns.result ~ '♻ Gelb ' %}
-                            {% elif 'Rest' in typ %}
-                              {% set ns.result = ns.result ~ '🗑 Rest ' %}
-                            {% else %}
-                              {% set ns.result = ns.result ~ typ ~ '  ' %}
-                            {% endif %}
-                          {% endif %}
-                        {% endfor %}
-                      {% endif %}
-
-                      {{ ns.result if ns.result else 'Keine Termine' }}
-
-                    secondary: >
-                      {% set next = state_attr('sensor.abfall_naechster_termin', 'next') %}
-                      {% if next %}
-                        {% set days = next.days_until | int %}
-                        {% if days == 0 %}
-                          {{ next.date_de }} · Heute
-                        {% elif days == 1 %}
-                          {{ next.date_de }} · Morgen
-                        {% elif days == 2 %}
-                          {{ next.date_de }} · Übermorgen
-                        {% else %}
-                          {{ next.date_de }} · in {{ days }} Tagen
-                        {% endif %}
-                      {% else %}
-                        Kein Termin
-                      {% endif %}
-
-                    icon: mdi:trash-can-outline
-                    icon_color: green
-                    fill_container: true
-                    card_mod: *inner_tile
+      - type: grid
+        cards:
+          - type: logbook
+            title: Agent Verlauf
+            hours_to_show: 24
+            entities:
+              - input_boolean.vacation_mode
+              - sensor.ai_agent_status # TODO: an echte Entity anpassen
+              - sensor.ai_agent_last_action # TODO: an echte Entity anpassen
