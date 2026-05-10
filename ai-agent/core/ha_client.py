@@ -4,7 +4,7 @@ import logging
 
 
 class HomeAssistantClient:
-    def __init__(self, config_path="/opt/ai-agent/config.yaml"):
+    def __init__(self, config_path="config.yaml"):
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 

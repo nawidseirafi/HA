@@ -1,6 +1,7 @@
 import yaml
 import logging
 from llm import create_llm_client
+from core.ha_client import HomeAssistantClient
 
 import warnings
 
@@ -12,15 +13,19 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
-
 def load_config():
     with open("config.yaml", "r") as f:
         return yaml.safe_load(f)
 
-
 def main():
     config = load_config()
     llm = create_llm_client(config)
+    ha = HomeAssistantClient()
+
+    states = ha.get_states()
+    logging.info(f"Entities gefunden: {len(states)}")
+    for entity in states[:5]:
+        logging.info(f"{entity['entity_id']} = {entity['state']}")
 
     response = llm.generate(
         system="Du bist ein Home-Assistant-Agent. Du darfst ausschließlich gültiges JSON zurückgeben. " \
