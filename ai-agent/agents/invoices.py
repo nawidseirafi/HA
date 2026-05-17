@@ -15,13 +15,18 @@ if str(BASE_DIR) not in sys.path:
 from core.invoice_email import EmailConfig
 from core.invoice_portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
 from core.invoice_scanner import HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+from core.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
 
 
-def load_config() -> InvoiceAgentConfig:
+def load_raw_config() -> dict:
     load_dotenv(BASE_DIR / ".env")
 
     with (BASE_DIR / "config.yaml").open("r") as f:
-        raw_config = yaml.safe_load(f) or {}
+        return yaml.safe_load(f) or {}
+
+
+def load_config() -> InvoiceAgentConfig:
+    raw_config = load_raw_config()
 
     invoice_config = raw_config.get("invoice_agent", {})
     email_config = invoice_config.get("email", {})
@@ -45,6 +50,22 @@ def load_config() -> InvoiceAgentConfig:
     )
 
 
+def load_tax_config() -> TaxExportConfig:
+    raw_config = load_raw_config()
+    invoice_config = raw_config.get("invoice_agent", {})
+    tax_config = raw_config.get("tax_export", {})
+    data_dir = BASE_DIR / "data" / "invoices"
+
+    rules = dict(DEFAULT_CATEGORY_RULES)
+    rules.update(tax_config.get("categories", {}))
+
+    return TaxExportConfig(
+        database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
+        output_dir=_path(tax_config.get("output_dir", data_dir / "tax")),
+        category_rules=rules,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Rechnungen suchen, katalogisieren und monatlich ablegen.")
     parser.add_argument("--once", action="store_true", help="Einmal scannen und beenden.")
@@ -52,6 +73,7 @@ def main():
     parser.add_argument("--reprocess", action="store_true", help="Bereits bekannte Dateien erneut auswerten.")
     parser.add_argument("--portal-login", choices=["huk24"], help="Interaktiven Portal-Login starten und Session speichern.")
     parser.add_argument("--portal-check", choices=["huk24"], help="Nur ein Portal pruefen und Downloads speichern.")
+    parser.add_argument("--tax-year", type=int, help="Steuer-Export fuer dieses Jahr erzeugen, z.B. 2025.")
     args = parser.parse_args()
 
     _setup_logging()
@@ -80,9 +102,15 @@ def main():
         watch(config)
         return
 
-    result = scan_once(config)
-    logging.info("Invoice-Agent fertig: %s", result)
-    print(result)
+    if args.once or not args.tax_year:
+        result = scan_once(config)
+        logging.info("Invoice-Agent fertig: %s", result)
+        print(result)
+
+    if args.tax_year:
+        tax_result = export_tax_year(load_tax_config(), args.tax_year)
+        logging.info("Tax-Export fertig: %s", tax_result)
+        print(tax_result)
 
 
 def _path(value) -> Path:

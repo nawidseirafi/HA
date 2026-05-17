@@ -237,6 +237,45 @@ Bereits bekannte Dateien erneut auswerten, zum Beispiel nach Verbesserungen an d
 ./venv/bin/python agents/invoices.py --once --reprocess
 ```
 
+## Steuer-Export
+
+Der Steuer-Export erzeugt eine Jahresuebersicht aus der bestehenden `invoices.db`. Das ist eine Vorbereitung fuer die Einkommensteuer, keine Steuerberatung.
+
+Start:
+
+```bash
+./venv/bin/python agents/invoices.py --tax-year 2026
+```
+
+Erst Rechnungen scannen und danach direkt den Steuer-Export erzeugen:
+
+```bash
+./venv/bin/python agents/invoices.py --once --tax-year 2026
+```
+
+Der separate Agent bleibt als Kurzweg verfuegbar:
+
+```bash
+./venv/bin/python agents/tax_export.py --year 2026
+```
+
+Ausgabe:
+
+```text
+data/invoices/tax/2025/einkommensteuer_2025.csv
+data/invoices/tax/2025/einkommensteuer_2025.xlsx
+```
+
+Die Excel-Datei enthaelt drei Tabellen:
+
+```text
+Alle Belege
+Summen
+Review
+```
+
+Die Regeln stehen in `config.yaml` unter `tax_export.categories`. Nicht sicher zuordenbare oder auffaellige Belege landen in `Review`.
+
 ## Systemd-Service auf Debian
 
 Beispiel fuer `/etc/systemd/system/invoice-agent.service`:
