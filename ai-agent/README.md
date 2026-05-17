@@ -36,10 +36,17 @@ Die Python-Pakete stehen in `requirements.txt`:
 ```text
 google-genai
 openai
+playwright
 python-dotenv
 PyYAML
 pypdf
 requests
+```
+
+Fuer Portal-Downloads wird zusaetzlich ein Playwright-Browser benoetigt:
+
+```bash
+./venv/bin/playwright install chromium
 ```
 
 ## Konfiguration
@@ -157,6 +164,58 @@ invoice_agent:
 Mit `only_on_changes: true` meldet der Agent nur, wenn neue Rechnungen archiviert wurden oder Dateien in `review` gelandet sind. Reine Duplikat-Laeufe bleiben still.
 
 Die Benachrichtigung nutzt die bestehende Home-Assistant-API-Konfiguration oben in `config.yaml`.
+
+## Portal-Downloads HUK24
+
+Fuer Anbieter wie HUK24, bei denen Rechnungen nur im Kundenportal liegen, nutzt der Agent Playwright mit einer gespeicherten Browser-Session.
+
+In `config.yaml`:
+
+```yaml
+invoice_agent:
+  portals:
+    enabled: true
+    providers:
+      - name: "huk24"
+        enabled: true
+        url: "https://www.huk24.de/meine-huk24/postfach/"
+        session_path: "./data/invoices/portal_sessions/huk24.json"
+        download_dir: "./data/invoices/portal_downloads/huk24"
+        headless: true
+        wait_seconds: 20
+```
+
+Einmalig interaktiv einloggen:
+
+```bash
+./venv/bin/python agents/invoices.py --portal-login huk24
+```
+
+Dann im Browser bei HUK24 einloggen, ggf. 2FA bestaetigen und bis ins Postfach navigieren. Danach im Terminal Enter druecken. Der Agent speichert die Session unter `session_path`.
+
+Danach laeuft HUK24 im normalen Scan mit:
+
+```bash
+./venv/bin/python agents/invoices.py --once
+```
+
+Nur HUK24 pruefen, ohne den kompletten Rechnungsbestand zu scannen:
+
+```bash
+./venv/bin/python agents/invoices.py --portal-check huk24
+```
+
+Der HUK24-Check schreibt Debug-Dateien nach `data/invoices/portal_debug/huk24`, damit man sehen kann, welche Postfach-Seite Playwright wirklich sieht.
+
+Wenn HUK24 erneut Login oder 2FA verlangt, meldet der Agent das im Log. Dann `--portal-login huk24` erneut ausfuehren.
+
+Wenn Home-Assistant-Benachrichtigungen aktiviert sind, sendet der Agent in diesem Fall zusaetzlich eine eigene Meldung:
+
+```text
+HUK24 Login erforderlich
+```
+
+Die Meldung enthaelt den passenden `--portal-login huk24` Befehl.
 
 ## Rechnungs-Agent starten
 

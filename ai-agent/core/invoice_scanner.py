@@ -8,6 +8,7 @@ from core.invoice_archiver import archive_invoice, copy_to_review
 from core.invoice_catalog import InvoiceCatalog
 from core.invoice_email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
 from core.invoice_extractor import extract_metadata, file_sha256
+from core.invoice_portals import PortalConfig, fetch_portal_documents
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv", ".eml"}
@@ -25,6 +26,7 @@ class InvoiceAgentConfig:
     confidence_threshold: float = 0.5
     reprocess_existing: bool = False
     email: EmailConfig = None
+    portals: PortalConfig = None
     home_assistant_notifications: "HomeAssistantNotificationConfig" = None
 
 
@@ -43,6 +45,11 @@ class ScanResult:
     review: int = 0
     duplicates: int = 0
     skipped: int = 0
+    portal_login_required: list[str] = None
+
+    def __post_init__(self):
+        if self.portal_login_required is None:
+            self.portal_login_required = []
 
 
 def scan_once(config: InvoiceAgentConfig) -> ScanResult:
@@ -51,6 +58,13 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
     result = ScanResult()
 
     try:
+        if config.portals and config.portals.enabled:
+            portal_results = fetch_portal_documents(config.portals)
+            for portal_result in portal_results:
+                logging.info("Portal Scan: %s", portal_result)
+                if portal_result.needs_login:
+                    result.portal_login_required.append(portal_result.provider)
+
         if config.email and config.email.enabled:
             try:
                 email_result = fetch_imap_attachments(
@@ -90,6 +104,7 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
         catalog.close()
 
     _notify_home_assistant(config, result)
+    _notify_portal_logins(config, result)
     return result
 
 
@@ -115,6 +130,10 @@ def _ensure_dirs(config: InvoiceAgentConfig) -> None:
 def _iter_input_files(config: InvoiceAgentConfig):
     for root in (config.inbox_dir, config.email_attachment_dir):
         yield from _iter_files(root)
+    if config.portals:
+        for provider in config.portals.providers:
+            if provider.download_dir:
+                yield from _iter_files(provider.download_dir)
 
 
 def _iter_files(root: Path):
@@ -154,3 +173,35 @@ def _notify_home_assistant(config: InvoiceAgentConfig, result: ScanResult) -> No
         )
     except Exception as exc:
         logging.warning("Home-Assistant-Benachrichtigung fehlgeschlagen: %s", exc)
+
+
+def _notify_portal_logins(config: InvoiceAgentConfig, result: ScanResult) -> None:
+    notify_config = config.home_assistant_notifications
+    if not notify_config or not notify_config.enabled or not result.portal_login_required:
+        return
+
+    for provider in result.portal_login_required:
+        if provider == "huk24":
+            message = (
+                "HUK24 verlangt eine neue Anmeldung.\n\n"
+                "Bitte auf dem Mac oder Agent-Server ausfuehren:\n\n"
+                "`../../venv/bin/python agents/invoices.py --portal-login huk24`\n\n"
+                "Danach bei HUK24 einloggen, ggf. 2FA bestaetigen, bis ins Postfach navigieren "
+                "und im Terminal Enter druecken."
+            )
+            title = "HUK24 Login erforderlich"
+            notification_id = "invoice_agent_huk24_login"
+        else:
+            message = f"{provider} verlangt eine neue Anmeldung."
+            title = "Portal Login erforderlich"
+            notification_id = f"invoice_agent_{provider}_login"
+
+        try:
+            ha = HomeAssistantClient()
+            ha.persistent_notification(
+                title=title,
+                message=message,
+                notification_id=notification_id,
+            )
+        except Exception as exc:
+            logging.warning("Home-Assistant-Portal-Benachrichtigung fehlgeschlagen: %s", exc)

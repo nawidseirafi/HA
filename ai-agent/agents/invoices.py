@@ -13,6 +13,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from core.invoice_email import EmailConfig
+from core.invoice_portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
 from core.invoice_scanner import HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
 
 
@@ -24,6 +25,7 @@ def load_config() -> InvoiceAgentConfig:
 
     invoice_config = raw_config.get("invoice_agent", {})
     email_config = invoice_config.get("email", {})
+    portals_config = invoice_config.get("portals", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
     data_dir = BASE_DIR / "data" / "invoices"
 
@@ -38,6 +40,7 @@ def load_config() -> InvoiceAgentConfig:
         confidence_threshold=float(invoice_config.get("confidence_threshold", 0.5)),
         reprocess_existing=bool(invoice_config.get("reprocess_existing", False)),
         email=_load_email_config(email_config),
+        portals=_load_portal_config(portals_config, data_dir),
         home_assistant_notifications=_load_ha_notification_config(ha_notification_config),
     )
 
@@ -47,12 +50,31 @@ def main():
     parser.add_argument("--once", action="store_true", help="Einmal scannen und beenden.")
     parser.add_argument("--watch", action="store_true", help="Dauerhaft beobachten.")
     parser.add_argument("--reprocess", action="store_true", help="Bereits bekannte Dateien erneut auswerten.")
+    parser.add_argument("--portal-login", choices=["huk24"], help="Interaktiven Portal-Login starten und Session speichern.")
+    parser.add_argument("--portal-check", choices=["huk24"], help="Nur ein Portal pruefen und Downloads speichern.")
     args = parser.parse_args()
 
     _setup_logging()
     config = load_config()
     if args.reprocess:
         config.reprocess_existing = True
+
+    if args.portal_login:
+        provider = _find_portal_provider(config.portals, args.portal_login)
+        result = login_portal(provider)
+        logging.info("Portal-Login fertig: %s", result)
+        print(result)
+        return
+
+    if args.portal_check:
+        provider = _find_portal_provider(config.portals, args.portal_check)
+        if provider.name == "huk24":
+            result = fetch_huk24_documents(provider)
+        else:
+            raise ValueError(f"Portal nicht unterstuetzt: {provider.name}")
+        logging.info("Portal-Check fertig: %s", result)
+        print(result)
+        return
 
     if args.watch:
         watch(config)
@@ -89,6 +111,39 @@ def _load_email_config(email_config: dict) -> EmailConfig:
         max_messages=int(email_config.get("max_messages", 25)),
         attachment_extensions=attachment_extensions,
     )
+
+
+def _load_portal_config(config: dict, data_dir: Path) -> PortalConfig:
+    providers = []
+    portal_dir = data_dir / "portal_downloads"
+    session_dir = data_dir / "portal_sessions"
+    for raw_provider in config.get("providers", []):
+        name = raw_provider.get("name", "")
+        providers.append(
+            PortalProviderConfig(
+                name=name,
+                enabled=bool(raw_provider.get("enabled", False)),
+                url=raw_provider.get("url", ""),
+                session_path=_path(raw_provider.get("session_path", session_dir / f"{name}.json")),
+                download_dir=_path(raw_provider.get("download_dir", portal_dir / name)),
+                headless=bool(raw_provider.get("headless", True)),
+                wait_seconds=int(raw_provider.get("wait_seconds", 20)),
+                debug_dir=_path(raw_provider.get("debug_dir", data_dir / "portal_debug" / name)),
+            )
+        )
+    return PortalConfig(
+        enabled=bool(config.get("enabled", False)),
+        providers=providers,
+    )
+
+
+def _find_portal_provider(config: PortalConfig, name: str) -> PortalProviderConfig:
+    if not config:
+        raise ValueError("Keine Portale konfiguriert.")
+    for provider in config.providers:
+        if provider.name == name:
+            return provider
+    raise ValueError(f"Portal nicht konfiguriert: {name}")
 
 
 def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfig:

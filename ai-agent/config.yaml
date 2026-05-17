@@ -37,9 +37,20 @@ invoice_agent:
     mailbox: "INBOX"
     search: "ALL"
     mark_seen: false
-    max_messages: 500
+    max_messages: 50
     attachment_extensions:
       - ".pdf"
+  portals:
+    enabled: false
+    providers:
+      - name: "huk24"
+        enabled: true
+        url: "https://www.huk24.de/meine-huk24/postfach/"
+        session_path: "./data/invoices/portal_sessions/huk24.json"
+        download_dir: "./data/invoices/portal_downloads/huk24"
+        debug_dir: "./data/invoices/portal_debug/huk24"
+        headless: true
+        wait_seconds: 45
   home_assistant_notifications:
     enabled: true
     only_on_changes: true

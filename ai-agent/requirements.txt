@@ -1,0 +1,7 @@
+google-genai
+openai
+playwright
+python-dotenv
+PyYAML
+pypdf
+requests
