@@ -1,18 +1,32 @@
 import requests
 import yaml
 import logging
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class HomeAssistantClient:
     def __init__(self, config_path="config.yaml"):
-        with open(config_path, "r") as f:
+        load_dotenv(BASE_DIR / ".env")
+        config_file = Path(config_path)
+        if not config_file.is_absolute():
+            config_file = BASE_DIR / config_file
+
+        with config_file.open("r") as f:
             config = yaml.safe_load(f)
 
         if not config:
             raise ValueError("config.yaml ist leer oder ungültig")
 
         self.base_url = config["home_assistant"]["url"].rstrip("/")
-        self.token = config["home_assistant"]["token"]
+        self.token = os.getenv(
+            config["home_assistant"].get("token_env", "HOME_ASSISTANT_TOKEN"),
+            config["home_assistant"].get("token", ""),
+        )
 
         self.headers = {
             "Authorization": f"Bearer {self.token}",
@@ -36,6 +50,16 @@ class HomeAssistantClient:
         r = requests.post(url, headers=self.headers, json=data, timeout=10)
         r.raise_for_status()
         return r.json()
+
+    def persistent_notification(self, title, message, notification_id=None):
+        data = {
+            "title": title,
+            "message": message,
+        }
+        if notification_id:
+            data["notification_id"] = notification_id
+        logging.info("Sende Home-Assistant-Benachrichtigung: %s", title)
+        return self.call_service("persistent_notification", "create", data)
 
     def turn_on(self, entity_id):
         domain = entity_id.split(".")[0]

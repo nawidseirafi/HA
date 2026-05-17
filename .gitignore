@@ -1,5 +1,10 @@
+.DS_Store
 ai-agent/.DS_Store
 ai-agent/.env
 ai-agent/venv
-
-
+ai-agent/.pycache/
+ai-agent/data/
+ai-agent/logs/*.log
+ai-agent/**/*.pyc
+.DS_Store
+ai-agent/logs/agent.log

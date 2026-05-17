@@ -1,0 +1,114 @@
+import argparse
+import logging
+import os
+import sys
+from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from core.invoice_email import EmailConfig
+from core.invoice_scanner import HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+
+
+def load_config() -> InvoiceAgentConfig:
+    load_dotenv(BASE_DIR / ".env")
+
+    with (BASE_DIR / "config.yaml").open("r") as f:
+        raw_config = yaml.safe_load(f) or {}
+
+    invoice_config = raw_config.get("invoice_agent", {})
+    email_config = invoice_config.get("email", {})
+    ha_notification_config = invoice_config.get("home_assistant_notifications", {})
+    data_dir = BASE_DIR / "data" / "invoices"
+
+    return InvoiceAgentConfig(
+        inbox_dir=_path(invoice_config.get("inbox_dir", data_dir / "inbox")),
+        archive_dir=_path(invoice_config.get("archive_dir", data_dir / "archive")),
+        review_dir=_path(invoice_config.get("review_dir", data_dir / "review")),
+        database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
+        email_attachment_dir=_path(invoice_config.get("email_attachment_dir", data_dir / "extracted_email_attachments")),
+        poll_interval_seconds=int(invoice_config.get("poll_interval_seconds", 600)),
+        default_category=invoice_config.get("default_category", "Unsortiert"),
+        confidence_threshold=float(invoice_config.get("confidence_threshold", 0.5)),
+        reprocess_existing=bool(invoice_config.get("reprocess_existing", False)),
+        email=_load_email_config(email_config),
+        home_assistant_notifications=_load_ha_notification_config(ha_notification_config),
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Rechnungen suchen, katalogisieren und monatlich ablegen.")
+    parser.add_argument("--once", action="store_true", help="Einmal scannen und beenden.")
+    parser.add_argument("--watch", action="store_true", help="Dauerhaft beobachten.")
+    parser.add_argument("--reprocess", action="store_true", help="Bereits bekannte Dateien erneut auswerten.")
+    args = parser.parse_args()
+
+    _setup_logging()
+    config = load_config()
+    if args.reprocess:
+        config.reprocess_existing = True
+
+    if args.watch:
+        watch(config)
+        return
+
+    result = scan_once(config)
+    logging.info("Invoice-Agent fertig: %s", result)
+    print(result)
+
+
+def _path(value) -> Path:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return (BASE_DIR / path).resolve()
+
+
+def _load_email_config(email_config: dict) -> EmailConfig:
+    extensions = email_config.get("attachment_extensions")
+    if extensions:
+        attachment_extensions = tuple(ext.lower() for ext in extensions)
+    else:
+        attachment_extensions = EmailConfig().attachment_extensions
+
+    return EmailConfig(
+        enabled=bool(email_config.get("enabled", False)),
+        host=os.getenv(email_config.get("host_env", "INVOICE_EMAIL_HOST"), email_config.get("host", "")),
+        port=int(email_config.get("port", 993)),
+        username=os.getenv(email_config.get("username_env", "INVOICE_EMAIL_USERNAME"), ""),
+        password=os.getenv(email_config.get("password_env", "INVOICE_EMAIL_PASSWORD"), ""),
+        mailbox=email_config.get("mailbox", "INBOX"),
+        search=email_config.get("search", "UNSEEN"),
+        mark_seen=bool(email_config.get("mark_seen", False)),
+        max_messages=int(email_config.get("max_messages", 25)),
+        attachment_extensions=attachment_extensions,
+    )
+
+
+def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfig:
+    return HomeAssistantNotificationConfig(
+        enabled=bool(config.get("enabled", False)),
+        only_on_changes=bool(config.get("only_on_changes", True)),
+        title=config.get("title", "Rechnungs-Agent"),
+        notification_id=config.get("notification_id", "invoice_agent"),
+    )
+
+
+def _setup_logging():
+    log_dir = BASE_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        filename=log_dir / "agent.log",
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+
+
+if __name__ == "__main__":
+    main()

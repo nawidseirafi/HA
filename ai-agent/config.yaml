@@ -1,6 +1,7 @@
 home_assistant:
   url: "http://192.168.178.159:8123"
-  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI3ZTEzNGQ3MTg0MDY0OGVjODI1MTZiMzE5YTI5ZGMzNyIsImlhdCI6MTc3NzcwMDAwOCwiZXhwIjoyMDkzMDYwMDA4fQ.10lZSyvgqa5bNU26YfPQ2IXiGTzbf9wb5heevOGdNVc"
+  token: HA-TOKEN
+  token_env: "HA-TOKEN"
 
 llm:
   provider: "gemini"
@@ -16,3 +17,31 @@ llm:
   llama:
     base_url: "http://192.168.178.X:11434"
     model: "qwen2.5:3b"
+
+invoice_agent:
+  inbox_dir: "./data/invoices/inbox"
+  archive_dir: "./data/invoices/archive"
+  review_dir: "./data/invoices/review"
+  database_path: "./data/invoices/invoices.db"
+  email_attachment_dir: "./data/invoices/extracted_email_attachments"
+  poll_interval_seconds: 600
+  default_category: "Unsortiert"
+  confidence_threshold: 0.5
+  reprocess_existing: false
+  email:
+    enabled: true
+    host_env: "INVOICE_EMAIL_HOST"
+    port: 993
+    username_env: "INVOICE_EMAIL_USERNAME"
+    password_env: "INVOICE_EMAIL_PASSWORD"
+    mailbox: "INBOX"
+    search: "ALL"
+    mark_seen: false
+    max_messages: 500
+    attachment_extensions:
+      - ".pdf"
+  home_assistant_notifications:
+    enabled: true
+    only_on_changes: true
+    title: "Rechnungs-Agent"
+    notification_id: "invoice_agent"
