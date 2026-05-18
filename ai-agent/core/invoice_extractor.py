@@ -1,11 +1,22 @@
 import hashlib
 import logging
+import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
+
+
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")
+
+# OCR per Default aktiv, kann ueber INVOICE_OCR_DISABLE=1 abgeschaltet werden.
+_OCR_DISABLED = os.getenv("INVOICE_OCR_DISABLE", "").lower() in ("1", "true", "yes")
+_OCR_LANG = os.getenv("INVOICE_OCR_LANG", "deu+eng")
+_OCR_MAX_PAGES = int(os.getenv("INVOICE_OCR_MAX_PAGES", "5"))
+_OCR_MAX_BYTES = int(os.getenv("INVOICE_OCR_MAX_BYTES", str(40 * 1024 * 1024)))  # 40 MB
 
 
 INVOICE_KEYWORDS = (
@@ -62,7 +73,6 @@ MONTH_WORDS = {
     "maerz": 3,
     "märz": 3,
     "marz": 3,
-    "märz": 3,
     "april": 4,
     "apr": 4,
     "mai": 5,
@@ -121,7 +131,7 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
     invoice_date = _find_best_date(path, combined)
     amount, currency = _find_amount(combined)
     invoice_number = _find_invoice_number(combined)
-    vendor = _find_vendor(path.stem, invoice_date)
+    vendor = _find_vendor(path.stem, invoice_date, vendor_hits)
 
     confidence = 0.0
     reasons = []
@@ -172,26 +182,39 @@ def _normalize_text(value: str) -> str:
 
 
 def _read_lightweight_text(path: Path) -> str:
-    if path.suffix.lower() in (".txt", ".csv"):
+    suffix = path.suffix.lower()
+    if suffix in (".txt", ".csv"):
         try:
             return path.read_text(encoding="utf-8", errors="ignore")[:20000]
         except OSError:
             return ""
-    if path.suffix.lower() == ".pdf":
+    if suffix == ".pdf":
         return _read_pdf_text(path)
+    if suffix in IMAGE_EXTENSIONS:
+        return _read_image_with_ocr(path)[:30000]
     return ""
 
 
 def _read_pdf_text(path: Path) -> str:
     pypdf_text = _read_pdf_with_pypdf(path)
-    if pypdf_text:
+    if _has_meaningful_text(pypdf_text):
         return pypdf_text[:30000]
 
     pdftotext_text = _read_pdf_with_pdftotext(path)
-    if pdftotext_text:
+    if _has_meaningful_text(pdftotext_text):
         return pdftotext_text[:30000]
 
-    return ""
+    ocr_text = _read_pdf_with_ocr(path)
+    if ocr_text:
+        return ocr_text[:30000]
+
+    # Letzter Strohhalm: leerer pypdf-Text ist immer noch besser als nichts.
+    return (pypdf_text or pdftotext_text)[:30000]
+
+
+def _has_meaningful_text(text: str) -> bool:
+    # Bild-PDFs liefern oft nur Whitespace oder einzelne Steuerzeichen.
+    return bool(text and len(re.sub(r"\s+", "", text)) >= 20)
 
 
 def _read_pdf_with_pypdf(path: Path) -> str:
@@ -222,6 +245,90 @@ def _read_pdf_with_pdftotext(path: Path) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout
+
+
+def _read_image_with_ocr(path: Path) -> str:
+    if _OCR_DISABLED:
+        return ""
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        logging.debug("OCR uebersprungen (pytesseract/Pillow nicht installiert): %s", path)
+        return ""
+
+    try:
+        with Image.open(path) as img:
+            return pytesseract.image_to_string(img, lang=_OCR_LANG)
+    except Exception as exc:
+        logging.info("OCR fuer Bild fehlgeschlagen: %s (%s)", path, exc)
+        return ""
+
+
+def _read_pdf_with_ocr(path: Path) -> str:
+    if _OCR_DISABLED:
+        return ""
+    try:
+        if path.stat().st_size > _OCR_MAX_BYTES:
+            logging.info("OCR uebersprungen, PDF zu gross (%s Bytes): %s", path.stat().st_size, path)
+            return ""
+    except OSError:
+        return ""
+
+    try:
+        import pytesseract
+    except ImportError:
+        logging.debug("OCR uebersprungen (pytesseract nicht installiert): %s", path)
+        return ""
+
+    images = _pdf_to_images(path)
+    if not images:
+        return ""
+
+    parts = []
+    for image in images:
+        try:
+            parts.append(pytesseract.image_to_string(image, lang=_OCR_LANG))
+        except Exception as exc:
+            logging.info("OCR-Seite fehlgeschlagen: %s (%s)", path, exc)
+        finally:
+            try:
+                image.close()
+            except Exception:
+                pass
+    return "\n".join(parts)
+
+
+def _pdf_to_images(path: Path):
+    # Bevorzugt pdf2image (Poppler), Fallback auf PyMuPDF (fitz).
+    try:
+        from pdf2image import convert_from_path
+        try:
+            return convert_from_path(str(path), dpi=200, first_page=1, last_page=_OCR_MAX_PAGES)
+        except Exception as exc:
+            logging.info("pdf2image fehlgeschlagen, versuche PyMuPDF: %s (%s)", path, exc)
+    except ImportError:
+        pass
+
+    try:
+        import fitz  # type: ignore
+        from PIL import Image
+        import io
+    except ImportError:
+        if not shutil.which("pdftoppm"):
+            logging.info("OCR nicht moeglich: weder pdf2image+Poppler noch PyMuPDF verfuegbar (%s)", path)
+        return []
+
+    images = []
+    try:
+        with fitz.open(str(path)) as doc:
+            for page_index in range(min(len(doc), _OCR_MAX_PAGES)):
+                pix = doc[page_index].get_pixmap(dpi=200)
+                images.append(Image.open(io.BytesIO(pix.tobytes("png"))))
+    except Exception as exc:
+        logging.info("PyMuPDF-Render fehlgeschlagen: %s (%s)", path, exc)
+        return []
+    return images
 
 
 def _find_best_date(path: Path, text: str) -> date:
@@ -289,16 +396,37 @@ def _file_date(path: Path) -> date:
 
 
 def _find_amount(text: str) -> tuple[Optional[float], str]:
-    pattern = r"\b(\d{1,6}(?:[.,]\d{2}))\s?(eur|euro|€|usd|chf)?\b"
-    matches = re.findall(pattern, text, flags=re.IGNORECASE)
+    pattern = r"(\d{1,6}(?:[.,]\d{2}))\s?(eur|euro|€|usd|chf)?"
+    currency_map = {"€": "EUR", "euro": "EUR", "eur": "EUR", "usd": "USD", "chf": "CHF"}
+
+    # Bevorzugt Beträge in der Nähe von Schlüsselwörtern wie "summe", "gesamt", "brutto", "total".
+    priority_keywords = ("gesamtsumme", "gesamtbetrag", "summe", "gesamt", "brutto", "total", "zahlbetrag", "endbetrag")
+    for keyword in priority_keywords:
+        for match in re.finditer(rf"{keyword}[^\n]{{0,40}}?" + pattern, text, flags=re.IGNORECASE):
+            amount = _parse_decimal(match.group(1))
+            currency = currency_map.get((match.group(2) or "").lower(), "EUR")
+            return amount, currency
+
+    # Fallback: größter Betrag mit Currency-Hinweis, sonst größter Betrag.
+    matches = list(re.finditer(r"\b" + pattern + r"\b", text, flags=re.IGNORECASE))
     if not matches:
         return None, "EUR"
 
-    raw_amount, raw_currency = matches[-1]
-    amount = _parse_decimal(raw_amount)
-    currency_map = {"€": "EUR", "euro": "EUR", "eur": "EUR", "usd": "USD", "chf": "CHF"}
-    currency = currency_map.get(raw_currency.lower(), "EUR") if raw_currency else "EUR"
-    return amount, currency
+    candidates: list[tuple[float, str]] = []
+    for match in matches:
+        try:
+            value = _parse_decimal(match.group(1))
+        except ValueError:
+            continue
+        candidates.append((value, (match.group(2) or "").lower()))
+
+    if not candidates:
+        return None, "EUR"
+
+    with_currency = [c for c in candidates if c[1]]
+    pool = with_currency or candidates
+    amount, raw_currency = max(pool, key=lambda c: c[0])
+    return amount, currency_map.get(raw_currency, "EUR")
 
 
 def _parse_decimal(value: str) -> float:
@@ -319,7 +447,13 @@ def _find_invoice_number(text: str) -> str:
     return ""
 
 
-def _find_vendor(stem: str, invoice_date: date) -> str:
+def _find_vendor(stem: str, invoice_date: date, vendor_hits: Optional[list] = None) -> str:
+    # Wenn ein bekannter Anbieter im Dateinamen/Text gefunden wurde, diesen bevorzugen.
+    if vendor_hits:
+        # Längster Treffer = spezifischster (z.B. "autoversicherung" vor "auto").
+        best = max(vendor_hits, key=len)
+        return best.title()
+
     cleaned = stem.lower().replace("_", " ").replace("-", " ")
     cleaned = re.sub(r"\b20\d{2}[. /-]?(?:0?[1-9]|1[0-2])[. /-]?(?:0?[1-9]|[12]\d|3[01])\b", " ", cleaned)
     cleaned = re.sub(r"\b(?:0?[1-9]|[12]\d|3[01])[. /-](?:0?[1-9]|1[0-2])[. /-]20\d{2}\b", " ", cleaned)

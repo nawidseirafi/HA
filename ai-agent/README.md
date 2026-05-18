@@ -21,6 +21,40 @@ sudo apt install -y poppler-utils
 
 `poppler-utils` liefert `pdftotext`. Der Rechnungs-Agent nutzt zuerst `pypdf`, kann aber auch `pdftotext` verwenden, falls es installiert ist.
 
+### OCR fuer Bild-PDFs und Bild-Belege (optional, aber empfohlen)
+
+Damit auch eingescannte oder fotografierte Rechnungen erkannt werden (Bild-PDFs ohne extrahierbaren Text sowie `.jpg/.png/.tif/...`), nutzt der Agent zusaetzlich Tesseract.
+
+Debian/Ubuntu:
+
+```bash
+sudo apt install -y tesseract-ocr tesseract-ocr-deu poppler-utils
+```
+
+macOS (Homebrew):
+
+```bash
+brew install tesseract tesseract-lang poppler
+```
+
+Windows:
+
+- Tesseract: `winget install UB-Mannheim.TesseractOCR` (deutsches Sprachpaket `deu` im Installer mit anhaken). Pfad zur `tesseract.exe` muss in `PATH` liegen.
+- Poppler (optional, fuer `pdf2image`): https://github.com/oschwartz10612/poppler-windows — `bin`-Ordner in `PATH` aufnehmen. Alternativ wird `PyMuPDF` (siehe Python-Pakete unten) als reiner Python-Renderer ohne externes Binary verwendet.
+
+Die zugehoerigen Python-Pakete (`pytesseract`, `Pillow`, `pdf2image`, `PyMuPDF`) stehen bereits in `requirements.txt` und werden mit `pip install -r requirements.txt` mitinstalliert.
+
+OCR laesst sich ueber Environment-Variablen steuern:
+
+```bash
+INVOICE_OCR_DISABLE=1            # OCR komplett abschalten
+INVOICE_OCR_LANG="deu+eng"       # Tesseract-Sprachen (Default: deu+eng)
+INVOICE_OCR_MAX_PAGES=5          # max. Seiten pro PDF (Default: 5)
+INVOICE_OCR_MAX_BYTES=41943040   # PDFs darueber werden uebersprungen (Default: 40 MB)
+```
+
+Fehlen Tesseract oder die Python-Pakete, ueberspringt der Agent OCR still und nutzt nur die bisherigen Textextraktoren.
+
 ## Python-Umgebung
 
 Im Verzeichnis `HA/ai-agent`:
@@ -41,6 +75,11 @@ python-dotenv
 PyYAML
 pypdf
 requests
+pytesseract
+Pillow
+pdf2image
+PyMuPDF
+openpyxl
 ```
 
 Fuer Portal-Downloads wird zusaetzlich ein Playwright-Browser benoetigt:
@@ -266,13 +305,20 @@ data/invoices/tax/2025/einkommensteuer_2025.csv
 data/invoices/tax/2025/einkommensteuer_2025.xlsx
 ```
 
-Die Excel-Datei enthaelt drei Tabellen:
+Die Excel-Datei enthaelt fuenf Tabellenblaetter (optimiert fuer Steuerberater/Finanzamt):
 
 ```text
-Alle Belege
-Summen
-Review
+Uebersicht   - Kennzahlen: Anzahl Belege, Summen EUR (gesamt / ohne Review), Erstellzeitpunkt
+Alle Belege  - Detailliste mit Datums-/EUR-Format, Autofilter, Summenzeile, Review-Zeilen farbig
+Monate       - Anzahl und Summe je Monat und Steuerkategorie
+Kategorien   - Anzahl und Summe je Steuerkategorie
+Review       - Belege, die manuell gepruefte werden muessen
 ```
+
+Voraussetzung fuer das formatierte Excel ist das Paket `openpyxl` (in `requirements.txt` enthalten).
+Ist es nicht installiert, faellt der Export auf einen einfachen XLSX-Writer ohne Formatierung zurueck.
+
+Die CSV-Datei nutzt UTF-8 mit BOM und deutsche Formatierung (Datum `TT.MM.JJJJ`, Komma als Dezimaltrenner, Semikolon als Trennzeichen) - damit oeffnet Excel sie direkt korrekt.
 
 Die Regeln stehen in `config.yaml` unter `tax_export.categories`. Nicht sicher zuordenbare oder auffaellige Belege landen in `Review`.
 

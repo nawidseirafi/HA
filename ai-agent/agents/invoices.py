@@ -21,12 +21,13 @@ from core.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_
 def load_raw_config() -> dict:
     load_dotenv(BASE_DIR / ".env")
 
-    with (BASE_DIR / "config.yaml").open("r") as f:
+    with (BASE_DIR / "config.yaml").open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
-def load_config() -> InvoiceAgentConfig:
-    raw_config = load_raw_config()
+def load_config(raw_config: dict | None = None) -> InvoiceAgentConfig:
+    if raw_config is None:
+        raw_config = load_raw_config()
 
     invoice_config = raw_config.get("invoice_agent", {})
     email_config = invoice_config.get("email", {})
@@ -50,8 +51,9 @@ def load_config() -> InvoiceAgentConfig:
     )
 
 
-def load_tax_config() -> TaxExportConfig:
-    raw_config = load_raw_config()
+def load_tax_config(raw_config: dict | None = None) -> TaxExportConfig:
+    if raw_config is None:
+        raw_config = load_raw_config()
     invoice_config = raw_config.get("invoice_agent", {})
     tax_config = raw_config.get("tax_export", {})
     data_dir = BASE_DIR / "data" / "invoices"
@@ -67,17 +69,20 @@ def load_tax_config() -> TaxExportConfig:
 
 
 def main():
+    raw_config = load_raw_config()
+    portal_names = _portal_provider_names(raw_config)
+
     parser = argparse.ArgumentParser(description="Rechnungen suchen, katalogisieren und monatlich ablegen.")
     parser.add_argument("--once", action="store_true", help="Einmal scannen und beenden.")
     parser.add_argument("--watch", action="store_true", help="Dauerhaft beobachten.")
     parser.add_argument("--reprocess", action="store_true", help="Bereits bekannte Dateien erneut auswerten.")
-    parser.add_argument("--portal-login", choices=["huk24"], help="Interaktiven Portal-Login starten und Session speichern.")
-    parser.add_argument("--portal-check", choices=["huk24"], help="Nur ein Portal pruefen und Downloads speichern.")
+    parser.add_argument("--portal-login", choices=portal_names or None, help="Interaktiven Portal-Login starten und Session speichern.")
+    parser.add_argument("--portal-check", choices=portal_names or None, help="Nur ein Portal pruefen und Downloads speichern.")
     parser.add_argument("--tax-year", type=int, help="Steuer-Export fuer dieses Jahr erzeugen, z.B. 2025.")
     args = parser.parse_args()
 
     _setup_logging()
-    config = load_config()
+    config = load_config(raw_config)
     if args.reprocess:
         config.reprocess_existing = True
 
@@ -102,13 +107,14 @@ def main():
         watch(config)
         return
 
+    # Standard: scannen, ausser es wurde ausschliesslich --tax-year angefordert.
     if args.once or not args.tax_year:
         result = scan_once(config)
         logging.info("Invoice-Agent fertig: %s", result)
         print(result)
 
     if args.tax_year:
-        tax_result = export_tax_year(load_tax_config(), args.tax_year)
+        tax_result = export_tax_year(load_tax_config(raw_config), args.tax_year)
         logging.info("Tax-Export fertig: %s", tax_result)
         print(tax_result)
 
@@ -166,12 +172,17 @@ def _load_portal_config(config: dict, data_dir: Path) -> PortalConfig:
 
 
 def _find_portal_provider(config: PortalConfig, name: str) -> PortalProviderConfig:
-    if not config:
+    if not config or not config.providers:
         raise ValueError("Keine Portale konfiguriert.")
     for provider in config.providers:
         if provider.name == name:
             return provider
     raise ValueError(f"Portal nicht konfiguriert: {name}")
+
+
+def _portal_provider_names(raw_config: dict) -> list[str]:
+    portals = (raw_config.get("invoice_agent", {}) or {}).get("portals", {}) or {}
+    return [p.get("name", "") for p in portals.get("providers", []) if p.get("name")]
 
 
 def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfig:
@@ -186,11 +197,22 @@ def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfi
 def _setup_logging():
     log_dir = BASE_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        filename=log_dir / "agent.log",
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    # Verhindert doppelte Handler, falls _setup_logging mehrfach aufgerufen wird.
+    if not any(isinstance(h, logging.FileHandler) and getattr(h, "_invoice_agent", False) for h in root.handlers):
+        file_handler = logging.FileHandler(log_dir / "agent.log", encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        file_handler._invoice_agent = True  # type: ignore[attr-defined]
+        root.addHandler(file_handler)
+
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler) for h in root.handlers):
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        root.addHandler(stream_handler)
 
 
 if __name__ == "__main__":
