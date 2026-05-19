@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import yaml
 from dotenv import load_dotenv
@@ -25,7 +26,7 @@ def load_raw_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_config(raw_config: dict | None = None) -> InvoiceAgentConfig:
+def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
     if raw_config is None:
         raw_config = load_raw_config()
 
@@ -51,7 +52,7 @@ def load_config(raw_config: dict | None = None) -> InvoiceAgentConfig:
     )
 
 
-def load_tax_config(raw_config: dict | None = None) -> TaxExportConfig:
+def load_tax_config(raw_config: Optional[dict] = None) -> TaxExportConfig:
     if raw_config is None:
         raw_config = load_raw_config()
     invoice_config = raw_config.get("invoice_agent", {})

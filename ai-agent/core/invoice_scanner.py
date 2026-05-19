@@ -185,7 +185,7 @@ def _notify_portal_logins(config: InvoiceAgentConfig, result: ScanResult) -> Non
             message = (
                 "HUK24 verlangt eine neue Anmeldung.\n\n"
                 "Bitte auf dem Mac oder Agent-Server ausfuehren:\n\n"
-                "`../../venv/bin/python agents/invoices.py --portal-login huk24`\n\n"
+                "`../venv/bin/python agents/invoices.py --portal-login huk24`\n\n"
                 "Danach bei HUK24 einloggen, ggf. 2FA bestaetigen, bis ins Postfach navigieren "
                 "und im Terminal Enter druecken."
             )

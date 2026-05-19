@@ -57,12 +57,11 @@ Fehlen Tesseract oder die Python-Pakete, ueberspringt der Agent OCR still und nu
 
 ## Python-Umgebung
 
-Im Verzeichnis `ai-agent`:
+Lokale Entwicklung in diesem Projekt nutzt das gemeinsame `venv` auf Repo-Ebene. Aus dem Verzeichnis `ai-agent`:
 
 ```bash
-python3 -m venv venv
-./venv/bin/python -m pip install --upgrade pip
-./venv/bin/pip install -r requirements.txt
+../venv/bin/python -m pip install --upgrade pip
+../venv/bin/pip install -r requirements.txt
 ```
 
 Die Python-Pakete stehen in `requirements.txt`:
@@ -85,7 +84,7 @@ openpyxl
 Fuer Portal-Downloads wird zusaetzlich ein Playwright-Browser benoetigt:
 
 ```bash
-./venv/bin/playwright install chromium
+../venv/bin/playwright install chromium
 ```
 
 ## Konfiguration
@@ -227,7 +226,7 @@ invoice_agent:
 Einmalig interaktiv einloggen:
 
 ```bash
-./venv/bin/python agents/invoices.py --portal-login huk24
+../venv/bin/python agents/invoices.py --portal-login huk24
 ```
 
 Dann im Browser bei HUK24 einloggen, ggf. 2FA bestaetigen und bis ins Postfach navigieren. Danach im Terminal Enter druecken. Der Agent speichert die Session unter `session_path`.
@@ -235,13 +234,13 @@ Dann im Browser bei HUK24 einloggen, ggf. 2FA bestaetigen und bis ins Postfach n
 Danach laeuft HUK24 im normalen Scan mit:
 
 ```bash
-./venv/bin/python agents/invoices.py --once
+../venv/bin/python agents/invoices.py --once
 ```
 
 Nur HUK24 pruefen, ohne den kompletten Rechnungsbestand zu scannen:
 
 ```bash
-./venv/bin/python agents/invoices.py --portal-check huk24
+../venv/bin/python agents/invoices.py --portal-check huk24
 ```
 
 Der HUK24-Check schreibt Debug-Dateien nach `data/invoices/portal_debug/huk24`, damit man sehen kann, welche Postfach-Seite Playwright wirklich sieht.
@@ -261,19 +260,19 @@ Die Meldung enthaelt den passenden `--portal-login huk24` Befehl.
 Einmaliger Lauf:
 
 ```bash
-./venv/bin/python agents/invoices.py --once
+../venv/bin/python agents/invoices.py --once
 ```
 
 Dauerbetrieb:
 
 ```bash
-./venv/bin/python agents/invoices.py --watch
+../venv/bin/python agents/invoices.py --watch
 ```
 
 Bereits bekannte Dateien erneut auswerten, zum Beispiel nach Verbesserungen an der Erkennung:
 
 ```bash
-./venv/bin/python agents/invoices.py --once --reprocess
+../venv/bin/python agents/invoices.py --once --reprocess
 ```
 
 ## Steuer-Export
@@ -283,19 +282,19 @@ Der Steuer-Export erzeugt eine Jahresuebersicht aus der bestehenden `invoices.db
 Start:
 
 ```bash
-./venv/bin/python agents/invoices.py --tax-year 2026
+../venv/bin/python agents/invoices.py --tax-year 2026
 ```
 
 Erst Rechnungen scannen und danach direkt den Steuer-Export erzeugen:
 
 ```bash
-./venv/bin/python agents/invoices.py --once --tax-year 2026
+../venv/bin/python agents/invoices.py --once --tax-year 2026
 ```
 
 Der separate Agent bleibt als Kurzweg verfuegbar:
 
 ```bash
-./venv/bin/python agents/tax_export.py --year 2026
+../venv/bin/python agents/tax_export.py --year 2026
 ```
 
 Ausgabe:

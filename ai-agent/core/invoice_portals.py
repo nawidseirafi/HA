@@ -246,6 +246,6 @@ def _load_playwright():
     except ImportError as exc:
         raise RuntimeError(
             "Playwright ist nicht installiert. Bitte ausfuehren: "
-            "./venv/bin/pip install playwright && ./venv/bin/playwright install chromium"
+            "../venv/bin/pip install playwright && ../venv/bin/playwright install chromium"
         ) from exc
     return sync_playwright
