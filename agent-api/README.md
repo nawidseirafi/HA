@@ -22,6 +22,16 @@ uvicorn main:app --host 0.0.0.0 --port 8080
 
 Danach ist die API im lokalen Netzwerk unter `http://<mini-pc-ip>:8080` erreichbar.
 
+## API-Dokumentation
+
+FastAPI stellt Swagger/OpenAPI automatisch bereit:
+
+```text
+Swagger UI:   http://localhost:8080/docs
+ReDoc:        http://localhost:8080/redoc
+OpenAPI JSON: http://localhost:8080/openapi.json
+```
+
 ## Endpoints
 
 ```text
