@@ -7,7 +7,6 @@ import os
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-print("BASE_DIR:", BASE_DIR)
 load_dotenv(BASE_DIR / ".env")
 
 def create_llm_client(config):

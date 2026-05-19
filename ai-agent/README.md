@@ -57,7 +57,7 @@ Fehlen Tesseract oder die Python-Pakete, ueberspringt der Agent OCR still und nu
 
 ## Python-Umgebung
 
-Im Verzeichnis `HA/ai-agent`:
+Im Verzeichnis `ai-agent`:
 
 ```bash
 python3 -m venv venv

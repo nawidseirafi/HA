@@ -1,5 +1,12 @@
 import yaml
 import logging
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from llm import create_llm_client
 from core.ha_client import HomeAssistantClient
 
@@ -7,14 +14,17 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
-    filename="logs/agent.log",
+    filename=LOG_DIR / "agent.log",
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
 def load_config():
-    with open("config.yaml", "r") as f:
+    with (BASE_DIR / "config.yaml").open("r") as f:
         return yaml.safe_load(f)
 
 def main():
