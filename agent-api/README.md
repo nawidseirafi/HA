@@ -61,4 +61,4 @@ curl -F "file=@rechnung.pdf" http://localhost:8080/agents/invoices/upload
 curl -F "file=@rechnung.pdf" http://192.168.178.143:8080/agents/invoices/upload
 ```
 
-Uploads fuer Rechnungen werden unter `storage/uploads/invoices` gespeichert. Der Agent-Status inklusive `last_run` wird in `storage/status.json` persistiert. Die aktuelle Implementierung triggert und loggt nur; echte Rechnungsverarbeitung und Vacation-Logik koennen spaeter in den Agent-Klassen angebunden werden.
+Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status inklusive `last_run` wird in `storage/status.json` persistiert. Die aktuelle Implementierung triggert und loggt nur; echte Rechnungsverarbeitung und Vacation-Logik koennen spaeter in den Agent-Klassen angebunden werden.

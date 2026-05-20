@@ -46,7 +46,7 @@ def resolve_path(value: Union[str, Path], default_base: Path = BASE_DIR) -> Path
 INVOICE_UPLOAD_DIR = resolve_path(
     config.get("agents", {}).get("invoices", {}).get(
         "upload_dir",
-        config.get("storage", {}).get("uploads_dir", "storage/uploads/invoices"),
+        config.get("storage", {}).get("uploads_dir", "../ai-agent/data/invoices/inbox"),
     )
 )
 
