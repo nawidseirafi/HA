@@ -27,7 +27,12 @@ invoice_agent:
   poll_interval_seconds: 600
   default_category: "Unsortiert"
   confidence_threshold: 0.5
+  require_amount_for_archive: true
   reprocess_existing: false
+  ai_extraction:
+    enabled: true
+    min_confidence: 0.8
+    max_file_bytes: 10485760
   email:
     enabled: true
     host_env: "INVOICE_EMAIL_HOST"

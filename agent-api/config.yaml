@@ -3,7 +3,7 @@ server:
   port: 8080
 
 storage:
-  uploads_dir: storage/uploads
+  uploads_dir: ../ai-agent/data/invoices/inbox
   status_file: storage/status.json
 
 logging:
@@ -13,6 +13,6 @@ logging:
 agents:
   invoices:
     enabled: true
-    upload_dir: storage/uploads/invoices
+    upload_dir: ../ai-agent/data/invoices/inbox
   vacation:
     enabled: true

@@ -1,5 +1,6 @@
 import re
 import shutil
+import filecmp
 from pathlib import Path
 
 from core.invoice_extractor import InvoiceMetadata
@@ -24,7 +25,7 @@ MONTH_NAMES = (
 def archive_invoice(source: Path, metadata: InvoiceMetadata, archive_dir: Path) -> Path:
     month_dir = archive_dir / str(metadata.invoice_date.year) / MONTH_NAMES[metadata.invoice_date.month - 1]
     month_dir.mkdir(parents=True, exist_ok=True)
-    target = _unique_path(month_dir / _archive_filename(source, metadata))
+    target = _unique_or_existing_same_file(source, month_dir / _archive_filename(source, metadata))
     shutil.copy2(source, target)
     return target
 
@@ -32,7 +33,7 @@ def archive_invoice(source: Path, metadata: InvoiceMetadata, archive_dir: Path) 
 def copy_to_review(source: Path, metadata: InvoiceMetadata, review_dir: Path) -> Path:
     month_dir = review_dir / str(metadata.invoice_date.year) / MONTH_NAMES[metadata.invoice_date.month - 1]
     month_dir.mkdir(parents=True, exist_ok=True)
-    target = _unique_path(month_dir / source.name)
+    target = _unique_or_existing_same_file(source, month_dir / source.name)
     shutil.copy2(source, target)
     return target
 
@@ -64,3 +65,27 @@ def _unique_path(path: Path) -> Path:
         if not candidate.exists():
             return candidate
     raise RuntimeError(f"Kein freier Dateiname gefunden fuer {path}")
+
+
+def _unique_or_existing_same_file(source: Path, path: Path) -> Path:
+    if not path.exists():
+        return path
+    if _same_file(source, path):
+        return path
+
+    stem = path.stem
+    suffix = path.suffix
+    for counter in range(2, 1000):
+        candidate = path.with_name(f"{stem}_{counter}{suffix}")
+        if not candidate.exists():
+            return candidate
+        if _same_file(source, candidate):
+            return candidate
+    raise RuntimeError(f"Kein freier Dateiname gefunden fuer {path}")
+
+
+def _same_file(left: Path, right: Path) -> bool:
+    try:
+        return left.stat().st_size == right.stat().st_size and filecmp.cmp(left, right, shallow=False)
+    except OSError:
+        return False

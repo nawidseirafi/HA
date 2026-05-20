@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import string
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -17,6 +18,7 @@ _OCR_DISABLED = os.getenv("INVOICE_OCR_DISABLE", "").lower() in ("1", "true", "y
 _OCR_LANG = os.getenv("INVOICE_OCR_LANG", "deu+eng")
 _OCR_MAX_PAGES = int(os.getenv("INVOICE_OCR_MAX_PAGES", "5"))
 _OCR_MAX_BYTES = int(os.getenv("INVOICE_OCR_MAX_BYTES", str(40 * 1024 * 1024)))  # 40 MB
+_OCR_DPI = int(os.getenv("INVOICE_OCR_DPI", "150"))
 
 
 INVOICE_KEYWORDS = (
@@ -37,33 +39,62 @@ REVIEW_KEYWORDS = (
 KNOWN_INVOICE_VENDORS = (
     "all-inkl",
     "all inkl",
+    "amazon",
+    "amazon eu",
     "apotheke",
-    "auto",
     "autoversicherung",
     "carwash",
     "congstar",
+    "aral",
+    "avia",
+    "esso",
     "gebäudeversicherung",
     "gebaudeversicherung",
     "grundbesitz",
     "hausrat",
+    "hem",
     "hotel",
     "huk24",
     "iphone",
+    "jet",
     "kfz",
     "lkh",
+    "porsche",
+    "porsche zentrum",
     "restaurant",
     "rechtschutz",
     "rechtsschutz",
     "strato",
     "strom",
+    "shell",
+    "star",
     "tankbeleg",
     "tankbelege",
+    "tankstelle",
     "telekom",
+    "totalenergies",
     "vodafone",
     "wasser",
     "zahn",
     "zahnarzt",
 )
+
+KNOWN_VENDOR_CATEGORIES = {
+    "aral": "KFZ",
+    "avia": "KFZ",
+    "esso": "KFZ",
+    "hem": "KFZ",
+    "jet": "KFZ",
+    "kraftstoff": "KFZ",
+    "porsche": "KFZ",
+    "porsche zentrum": "KFZ",
+    "shell": "KFZ",
+    "star": "KFZ",
+    "tankbeleg": "KFZ",
+    "tankbelege": "KFZ",
+    "tankstelle": "KFZ",
+    "totalenergies": "KFZ",
+}
 
 MONTH_WORDS = {
     "januar": 1,
@@ -121,17 +152,21 @@ def file_sha256(path: Path) -> str:
 def extract_metadata(path: Path, default_category: str = "Unsortiert") -> InvoiceMetadata:
     file_hash = file_sha256(path)
     filename_text = _normalize_text(path.stem)
-    path_text = _normalize_text(" ".join(path.parts[-5:]))
     body_text = _read_lightweight_text(path)
-    combined = f"{path_text} {filename_text} {_normalize_text(body_text)}".strip()
+    body_text_normalized = _normalize_text(body_text)
+    combined = f"{filename_text} {body_text_normalized}".strip()
+    content_text = body_text_normalized if _has_meaningful_text(body_text_normalized) else ""
 
-    keyword_hits = [keyword for keyword in INVOICE_KEYWORDS if keyword in combined]
-    vendor_hits = [vendor for vendor in KNOWN_INVOICE_VENDORS if vendor in combined]
-    review_hits = [keyword for keyword in REVIEW_KEYWORDS if keyword in combined]
+    keyword_hits = _keyword_hits(INVOICE_KEYWORDS, combined)
+    vendor_hits = _keyword_hits(KNOWN_INVOICE_VENDORS, combined)
+    review_hits = _keyword_hits(REVIEW_KEYWORDS, combined)
     invoice_date = _find_best_date(path, combined)
-    amount, currency = _find_amount(combined)
+    amount, currency = _find_amount(content_text or filename_text)
+    if not content_text and _looks_like_upload_filename(filename_text):
+        amount, currency = None, "EUR"
     invoice_number = _find_invoice_number(combined)
     vendor = _find_vendor(path.stem, invoice_date, vendor_hits)
+    category = _find_category(vendor_hits, default_category)
 
     confidence = 0.0
     reasons = []
@@ -161,6 +196,10 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
         confidence = min(confidence, 0.3)
         is_invoice = False
         reasons.append("review_keyword:" + ",".join(review_hits[:3]))
+    if not content_text and _looks_like_upload_filename(filename_text):
+        confidence = min(confidence, 0.3)
+        is_invoice = False
+        reasons.append("no_readable_text")
 
     return InvoiceMetadata(
         source_path=str(path),
@@ -172,13 +211,30 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
         amount=amount,
         currency=currency,
         invoice_number=invoice_number,
-        category=default_category,
+        category=category,
         reason="; ".join(reasons) if reasons else "no invoice signals found",
     )
 
 
 def _normalize_text(value: str) -> str:
     return value.lower().replace("_", " ").replace("-", " ")
+
+
+def _looks_like_upload_filename(text: str) -> bool:
+    return bool(
+        re.search(r"\b20\d{6}t\d{6}z\b", text)
+        or re.search(r"\b[a-f0-9]{24,}\b", text)
+        or re.search(r"\b[0-9a-f]{8} [0-9a-f]{4} [0-9a-f]{4}", text)
+    )
+
+
+def _keyword_hits(keywords: tuple[str, ...], text: str) -> list[str]:
+    hits = []
+    for keyword in keywords:
+        pattern = rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])"
+        if re.search(pattern, text):
+            hits.append(keyword)
+    return hits
 
 
 def _read_lightweight_text(path: Path) -> str:
@@ -214,7 +270,32 @@ def _read_pdf_text(path: Path) -> str:
 
 def _has_meaningful_text(text: str) -> bool:
     # Bild-PDFs liefern oft nur Whitespace oder einzelne Steuerzeichen.
-    return bool(text and len(re.sub(r"\s+", "", text)) >= 20)
+    if not text or len(re.sub(r"\s+", "", text)) < 20:
+        return False
+    normalized = _normalize_text(text)
+    business_words = (
+        "rechnung",
+        "invoice",
+        "gesamt",
+        "betrag",
+        "datum",
+        "lieferung",
+        "kund",
+        "ust",
+        "mwst",
+        "eur",
+        "gmbh",
+        "amazon",
+        "porsche",
+        "reparatur",
+        "wartung",
+    )
+    if any(word in normalized for word in business_words):
+        return True
+
+    printable = sum(1 for char in text if char in string.printable or char in "äöüÄÖÜß€éèàáóíúÉ")
+    non_space = len(re.sub(r"\s+", "", text))
+    return non_space > 0 and printable / max(len(text), 1) >= 0.75
 
 
 def _read_pdf_with_pypdf(path: Path) -> str:
@@ -304,7 +385,7 @@ def _pdf_to_images(path: Path):
     try:
         from pdf2image import convert_from_path
         try:
-            return convert_from_path(str(path), dpi=200, first_page=1, last_page=_OCR_MAX_PAGES)
+            return convert_from_path(str(path), dpi=_OCR_DPI, first_page=1, last_page=_OCR_MAX_PAGES)
         except Exception as exc:
             logging.info("pdf2image fehlgeschlagen, versuche PyMuPDF: %s (%s)", path, exc)
     except ImportError:
@@ -323,7 +404,7 @@ def _pdf_to_images(path: Path):
     try:
         with fitz.open(str(path)) as doc:
             for page_index in range(min(len(doc), _OCR_MAX_PAGES)):
-                pix = doc[page_index].get_pixmap(dpi=200)
+                pix = doc[page_index].get_pixmap(dpi=_OCR_DPI)
                 images.append(Image.open(io.BytesIO(pix.tobytes("png"))))
     except Exception as exc:
         logging.info("PyMuPDF-Render fehlgeschlagen: %s (%s)", path, exc)
@@ -396,13 +477,29 @@ def _file_date(path: Path) -> date:
 
 
 def _find_amount(text: str) -> tuple[Optional[float], str]:
-    pattern = r"(\d{1,6}(?:[.,]\d{2}))\s?(eur|euro|€|usd|chf)?"
+    pattern = r"((?:\d{1,3}(?:[. ]\d{3})+|\d{1,6})(?:[.,]\d{2}))\s?(eur|euro|€|usd|chf)?"
     currency_map = {"€": "EUR", "euro": "EUR", "eur": "EUR", "usd": "USD", "chf": "CHF"}
 
-    # Bevorzugt Beträge in der Nähe von Schlüsselwörtern wie "summe", "gesamt", "brutto", "total".
-    priority_keywords = ("gesamtsumme", "gesamtbetrag", "summe", "gesamt", "brutto", "total", "zahlbetrag", "endbetrag")
+    porsche_amount = _find_porsche_gross_amount(text)
+    if porsche_amount is not None:
+        return porsche_amount, "EUR"
+
+    # Bevorzugt eindeutige Brutto-/Zahlbetrag-Signale.
+    priority_keywords = (
+        "zahlbetrag",
+        "endbetrag",
+        "gesamtpreis",
+        "zu zahlen",
+        "kartenzahlung",
+        "total",
+        "gesamtsumme",
+        "gesamtbetrag",
+        "brutto",
+    )
     for keyword in priority_keywords:
-        for match in re.finditer(rf"{keyword}[^\n]{{0,40}}?" + pattern, text, flags=re.IGNORECASE):
+        for match in re.finditer(rf"(?<![a-z0-9]){keyword}(?![a-z0-9])[^\n]{{0,40}}?" + pattern, text, flags=re.IGNORECASE):
+            if _looks_like_tax_context(text, match):
+                continue
             amount = _parse_decimal(match.group(1))
             currency = currency_map.get((match.group(2) or "").lower(), "EUR")
             return amount, currency
@@ -414,6 +511,8 @@ def _find_amount(text: str) -> tuple[Optional[float], str]:
 
     candidates: list[tuple[float, str]] = []
     for match in matches:
+        if _looks_like_time_or_date_amount(text, match):
+            continue
         try:
             value = _parse_decimal(match.group(1))
         except ValueError:
@@ -427,6 +526,46 @@ def _find_amount(text: str) -> tuple[Optional[float], str]:
     pool = with_currency or candidates
     amount, raw_currency = max(pool, key=lambda c: c[0])
     return amount, currency_map.get(raw_currency, "EUR")
+
+
+def _looks_like_time_or_date_amount(text: str, match: re.Match) -> bool:
+    start, end = match.span(1)
+    before = text[max(0, start - 12):start]
+    after = text[end:end + 12]
+    value = match.group(1)
+    if re.search(r"(?:^|\s)(?:um|at)\s*$", before):
+        return True
+    if re.match(r"^\s*(?:uhr|h)\b", after):
+        return True
+    if re.match(r"^\d{1,2}[.,]\d{2}$", value):
+        hour = int(value[: value.index(",") if "," in value else value.index(".")])
+        if 0 <= hour <= 23 and re.search(r"(?:^|\s)(?:um|at)\s*$", before):
+            return True
+    if re.search(r"\b20\d{2}[ ._/-]?$", before) or re.match(r"^[ ._/-]?\d{2}\b", after):
+        return True
+    return False
+
+
+def _looks_like_tax_context(text: str, match: re.Match) -> bool:
+    context = text[max(0, match.start() - 25):match.end() + 25]
+    return bool(re.search(r"\b(?:ust|mwst|netto|ohne\s+ust)\b", context))
+
+
+def _find_porsche_gross_amount(text: str) -> Optional[float]:
+    normalized = _normalize_text(text)
+    if "porsche" not in normalized or "zwischensumme" not in normalized:
+        return None
+
+    net_amounts = []
+    for match in re.finditer(r"zwischensumme\s+((?:\d{1,3}(?:[. ]\d{3})+|\d{1,6})(?:[.,]\d{2}))", text, flags=re.IGNORECASE):
+        try:
+            net_amounts.append(_parse_decimal(match.group(1)))
+        except ValueError:
+            continue
+
+    if not net_amounts:
+        return None
+    return round(max(net_amounts) * 1.19 + 1e-9, 2)
 
 
 def _parse_decimal(value: str) -> float:
@@ -466,3 +605,13 @@ def _find_vendor(stem: str, invoice_date: date, vendor_hits: Optional[list] = No
     if vendor:
         return vendor.title()
     return f"Unbekannt {invoice_date.year}"
+
+
+def _find_category(vendor_hits: Optional[list], default_category: str) -> str:
+    if not vendor_hits:
+        return default_category
+    for vendor in sorted(vendor_hits, key=len, reverse=True):
+        category = KNOWN_VENDOR_CATEGORIES.get(vendor)
+        if category:
+            return category
+    return default_category

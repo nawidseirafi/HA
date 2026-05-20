@@ -43,6 +43,37 @@ class InvoiceCatalog:
         ).fetchone()
         return row is not None
 
+    def has_metadata_duplicate(self, metadata: InvoiceMetadata) -> bool:
+        if metadata.invoice_number:
+            row = self.connection.execute(
+                """
+                select 1 from invoices
+                where status = 'archived'
+                  and lower(vendor) = lower(?)
+                  and lower(invoice_number) = lower(?)
+                limit 1
+                """,
+                (metadata.vendor, metadata.invoice_number),
+            ).fetchone()
+            if row is not None:
+                return True
+
+        if metadata.amount is None:
+            return False
+
+        row = self.connection.execute(
+            """
+            select 1 from invoices
+            where status = 'archived'
+              and lower(vendor) = lower(?)
+              and invoice_date = ?
+              and abs(amount - ?) < 0.005
+            limit 1
+            """,
+            (metadata.vendor, metadata.invoice_date.isoformat(), metadata.amount),
+        ).fetchone()
+        return row is not None
+
     def has_email_message(self, message_key: str) -> bool:
         row = self.connection.execute(
             "select 1 from email_messages where message_key = ? limit 1",

@@ -51,9 +51,26 @@ INVOICE_OCR_DISABLE=1            # OCR komplett abschalten
 INVOICE_OCR_LANG="deu+eng"       # Tesseract-Sprachen (Default: deu+eng)
 INVOICE_OCR_MAX_PAGES=5          # max. Seiten pro PDF (Default: 5)
 INVOICE_OCR_MAX_BYTES=41943040   # PDFs darueber werden uebersprungen (Default: 40 MB)
+INVOICE_OCR_DPI=150              # Render-Aufloesung fuer PDF-OCR (Default: 150)
 ```
 
 Fehlen Tesseract oder die Python-Pakete, ueberspringt der Agent OCR still und nutzt nur die bisherigen Textextraktoren.
+
+### KI-Extraktion als Fallback
+
+Der Rechnungs-Agent nutzt zuerst lokale Text-Extraktion und OCR. Wenn dabei zu wenig Vertrauen entsteht, kein Betrag gefunden wird oder ein Scan keinen lesbaren Text liefert, kann ein LLM/Vision-Modell den Beleg direkt analysieren.
+
+In `config.yaml`:
+
+```yaml
+invoice_agent:
+  ai_extraction:
+    enabled: true
+    min_confidence: 0.8
+    max_file_bytes: 10485760
+```
+
+Die KI-Extraktion nutzt die zentrale `llm`-Konfiguration und die API-Keys aus `.env`, zum Beispiel `GEMINI_API_KEY`. Der Agent erwartet strukturiertes JSON vom Modell und uebernimmt Anbieter, Datum, Bruttobetrag, Waehrung, Kategorie und Konfidenz nur als Fallback/Verbesserung.
 
 ## Python-Umgebung
 
@@ -274,6 +291,24 @@ Bereits bekannte Dateien erneut auswerten, zum Beispiel nach Verbesserungen an d
 ```bash
 ../venv/bin/python agents/invoices.py --once --reprocess
 ```
+
+## Archiv aufraeumen
+
+Wenn nach Testlaeufen oder neu aufgebauter Datenbank mehrfach archivierte Dateien im `archive` liegen, kann der Cleanup-Agent Dateien finden, die nicht mehr in `invoices.db` referenziert sind.
+
+Nur pruefen:
+
+```bash
+../venv/bin/python agents/cleanup_archive.py
+```
+
+Unreferenzierte Dateien in ein Backup verschieben:
+
+```bash
+../venv/bin/python agents/cleanup_archive.py --apply
+```
+
+Das Script loescht nichts direkt. Es verschiebt nach `data/invoices/archive_cleanup_backup/<timestamp>/`.
 
 ## Steuer-Export
 

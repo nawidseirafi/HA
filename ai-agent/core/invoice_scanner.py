@@ -2,8 +2,10 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 from core.ha_client import HomeAssistantClient
+from core.invoice_ai_extractor import refine_metadata_with_ai
 from core.invoice_archiver import archive_invoice, copy_to_review
 from core.invoice_catalog import InvoiceCatalog
 from core.invoice_email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
@@ -12,6 +14,7 @@ from core.invoice_portals import PortalConfig, fetch_portal_documents
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv", ".eml"}
+AI_EXTRACTABLE_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
 
 @dataclass
@@ -24,10 +27,13 @@ class InvoiceAgentConfig:
     poll_interval_seconds: int
     default_category: str = "Unsortiert"
     confidence_threshold: float = 0.5
+    require_amount_for_archive: bool = True
     reprocess_existing: bool = False
     email: EmailConfig = None
     portals: PortalConfig = None
     home_assistant_notifications: "HomeAssistantNotificationConfig" = None
+    ai_extraction: "AIExtractionConfig" = None
+    llm_config: Optional[dict] = None
 
 
 @dataclass
@@ -36,6 +42,13 @@ class HomeAssistantNotificationConfig:
     only_on_changes: bool = True
     title: str = "Rechnungs-Agent"
     notification_id: str = "invoice_agent"
+
+
+@dataclass
+class AIExtractionConfig:
+    enabled: bool = False
+    min_confidence: float = 0.8
+    max_file_bytes: int = 10 * 1024 * 1024
 
 
 @dataclass
@@ -56,6 +69,7 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
     _ensure_dirs(config)
     catalog = InvoiceCatalog(config.database_path)
     result = ScanResult()
+    llm_client = None
 
     try:
         if config.portals and config.portals.enabled:
@@ -86,7 +100,30 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
                 continue
 
             metadata = extract_metadata(path, default_category=config.default_category)
-            if metadata.is_invoice and metadata.confidence >= config.confidence_threshold:
+            if _should_use_ai_extraction(config, metadata, path):
+                if llm_client is None:
+                    llm_client = _create_llm_client(config)
+                if llm_client is not None:
+                    try:
+                        metadata = refine_metadata_with_ai(
+                            path=path,
+                            metadata=metadata,
+                            llm_client=llm_client,
+                            default_category=config.default_category,
+                        )
+                    except Exception as exc:
+                        logging.warning("KI-Belegextraktion fehlgeschlagen, lokale Metadaten werden genutzt: %s", exc)
+            if catalog.has_metadata_duplicate(metadata) and not config.reprocess_existing:
+                result.duplicates += 1
+                logging.info(
+                    "Metadaten-Duplikat uebersprungen: %s (%s, %s, %s)",
+                    path,
+                    metadata.vendor,
+                    metadata.invoice_date,
+                    metadata.amount,
+                )
+                continue
+            if _should_archive(config, metadata):
                 archive_path = archive_invoice(path, metadata, config.archive_dir)
                 catalog.upsert(metadata, archive_path, "archived")
                 result.archived += 1
@@ -106,6 +143,45 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
     _notify_home_assistant(config, result)
     _notify_portal_logins(config, result)
     return result
+
+
+def _should_archive(config: InvoiceAgentConfig, metadata) -> bool:
+    if not metadata.is_invoice or metadata.confidence < config.confidence_threshold:
+        return False
+    if config.require_amount_for_archive and metadata.amount is None:
+        return False
+    return True
+
+
+def _should_use_ai_extraction(config: InvoiceAgentConfig, metadata, path: Path) -> bool:
+    ai_config = config.ai_extraction
+    if not ai_config or not ai_config.enabled:
+        return False
+    if path.suffix.lower() not in AI_EXTRACTABLE_EXTENSIONS:
+        return False
+    try:
+        if path.stat().st_size > ai_config.max_file_bytes:
+            logging.info("KI-Belegextraktion uebersprungen, Datei zu gross: %s", path)
+            return False
+    except OSError:
+        return False
+    return (
+        metadata.confidence < ai_config.min_confidence
+        or metadata.amount is None
+        or "no_readable_text" in metadata.reason
+    )
+
+
+def _create_llm_client(config: InvoiceAgentConfig):
+    if not config.llm_config:
+        logging.info("KI-Belegextraktion deaktiviert: keine llm-Konfiguration vorhanden.")
+        return None
+    try:
+        from llm import create_llm_client
+        return create_llm_client({"llm": config.llm_config})
+    except Exception as exc:
+        logging.warning("LLM-Client konnte nicht erstellt werden: %s", exc)
+        return None
 
 
 def watch(config: InvoiceAgentConfig):

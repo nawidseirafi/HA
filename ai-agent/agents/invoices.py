@@ -15,7 +15,7 @@ if str(BASE_DIR) not in sys.path:
 
 from core.invoice_email import EmailConfig
 from core.invoice_portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
-from core.invoice_scanner import HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+from core.invoice_scanner import AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
 from core.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
 
 
@@ -34,6 +34,7 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
     email_config = invoice_config.get("email", {})
     portals_config = invoice_config.get("portals", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
+    ai_extraction_config = invoice_config.get("ai_extraction", {})
     data_dir = BASE_DIR / "data" / "invoices"
 
     return InvoiceAgentConfig(
@@ -45,10 +46,13 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
         poll_interval_seconds=int(invoice_config.get("poll_interval_seconds", 600)),
         default_category=invoice_config.get("default_category", "Unsortiert"),
         confidence_threshold=float(invoice_config.get("confidence_threshold", 0.5)),
+        require_amount_for_archive=bool(invoice_config.get("require_amount_for_archive", True)),
         reprocess_existing=bool(invoice_config.get("reprocess_existing", False)),
         email=_load_email_config(email_config),
         portals=_load_portal_config(portals_config, data_dir),
         home_assistant_notifications=_load_ha_notification_config(ha_notification_config),
+        ai_extraction=_load_ai_extraction_config(ai_extraction_config),
+        llm_config=raw_config.get("llm", {}),
     )
 
 
@@ -192,6 +196,14 @@ def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfi
         only_on_changes=bool(config.get("only_on_changes", True)),
         title=config.get("title", "Rechnungs-Agent"),
         notification_id=config.get("notification_id", "invoice_agent"),
+    )
+
+
+def _load_ai_extraction_config(config: dict) -> AIExtractionConfig:
+    return AIExtractionConfig(
+        enabled=bool(config.get("enabled", False)),
+        min_confidence=float(config.get("min_confidence", 0.8)),
+        max_file_bytes=int(config.get("max_file_bytes", 10 * 1024 * 1024)),
     )
 
 

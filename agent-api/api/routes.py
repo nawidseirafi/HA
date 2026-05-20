@@ -4,7 +4,7 @@ import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 from uuid import uuid4
 
 import yaml
@@ -17,7 +17,6 @@ from agents.vacation import VacationAgent
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config.yaml"
 STATUS_PATH = BASE_DIR / "storage" / "status.json"
-INVOICE_UPLOAD_DIR = BASE_DIR / "storage" / "uploads" / "invoices"
 
 logger = logging.getLogger("agent-api.routes")
 router = APIRouter()
@@ -35,6 +34,21 @@ agents = {
     "invoices": InvoiceAgent(config=config.get("agents", {}).get("invoices", {})),
     "vacation": VacationAgent(config=config.get("agents", {}).get("vacation", {})),
 }
+
+
+def resolve_path(value: Union[str, Path], default_base: Path = BASE_DIR) -> Path:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return (default_base / path).resolve()
+
+
+INVOICE_UPLOAD_DIR = resolve_path(
+    config.get("agents", {}).get("invoices", {}).get(
+        "upload_dir",
+        config.get("storage", {}).get("uploads_dir", "storage/uploads/invoices"),
+    )
+)
 
 
 def utc_now() -> str:
@@ -151,12 +165,17 @@ def upload_invoice(file: UploadFile = File(...)) -> dict[str, Any]:
         shutil.copyfileobj(file.file, output_file)
 
     logger.info("Invoice upload stored: %s", destination)
+    try:
+        path = str(destination.relative_to(BASE_DIR))
+    except ValueError:
+        path = str(destination)
+
     return {
         "status": "uploaded",
         "agent": "invoices",
         "filename": safe_name,
         "stored_filename": stored_name,
-        "path": str(destination.relative_to(BASE_DIR)),
+        "path": path,
     }
 
 
