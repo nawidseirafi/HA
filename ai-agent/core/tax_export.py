@@ -1,7 +1,9 @@
 import csv
 import logging
+import re
 import sqlite3
 import zipfile
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -55,6 +57,7 @@ REVIEW_KEYWORDS = (
 )
 
 DETAIL_HEADERS = (
+    "Lfd. Nr.",
     "Datum",
     "Anbieter",
     "Betrag",
@@ -67,8 +70,10 @@ DETAIL_HEADERS = (
     "Quelle",
 )
 
-SUMMARY_HEADERS = ("Steuerkategorie", "Anzahl", "Summe EUR")
+SUMMARY_HEADERS = ("Steuerkategorie", "Anzahl", "Summe EUR", "Anteil %")
 REVIEW_HEADERS = DETAIL_HEADERS
+VENDOR_HEADERS = ("Anbieter", "Steuerkategorie (haeufigste)", "Anzahl", "Summe EUR")
+QUARTER_HEADERS = ("Quartal", "Steuerkategorie", "Anzahl", "Summe EUR")
 
 
 @dataclass
@@ -96,10 +101,17 @@ def export_tax_year(config: TaxExportConfig, year: int) -> TaxExportResult:
     csv_path = year_dir / f"einkommensteuer_{year}.csv"
     xlsx_path = year_dir / f"einkommensteuer_{year}.xlsx"
 
-    detail_rows = [DETAIL_HEADERS] + [_detail_row(row) for row in categorized]
+    detail_rows = [DETAIL_HEADERS] + [_detail_row(i, row) for i, row in enumerate(categorized, start=1)]
     summary_rows = [SUMMARY_HEADERS] + _summary_rows(categorized)
-    review_rows = [REVIEW_HEADERS] + [_detail_row(row) for row in categorized if row["tax_category"] == "Review"]
+    review_rows = [REVIEW_HEADERS] + [
+        _detail_row(i, row)
+        for i, row in enumerate(
+            (r for r in categorized if r["tax_category"] == "Review"), start=1
+        )
+    ]
     monthly_rows = _monthly_rows(categorized)
+    quarterly_rows = _quarterly_rows(categorized)
+    vendor_rows = _vendor_rows(categorized)
     overview_rows = _overview_rows(year, categorized)
 
     _write_csv(csv_path, detail_rows)
@@ -108,7 +120,9 @@ def export_tax_year(config: TaxExportConfig, year: int) -> TaxExportResult:
         "Uebersicht": overview_rows,
         "Alle Belege": detail_rows,
         "Monate": monthly_rows,
+        "Quartale": quarterly_rows,
         "Kategorien": summary_rows,
+        "Anbieter": vendor_rows,
         "Review": review_rows,
     }
 
@@ -192,10 +206,11 @@ def _categorize(row: sqlite3.Row, rules: dict[str, str]) -> dict:
     }
 
 
-def _detail_row(row: dict) -> list[object]:
+def _detail_row(seq: int, row: dict) -> list[object]:
     invoice_date = _to_date(row["invoice_date"])
     amount = row["amount"] if row["amount"] is not None else ""
     return [
+        seq,
         invoice_date,
         row["vendor"],
         amount,
@@ -222,17 +237,21 @@ def _to_date(value):
 
 def _summary_rows(rows: Iterable[dict]) -> list[list[object]]:
     grouped: dict[str, dict[str, float]] = {}
+    total_sum = 0.0
     for row in rows:
         if row["currency"] != "EUR" or row["amount"] is None:
             continue
         bucket = grouped.setdefault(row["tax_category"], {"count": 0, "sum": 0.0})
         bucket["count"] += 1
         bucket["sum"] += float(row["amount"])
+        total_sum += float(row["amount"])
 
     output = []
-    for category in sorted(grouped):
+    # Sortierung: groesste Summe zuerst (interessant fuer den Steuerberater)
+    for category in sorted(grouped, key=lambda k: grouped[k]["sum"], reverse=True):
         bucket = grouped[category]
-        output.append([category, bucket["count"], round(bucket["sum"], 2)])
+        share = round(bucket["sum"] / total_sum * 100, 2) if total_sum > 0 else 0.0
+        output.append([category, bucket["count"], round(bucket["sum"], 2), share])
     return output
 
 
@@ -260,6 +279,48 @@ def _monthly_rows(rows: Iterable[dict]) -> list[list[object]]:
     return output
 
 
+def _quarterly_rows(rows: Iterable[dict]) -> list[list[object]]:
+    grouped: dict[tuple[str, str], dict[str, float]] = {}
+    for row in rows:
+        if row["currency"] != "EUR" or row["amount"] is None:
+            continue
+        d = _to_date(row["invoice_date"])
+        if not isinstance(d, date):
+            continue
+        quarter = f"{d.year:04d}-Q{(d.month - 1) // 3 + 1}"
+        key = (quarter, row["tax_category"])
+        bucket = grouped.setdefault(key, {"count": 0, "sum": 0.0})
+        bucket["count"] += 1
+        bucket["sum"] += float(row["amount"])
+
+    output: list[list[object]] = [list(QUARTER_HEADERS)]
+    for (quarter, category) in sorted(grouped):
+        bucket = grouped[(quarter, category)]
+        output.append([quarter, category, bucket["count"], round(bucket["sum"], 2)])
+    return output
+
+
+def _vendor_rows(rows: Iterable[dict]) -> list[list[object]]:
+    grouped: dict[str, dict] = {}
+    for row in rows:
+        if row["currency"] != "EUR" or row["amount"] is None:
+            continue
+        vendor = row["vendor"] or "(unbekannt)"
+        bucket = grouped.setdefault(
+            vendor, {"count": 0, "sum": 0.0, "categories": Counter()}
+        )
+        bucket["count"] += 1
+        bucket["sum"] += float(row["amount"])
+        bucket["categories"][row["tax_category"]] += 1
+
+    output: list[list[object]] = [list(VENDOR_HEADERS)]
+    for vendor in sorted(grouped, key=lambda k: grouped[k]["sum"], reverse=True):
+        bucket = grouped[vendor]
+        top_category = bucket["categories"].most_common(1)[0][0]
+        output.append([vendor, top_category, bucket["count"], round(bucket["sum"], 2)])
+    return output
+
+
 OVERVIEW_HEADERS = ("Kennzahl", "Wert")
 
 
@@ -267,19 +328,31 @@ def _overview_rows(year: int, rows: list[dict]) -> list[list[object]]:
     total_count = len(rows)
     archived = sum(1 for r in rows if r["status"] == "archived")
     review = sum(1 for r in rows if r["tax_category"] == "Review")
-    eur_sum = round(
-        sum(float(r["amount"]) for r in rows if r["currency"] == "EUR" and r["amount"] is not None),
-        2,
-    )
-    eur_sum_clean = round(
-        sum(
-            float(r["amount"])
-            for r in rows
-            if r["currency"] == "EUR" and r["amount"] is not None and r["tax_category"] != "Review"
-        ),
-        2,
-    )
+    eur_amounts = [
+        float(r["amount"]) for r in rows if r["currency"] == "EUR" and r["amount"] is not None
+    ]
+    eur_amounts_clean = [
+        float(r["amount"])
+        for r in rows
+        if r["currency"] == "EUR"
+        and r["amount"] is not None
+        and r["tax_category"] != "Review"
+    ]
+    eur_sum = round(sum(eur_amounts), 2)
+    eur_sum_clean = round(sum(eur_amounts_clean), 2)
     missing_amount = sum(1 for r in rows if r["amount"] is None)
+    highest = max(eur_amounts) if eur_amounts else 0.0
+    average = round(sum(eur_amounts) / len(eur_amounts), 2) if eur_amounts else 0.0
+
+    cat_sum: Counter = Counter()
+    vendor_sum: Counter = Counter()
+    for r in rows:
+        if r["currency"] != "EUR" or r["amount"] is None:
+            continue
+        cat_sum[r["tax_category"]] += float(r["amount"])
+        vendor_sum[r["vendor"] or "(unbekannt)"] += float(r["amount"])
+    top_category = cat_sum.most_common(1)[0][0] if cat_sum else "-"
+    top_vendor = vendor_sum.most_common(1)[0][0] if vendor_sum else "-"
 
     return [
         list(OVERVIEW_HEADERS),
@@ -290,6 +363,10 @@ def _overview_rows(year: int, rows: list[dict]) -> list[list[object]]:
         ["Belege ohne Betrag", missing_amount],
         ["Summe EUR (alle Belege)", eur_sum],
         ["Summe EUR (ohne Review)", eur_sum_clean],
+        ["Hoechster Einzelbetrag EUR", round(highest, 2)],
+        ["Durchschnittsbetrag EUR", average],
+        ["Groesste Kategorie (Summe)", top_category],
+        ["Top-Anbieter (Summe)", top_vendor],
         ["Erstellt am", datetime.now().strftime("%Y-%m-%d %H:%M")],
     ]
 
@@ -314,24 +391,35 @@ def _write_xlsx_styled(path: Path, sheets: dict[str, list[list[object]]], year: 
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
         from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.formatting.rule import FormulaRule
     except ImportError:
         logging.info("openpyxl nicht installiert, nutze einfachen XLSX-Writer.")
         return False
 
     wb = Workbook()
     wb.remove(wb.active)
+    wb.properties.title = f"Einkommensteuer-Auswertung {year}"
+    wb.properties.subject = "Belegauswertung fuer Steuerberater/Finanzamt"
+    wb.properties.creator = "Invoice-Agent"
 
-    header_font = Font(bold=True, color="FFFFFFFF")
+    header_font = Font(bold=True, color="FFFFFFFF", size=11)
     header_fill = PatternFill("solid", fgColor="FF305496")
+    title_font = Font(bold=True, size=14, color="FF305496")
     review_fill = PatternFill("solid", fgColor="FFFCE4D6")
+    missing_fill = PatternFill("solid", fgColor="FFFFF2CC")
     total_font = Font(bold=True)
     total_fill = PatternFill("solid", fgColor="FFE7E6E6")
+    label_font = Font(bold=True)
+    hyperlink_font = Font(color="FF0563C1", underline="single")
     thin = Side(border_style="thin", color="FFBFBFBF")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     center = Alignment(horizontal="center", vertical="center")
     left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    right_align = Alignment(horizontal="right", vertical="center")
 
     money_fmt = '#,##0.00\u00a0"\u20ac"'
+    percent_fmt = '0.00"\u00a0%"'
     int_fmt = "#,##0"
     date_fmt = "DD.MM.YYYY"
 
@@ -340,65 +428,146 @@ def _write_xlsx_styled(path: Path, sheets: dict[str, list[list[object]]], year: 
         if not rows:
             continue
 
+        # Titel-Zeile oberhalb der Tabelle
+        title_text = f"{sheet_name} - Steuerjahr {year}"
+        ws.cell(row=1, column=1, value=title_text).font = title_font
+        ws.row_dimensions[1].height = 22
+
+        header_row_index = 2
         headers = rows[0]
         for col_index, header in enumerate(headers, start=1):
-            cell = ws.cell(row=1, column=col_index, value=str(header))
+            cell = ws.cell(row=header_row_index, column=col_index, value=str(header))
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = center
             cell.border = border
+        ws.row_dimensions[header_row_index].height = 20
 
         amount_columns = _find_amount_columns(headers)
+        percent_columns = _find_percent_columns(headers)
         count_columns = _find_count_columns(headers)
         date_columns = _find_date_columns(headers)
+        path_columns = _find_path_columns(headers)
+        seq_columns = _find_seq_columns(headers)
+        status_col = _find_column(headers, "status")
+        category_col = _find_column(headers, "steuerkategorie")
+        amount_col_for_format = next(iter(amount_columns), None)
 
-        for row_index, row in enumerate(rows[1:], start=2):
-            is_review_row = sheet_name == "Alle Belege" and _row_is_review(headers, row)
+        data_start = header_row_index + 1
+        for offset, row in enumerate(rows[1:], start=0):
+            r = data_start + offset
             for col_index, value in enumerate(row, start=1):
-                cell = ws.cell(row=row_index, column=col_index, value=_xlsx_value(value))
+                cell = ws.cell(row=r, column=col_index, value=_xlsx_value(value))
                 cell.border = border
-                cell.alignment = left
                 if col_index in amount_columns and isinstance(value, (int, float)) and value != "":
                     cell.number_format = money_fmt
+                    cell.alignment = right_align
+                elif col_index in percent_columns and isinstance(value, (int, float)) and value != "":
+                    cell.number_format = percent_fmt
+                    cell.alignment = right_align
                 elif col_index in count_columns and isinstance(value, (int, float)) and value != "":
                     cell.number_format = int_fmt
+                    cell.alignment = right_align
+                elif col_index in seq_columns and isinstance(value, (int, float)) and value != "":
+                    cell.number_format = int_fmt
+                    cell.alignment = center
                 elif col_index in date_columns and isinstance(value, date):
                     cell.number_format = date_fmt
-                if is_review_row:
-                    cell.fill = review_fill
+                    cell.alignment = center
+                else:
+                    cell.alignment = left
 
-        # Spaltenbreite + Filter + Freeze
+                # Hyperlink auf Archivpfad / Quelle, wenn Datei existiert
+                if col_index in path_columns and isinstance(value, str) and value:
+                    try:
+                        if Path(value).exists():
+                            cell.hyperlink = Path(value).as_uri()
+                            cell.font = hyperlink_font
+                    except (OSError, ValueError):
+                        pass
+
+        # Spaltenbreite
         max_col = len(headers)
-        max_row = len(rows)
+        max_row = header_row_index + len(rows) - 1
         for col_index in range(1, max_col + 1):
             letter = get_column_letter(col_index)
-            width = max(
-                (len(str(_xlsx_value(r[col_index - 1]))) for r in rows if col_index - 1 < len(r)),
-                default=10,
-            )
+            widths = [len(str(_xlsx_value(r[col_index - 1]))) for r in rows if col_index - 1 < len(r)]
+            width = max(widths) if widths else 10
             ws.column_dimensions[letter].width = min(max(width + 2, 12), 60)
-        ws.freeze_panes = "A2"
-        if max_row >= 1 and max_col >= 1:
-            ws.auto_filter.ref = f"A1:{get_column_letter(max_col)}{max_row}"
 
-        # Summenzeile fuer Tabellen mit numerischen Spalten
-        if sheet_name in ("Alle Belege", "Monate", "Kategorien") and max_row > 1:
+        # Filter + Freeze (gilt nicht fuer Uebersicht)
+        if sheet_name != "Uebersicht":
+            ws.freeze_panes = ws.cell(row=data_start, column=1).coordinate
+            ws.auto_filter.ref = f"A{header_row_index}:{get_column_letter(max_col)}{max_row}"
+
+        # Bedingte Formatierungen auf "Alle Belege" und "Review"
+        if sheet_name in ("Alle Belege", "Review") and category_col and max_row >= data_start:
+            cat_letter = get_column_letter(category_col)
+            row_range = f"A{data_start}:{get_column_letter(max_col)}{max_row}"
+            ws.conditional_formatting.add(
+                row_range,
+                FormulaRule(formula=[f'EXACT(${cat_letter}{data_start},"Review")'], fill=review_fill),
+            )
+            if amount_col_for_format:
+                amt_letter = get_column_letter(amount_col_for_format)
+                ws.conditional_formatting.add(
+                    row_range,
+                    FormulaRule(formula=[f'ISBLANK(${amt_letter}{data_start})'], fill=missing_fill),
+                )
+
+        # Summenzeile mit SUBTOTAL (rechnet mit Filtern korrekt)
+        if sheet_name in ("Alle Belege", "Monate", "Quartale", "Kategorien", "Anbieter", "Review") and max_row > header_row_index:
             total_row = max_row + 1
-            ws.cell(row=total_row, column=1, value="Summe").font = total_font
-            ws.cell(row=total_row, column=1).fill = total_fill
-            for col_index in range(1, max_col + 1):
+            label_cell = ws.cell(row=total_row, column=1, value="Summe (gefiltert)")
+            label_cell.font = total_font
+            label_cell.fill = total_fill
+            label_cell.border = border
+            label_cell.alignment = left
+            for col_index in range(2, max_col + 1):
                 cell = ws.cell(row=total_row, column=col_index)
                 cell.fill = total_fill
                 cell.font = total_font
                 cell.border = border
                 if col_index in amount_columns:
                     letter = get_column_letter(col_index)
-                    cell.value = f"=SUM({letter}2:{letter}{max_row})"
+                    cell.value = f"=SUBTOTAL(9,{letter}{data_start}:{letter}{max_row})"
                     cell.number_format = money_fmt
+                    cell.alignment = right_align
                 elif col_index in count_columns:
                     letter = get_column_letter(col_index)
-                    cell.value = f"=SUM({letter}2:{letter}{max_row})"
+                    cell.value = f"=SUBTOTAL(9,{letter}{data_start}:{letter}{max_row})"
                     cell.number_format = int_fmt
+                    cell.alignment = right_align
+
+        # Druck-Layout
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.7, bottom=0.7)
+        ws.print_options.horizontalCentered = True
+        ws.print_title_rows = f"{header_row_index}:{header_row_index}"
+        ws.oddHeader.left.text = title_text
+        ws.oddHeader.right.text = f"Stand: {datetime.now().strftime('%d.%m.%Y')}"
+        ws.oddFooter.center.text = "Seite &P von &N"
+
+        # Uebersicht hat besondere Formatierung: linke Spalte fett, ohne Filter
+        if sheet_name == "Uebersicht":
+            for r in range(data_start, max_row + 1):
+                left_cell = ws.cell(row=r, column=1)
+                left_cell.font = label_font
+                left_cell.alignment = left
+                value_cell = ws.cell(row=r, column=2)
+                if isinstance(value_cell.value, (int, float)):
+                    if "EUR" in str(ws.cell(row=r, column=1).value):
+                        value_cell.number_format = money_fmt
+                        value_cell.alignment = right_align
+                    else:
+                        value_cell.number_format = int_fmt
+                        value_cell.alignment = right_align
+            ws.column_dimensions["A"].width = 38
+            ws.column_dimensions["B"].width = 28
 
     # Uebersicht als erste Registerkarte anzeigen
     if "Uebersicht" in wb.sheetnames:
@@ -418,6 +587,13 @@ def _xlsx_value(value):
     return value
 
 
+def _find_column(headers, name: str):
+    for i, h in enumerate(headers):
+        if isinstance(h, str) and h.lower() == name.lower():
+            return i + 1
+    return None
+
+
 def _find_amount_columns(headers) -> set:
     return {
         i + 1
@@ -426,12 +602,28 @@ def _find_amount_columns(headers) -> set:
     }
 
 
+def _find_percent_columns(headers) -> set:
+    return {i + 1 for i, h in enumerate(headers) if isinstance(h, str) and "anteil" in h.lower()}
+
+
 def _find_count_columns(headers) -> set:
     return {i + 1 for i, h in enumerate(headers) if isinstance(h, str) and h.lower() == "anzahl"}
 
 
 def _find_date_columns(headers) -> set:
     return {i + 1 for i, h in enumerate(headers) if isinstance(h, str) and h.lower() == "datum"}
+
+
+def _find_path_columns(headers) -> set:
+    return {
+        i + 1
+        for i, h in enumerate(headers)
+        if isinstance(h, str) and ("pfad" in h.lower() or h.lower() == "quelle")
+    }
+
+
+def _find_seq_columns(headers) -> set:
+    return {i + 1 for i, h in enumerate(headers) if isinstance(h, str) and h.lower().startswith("lfd")}
 
 
 def _row_is_review(headers, row) -> bool:
