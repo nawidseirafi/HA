@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, Bot, CalendarDays, Gauge, LogOut, Play, Settings, Upload } from 'lucide-react';
+import { BarChart3, BellRing, Bot, CalendarDays, Gauge, LogOut, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -8,9 +8,11 @@ interface Props {
   route: Route;
   navigate: (route: Route) => void;
   onLogout: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function Sidebar({ route, navigate, onLogout }: Props) {
+export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const isNeutralArea = route.name === 'agents' || route.name === 'settings';
@@ -36,7 +38,10 @@ export function Sidebar({ route, navigate, onLogout }: Props) {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+      <button className="mobile-menu-close" type="button" onClick={onClose} aria-label="Menü schließen">
+        <X size={20} />
+      </button>
       <div className="brand">
         <div className="brand-logo"><img src={logo} alt="Seirafi" /></div>
         <div>
