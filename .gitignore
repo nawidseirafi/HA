@@ -5,9 +5,9 @@ __pycache__/
 .venv/
 venv/
 **/logs/*.log
-agent-api/storage/status.json
-agent-api/storage/uploads/invoices/*
-!agent-api/storage/uploads/invoices/.gitkeep
+agent-api/backend/storage/status.json
+agent-api/frontend/node_modules/
+agent-api/frontend/dist/
 ai-agent/.env
 ai-agent/data/
 !ai-agent/data/.gitkeep

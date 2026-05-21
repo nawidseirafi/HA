@@ -1,0 +1,23 @@
+import { useEffect, useState } from 'react';
+import { api } from '../api/client';
+import { YearCard } from '../components/YearCard';
+import type { Route } from '../App';
+import type { YearSummary } from '../types/invoice';
+
+export function YearsPage({ navigate }: { navigate: (route: Route) => void }) {
+  const [years, setYears] = useState<YearSummary[]>([]);
+  useEffect(() => { api.years().then(setYears); }, []);
+  return (
+    <div className="page-stack">
+      <header className="page-header">
+        <div>
+          <span className="eyebrow">Archiv</span>
+          <h1>Jahre</h1>
+        </div>
+      </header>
+      <section className="card-grid">
+        {years.map((year) => <YearCard key={year.year} year={year} onOpen={() => navigate({ name: 'year', year: year.year })} />)}
+      </section>
+    </div>
+  );
+}

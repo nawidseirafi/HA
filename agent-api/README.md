@@ -1,38 +1,96 @@
-# Local Agent API
+# RoboterSteve Agent API und Agent Console
 
-Zentrale FastAPI-Schnittstelle, um lokale Agenten vom Mini-PC aus über Home Assistant, iPhone Shortcuts oder andere Tools zu starten.
+Lokale FastAPI-Schnittstelle und React-Weboberflaeche fuer lokale Agenten. Der Rechnungs-Agent ist der erste aktive Bereich; weitere Agenten koennen als eigene Bereiche ergaenzt werden.
 
-## Setup
+## Entwicklung
 
-Lokale Entwicklung in diesem Projekt nutzt das gemeinsame `venv` auf Repo-Ebene:
+## Struktur
 
-```bash
-source venv/bin/activate
-pip install -r agent-api/requirements.txt
+```text
+agent-api/
+├── backend/
+│   ├── main.py
+│   ├── api/
+│   ├── services/
+│   └── storage/
+├── frontend/
+│   └── src/
+├── logs/
+├── config.yaml
+├── main.py
+└── requirements.txt
 ```
 
-Auf dem Mini-PC kann spaeter eine eigene venv ausserhalb dieses Verzeichnisses verwendet werden.
+`main.py` im Root bleibt als kleiner Kompatibilitaets-Einstieg fuer `uvicorn main:app`. Der eigentliche Backend-Code liegt unter `backend/`.
 
-## Start
+Backend:
 
 ```bash
 cd agent-api
-uvicorn main:app --host 0.0.0.0 --port 8080
+../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-Danach ist die API im lokalen Netzwerk unter `http://<mini-pc-ip>:8080` erreichbar.
+Frontend:
 
-## API-Dokumentation
+```bash
+cd agent-api/frontend
+npm install
+npm run dev
+```
 
-FastAPI stellt Swagger/OpenAPI automatisch bereit:
+Danach:
 
 ```text
-Swagger UI:   http://localhost:8080/docs
-ReDoc:        http://localhost:8080/redoc
-OpenAPI JSON: http://localhost:8080/openapi.json
+Frontend: http://localhost:5173
+Backend:  http://localhost:8080
+Swagger:  http://localhost:8080/docs
 ```
 
-## Endpoints
+Im lokalen Netzwerk ist Vite je nach Host-IP z.B. unter `http://192.168.178.143:5173` erreichbar.
+
+## Produktion
+
+```bash
+cd agent-api/frontend
+npm run build
+
+cd ..
+../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080
+```
+
+Wenn `frontend/dist` existiert, liefert FastAPI die gebaute React-App direkt aus.
+
+## API
+
+Neue Invoice-Endpunkte:
+
+```text
+GET    /api/invoices/summary
+GET    /api/invoices/years
+GET    /api/invoices/years/{year}
+GET    /api/invoices/years/{year}/months/{month}
+GET    /api/invoices/{invoice_id}
+GET    /api/invoices/{invoice_id}/file
+PUT    /api/invoices/{invoice_id}
+POST   /api/invoices/{invoice_id}/reanalyze
+POST   /api/invoices/{invoice_id}/mark-reviewed
+DELETE /api/invoices/{invoice_id}
+POST   /api/invoices/upload
+POST   /api/invoices/run
+```
+
+Export-Endpunkte:
+
+```text
+GET /api/exports/year/{year}/excel
+GET /api/exports/year/{year}/pdf
+GET /api/exports/year/{year}/zip
+GET /api/exports/month/{year}/{month}/excel
+GET /api/exports/month/{year}/{month}/pdf
+GET /api/exports/month/{year}/{month}/zip
+```
+
+Kompatible alte Endpunkte bleiben aktiv:
 
 ```text
 GET  /health
@@ -43,22 +101,11 @@ POST /agents/invoices/upload
 POST /agents/vacation/run
 ```
 
-## Beispiele
+Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status liegt unter `backend/storage/status.json`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
 
-Upload-Adresse im lokalen Netzwerk:
+## Hinweise
 
-```text
-http://192.168.178.143:8080/agents/invoices/upload
-```
-
-```bash
-curl http://localhost:8080/health
-curl http://localhost:8080/agents
-curl http://localhost:8080/agents/status
-curl -X POST http://localhost:8080/agents/invoices/run
-curl -X POST http://localhost:8080/agents/vacation/run
-curl -F "file=@rechnung.pdf" http://localhost:8080/agents/invoices/upload
-curl -F "file=@rechnung.pdf" http://192.168.178.143:8080/agents/invoices/upload
-```
-
-Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status inklusive `last_run` wird in `storage/status.json` persistiert. Die aktuelle Implementierung triggert und loggt nur; echte Rechnungsverarbeitung und Vacation-Logik koennen spaeter in den Agent-Klassen angebunden werden.
+- Kein Login-System in V1.
+- API-Key/Auth ist als naechster Backend-Middleware-Schritt vorbereitet.
+- ELSTER-Direktversand ist nicht implementiert und wird nur als deaktivierter Platzhalter angezeigt.
+- Steuerkategorien sind nur Datenfelder, keine Steuerberatung.
