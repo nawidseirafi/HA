@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { api } from '../api/client';
 import { ExportButtons } from '../components/ExportButtons';
 import { InvoiceTable } from '../components/InvoiceTable';
@@ -10,7 +11,7 @@ import { monthNames } from '../lib/format';
 export function MonthPage({ year, month, navigate }: { year: number; month: number; navigate: (route: Route) => void }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [preview, setPreview] = useState<Invoice | null>(null);
-  const [filters, setFilters] = useState({ category: '', status: '', vendor: '', amountMin: '', amountMax: '', search: '' });
+  const [filters, setFilters] = useState({ category: '', status: '', amountMin: '', amountMax: '', search: '' });
 
   const params = useMemo(() => {
     const value = new URLSearchParams();
@@ -33,14 +34,15 @@ export function MonthPage({ year, month, navigate }: { year: number; month: numb
         <div>
           <span className="eyebrow">{year}</span>
           <h1>{monthNames[month - 1]}</h1>
+          <p>Belege prüfen, öffnen und bei Bedarf exportieren.</p>
         </div>
         <div className="button-row">
-          <button className="button ghost" onClick={() => navigate({ name: 'year', year })}>Zurueck zum Jahr</button>
+          <button className="button ghost" onClick={() => navigate({ name: 'year', year })}><ArrowLeft size={16} /> Zurück zum Jahr</button>
           <ExportButtons year={year} month={month} />
         </div>
       </header>
       <section className="filters">
-        {(['search', 'category', 'status', 'vendor', 'amountMin', 'amountMax'] as const).map((key) => (
+        {(['search', 'category', 'status', 'amountMin', 'amountMax'] as const).map((key) => (
           <input key={key} placeholder={labelFor(key)} value={filters[key]} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.value }))} />
         ))}
       </section>
@@ -61,7 +63,6 @@ function labelFor(key: string) {
     search: 'Suche',
     category: 'Kategorie',
     status: 'Status',
-    vendor: 'Anbieter',
     amountMin: 'Betrag von',
     amountMax: 'Betrag bis',
   }[key] ?? key;

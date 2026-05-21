@@ -16,14 +16,10 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
         <thead>
           <tr>
             <th>Datum</th>
-            <th>Anbieter</th>
+            <th>Anbieter/Händler</th>
             <th>Kategorie</th>
-            <th>Betrag Brutto</th>
-            <th>Art</th>
-            <th>MwSt</th>
-            <th>Zahlungsart</th>
+            <th>Betrag</th>
             <th>Status</th>
-            <th>Quelle</th>
             <th>Aktionen</th>
           </tr>
         </thead>
@@ -38,11 +34,7 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
               </td>
               <td>{invoice.category}</td>
               <td>{currency(invoice.gross_amount ?? invoice.amount, invoice.currency)}</td>
-              <td>{invoice.transaction_type === 'income' ? 'Einnahme' : 'Ausgabe'}</td>
-              <td>{invoice.tax_amount ? currency(invoice.tax_amount, invoice.currency) : '-'}</td>
-              <td>{invoice.payment_method || '-'}</td>
-              <td><span className={`status status-${invoice.review_status}`}>{invoice.review_status}</span></td>
-              <td>{invoice.source || invoice.original_filename || '-'}</td>
+              <td><span className={`status status-${invoice.review_status}`}>{statusLabel(invoice.review_status)}</span></td>
               <td>
                 <div className="icon-actions">
                   <button title="Detail öffnen" onClick={() => onOpen(invoice)}><Eye size={16} /></button>
@@ -56,4 +48,16 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
       </table>
     </div>
   );
+}
+
+function statusLabel(status: Invoice['review_status']) {
+  return {
+    reviewed: 'Verarbeitet',
+    exported: 'Verarbeitet',
+    needs_review: 'In Prüfung',
+    review: 'In Prüfung',
+    error: 'Fehler',
+    new: 'Neu',
+    archived: 'Verarbeitet',
+  }[status] ?? status;
 }

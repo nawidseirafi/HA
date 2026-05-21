@@ -1,12 +1,12 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, CalendarDays } from 'lucide-react';
 import type { YearSummary } from '../types/invoice';
 import { currency } from '../lib/format';
 
 export function YearCard({ year, onOpen }: { year: YearSummary; onOpen: () => void }) {
   return (
-    <button className="summary-card clickable" onClick={onOpen}>
+    <button className="summary-card year-card clickable" onClick={onOpen}>
       <div className="card-topline">
-        <span>Jahr</span>
+        <span><CalendarDays size={16} /> Jahr</span>
         <ArrowRight size={18} />
       </div>
       <strong className="card-title">{year.year}</strong>
@@ -30,6 +30,7 @@ export function YearCard({ year, onOpen }: { year: YearSummary; onOpen: () => vo
         <span>Offen</span>
         <b>{year.needs_review_count}</b>
       </div>
+      <div className="card-progress"><span style={{ width: `${Math.min(year.invoice_count * 8, 100)}%` }} /></div>
     </button>
   );
 }

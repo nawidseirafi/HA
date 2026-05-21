@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { api } from '../api/client';
 import { InvoiceDetailPanel } from '../components/InvoiceDetailPanel';
 import { PdfPreview } from '../components/PdfPreview';
@@ -25,7 +26,7 @@ export function InvoiceDetailPage({ id, navigate }: { id: number; navigate: (rou
           <span className="eyebrow">Detail</span>
           <h1>{invoice.vendor}</h1>
         </div>
-        <button className="button ghost" onClick={() => navigate({ name: 'month', year: invoice.year, month: invoice.month })}>Zurueck zum Monat</button>
+        <button className="button ghost" onClick={() => navigate({ name: 'month', year: invoice.year, month: invoice.month })}><ArrowLeft size={16} /> Zurück zum Monat</button>
       </header>
       <div className="detail-layout">
         <PdfPreview invoice={invoice} />
@@ -51,6 +52,11 @@ export function InvoiceDetailPage({ id, navigate }: { id: number; navigate: (rou
               setNotice('');
               setError(exc instanceof Error ? exc.message : String(exc));
             }
+          }}
+          onMarkReviewed={async () => {
+            const updated = await api.markReviewed(id);
+            setInvoice(updated);
+            setNotice('Als geprüft markiert.');
           }}
         />
       </div>

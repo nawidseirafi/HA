@@ -13,6 +13,7 @@ export function YearsPage({ navigate }: { navigate: (route: Route) => void }) {
         <div>
           <span className="eyebrow">Archiv</span>
           <h1>Jahre</h1>
+          <p>Wähle ein Geschäftsjahr und öffne die Monatsübersicht.</p>
         </div>
       </header>
       <section className="card-grid">

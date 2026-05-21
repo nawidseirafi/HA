@@ -37,7 +37,8 @@ function parseRoute(): Route {
   if (parts[0] === 'invoices' && parts[1]) return { name: 'invoice', id: Number(parts[1]) };
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'years') return { name: 'years' };
-  return { name: 'agents' };
+  if (parts[0] === 'agents') return { name: 'agents' };
+  return { name: 'invoiceDashboard' };
 }
 
 export function App() {
@@ -93,7 +94,7 @@ export function App() {
 }
 
 function routeToPath(route: Route) {
-  if (route.name === 'agents') return '/';
+  if (route.name === 'agents') return '/agents';
   if (route.name === 'invoiceDashboard') return '/invoices';
   if (route.name === 'years') return '/invoices/years';
   if (route.name === 'year') return `/invoices/years/${route.year}`;
