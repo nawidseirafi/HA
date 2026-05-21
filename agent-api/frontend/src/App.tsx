@@ -74,7 +74,7 @@ function AppContent() {
   }, [route]);
 
   if (!isAuthenticated) {
-    return <LoginPage onLoggedIn={() => navigate({ name: 'invoiceDashboard' })} />;
+    return <LoginPage onLoggedIn={() => navigate({ name: 'agents' })} />;
   }
 
   return (

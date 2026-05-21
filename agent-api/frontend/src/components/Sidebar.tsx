@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, CalendarDays, FileText, Gauge, LogOut, Play, Settings, Upload } from 'lucide-react';
+import { BarChart3, BellRing, Bot, CalendarDays, Gauge, LogOut, Play, Settings, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -13,6 +13,7 @@ interface Props {
 export function Sidebar({ route, navigate, onLogout }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const isNeutralArea = route.name === 'agents' || route.name === 'settings';
 
   const runAgent = async () => {
     setBusy(true);
@@ -40,26 +41,33 @@ export function Sidebar({ route, navigate, onLogout }: Props) {
         <div className="brand-logo"><img src={logo} alt="Seirafi" /></div>
         <div>
           <strong>RoboterSteve</strong>
-          <span>Invoice Manager</span>
+          <span>{isNeutralArea ? 'Agent Console' : 'Invoice Manager'}</span>
         </div>
       </div>
       <nav className="nav-list">
-        <button className={route.name === 'invoiceDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'invoiceDashboard' })}>
-          <Gauge size={18} /> Übersicht
+        <button className={route.name === 'agents' ? 'active' : ''} onClick={() => navigate({ name: 'agents' })}>
+          <Bot size={18} /> Agenten
         </button>
-        <button className={route.name === 'years' || route.name === 'year' || route.name === 'month' ? 'active' : ''} onClick={() => navigate({ name: 'years' })}>
-          <CalendarDays size={18} /> Jahre
-        </button>
-        <button onClick={() => fileRef.current?.click()} disabled={busy}>
-          <Upload size={18} /> Belege hochladen
-        </button>
-        <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
-        <button onClick={runAgent} disabled={busy}>
-          <Play size={18} /> Invoice Agent starten
-        </button>
-        <button disabled>
-          <BarChart3 size={18} /> Exports
-        </button>
+        {!isNeutralArea && (
+          <>
+            <button className={route.name === 'invoiceDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'invoiceDashboard' })}>
+              <Gauge size={18} /> Übersicht
+            </button>
+            <button className={route.name === 'years' || route.name === 'year' || route.name === 'month' ? 'active' : ''} onClick={() => navigate({ name: 'years' })}>
+              <CalendarDays size={18} /> Jahre
+            </button>
+            <button onClick={() => fileRef.current?.click()} disabled={busy}>
+              <Upload size={18} /> Belege hochladen
+            </button>
+            <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
+            <button onClick={runAgent} disabled={busy}>
+              <Play size={18} /> Invoice Agent starten
+            </button>
+            <button disabled>
+              <BarChart3 size={18} /> Exports
+            </button>
+          </>
+        )}
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}>
           <Settings size={18} /> Settings
         </button>
