@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.export_routes import router as export_router
 from backend.api.invoice_routes import router as invoice_router
-from backend.api.routes import router as legacy_router
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -35,9 +34,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(legacy_router)
 app.include_router(invoice_router)
 app.include_router(export_router)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
 
 if FRONTEND_DIST.exists():
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

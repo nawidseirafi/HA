@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
+import logo from '../assets/logo.svg';
 
 interface Props {
   onLogin: (accessCode: string) => boolean;
@@ -21,7 +22,7 @@ export function LoginPage({ onLogin }: Props) {
     <main className="login-shell">
       <section className="login-visual">
         <div className="login-brand">
-          <div className="brand-mark">RS</div>
+          <div className="brand-logo"><img src={logo} alt="Seirafi" /></div>
           <div>
             <strong>RoboterSteve</strong>
             <span>Agent Console</span>

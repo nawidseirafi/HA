@@ -1,5 +1,6 @@
 import { BarChart3, Bot, CalendarDays, FileText, LogOut, Settings } from 'lucide-react';
 import type { Route } from '../App';
+import logo from '../assets/logo.svg';
 
 interface Props {
   route: Route;
@@ -11,7 +12,7 @@ export function Sidebar({ route, navigate, onLogout }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">RS</div>
+        <div className="brand-logo"><img src={logo} alt="Seirafi" /></div>
         <div>
           <strong>RoboterSteve</strong>
           <span>Agent Console</span>
