@@ -26,16 +26,16 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
         <tbody>
           {invoices.map((invoice) => (
             <tr key={invoice.id} onDoubleClick={() => onOpen(invoice)}>
-              <td>{shortDate(invoice.invoice_date)}</td>
-              <td>
+              <td data-label="Datum">{shortDate(invoice.invoice_date)}</td>
+              <td data-label="Anbieter">
                 <button className="table-link" onClick={() => onOpen(invoice)}>
                   {invoice.vendor}
                 </button>
               </td>
-              <td>{invoice.category}</td>
-              <td>{currency(invoice.gross_amount ?? invoice.amount, invoice.currency)}</td>
-              <td><span className={`status status-${invoice.review_status}`}>{statusLabel(invoice.review_status)}</span></td>
-              <td>
+              <td data-label="Kategorie">{invoice.category}</td>
+              <td data-label="Betrag">{currency(invoice.gross_amount ?? invoice.amount, invoice.currency)}</td>
+              <td data-label="Status"><span className={`status status-${invoice.review_status}`}>{statusLabel(invoice.review_status)}</span></td>
+              <td data-label="Aktionen">
                 <div className="icon-actions">
                   <button title="Detail öffnen" onClick={() => onOpen(invoice)}><Eye size={16} /></button>
                   <button title="PDF anzeigen" onClick={() => onPreview(invoice)}><FileSearch size={16} /></button>

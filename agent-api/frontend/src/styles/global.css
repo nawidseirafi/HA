@@ -970,13 +970,103 @@ label.check input { width: auto; }
 }
 
 @media (max-width: 640px) {
-  .nav-list, .kpi-grid, .form-grid { grid-template-columns: 1fr; }
+  .nav-list, .form-grid { grid-template-columns: 1fr; }
+  .login-visual { display: none; }
+  .login-panel {
+    min-height: 100vh;
+    padding: 18px;
+  }
   .login-copy h1 { font-size: 2.25rem; }
   .login-form { padding: 22px; border-radius: 22px; }
   .login-options { align-items: flex-start; flex-direction: column; }
+  .top-tools { display: none; }
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .kpi-card {
+    min-height: 108px;
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .kpi-card small { display: none; }
+  .kpi-card strong { font-size: 1.25rem; }
+  .kpi-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+  .kpi-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+  .dashboard-grid {
+    gap: 12px;
+  }
+  .panel {
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .wide-panel,
+  .category-chart-panel {
+    min-height: auto;
+  }
+  .bar-chart {
+    height: 160px;
+    gap: 4px;
+    padding-top: 8px;
+  }
   .bar-chart { gap: 5px; }
   .bar-item span { font-size: 0.68rem; }
   .donut-wrap { grid-template-columns: 1fr; }
   .donut { margin: 0 auto; }
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  thead { display: none; }
+  tr {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.045);
+  }
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(190, 208, 235, 0.08);
+    white-space: normal;
+  }
+  td:last-child {
+    border-bottom: 0;
+  }
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    flex: 0 0 92px;
+  }
+  td[data-label="Aktionen"] {
+    align-items: center;
+  }
+  td[data-label="Aktionen"]::before {
+    align-self: center;
+  }
+  .icon-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
   h1 { font-size: 1.75rem; }
 }
