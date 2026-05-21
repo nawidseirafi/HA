@@ -204,6 +204,7 @@ def _load_ai_extraction_config(config: dict) -> AIExtractionConfig:
         enabled=bool(config.get("enabled", False)),
         min_confidence=float(config.get("min_confidence", 0.8)),
         max_file_bytes=int(config.get("max_file_bytes", 10 * 1024 * 1024)),
+        always_for_documents=bool(config.get("always_for_documents", True)),
     )
 
 

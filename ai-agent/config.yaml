@@ -31,6 +31,7 @@ invoice_agent:
   reprocess_existing: false
   ai_extraction:
     enabled: true
+    always_for_documents: true
     min_confidence: 0.8
     max_file_bytes: 10485760
   email:

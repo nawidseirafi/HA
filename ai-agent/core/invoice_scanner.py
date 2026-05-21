@@ -49,6 +49,7 @@ class AIExtractionConfig:
     enabled: bool = False
     min_confidence: float = 0.8
     max_file_bytes: int = 10 * 1024 * 1024
+    always_for_documents: bool = True
 
 
 @dataclass
@@ -165,6 +166,8 @@ def _should_use_ai_extraction(config: InvoiceAgentConfig, metadata, path: Path) 
             return False
     except OSError:
         return False
+    if ai_config.always_for_documents:
+        return True
     return (
         metadata.confidence < ai_config.min_confidence
         or metadata.amount is None

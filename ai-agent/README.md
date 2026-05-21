@@ -21,44 +21,9 @@ sudo apt install -y poppler-utils
 
 `poppler-utils` liefert `pdftotext`. Der Rechnungs-Agent nutzt zuerst `pypdf`, kann aber auch `pdftotext` verwenden, falls es installiert ist.
 
-### OCR fuer Bild-PDFs und Bild-Belege (optional, aber empfohlen)
+### KI-Extraktion fuer Belege
 
-Damit auch eingescannte oder fotografierte Rechnungen erkannt werden (Bild-PDFs ohne extrahierbaren Text sowie `.jpg/.png/.tif/...`), nutzt der Agent zusaetzlich Tesseract.
-
-Debian/Ubuntu:
-
-```bash
-sudo apt install -y tesseract-ocr tesseract-ocr-deu poppler-utils
-```
-
-macOS (Homebrew):
-
-```bash
-brew install tesseract tesseract-lang poppler
-```
-
-Windows:
-
-- Tesseract: `winget install UB-Mannheim.TesseractOCR` (deutsches Sprachpaket `deu` im Installer mit anhaken). Pfad zur `tesseract.exe` muss in `PATH` liegen.
-- Poppler (optional, fuer `pdf2image`): https://github.com/oschwartz10612/poppler-windows — `bin`-Ordner in `PATH` aufnehmen. Alternativ wird `PyMuPDF` (siehe Python-Pakete unten) als reiner Python-Renderer ohne externes Binary verwendet.
-
-Die zugehoerigen Python-Pakete (`pytesseract`, `Pillow`, `pdf2image`, `PyMuPDF`) stehen bereits in `requirements.txt` und werden mit `pip install -r requirements.txt` mitinstalliert.
-
-OCR laesst sich ueber Environment-Variablen steuern:
-
-```bash
-INVOICE_OCR_DISABLE=1            # OCR komplett abschalten
-INVOICE_OCR_LANG="deu+eng"       # Tesseract-Sprachen (Default: deu+eng)
-INVOICE_OCR_MAX_PAGES=5          # max. Seiten pro PDF (Default: 5)
-INVOICE_OCR_MAX_BYTES=41943040   # PDFs darueber werden uebersprungen (Default: 40 MB)
-INVOICE_OCR_DPI=150              # Render-Aufloesung fuer PDF-OCR (Default: 150)
-```
-
-Fehlen Tesseract oder die Python-Pakete, ueberspringt der Agent OCR still und nutzt nur die bisherigen Textextraktoren.
-
-### KI-Extraktion als Fallback
-
-Der Rechnungs-Agent nutzt zuerst lokale Text-Extraktion und OCR. Wenn dabei zu wenig Vertrauen entsteht, kein Betrag gefunden wird oder ein Scan keinen lesbaren Text liefert, kann ein LLM/Vision-Modell den Beleg direkt analysieren.
+Der Rechnungs-Agent gibt PDF- und Bild-Belege direkt an das konfigurierte LLM/Vision-Modell weiter. Lokale OCR wird im normalen Scan nicht verwendet. Die lokale Voranalyse liest nur Dateiname und, falls vorhanden, eingebetteten PDF-Text als Fallback-Kontext.
 
 In `config.yaml`:
 
@@ -66,11 +31,12 @@ In `config.yaml`:
 invoice_agent:
   ai_extraction:
     enabled: true
+    always_for_documents: true
     min_confidence: 0.8
     max_file_bytes: 10485760
 ```
 
-Die KI-Extraktion nutzt die zentrale `llm`-Konfiguration und die API-Keys aus `.env`, zum Beispiel `GEMINI_API_KEY`. Der Agent erwartet strukturiertes JSON vom Modell und uebernimmt Anbieter, Datum, Bruttobetrag, Waehrung, Kategorie und Konfidenz nur als Fallback/Verbesserung.
+Die KI-Extraktion nutzt die zentrale `llm`-Konfiguration und die API-Keys aus `.env`, zum Beispiel `GEMINI_API_KEY`. Der Agent erwartet strukturiertes JSON vom Modell und uebernimmt Anbieter, Datum, Bruttobetrag, Waehrung, Kategorie und Konfidenz.
 
 ## Python-Umgebung
 
@@ -91,10 +57,6 @@ python-dotenv
 PyYAML
 pypdf
 requests
-pytesseract
-Pillow
-pdf2image
-PyMuPDF
 openpyxl
 ```
 

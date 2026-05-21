@@ -1,8 +1,6 @@
 import hashlib
 import logging
-import os
 import re
-import shutil
 import subprocess
 import string
 from dataclasses import dataclass
@@ -12,13 +10,6 @@ from typing import Optional
 
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")
-
-# OCR per Default aktiv, kann ueber INVOICE_OCR_DISABLE=1 abgeschaltet werden.
-_OCR_DISABLED = os.getenv("INVOICE_OCR_DISABLE", "").lower() in ("1", "true", "yes")
-_OCR_LANG = os.getenv("INVOICE_OCR_LANG", "deu+eng")
-_OCR_MAX_PAGES = int(os.getenv("INVOICE_OCR_MAX_PAGES", "5"))
-_OCR_MAX_BYTES = int(os.getenv("INVOICE_OCR_MAX_BYTES", str(40 * 1024 * 1024)))  # 40 MB
-_OCR_DPI = int(os.getenv("INVOICE_OCR_DPI", "150"))
 
 
 INVOICE_KEYWORDS = (
@@ -247,7 +238,7 @@ def _read_lightweight_text(path: Path) -> str:
     if suffix == ".pdf":
         return _read_pdf_text(path)
     if suffix in IMAGE_EXTENSIONS:
-        return _read_image_with_ocr(path)[:30000]
+        return ""
     return ""
 
 
@@ -259,10 +250,6 @@ def _read_pdf_text(path: Path) -> str:
     pdftotext_text = _read_pdf_with_pdftotext(path)
     if _has_meaningful_text(pdftotext_text):
         return pdftotext_text[:30000]
-
-    ocr_text = _read_pdf_with_ocr(path)
-    if ocr_text:
-        return ocr_text[:30000]
 
     # Letzter Strohhalm: leerer pypdf-Text ist immer noch besser als nichts.
     return (pypdf_text or pdftotext_text)[:30000]
@@ -326,90 +313,6 @@ def _read_pdf_with_pdftotext(path: Path) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout
-
-
-def _read_image_with_ocr(path: Path) -> str:
-    if _OCR_DISABLED:
-        return ""
-    try:
-        import pytesseract
-        from PIL import Image
-    except ImportError:
-        logging.debug("OCR uebersprungen (pytesseract/Pillow nicht installiert): %s", path)
-        return ""
-
-    try:
-        with Image.open(path) as img:
-            return pytesseract.image_to_string(img, lang=_OCR_LANG)
-    except Exception as exc:
-        logging.info("OCR fuer Bild fehlgeschlagen: %s (%s)", path, exc)
-        return ""
-
-
-def _read_pdf_with_ocr(path: Path) -> str:
-    if _OCR_DISABLED:
-        return ""
-    try:
-        if path.stat().st_size > _OCR_MAX_BYTES:
-            logging.info("OCR uebersprungen, PDF zu gross (%s Bytes): %s", path.stat().st_size, path)
-            return ""
-    except OSError:
-        return ""
-
-    try:
-        import pytesseract
-    except ImportError:
-        logging.debug("OCR uebersprungen (pytesseract nicht installiert): %s", path)
-        return ""
-
-    images = _pdf_to_images(path)
-    if not images:
-        return ""
-
-    parts = []
-    for image in images:
-        try:
-            parts.append(pytesseract.image_to_string(image, lang=_OCR_LANG))
-        except Exception as exc:
-            logging.info("OCR-Seite fehlgeschlagen: %s (%s)", path, exc)
-        finally:
-            try:
-                image.close()
-            except Exception:
-                pass
-    return "\n".join(parts)
-
-
-def _pdf_to_images(path: Path):
-    # Bevorzugt pdf2image (Poppler), Fallback auf PyMuPDF (fitz).
-    try:
-        from pdf2image import convert_from_path
-        try:
-            return convert_from_path(str(path), dpi=_OCR_DPI, first_page=1, last_page=_OCR_MAX_PAGES)
-        except Exception as exc:
-            logging.info("pdf2image fehlgeschlagen, versuche PyMuPDF: %s (%s)", path, exc)
-    except ImportError:
-        pass
-
-    try:
-        import fitz  # type: ignore
-        from PIL import Image
-        import io
-    except ImportError:
-        if not shutil.which("pdftoppm"):
-            logging.info("OCR nicht moeglich: weder pdf2image+Poppler noch PyMuPDF verfuegbar (%s)", path)
-        return []
-
-    images = []
-    try:
-        with fitz.open(str(path)) as doc:
-            for page_index in range(min(len(doc), _OCR_MAX_PAGES)):
-                pix = doc[page_index].get_pixmap(dpi=_OCR_DPI)
-                images.append(Image.open(io.BytesIO(pix.tobytes("png"))))
-    except Exception as exc:
-        logging.info("PyMuPDF-Render fehlgeschlagen: %s (%s)", path, exc)
-        return []
-    return images
 
 
 def _find_best_date(path: Path, text: str) -> date:
