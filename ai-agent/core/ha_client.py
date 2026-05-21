@@ -24,7 +24,6 @@ class HomeAssistantClient:
 
         self.base_url = config["home_assistant"]["url"].rstrip("/")
         self.token = os.getenv(
-            config["home_assistant"].get("token_env", "HOME_ASSISTANT_TOKEN"),
             config["home_assistant"].get("token", ""),
         )
 

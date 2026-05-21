@@ -1,10 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
 google-genai
 openai
-playwright
 python-dotenv
 PyYAML
-pypdf
 requests
-# Formatiertes XLSX fuer Steuer-Export (Header, Filter, Summen, Datums-/EUR-Format).
-# Ohne openpyxl wird ein minimaler XLSX-Writer als Fallback genutzt.
+pypdf
 openpyxl
+pillow

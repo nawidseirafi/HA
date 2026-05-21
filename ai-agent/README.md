@@ -81,7 +81,7 @@ In `config.yaml` verweist `token_env` darauf:
 ```yaml
 home_assistant:
   url: "http://homeassistant.local:8123"
-  token_env: "HA-TOKEN"
+  token: "TOKEN"
 ```
 
 Wichtige Pfade fuer den Rechnungs-Agenten:
