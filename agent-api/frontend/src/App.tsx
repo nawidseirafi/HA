@@ -8,9 +8,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { Layout } from './components/Layout';
-
-const SESSION_KEY = 'robotersteve.agent-console.session';
-const LOGIN_CODE = import.meta.env.VITE_LOGIN_CODE ?? '';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 export type Route =
   | { name: 'agents' }
@@ -42,8 +40,16 @@ function parseRoute(): Route {
 }
 
 export function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+function AppContent() {
   const [route, setRoute] = useState<Route>(parseRoute());
-  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem(SESSION_KEY) === 'active');
+  const { isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     const onPop = () => setRoute(parseRoute());
@@ -67,23 +73,8 @@ export function App() {
     return <DashboardPage navigate={navigate} />;
   }, [route]);
 
-  const login = (accessCode: string) => {
-    const trimmed = accessCode.trim();
-    const isValid = LOGIN_CODE ? trimmed === LOGIN_CODE : trimmed.length > 0;
-    if (isValid) {
-      localStorage.setItem(SESSION_KEY, 'active');
-      setIsAuthenticated(true);
-    }
-    return isValid;
-  };
-
-  const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
-    setIsAuthenticated(false);
-  };
-
   if (!isAuthenticated) {
-    return <LoginPage onLogin={login} />;
+    return <LoginPage onLoggedIn={() => navigate({ name: 'invoiceDashboard' })} />;
   }
 
   return (

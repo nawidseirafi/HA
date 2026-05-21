@@ -1,63 +1,67 @@
-import { FormEvent, useState } from 'react';
-import { LockKeyhole, ShieldCheck } from 'lucide-react';
+import { Bot, Cpu, LockKeyhole } from 'lucide-react';
 import logo from '../assets/logo.svg';
+import { LoginForm } from '../components/auth/LoginForm';
 
 interface Props {
-  onLogin: (accessCode: string) => boolean;
+  onLoggedIn: () => void;
 }
 
-export function LoginPage({ onLogin }: Props) {
-  const [accessCode, setAccessCode] = useState('');
-  const [error, setError] = useState('');
+const features = [
+  {
+    icon: Bot,
+    title: 'Agenten zentral steuern',
+    text: 'Starte und verwalte deine lokalen KI-Agenten',
+  },
+  {
+    icon: Cpu,
+    title: 'Automationen im Blick',
+    text: 'Behalte Aufgaben, Ergebnisse und Status im Überblick',
+  },
+  {
+    icon: LockKeyhole,
+    title: 'Sicher & Privat',
+    text: 'Deine Daten bleiben bei dir',
+  },
+];
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setError('');
-    if (!onLogin(accessCode)) {
-      setError('Der Zugriffscode ist nicht korrekt.');
-    }
-  };
-
+export function LoginPage({ onLoggedIn }: Props) {
   return (
     <main className="login-shell">
       <section className="login-visual">
         <div className="login-brand">
-          <div className="brand-logo"><img src={logo} alt="Seirafi" /></div>
+          <div className="brand-logo"><img src={logo} alt="RoboterSteve" /></div>
           <div>
             <strong>RoboterSteve</strong>
             <span>Agent Console</span>
           </div>
         </div>
+
         <div className="login-copy">
-          <span className="eyebrow">Lokale Verwaltung</span>
-          <h1>Deine lokalen Agenten an einem Ort.</h1>
-          <p>Agenten starten, Ergebnisse pruefen und lokale Automationen verwalten. Alles auf deinem System, ohne Cloud-Dienst.</p>
+          <span className="eyebrow">Lokale KI-Verwaltung</span>
+          <h1>Deine Agenten.<br />Intelligent verwaltet.</h1>
+          <p>Steuere, überwache und verwalte deine lokalen KI-Agenten - privat, nachvollziehbar und ohne Cloud-Dienst.</p>
         </div>
-        <div className="login-assurance">
-          <ShieldCheck size={18} />
-          <span>Lokaler Zugriff. API-Key/Auth ist vorbereitet.</span>
+
+        <div className="login-feature-list">
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <div className="login-feature" key={feature.title}>
+                <div><Icon size={20} /></div>
+                <section>
+                  <strong>{feature.title}</strong>
+                  <span>{feature.text}</span>
+                </section>
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <section className="login-panel">
-        <form onSubmit={submit}>
-          <div className="login-icon"><LockKeyhole size={24} /></div>
-          <h2>Anmelden</h2>
-          <p>Gib deinen lokalen Zugriffscode ein.</p>
-          <label>
-            Zugriffscode
-            <input
-              autoFocus
-              type="password"
-              value={accessCode}
-              onChange={(event) => setAccessCode(event.target.value)}
-              placeholder="Lokaler Code"
-            />
-          </label>
-          {error && <div className="login-error">{error}</div>}
-          <button className="button primary login-button" type="submit">Einloggen</button>
-          <span className="login-hint">V1 schuetzt die Konsole lokal im Browser. Backend-API-Key folgt als naechster Schritt.</span>
-        </form>
+        <div className="login-card-shell">
+          <LoginForm onLoggedIn={onLoggedIn} />
+        </div>
       </section>
     </main>
   );
