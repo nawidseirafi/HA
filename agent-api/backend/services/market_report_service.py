@@ -258,17 +258,25 @@ class MarketReportService:
         with self.connect() as connection:
             return [self._report_row(row) for row in connection.execute(query, tuple(params)).fetchall()]
 
-    def latest_reports(self) -> list[dict[str, Any]]:
+    def latest_reports(self, watchlist_only: bool = False, enabled_only: bool = False) -> list[dict[str, Any]]:
+        watchlist_join = ""
+        watchlist_where = ""
+        if watchlist_only or enabled_only:
+            watchlist_join = "join market_watchlist w on upper(w.symbol) = upper(r.symbol)"
+            if enabled_only:
+                watchlist_where = "where w.enabled = 1"
         with self.connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 select r.*
                 from market_reports r
+                {watchlist_join}
                 join (
                     select symbol, max(created_at) as created_at
                     from market_reports
                     group by symbol
                 ) latest on latest.symbol = r.symbol and latest.created_at = r.created_at
+                {watchlist_where}
                 order by r.symbol
                 """
             ).fetchall()
@@ -295,7 +303,7 @@ class MarketReportService:
 
     def summary(self) -> dict[str, Any]:
         watchlist = self.watchlist()
-        latest = self.latest_reports()
+        latest = self.latest_reports(enabled_only=True)
         counts = {signal: 0 for signal in ("bullish", "neutral", "bearish", "watch")}
         for report in latest:
             counts[report["signal"]] = counts.get(report["signal"], 0) + 1

@@ -3,7 +3,7 @@ home_assistant:
   token: HA-TOKEN
 
 llm:
-  provider: "gemini"
+  provider: "openai"  # Options: gemini, openai, claude, llama
   gemini:
     api_key: GEMINI_API_KEY
     model: "gemini-2.5-flash"

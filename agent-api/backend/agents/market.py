@@ -4,6 +4,7 @@ from backend.services.market_analysis_service import MarketAnalysisService
 from backend.services.market_data_service import MarketDataService
 from backend.services.market_news_service import MarketNewsService
 from backend.services.market_report_service import MarketReportService, utc_now
+from backend.services.market_symbol_resolver import MarketSymbolResolver
 
 
 class MarketAgent:
@@ -12,6 +13,7 @@ class MarketAgent:
         self.data = MarketDataService()
         self.news = MarketNewsService()
         self.analysis = MarketAnalysisService()
+        self.symbol_resolver = MarketSymbolResolver()
 
     def run(self) -> dict[str, Any]:
         entries = self.store.watchlist(enabled_only=True)
@@ -34,10 +36,33 @@ class MarketAgent:
         news_items: list[dict[str, Any]] = []
         quote_provider = "none"
         news_provider = "none"
+        yahoo_symbol = symbol
+        resolution: dict[str, Any] | None = None
+        resolution_candidates: list[dict[str, Any]] = []
+        quote_errors: list[str] = []
         try:
-            quote = self.data.quote(symbol)
+            try:
+                quote = self.data.quote(yahoo_symbol)
+            except Exception as original_quote_error:
+                quote_errors.append(f"{yahoo_symbol}: {original_quote_error}")
+                resolution_candidates = self.symbol_resolver.resolve_candidates(symbol, item)
+                if not resolution_candidates:
+                    raise original_quote_error
+                last_quote_error = original_quote_error
+                for candidate in resolution_candidates:
+                    candidate_symbol = candidate["yahoo_symbol"]
+                    try:
+                        quote = self.data.quote(candidate_symbol)
+                        yahoo_symbol = candidate_symbol
+                        resolution = candidate
+                        break
+                    except Exception as candidate_error:
+                        last_quote_error = candidate_error
+                        quote_errors.append(f"{candidate_symbol}: {candidate_error}")
+                if not quote:
+                    raise last_quote_error
             quote_provider = quote.get("provider", "none")
-            news_items = self.news.news_for_symbol(symbol)
+            news_items = self.news.news_for_symbol(yahoo_symbol)
             self.store.save_news(symbol, news_items)
             news_provider = next((item.get("provider") for item in news_items if item.get("provider")), "none")
             analysis = self.analysis.analyze(item, quote, news_items)
@@ -46,6 +71,7 @@ class MarketAgent:
             data_quality = "real" if quote_provider == "yahoo" and news_provider == "yahoo_rss" and analysis_source == "llm" else "partial"
             report = {
                 **analysis,
+                "symbol": symbol,
                 "report_date": utc_now()[:10],
                 "price": quote.get("price"),
                 "change_percent": quote.get("change_percent"),
@@ -58,6 +84,10 @@ class MarketAgent:
                     "analysis": analysis,
                     "quote": quote,
                     "news": news_items,
+                    "symbol_resolution": resolution,
+                    "symbol_resolution_candidates": resolution_candidates,
+                    "quote_errors": quote_errors,
+                    "yahoo_symbol": yahoo_symbol,
                     "analysis_source": analysis_source,
                     "analysis_error": analysis_error,
                 },
@@ -82,7 +112,15 @@ class MarketAgent:
                 "negative_factors": [],
                 "risk_factors": [],
                 "news_summary": "",
-                "ai_raw_json": {"error": str(exc), "quote": quote, "news": news_items},
+                "ai_raw_json": {
+                    "error": str(exc),
+                    "quote": quote,
+                    "news": news_items,
+                    "symbol_resolution": resolution,
+                    "symbol_resolution_candidates": resolution_candidates,
+                    "quote_errors": quote_errors,
+                    "yahoo_symbol": yahoo_symbol,
+                },
                 "status": "error",
                 "error": str(exc),
             }
