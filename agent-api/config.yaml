@@ -16,3 +16,16 @@ agents:
     upload_dir: ../ai-agent/data/invoices/inbox
   vacation:
     enabled: true
+  mywellness:
+    enabled: true
+    token_env: MY_WELLNESS_TOKEN
+    user_id_env: MY_WELLNESS_USER_ID
+    facility_id_env: MY_WELLNESS_FACILITY_ID
+    desired_courses:
+      - Cross-Power
+      - Body Workout
+      - Functional Training
+    days: 2
+    schedule:
+      - "17:00:00"
+      - "20:59:58"

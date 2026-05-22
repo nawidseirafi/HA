@@ -4,6 +4,7 @@ import time
 import os
 import json
 import sys
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.ha_client import HomeAssistantClient
 from dotenv import load_dotenv
@@ -27,19 +28,37 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else "book"
 MAX_RETRIES = 30  # Reduziert: meist reichen 2-3 Versuche
 RETRY_DELAY = 0.1  # Schneller Retry
 REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_FILE = os.path.join(BASE_DIR, "mywellness.log")
-CACHE_FILE = os.path.join(BASE_DIR, "mywellness_cache.json")
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+LOG_FILE = BASE_DIR / "mywellness.log"
+CACHE_FILE = BASE_DIR / "mywellness_cache.json"
 
 def load_raw_config() -> dict:
-    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(PROJECT_DIR / ".env")
 
-    with (BASE_DIR / "config.yaml").open("r", encoding="utf-8") as f:
+    with (PROJECT_DIR / "config.yaml").open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+def resolve_config_value(value):
+    text = str(value or "")
+    resolved = os.getenv(text) or os.getenv(text.upper())
+    if resolved:
+        return resolved
+    if text.isupper() and text.replace("_", "").isalnum():
+        return ""
+    return text
+
+def mywellness_config() -> dict:
+    config = load_raw_config().get("myWelness_agent", {})
+    return {
+        "token": os.getenv("MY_WELLNESS_TOKEN") or resolve_config_value(config.get("token", "")),
+        "user_id": os.getenv("MY_WELLNESS_USER_ID") or resolve_config_value(config.get("user_id", "")),
+        "facility_id": os.getenv("MY_WELLNESS_FACILITY_ID") or resolve_config_value(config.get("facility_id", "")),
+    }
     
 headers = {
     "Content-Type": "application/json",
-    "Authorization": load_raw_config().get("myWelness_agent", {}).get("token", "")
+    "Authorization": mywellness_config().get("token", "")
 }
 
 session = requests.Session()
@@ -126,7 +145,7 @@ def load_course_ids(target_date):
 # =====================
 def prepare_course_ids():
     current_date, target_date = get_dates()
-    facility_id = load_raw_config().get("myWelness_agent", {}).get("facility_id", "")
+    facility_id = mywellness_config().get("facility_id", "")
     search_url = (
         f"https://services.mywellness.com/Core/Facility/{facility_id}/"
         f"SearchCalendarEvents?_c=de-DE&dateStart={current_date}&dateLimit=0"
@@ -166,7 +185,7 @@ def try_booking_course(course_name, course_id, target_date):
     booking_url = f"https://services.mywellness.com/core/calendarevent/{course_id}/book?_c=de-DE"
     payload = {
         "partitionDate": target_date,
-        "userId": load_raw_config().get("myWelness_agent", {}).get("user_id", "")
+        "userId": mywellness_config().get("user_id", "")
     }
     for attempt in range(1, MAX_RETRIES + 1):
         start = time.perf_counter()
@@ -256,6 +275,7 @@ def book_saved_course_ids():
     log("\n\n".join(all_results))
     if successful_bookings:
         message = "Erfolgreich gebucht:\n" + "\n".join(successful_bookings)
+        log("Erfolgreich gebucht: " + ", ".join(successful_bookings))
         send_ha_notification("Buchung erfolgreich", message)
     else:
         log("Keine erfolgreiche Buchung erkannt. Keine Push gesendet.")

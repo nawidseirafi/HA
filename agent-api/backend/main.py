@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.export_routes import router as export_router
 from backend.api.invoice_routes import router as invoice_router
+from backend.api.mywellness_routes import router as mywellness_router
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -36,6 +37,7 @@ app.add_middleware(
 
 app.include_router(invoice_router)
 app.include_router(export_router)
+app.include_router(mywellness_router)
 
 
 @app.get("/health")

@@ -6,6 +6,7 @@ __pycache__/
 venv/
 **/logs/*.log
 agent-api/backend/storage/status.json
+agent-api/backend/storage/mywellness_status.json
 agent-api/frontend/node_modules/
 agent-api/frontend/dist/
 ai-agent/.env

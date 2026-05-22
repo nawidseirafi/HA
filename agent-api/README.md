@@ -90,6 +90,19 @@ GET /api/exports/month/{year}/{month}/pdf
 GET /api/exports/month/{year}/{month}/zip
 ```
 
+MyWellness-Endpunkte:
+
+```text
+GET  /api/agent/status
+POST /api/agent/start
+POST /api/agent/stop
+GET  /api/mywellness/courses
+GET  /api/mywellness/bookings
+GET  /api/mywellness/logs
+```
+
+`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Der lokale Status wird in `backend/storage/mywellness_status.json` gespeichert, Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
+
 Kompatible alte Endpunkte bleiben aktiv:
 
 ```text
@@ -102,6 +115,29 @@ POST /agents/vacation/run
 ```
 
 Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status liegt unter `backend/storage/status.json`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
+
+## MyWellness Agent
+
+Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse und die letzten Logs. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal oder laden API-Daten neu.
+
+Erforderliche ENV-Werte werden aus der Umgebung oder aus `../ai-agent/.env` gelesen:
+
+```text
+MY_WELLNESS_TOKEN
+MY_WELLNESS_USER_ID
+MY_WELLNESS_FACILITY_ID
+```
+
+Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert.
+
+Fehler pruefen:
+
+```bash
+cd agent-api
+../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in `backend/storage/mywellness_status.json`, `../ai-agent/agents/mywellness.log` und im UI-Panel "Agent Logs".
 
 ## Hinweise
 

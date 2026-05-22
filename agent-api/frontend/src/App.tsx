@@ -7,11 +7,13 @@ import { InvoiceDetailPage } from './pages/InvoiceDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
+import { MyWellnessPage } from './pages/MyWellnessPage';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 export type Route =
   | { name: 'agents' }
+  | { name: 'mywellness' }
   | { name: 'invoiceDashboard' }
   | { name: 'years' }
   | { name: 'year'; year: number }
@@ -36,6 +38,7 @@ function parseRoute(): Route {
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'years') return { name: 'years' };
   if (parts[0] === 'agents') return { name: 'agents' };
+  if (parts[0] === 'mywellness') return { name: 'mywellness' };
   return { name: 'invoiceDashboard' };
 }
 
@@ -65,6 +68,7 @@ function AppContent() {
 
   const page = useMemo(() => {
     if (route.name === 'agents') return <AgentsPage navigate={navigate} />;
+    if (route.name === 'mywellness') return <MyWellnessPage />;
     if (route.name === 'years') return <YearsPage navigate={navigate} />;
     if (route.name === 'year') return <YearPage year={route.year} navigate={navigate} />;
     if (route.name === 'month') return <MonthPage year={route.year} month={route.month} navigate={navigate} />;
@@ -86,6 +90,7 @@ function AppContent() {
 
 function routeToPath(route: Route) {
   if (route.name === 'agents') return '/agents';
+  if (route.name === 'mywellness') return '/mywellness';
   if (route.name === 'invoiceDashboard') return '/invoices';
   if (route.name === 'years') return '/invoices/years';
   if (route.name === 'year') return `/invoices/years/${route.year}`;

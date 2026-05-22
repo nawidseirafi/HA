@@ -20,7 +20,7 @@ llm:
 myWelness_agent:
   token: MY_WELLNESS_KEY
   user_id: b47c2332-cd03-4baa-b0fd-a26b32eadc3a
-  facility_id = 0273e18b-52bf-404e-afa6-8bfb2eeccbad
+  facility_id: MY_WELLNESS_FACILITY_ID
 
 invoice_agent:
   inbox_dir: "./data/invoices/inbox"

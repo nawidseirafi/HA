@@ -2,6 +2,29 @@ import type { Invoice, MonthSummary, Summary, YearSummary } from '../types/invoi
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
+export type AgentStatus = {
+  enabled: boolean;
+  is_running: boolean;
+  current_status: string;
+  last_successful_run: string | null;
+  next_scheduled_run: string | null;
+  last_error: string | null;
+  last_started_at?: string | null;
+  last_finished_at?: string | null;
+  last_mode?: 'prepare' | 'book';
+};
+
+export type MyWellnessCourse = {
+  id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  booking_status: string;
+  is_desired?: boolean;
+  is_participant?: boolean;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -37,6 +60,13 @@ export const api = {
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
   runAgent: () => request('/api/invoices/run', { method: 'POST' }),
+  mywellnessStatus: () => request<AgentStatus>('/api/agent/status'),
+  startMywellnessAgent: (mode: 'prepare' | 'book' = 'prepare') =>
+    request<AgentStatus>('/api/agent/start', { method: 'POST', body: JSON.stringify({ mode }) }),
+  stopMywellnessAgent: () => request<AgentStatus>('/api/agent/stop', { method: 'POST' }),
+  mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
+  mywellnessBookings: async () => (await request<{ bookings: MyWellnessCourse[] }>('/api/mywellness/bookings')).bookings,
+  mywellnessLogs: async () => (await request<{ logs: string[] }>('/api/mywellness/logs')).logs,
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);

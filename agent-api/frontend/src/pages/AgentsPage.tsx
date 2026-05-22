@@ -1,4 +1,4 @@
-import { Bot, CalendarCheck, FileText, Home, Mail, Settings2 } from 'lucide-react';
+import { Bot, CalendarCheck, Dumbbell, FileText, Home, Mail, Settings2 } from 'lucide-react';
 import type { Route } from '../App';
 
 interface Props {
@@ -29,6 +29,15 @@ export function AgentsPage({ navigate }: Props) {
             <span className="eyebrow">Aktiv</span>
             <h2>Rechnungs-Agent</h2>
             <p>Belege hochladen, mit KI analysieren, prüfen und exportieren.</p>
+          </div>
+        </button>
+
+        <button className="agent-card active-agent" onClick={() => navigate({ name: 'mywellness' })}>
+          <div className="agent-icon"><Dumbbell size={24} /></div>
+          <div>
+            <span className="eyebrow">Aktiv</span>
+            <h2>MyWellness-Agent</h2>
+            <p>Kurse finden, Buchungen prüfen und den Agenten manuell steuern.</p>
           </div>
         </button>
 

@@ -735,6 +735,148 @@ p { color: var(--muted); line-height: 1.65; }
 .planned-agent .agent-icon { color: var(--muted); background: var(--surface-soft); }
 .agent-note { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 
+.mywellness-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.mywellness-status,
+.logs-panel {
+  grid-column: 1 / -1;
+}
+
+.mywellness-left-column,
+.mywellness-right-column {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.mywellness-left-column {
+  grid-column: 1;
+}
+
+.mywellness-right-column {
+  grid-column: 2;
+}
+
+.agent-state-pill,
+.count-pill,
+.booking-pill {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.agent-state-pill.ok,
+.booking-pill.booked {
+  color: #9af0c9;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.agent-state-pill.waiting,
+.booking-pill.cached,
+.booking-pill.found {
+  color: #ffd98a;
+  background: rgba(251, 191, 36, 0.13);
+}
+
+.agent-state-pill.error {
+  color: #ff9aaa;
+  background: rgba(251, 113, 133, 0.13);
+}
+
+.count-pill,
+.booking-pill.available,
+.booking-pill.unknown {
+  color: #a9c8ff;
+  background: rgba(77, 141, 255, 0.14);
+}
+
+.agent-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-status-grid > div {
+  min-height: 96px;
+  display: grid;
+  align-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+}
+
+.agent-status-grid svg { color: var(--blue); }
+.agent-status-grid span { color: var(--muted); }
+.agent-status-grid strong { font-size: 1.05rem; overflow-wrap: anywhere; }
+.agent-error { margin-top: 12px; color: #ff9aaa; }
+
+.control-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.course-list {
+  display: grid;
+  gap: 10px;
+}
+
+.course-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+}
+
+.course-row h3 {
+  font-size: 0.98rem;
+  margin-bottom: 8px;
+}
+
+.course-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.course-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.logs-panel pre {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(2, 8, 18, 0.42);
+  color: #dce8ff;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .filters {
   display: grid;
   grid-template-columns: 2fr repeat(4, 1fr);
@@ -965,6 +1107,14 @@ label.check input { width: auto; }
   .search-box { width: 100%; }
   .filters, .detail-layout { grid-template-columns: 1fr; }
   .dashboard-grid { grid-template-columns: 1fr; }
+  .mywellness-layout,
+  .agent-status-grid {
+    grid-template-columns: 1fr;
+  }
+  .mywellness-left-column,
+  .mywellness-right-column {
+    grid-column: 1;
+  }
   .preview-pane { height: 460px; min-height: 320px; }
   .quick-stack { grid-template-columns: 1fr; }
 }
@@ -1006,6 +1156,12 @@ label.check input { width: auto; }
   .panel {
     padding: 12px;
     border-radius: 18px;
+  }
+  .course-row {
+    grid-template-columns: 1fr;
+  }
+  .booking-pill {
+    width: fit-content;
   }
   .wide-panel,
   .category-chart-panel {

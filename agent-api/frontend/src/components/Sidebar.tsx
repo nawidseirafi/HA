@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, Bot, CalendarDays, Gauge, LogOut, Play, Settings, Upload, X } from 'lucide-react';
+import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, LogOut, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -15,7 +15,7 @@ interface Props {
 export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const isNeutralArea = route.name === 'agents' || route.name === 'settings';
+  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || route.name === 'mywellness';
 
   const runAgent = async () => {
     setBusy(true);
@@ -53,6 +53,11 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
         <button className={route.name === 'agents' ? 'active' : ''} onClick={() => navigate({ name: 'agents' })}>
           <Bot size={18} /> Agenten
         </button>
+        {route.name === 'mywellness' && (
+          <button className="active" onClick={() => navigate({ name: 'mywellness' })}>
+            <Dumbbell size={18} /> MyWellness
+          </button>
+        )}
         {!isNeutralArea && (
           <>
             <button className={route.name === 'invoiceDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'invoiceDashboard' })}>
