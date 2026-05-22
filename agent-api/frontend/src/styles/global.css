@@ -763,6 +763,18 @@ p { color: var(--muted); line-height: 1.65; }
   grid-column: 2;
 }
 
+.mywellness-left-column > .control-panel,
+.mywellness-right-column > .course-panel {
+  height: 360px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mywellness-right-column > .course-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .agent-state-pill,
 .count-pill,
 .booking-pill {
@@ -828,19 +840,26 @@ p { color: var(--muted); line-height: 1.65; }
 
 .control-panel {
   display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 14px;
 }
 
 .control-courses {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+  min-height: 0;
 }
 
 .control-course-list {
   display: grid;
+  align-content: start;
   gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .control-course-row {
@@ -868,7 +887,11 @@ p { color: var(--muted); line-height: 1.65; }
 
 .course-list {
   display: grid;
+  align-content: start;
   gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .course-row {
@@ -1225,6 +1248,17 @@ label.check input { width: auto; }
   .mywellness-left-column,
   .mywellness-right-column {
     grid-column: 1;
+  }
+  .mywellness-left-column > .control-panel,
+  .mywellness-right-column > .course-panel {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .control-course-list,
+  .course-list {
+    overflow: visible;
+    padding-right: 0;
   }
   .preview-pane { height: 460px; min-height: 320px; }
   .quick-stack { grid-template-columns: 1fr; }
