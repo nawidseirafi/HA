@@ -87,7 +87,7 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
       </nav>
       <div className="sidebar-note">
         <BellRing size={16} />
-        <span>Lokal verbunden. API-Key vorbereitet als nächster Schritt.</span>
+        <span>Lokal verbunden. Sitzung ist per JWT geschützt.</span>
       </div>
     </aside>
   );

@@ -2,12 +2,15 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from backend.api.auth_routes import router as auth_router
 from backend.api.export_routes import router as export_router
 from backend.api.invoice_routes import router as invoice_router
 from backend.api.mywellness_routes import router as mywellness_router
+from backend.services.auth_service import user_from_request
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -35,6 +38,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+PUBLIC_API_PATHS = {"/health", "/api/auth/login"}
+
+
+@app.middleware("http")
+async def require_api_auth(request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and path not in PUBLIC_API_PATHS:
+        try:
+            user_from_request(request)
+        except Exception as exc:
+            return JSONResponse({"detail": getattr(exc, "detail", "Nicht angemeldet.")}, status_code=getattr(exc, "status_code", 401))
+    return await call_next(request)
+
+
+app.include_router(auth_router)
 app.include_router(invoice_router)
 app.include_router(export_router)
 app.include_router(mywellness_router)

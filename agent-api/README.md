@@ -60,7 +60,26 @@ cd ..
 
 Wenn `frontend/dist` existiert, liefert FastAPI die gebaute React-App direkt aus.
 
+## Auth
+
+Alle `/api/*`-Endpunkte ausser `/api/auth/login` sind per JWT geschuetzt. Zugangsdaten werden ueber ENV gesetzt:
+
+```text
+AGENT_API_USERNAME
+AGENT_API_PASSWORD
+AGENT_API_JWT_SECRET
+```
+
+Lokaler Fallback fuer Entwicklung ist `admin` / `admin`. `AGENT_API_JWT_SECRET` sollte fuer echte Nutzung gesetzt werden.
+
 ## API
+
+Auth-Endpunkte:
+
+```text
+POST /api/auth/login
+GET  /api/auth/me
+```
 
 Neue Invoice-Endpunkte:
 

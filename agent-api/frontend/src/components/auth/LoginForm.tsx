@@ -27,6 +27,8 @@ export function LoginForm({ onLoggedIn }: Props) {
         return;
       }
       onLoggedIn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen.');
     } finally {
       setBusy(false);
     }
@@ -89,7 +91,7 @@ export function LoginForm({ onLoggedIn }: Props) {
         <ArrowRight size={18} />
       </button>
 
-      <span className="login-hint">Mock-Login für V1. FastAPI/JWT kann später im AuthContext angebunden werden.</span>
+      <span className="login-hint"></span>
     </form>
   );
 }

@@ -1,6 +1,5 @@
-import { ReactNode, createContext, useContext, useMemo, useState } from 'react';
-
-const SESSION_KEY = 'robotersteve.invoice-manager.session';
+import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { api, clearAuthToken, getAuthToken, setAuthToken } from '../api/client';
 
 interface LoginInput {
   username: string;
@@ -17,24 +16,27 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => (
-    localStorage.getItem(SESSION_KEY) === 'active' || sessionStorage.getItem(SESSION_KEY) === 'active'
-  ));
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getAuthToken()));
+
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    api.me().catch(() => {
+      clearAuthToken();
+      setIsAuthenticated(false);
+    });
+  }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
     isAuthenticated,
     login: async ({ username, password, remember }) => {
-      const isValid = username.trim().length > 0 && password.trim().length > 0;
-      if (!isValid) return false;
-
-      const storage = remember ? localStorage : sessionStorage;
-      storage.setItem(SESSION_KEY, 'active');
+      if (!username.trim() || !password.trim()) return false;
+      const response = await api.login(username, password);
+      setAuthToken(response.access_token, remember);
       setIsAuthenticated(true);
       return true;
     },
     logout: () => {
-      localStorage.removeItem(SESSION_KEY);
-      sessionStorage.removeItem(SESSION_KEY);
+      clearAuthToken();
       setIsAuthenticated(false);
     },
   }), [isAuthenticated]);

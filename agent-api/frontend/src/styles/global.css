@@ -242,12 +242,36 @@ p { color: var(--muted); line-height: 1.65; }
   border: 1px solid rgba(190, 208, 235, 0.18);
   background: rgba(3, 12, 24, 0.28);
   color: var(--muted);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-field > div:focus-within {
+  border-color: rgba(77, 141, 255, 0.58);
+  background: rgba(7, 17, 31, 0.78);
+  box-shadow: 0 0 0 3px rgba(77, 141, 255, 0.13);
+  color: #cfe0ff;
 }
 
 .auth-field input {
   border: 0;
   background: transparent;
   padding: 0;
+  color: var(--ink);
+  caret-color: var(--blue);
+  outline: none;
+}
+
+.auth-field input::placeholder {
+  color: rgba(153, 168, 195, 0.72);
+}
+
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  box-shadow: 0 0 0 1000px #07111f inset;
+  transition: background-color 9999s ease-in-out 0s;
+  caret-color: var(--blue);
 }
 
 .field-icon-button {

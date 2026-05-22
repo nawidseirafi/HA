@@ -10,6 +10,12 @@ logging:
   file: logs/agent-api.log
   level: INFO
 
+auth:
+  username_env: AGENT_API_USERNAME
+  password_env: AGENT_API_PASSWORD
+  jwt_secret_env: AGENT_API_JWT_SECRET
+  token_ttl_seconds: 604800
+
 agents:
   invoices:
     enabled: true

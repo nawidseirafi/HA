@@ -1,6 +1,30 @@
 import type { Invoice, MonthSummary, Summary, YearSummary } from '../types/invoice';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const TOKEN_KEY = 'robotersteve.agent-api.token';
+const SESSION_TOKEN_KEY = 'robotersteve.agent-api.session-token';
+
+export type AuthResponse = {
+  access_token: string;
+  token_type: 'bearer';
+  expires_at: number;
+  user: { username: string };
+};
+
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string, remember: boolean) {
+  clearAuthToken();
+  const storage = remember ? localStorage : sessionStorage;
+  storage.setItem(remember ? TOKEN_KEY : SESSION_TOKEN_KEY, token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+}
 
 export type AgentStatus = {
   enabled: boolean;
@@ -42,10 +66,12 @@ export type Course = {
 export type MyWellnessCourse = Course;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
   });
@@ -64,6 +90,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  login: (username: string, password: string) =>
+    request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  me: () => request<{ user: { username: string } }>('/api/auth/me'),
   summary: () => request<Summary>('/api/invoices/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),
@@ -91,7 +120,12 @@ export const api = {
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);
-    const response = await fetch(`${API_BASE}/api/invoices/upload`, { method: 'POST', body: data });
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE}/api/invoices/upload`, {
+      method: 'POST',
+      body: data,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
