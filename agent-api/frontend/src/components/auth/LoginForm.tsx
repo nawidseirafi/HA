@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LockKeyhole, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.svg';
 
@@ -9,7 +9,7 @@ interface Props {
 
 export function LoginForm({ onLoggedIn }: Props) {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -21,9 +21,9 @@ export function LoginForm({ onLoggedIn }: Props) {
     setError('');
     setBusy(true);
     try {
-      const ok = await login({ email, password, remember });
+      const ok = await login({ username, password, remember });
       if (!ok) {
-        setError('Bitte E-Mail-Adresse und Passwort eingeben.');
+        setError('Bitte Benutzername und Passwort eingeben.');
         return;
       }
       onLoggedIn();
@@ -36,21 +36,21 @@ export function LoginForm({ onLoggedIn }: Props) {
     <form className="login-form" onSubmit={submit}>
       <div className="login-form-header">
         <div className="login-icon"><img src={logo} alt="RoboterSteve" /></div>
-        <h2>Willkommen bei RoboterSteve</h2>
-        <p>Bitte melde dich an, um fortzufahren.</p>
+        <h2>Roboter Steve</h2>
+    
       </div>
 
       <label className="auth-field">
-        <span>E-Mail-Adresse</span>
+        <span>Benutzername</span>
         <div>
-          <Mail size={17} />
+          <User size={17} />
           <input
             autoFocus
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="nawid@example.local"
-            autoComplete="email"
+            type="text"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="Benutzername"
+            autoComplete="username"
           />
         </div>
       </label>

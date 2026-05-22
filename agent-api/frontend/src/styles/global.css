@@ -220,8 +220,8 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 @keyframes login-logo-spin {
-  from { transform: rotateX(0deg); }
-  to { transform: rotateX(360deg); }
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
 }
 
 .auth-field {

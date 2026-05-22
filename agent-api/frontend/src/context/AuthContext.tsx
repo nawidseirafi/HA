@@ -3,7 +3,7 @@ import { ReactNode, createContext, useContext, useMemo, useState } from 'react';
 const SESSION_KEY = 'robotersteve.invoice-manager.session';
 
 interface LoginInput {
-  email: string;
+  username: string;
   password: string;
   remember: boolean;
 }
@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => ({
     isAuthenticated,
-    login: async ({ email, password, remember }) => {
-      const isValid = email.trim().length > 0 && password.trim().length > 0;
+    login: async ({ username, password, remember }) => {
+      const isValid = username.trim().length > 0 && password.trim().length > 0;
       if (!isValid) return false;
 
       const storage = remember ? localStorage : sessionStorage;
