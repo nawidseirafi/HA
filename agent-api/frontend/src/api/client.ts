@@ -120,6 +120,14 @@ export type SettingsInfo = {
     vacation: {
       enabled: boolean;
     };
+    market?: {
+      enabled: boolean;
+      database: PathSetting;
+      price_provider: string;
+      news_provider: string;
+      trading_enabled: boolean;
+      disclaimer: string;
+    };
   };
   integrations: {
     llm: {
@@ -138,6 +146,71 @@ export type SettingsInfo = {
     secrets_visible: boolean;
     note: string;
   };
+};
+
+export type MarketSignal = 'bullish' | 'neutral' | 'bearish' | 'watch';
+
+export type MarketWatchlistItem = {
+  id: number;
+  symbol: string;
+  name: string;
+  asset_type: 'stock' | 'etf' | 'crypto' | 'index';
+  exchange: string;
+  currency: string;
+  notes: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MarketWatchlistPayload = Omit<MarketWatchlistItem, 'id' | 'created_at' | 'updated_at'>;
+
+export type MarketReport = {
+  id: number;
+  symbol: string;
+  report_date: string;
+  signal: MarketSignal;
+  confidence: number;
+  price: number | null;
+  change_percent: number | null;
+  volume: number | null;
+  summary: string;
+  positive_factors: string[];
+  negative_factors: string[];
+  risk_factors: string[];
+  news_summary: string;
+  ai_raw_json: unknown;
+  status: 'ok' | 'degraded' | 'error';
+  error: string;
+  quote_provider?: string;
+  news_provider?: string;
+  analysis_source?: 'llm' | 'heuristic' | 'error' | '';
+  data_quality?: 'real' | 'partial' | 'error' | 'unknown';
+  created_at: string;
+  news?: MarketNews[];
+  disclaimer?: string;
+};
+
+export type MarketNews = {
+  id?: number;
+  symbol: string;
+  title: string;
+  source: string;
+  url: string;
+  published_at: string | null;
+  sentiment: string;
+  summary: string;
+  created_at?: string;
+};
+
+export type MarketSummary = {
+  watchlist_count: number;
+  enabled_count: number;
+  signals: Record<MarketSignal, number>;
+  top_gainers: MarketReport[];
+  top_losers: MarketReport[];
+  latest_reports: MarketReport[];
+  disclaimer: string;
 };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -169,6 +242,22 @@ export const api = {
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
   settings: () => request<SettingsInfo>('/api/settings'),
+  marketSummary: () => request<MarketSummary>('/api/market/summary'),
+  marketWatchlist: async () => (await request<{ items: MarketWatchlistItem[]; disclaimer: string }>('/api/market/watchlist')).items,
+  createMarketWatchlistItem: (payload: MarketWatchlistPayload) =>
+    request<MarketWatchlistItem>('/api/market/watchlist', { method: 'POST', body: JSON.stringify(payload) }),
+  updateMarketWatchlistItem: (id: number, payload: MarketWatchlistPayload) =>
+    request<MarketWatchlistItem>(`/api/market/watchlist/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteMarketWatchlistItem: (id: number) => request<{ ok: boolean }>(`/api/market/watchlist/${id}`, { method: 'DELETE' }),
+  runMarketAgent: () => request<{ status: string; reports: MarketReport[]; disclaimer: string }>('/api/market/run', { method: 'POST' }),
+  analyzeMarketSymbol: (symbol: string) => request<MarketReport>(`/api/market/analyze/${encodeURIComponent(symbol)}`, { method: 'POST' }),
+  marketReports: (params = new URLSearchParams()) =>
+    request<{ reports: MarketReport[]; disclaimer: string }>(`/api/market/reports${params.toString() ? `?${params}` : ''}`),
+  marketLatestReports: () => request<{ reports: MarketReport[]; disclaimer: string }>('/api/market/reports/latest'),
+  marketSymbolReports: (symbol: string) =>
+    request<{ reports: MarketReport[]; news: MarketNews[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}`),
+  marketLatestSymbolReport: (symbol: string) =>
+    request<{ report: MarketReport; news: MarketNews[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}/latest`),
   summary: () => request<Summary>('/api/invoices/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),

@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, LogOut, Play, Settings, Upload, X } from 'lucide-react';
+import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -15,7 +15,8 @@ interface Props {
 export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || route.name === 'mywellness';
+  const isMarketArea = route.name === 'marketDashboard' || route.name === 'marketWatchlist' || route.name === 'marketReports' || route.name === 'marketSymbol';
+  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || route.name === 'mywellness' || isMarketArea;
 
   const runAgent = async () => {
     setBusy(true);
@@ -57,6 +58,19 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
           <button className="active" onClick={() => navigate({ name: 'mywellness' })}>
             <Dumbbell size={18} /> MyWellness
           </button>
+        )}
+        {isMarketArea && (
+          <>
+            <button className={route.name === 'marketDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'marketDashboard' })}>
+              <LineChart size={18} /> Marktanalyse
+            </button>
+            <button className={route.name === 'marketWatchlist' ? 'active' : ''} onClick={() => navigate({ name: 'marketWatchlist' })}>
+              <ListChecks size={18} /> Watchlist
+            </button>
+            <button className={route.name === 'marketReports' ? 'active' : ''} onClick={() => navigate({ name: 'marketReports' })}>
+              <BarChart3 size={18} /> Marktberichte
+            </button>
+          </>
         )}
         {!isNeutralArea && (
           <>

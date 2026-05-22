@@ -163,6 +163,23 @@ export function SettingsPage() {
             <SettingRow label="Notify Service" value={settings.integrations.home_assistant.notify_service || '-'} />
           </article>
 
+          {settings.agents.market && (
+            <article className="panel settings-card">
+              <div className="settings-card-head">
+                <div>
+                  <span className="eyebrow">Agent</span>
+                  <h2>MarketAgent</h2>
+                </div>
+                <StatusBadge ok={settings.agents.market.enabled} />
+              </div>
+              <PathRow label="Datenbank" value={settings.agents.market.database} />
+              <SettingRow label="Kursdaten" value={settings.agents.market.price_provider} />
+              <SettingRow label="News" value={settings.agents.market.news_provider} />
+              <SettingRow label="Trading aktiv" value={settings.agents.market.trading_enabled} />
+              <SettingRow label="Hinweis" value={settings.agents.market.disclaimer} />
+            </article>
+          )}
+
           <article className="panel settings-card">
             <div className="settings-card-head">
               <div>

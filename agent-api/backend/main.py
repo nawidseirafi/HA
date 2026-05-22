@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.api.auth_routes import router as auth_router
 from backend.api.export_routes import router as export_router
 from backend.api.invoice_routes import router as invoice_router
+from backend.api.market_routes import router as market_router
 from backend.api.mywellness_routes import router as mywellness_router
 from backend.api.settings_routes import router as settings_router
 from backend.services.auth_service import user_from_request
@@ -58,6 +59,7 @@ app.include_router(invoice_router)
 app.include_router(export_router)
 app.include_router(mywellness_router)
 app.include_router(settings_router)
+app.include_router(market_router)
 
 
 @app.get("/health")

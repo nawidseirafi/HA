@@ -89,6 +89,7 @@ def get_settings() -> dict[str, Any]:
     agents_config = api_config.get("agents", {})
     invoice_config = agent_config.get("invoice_agent", {})
     mywellness_config = agents_config.get("mywellness", {})
+    market_config = agents_config.get("market", {})
     ha_config = agent_config.get("home_assistant", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
 
@@ -145,6 +146,14 @@ def get_settings() -> dict[str, Any]:
             },
             "vacation": {
                 "enabled": bool(agents_config.get("vacation", {}).get("enabled", False)),
+            },
+            "market": {
+                "enabled": bool(market_config.get("enabled", False)),
+                "database": _path_info(BASE_DIR, market_config.get("database_path", "../ai-agent/data/market/market.db")),
+                "price_provider": market_config.get("price_provider", "yahoo"),
+                "news_provider": market_config.get("news_provider", "fallback"),
+                "trading_enabled": False,
+                "disclaimer": "Keine Finanzberatung.",
             },
         },
         "integrations": {

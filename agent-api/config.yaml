@@ -35,3 +35,8 @@ agents:
     schedule:
       - "17:00:00"
       - "20:59:58"
+  market:
+    enabled: true
+    database_path: ../ai-agent/data/market/market.db
+    price_provider: yahoo
+    news_provider: fallback
