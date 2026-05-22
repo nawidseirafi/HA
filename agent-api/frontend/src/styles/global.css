@@ -37,11 +37,10 @@ p { color: var(--muted); line-height: 1.65; }
 .login-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   background:
-    radial-gradient(circle at 14% 18%, rgba(77, 141, 255, 0.24), transparent 30%),
-    radial-gradient(circle at 58% 62%, rgba(52, 211, 153, 0.08), transparent 26%),
-    radial-gradient(circle at 86% 78%, rgba(139, 92, 246, 0.22), transparent 30%),
+    radial-gradient(circle at 50% 18%, rgba(77, 141, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 50% 78%, rgba(52, 211, 153, 0.08), transparent 26%),
     linear-gradient(135deg, #07111f 0%, #0b1b31 100%);
   overflow: hidden;
 }
@@ -165,7 +164,6 @@ p { color: var(--muted); line-height: 1.65; }
     radial-gradient(circle at 50% 18%, rgba(77, 141, 255, 0.12), transparent 32%),
     linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)),
     rgba(8, 18, 34, 0.54);
-  border-left: 1px solid var(--border);
   backdrop-filter: blur(18px);
 }
 
@@ -193,6 +191,7 @@ p { color: var(--muted); line-height: 1.65; }
   gap: 10px;
   text-align: center;
   margin-bottom: 20px;
+  perspective: 900px;
 }
 
 .login-form-header h2 {
@@ -200,23 +199,29 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .login-icon {
-  width: 64px;
-  height: 64px;
+  width: 132px;
+  height: 132px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   color: #bda7ff;
   border: 1px solid rgba(139, 92, 246, 0.78);
   background: rgba(139, 92, 246, 0.08);
-  box-shadow: 0 0 34px rgba(139, 92, 246, 0.24);
+  box-shadow: 0 0 54px rgba(139, 92, 246, 0.32);
   overflow: hidden;
+  animation: login-logo-spin 9s linear infinite;
 }
 
 .login-icon img {
-  width: 48px;
-  height: 48px;
+  width: 104px;
+  height: 104px;
   object-fit: contain;
   display: block;
+}
+
+@keyframes login-logo-spin {
+  from { transform: rotateX(0deg); }
+  to { transform: rotateX(360deg); }
 }
 
 .auth-field {
