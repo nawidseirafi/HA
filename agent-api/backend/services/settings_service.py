@@ -1,0 +1,163 @@
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+PROJECT_DIR = BASE_DIR.parent
+AGENT_DIR = PROJECT_DIR / "ai-agent"
+API_CONFIG_PATH = BASE_DIR / "config.yaml"
+AGENT_CONFIG_PATH = AGENT_DIR / "config.yaml"
+ENV_PATHS = (BASE_DIR / ".env", AGENT_DIR / ".env")
+
+
+def _load_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as config_file:
+        return yaml.safe_load(config_file) or {}
+
+
+def _load_env_files() -> dict[str, str]:
+    values: dict[str, str] = {}
+    for path in ENV_PATHS:
+        if not path.exists():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, raw_value = line.split("=", 1)
+            values[key.strip()] = raw_value.strip().strip("\"'")
+    return values
+
+
+def _resolve_path(base: Path, value: str | None) -> Path | None:
+    if not value:
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        path = base / path
+    return path.resolve()
+
+
+def _path_info(base: Path, value: str | None) -> dict[str, Any]:
+    path = _resolve_path(base, value)
+    if path is None:
+        return {"path": "", "exists": False}
+    return {"path": str(path), "exists": path.exists()}
+
+
+def _env_present(name: str | None, env_values: dict[str, str]) -> bool:
+    if not name:
+        return False
+    value = os.getenv(name) or os.getenv(name.upper()) or env_values.get(name) or env_values.get(name.upper())
+    return bool(value)
+
+
+def _setting_present(value: str | None, env_values: dict[str, str]) -> bool:
+    if not value:
+        return False
+    if value in env_values or value.upper() in env_values or os.getenv(value) or os.getenv(value.upper()):
+        return True
+    placeholders = {"HA-TOKEN", "GEMINI_API_KEY", "OPENAI_API_KEY", "CLAUDE_API_KEY", "MY_WELLNESS_KEY", "MY_WELLNESS_FACILITY_ID"}
+    return value not in placeholders and not value.endswith("_KEY") and not value.endswith("_TOKEN")
+
+
+def _llm_info(agent_config: dict[str, Any], env_values: dict[str, str]) -> dict[str, Any]:
+    llm_config = agent_config.get("llm", {})
+    provider = llm_config.get("provider", "")
+    provider_config = llm_config.get(provider, {}) if provider else {}
+    api_key_setting = provider_config.get("api_key")
+    return {
+        "provider": provider,
+        "model": provider_config.get("model", ""),
+        "api_key_configured": _setting_present(api_key_setting, env_values),
+    }
+
+
+def get_settings() -> dict[str, Any]:
+    api_config = _load_yaml(API_CONFIG_PATH)
+    agent_config = _load_yaml(AGENT_CONFIG_PATH)
+    env_values = _load_env_files()
+
+    server_config = api_config.get("server", {})
+    auth_config = api_config.get("auth", {})
+    storage_config = api_config.get("storage", {})
+    agents_config = api_config.get("agents", {})
+    invoice_config = agent_config.get("invoice_agent", {})
+    mywellness_config = agents_config.get("mywellness", {})
+    ha_config = agent_config.get("home_assistant", {})
+    ha_notification_config = invoice_config.get("home_assistant_notifications", {})
+
+    token_ttl_seconds = int(auth_config.get("token_ttl_seconds", 0) or 0)
+    mywellness_db = AGENT_DIR / "data" / "mywellness" / "mywellness.db"
+    invoice_db = _path_info(AGENT_DIR, invoice_config.get("database_path"))
+
+    return {
+        "api": {
+            "title": "RoboterSteve Agent API",
+            "version": "0.2.0",
+            "host": server_config.get("host", "0.0.0.0"),
+            "port": server_config.get("port", 8080),
+            "config_file": str(API_CONFIG_PATH),
+        },
+        "auth": {
+            "mode": "JWT",
+            "enabled": True,
+            "username_env": auth_config.get("username_env", "AGENT_API_USERNAME"),
+            "password_configured": _env_present(auth_config.get("password_env", "AGENT_API_PASSWORD"), env_values),
+            "jwt_secret_configured": _env_present(auth_config.get("jwt_secret_env", "AGENT_API_JWT_SECRET"), env_values),
+            "token_ttl_seconds": token_ttl_seconds,
+            "token_ttl_days": round(token_ttl_seconds / 86400, 1) if token_ttl_seconds else 0,
+        },
+        "frontend": {
+            "dev_server": "Vite 5173",
+            "production_dist": str(BASE_DIR / "frontend" / "dist"),
+            "production_dist_exists": (BASE_DIR / "frontend" / "dist").exists(),
+        },
+        "storage": {
+            "uploads": _path_info(BASE_DIR, storage_config.get("uploads_dir")),
+            "status_file": _path_info(BASE_DIR, storage_config.get("status_file")),
+            "log_file": _path_info(BASE_DIR, api_config.get("logging", {}).get("file")),
+        },
+        "agents": {
+            "invoices": {
+                "enabled": bool(agents_config.get("invoices", {}).get("enabled", True)),
+                "upload_dir": _path_info(BASE_DIR, agents_config.get("invoices", {}).get("upload_dir")),
+                "database": invoice_db,
+                "email_enabled": bool(invoice_config.get("email", {}).get("enabled", False)),
+                "portal_import_enabled": bool(invoice_config.get("portals", {}).get("enabled", False)),
+                "ai_extraction_enabled": bool(invoice_config.get("ai_extraction", {}).get("enabled", False)),
+                "poll_interval_seconds": invoice_config.get("poll_interval_seconds"),
+            },
+            "mywellness": {
+                "enabled": bool(mywellness_config.get("enabled", False)),
+                "database": {"path": str(mywellness_db), "exists": mywellness_db.exists()},
+                "days": mywellness_config.get("days", 2),
+                "schedule": mywellness_config.get("schedule", []),
+                "desired_courses": mywellness_config.get("desired_courses", []),
+                "token_configured": _env_present(mywellness_config.get("token_env"), env_values),
+                "user_id_configured": _env_present(mywellness_config.get("user_id_env"), env_values),
+                "facility_id_configured": _env_present(mywellness_config.get("facility_id_env"), env_values),
+            },
+            "vacation": {
+                "enabled": bool(agents_config.get("vacation", {}).get("enabled", False)),
+            },
+        },
+        "integrations": {
+            "llm": _llm_info(agent_config, env_values),
+            "home_assistant": {
+                "configured": _setting_present(ha_config.get("token"), env_values),
+                "notifications_enabled": bool(ha_notification_config.get("enabled", False)),
+                "notify_service": ha_notification_config.get("notify_service", ""),
+                "persistent_notifications": bool(ha_notification_config.get("persistent", False)),
+            },
+        },
+        "security": {
+            "secrets_visible": False,
+            "note": "Secrets werden nur als gesetzt/nicht gesetzt angezeigt.",
+        },
+    }

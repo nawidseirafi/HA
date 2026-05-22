@@ -65,6 +65,81 @@ export type Course = {
 
 export type MyWellnessCourse = Course;
 
+export type PathSetting = {
+  path: string;
+  exists: boolean;
+};
+
+export type SettingsInfo = {
+  api: {
+    title: string;
+    version: string;
+    host: string;
+    port: number;
+    config_file: string;
+  };
+  auth: {
+    mode: string;
+    enabled: boolean;
+    username_env: string;
+    password_configured: boolean;
+    jwt_secret_configured: boolean;
+    token_ttl_seconds: number;
+    token_ttl_days: number;
+  };
+  frontend: {
+    dev_server: string;
+    production_dist: string;
+    production_dist_exists: boolean;
+  };
+  storage: {
+    uploads: PathSetting;
+    status_file: PathSetting;
+    log_file: PathSetting;
+  };
+  agents: {
+    invoices: {
+      enabled: boolean;
+      upload_dir: PathSetting;
+      database: PathSetting;
+      email_enabled: boolean;
+      portal_import_enabled: boolean;
+      ai_extraction_enabled: boolean;
+      poll_interval_seconds?: number;
+    };
+    mywellness: {
+      enabled: boolean;
+      database: PathSetting;
+      days: number;
+      schedule: string[];
+      desired_courses: string[];
+      token_configured: boolean;
+      user_id_configured: boolean;
+      facility_id_configured: boolean;
+    };
+    vacation: {
+      enabled: boolean;
+    };
+  };
+  integrations: {
+    llm: {
+      provider: string;
+      model: string;
+      api_key_configured: boolean;
+    };
+    home_assistant: {
+      configured: boolean;
+      notifications_enabled: boolean;
+      notify_service: string;
+      persistent_notifications: boolean;
+    };
+  };
+  security: {
+    secrets_visible: boolean;
+    note: string;
+  };
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE}${path}`, {
@@ -93,6 +168,7 @@ export const api = {
   login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
+  settings: () => request<SettingsInfo>('/api/settings'),
   summary: () => request<Summary>('/api/invoices/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),

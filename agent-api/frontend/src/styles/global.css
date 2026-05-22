@@ -1164,8 +1164,81 @@ label.check input { width: auto; }
 .modal { width: min(1000px, 94vw); height: min(760px, 88vh); }
 .modal .preview-pane { height: 100%; min-height: 0; }
 .settings-list { display: grid; gap: 14px; max-width: 760px; }
-.settings-list div { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid rgba(190, 208, 235, 0.1); padding-bottom: 12px; }
-.settings-list span { color: var(--muted); text-align: right; }
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.settings-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.settings-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 2px;
+}
+.settings-card-head h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.38fr) minmax(0, 1fr);
+  gap: 18px;
+  border-bottom: 1px solid rgba(190, 208, 235, 0.1);
+  padding-bottom: 10px;
+}
+.settings-row strong {
+  color: #dbe8ff;
+  font-size: 13px;
+}
+.settings-row span {
+  color: var(--muted);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.settings-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(238, 194, 85, 0.35);
+  color: #ffd983;
+  background: rgba(238, 194, 85, 0.11);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.settings-badge.ok {
+  border-color: rgba(69, 217, 146, 0.35);
+  color: #80f0bd;
+  background: rgba(69, 217, 146, 0.11);
+}
+.settings-badge.warn {
+  border-color: rgba(238, 194, 85, 0.35);
+  color: #ffd983;
+  background: rgba(238, 194, 85, 0.11);
+}
+.settings-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+.settings-tags span {
+  border: 1px solid rgba(77, 141, 255, 0.24);
+  background: rgba(77, 141, 255, 0.1);
+  color: #bfd6ff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
 .error-panel { color: #ff9aaa; }
 .toast {
   position: fixed;
@@ -1203,6 +1276,9 @@ label.check input { width: auto; }
   .login-feature-list { grid-template-columns: 1fr; max-width: none; }
   .login-feature { min-height: auto; grid-template-columns: 40px 1fr; align-items: start; }
   .login-card-shell, .login-form { width: min(100%, 520px); }
+  .settings-grid { grid-template-columns: 1fr; }
+  .settings-row { grid-template-columns: 1fr; gap: 6px; }
+  .settings-row span { text-align: left; }
   .mobile-menu-toggle {
     position: fixed;
     top: 14px;
