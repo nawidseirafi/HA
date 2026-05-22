@@ -22,6 +22,10 @@ AGENT_CACHE_FILE = AI_AGENT_DIR / "agents" / "mywellness_cache.json"
 CONFIG_PATH = BASE_DIR / "config.yaml"
 AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
 STATUS_FILE = BASE_DIR / "backend" / "storage" / "mywellness_status.json"
+if str(AI_AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(AI_AGENT_DIR))
+
+from core.mywellness_store import list_prepared_courses, replace_live_courses
 
 
 def utc_now() -> str:
@@ -305,7 +309,9 @@ class MyWellnessService:
                 data = response.json()
                 courses.extend(self._normalize_course(item, date_value, desired) for item in self._event_items(data))
 
-        return self._dedupe_courses(courses)
+        deduped = self._dedupe_courses(courses)
+        replace_live_courses(deduped)
+        return deduped
 
     def _normalize_course(self, item: dict[str, Any], target_date: str, desired: set[str]) -> dict[str, Any]:
         is_participant = bool(item.get("isParticipant"))
@@ -414,6 +420,11 @@ class MyWellnessService:
         return [course for course in courses if course.get("is_participant") is True]
 
     def _courses_from_cache(self) -> list[dict[str, Any]]:
+        _, target_date = self._dates()
+        prepared_courses = list_prepared_courses(target_date)
+        if prepared_courses:
+            return prepared_courses
+
         if not AGENT_CACHE_FILE.exists():
             return []
         try:

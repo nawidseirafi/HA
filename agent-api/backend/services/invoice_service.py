@@ -343,17 +343,21 @@ class InvoiceService:
             "invoice_number": metadata.invoice_number,
             "invoice_date": metadata.invoice_date.isoformat(),
             "category": metadata.category,
-            "gross_amount": metadata.amount,
+            "net_amount": metadata.net_amount,
+            "tax_amount": metadata.tax_amount,
+            "gross_amount": metadata.gross_amount if metadata.gross_amount is not None else metadata.amount,
             "currency": metadata.currency,
             "review_status": "needs_review",
-            "document_type": "invoice" if metadata.is_invoice else "document",
-            "transaction_type": "expense",
+            "document_type": metadata.document_type,
+            "transaction_type": metadata.transaction_type,
+            "is_business": metadata.is_business,
+            "is_tax_relevant": metadata.is_tax_relevant,
         }
         self.update(invoice_id, payload)
         with self.connect() as connection:
             connection.execute(
                 "update invoices set reason = ?, ai_raw_json = ?, ai_confidence = ? where id = ?",
-                (metadata.reason, metadata.reason, metadata.confidence, invoice_id),
+                (metadata.reason, metadata.ai_raw_json or metadata.reason, metadata.confidence, invoice_id),
             )
             connection.commit()
         updated = self.get(invoice_id)

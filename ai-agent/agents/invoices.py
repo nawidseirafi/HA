@@ -196,6 +196,8 @@ def _load_ha_notification_config(config: dict) -> HomeAssistantNotificationConfi
         only_on_changes=bool(config.get("only_on_changes", True)),
         title=config.get("title", "Rechnungs-Agent"),
         notification_id=config.get("notification_id", "invoice_agent"),
+        notify_service=config.get("notify_service", ""),
+        persistent=bool(config.get("persistent", True)),
     )
 
 

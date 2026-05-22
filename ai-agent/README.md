@@ -165,7 +165,7 @@ search: "ALL"
 
 ## Home-Assistant-Benachrichtigung
 
-Der Agent kann nach einem Scan eine `persistent_notification` in Home Assistant erstellen.
+Der Agent kann nach einem Scan eine Home-Assistant-Mobile-Benachrichtigung schicken und optional weiter eine `persistent_notification` in Home Assistant erstellen.
 
 In `config.yaml`:
 
@@ -176,15 +176,27 @@ invoice_agent:
     only_on_changes: true
     title: "Rechnungs-Agent"
     notification_id: "invoice_agent"
+    notify_service: "notify.mobile_app_system_error_404"
+    persistent: true
 ```
 
 Mit `only_on_changes: true` meldet der Agent nur, wenn neue Rechnungen archiviert wurden oder Dateien in `review` gelandet sind. Reine Duplikat-Laeufe bleiben still.
 
-Die Benachrichtigung nutzt die bestehende Home-Assistant-API-Konfiguration oben in `config.yaml`.
+`notify_service` ist der Home-Assistant-Service fuer dein Handy, z.B. `notify.mobile_app_system_error_404`. Die Benachrichtigung nutzt die bestehende Home-Assistant-API-Konfiguration oben in `config.yaml`.
 
 ## Portal-Downloads HUK24
 
 Fuer Anbieter wie HUK24, bei denen Rechnungen nur im Kundenportal liegen, nutzt der Agent Playwright mit einer gespeicherten Browser-Session.
+
+## MyWellness-Datenbank
+
+Der MyWellness-Agent speichert vorbereitete und live geladene Kursdaten in:
+
+```text
+ai-agent/data/mywellness/mywellness.db
+```
+
+`agents/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `agents/mywellness.py book` liest diese Kurs-IDs bevorzugt aus der Datenbank und nutzt `agents/mywellness_cache.json` nur noch als Fallback fuer alte Laeufe. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
 
 In `config.yaml`:
 

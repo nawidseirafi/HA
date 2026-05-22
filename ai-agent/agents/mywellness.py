@@ -6,7 +6,6 @@ import json
 import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from core.ha_client import HomeAssistantClient
 from dotenv import load_dotenv
 import yaml
 
@@ -30,6 +29,12 @@ RETRY_DELAY = 0.1  # Schneller Retry
 REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
+
+from core.ha_client import HomeAssistantClient
+from core.mywellness_store import prepared_course_ids, record_run, replace_prepared_courses
+
 LOG_FILE = BASE_DIR / "mywellness.log"
 CACHE_FILE = BASE_DIR / "mywellness_cache.json"
 
@@ -125,6 +130,11 @@ def save_course_ids(target_date, course_ids):
     log(f"Kurs-IDs gespeichert: {course_ids}")
 
 def load_course_ids(target_date):
+    stored_course_ids = prepared_course_ids(target_date)
+    if stored_course_ids:
+        log(f"Kurs-IDs aus Datenbank geladen: {stored_course_ids}")
+        return stored_course_ids
+
     if not os.path.exists(CACHE_FILE):
         log("Keine Cache-Datei gefunden.")
         return {}
@@ -166,6 +176,7 @@ def prepare_course_ids():
             for event in event_items
             if event.get("name") in desired_courses
         }
+        replace_prepared_courses(target_date, event_items, desired_courses)
         save_course_ids(target_date, course_ids)
         message = "Vorbereitung abgeschlossen.\n\n"
         message += "Gefunden:\n"
@@ -286,10 +297,16 @@ def book_saved_course_ids():
 # =====================
 if __name__ == "__main__":
     ha = HomeAssistantClient()
+    started_at = datetime.now().isoformat(timespec="seconds")
 
-    if MODE == "prepare":
-        prepare_course_ids()
-    elif MODE == "book":
-        book_saved_course_ids()
-    else:
-        log(f"Unbekannter MODE: {MODE}")
+    try:
+        if MODE == "prepare":
+            prepare_course_ids()
+        elif MODE == "book":
+            book_saved_course_ids()
+        else:
+            log(f"Unbekannter MODE: {MODE}")
+        record_run(MODE, "ok", started_at, datetime.now().isoformat(timespec="seconds"))
+    except Exception as exc:
+        record_run(MODE, "error", started_at, datetime.now().isoformat(timespec="seconds"), str(exc))
+        raise

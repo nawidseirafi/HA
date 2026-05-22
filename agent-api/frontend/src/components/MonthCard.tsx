@@ -12,6 +12,14 @@ export function MonthCard({ month, onOpen }: { month: MonthSummary; onOpen: () =
       </div>
       <strong>{monthNames[month.month - 1]}</strong>
       <div className="metric-row">
+        <span>Saldo</span>
+        <b>{currency(month.income_total - month.expense_total)}</b>
+      </div>
+      <div className="metric-row">
+        <span>Einnahmen</span>
+        <b>{currency(month.income_total)}</b>
+      </div>
+      <div className="metric-row">
         <span>Ausgaben</span>
         <b>{currency(month.expense_total)}</b>
       </div>

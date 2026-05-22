@@ -42,6 +42,8 @@ class HomeAssistantNotificationConfig:
     only_on_changes: bool = True
     title: str = "Rechnungs-Agent"
     notification_id: str = "invoice_agent"
+    notify_service: str = ""
+    persistent: bool = True
 
 
 @dataclass
@@ -245,11 +247,22 @@ def _notify_home_assistant(config: InvoiceAgentConfig, result: ScanResult) -> No
 
     try:
         ha = HomeAssistantClient()
-        ha.persistent_notification(
-            title=notify_config.title,
-            message=message,
-            notification_id=notify_config.notification_id,
-        )
+        if notify_config.notify_service:
+            ha.notify(
+                service=notify_config.notify_service,
+                title=notify_config.title,
+                message=message,
+                data={
+                    "tag": notify_config.notification_id,
+                    "group": "invoice_agent",
+                },
+            )
+        if notify_config.persistent:
+            ha.persistent_notification(
+                title=notify_config.title,
+                message=message,
+                notification_id=notify_config.notification_id,
+            )
     except Exception as exc:
         logging.warning("Home-Assistant-Benachrichtigung fehlgeschlagen: %s", exc)
 
@@ -277,10 +290,21 @@ def _notify_portal_logins(config: InvoiceAgentConfig, result: ScanResult) -> Non
 
         try:
             ha = HomeAssistantClient()
-            ha.persistent_notification(
-                title=title,
-                message=message,
-                notification_id=notification_id,
-            )
+            if notify_config.notify_service:
+                ha.notify(
+                    service=notify_config.notify_service,
+                    title=title,
+                    message=message,
+                    data={
+                        "tag": notification_id,
+                        "group": "invoice_agent",
+                    },
+                )
+            if notify_config.persistent:
+                ha.persistent_notification(
+                    title=title,
+                    message=message,
+                    notification_id=notification_id,
+                )
         except Exception as exc:
             logging.warning("Home-Assistant-Portal-Benachrichtigung fehlgeschlagen: %s", exc)

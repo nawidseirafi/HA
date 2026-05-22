@@ -104,7 +104,7 @@ GET  /api/mywellness/bookings
 GET  /api/mywellness/logs
 ```
 
-`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Der lokale Status wird in `backend/storage/mywellness_status.json` gespeichert, Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
+`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Der lokale Status wird in `backend/storage/mywellness_status.json` gespeichert, Kursdaten liegen in `../ai-agent/data/mywellness/mywellness.db`, Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
 
 `GET /api/mywellness/courses/upcoming` liefert das einheitliche Course-Modell fuer die naechsten 48 Stunden. `POST /api/mywellness/book` und `POST /api/mywellness/cancel` erwarten `{"courseId":"..."}` und fuehren Buchung oder Stornierung ausschliesslich ueber das Backend aus.
 
@@ -133,7 +133,7 @@ MY_WELLNESS_USER_ID
 MY_WELLNESS_FACILITY_ID
 ```
 
-Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert.
+Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. `mywellness_cache.json` bleibt nur noch als Fallback fuer alte Skript-Laeufe; das Dashboard liest vorbereitete Kurse bevorzugt aus `../ai-agent/data/mywellness/mywellness.db`.
 
 Fehler pruefen:
 

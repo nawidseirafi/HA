@@ -130,6 +130,15 @@ class InvoiceMetadata:
     invoice_number: str
     category: str
     reason: str
+    document_type: str = "invoice"
+    transaction_type: str = "expense"
+    net_amount: Optional[float] = None
+    tax_amount: Optional[float] = None
+    gross_amount: Optional[float] = None
+    is_business: bool = True
+    is_tax_relevant: bool = True
+    review_status: str = "needs_review"
+    ai_raw_json: str = ""
 
 
 def file_sha256(path: Path) -> str:
@@ -204,6 +213,10 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
         invoice_number=invoice_number,
         category=category,
         reason="; ".join(reasons) if reasons else "no invoice signals found",
+        document_type="invoice" if is_invoice else "document",
+        transaction_type="expense",
+        gross_amount=amount,
+        review_status="needs_review",
     )
 
 

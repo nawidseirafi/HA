@@ -66,6 +66,8 @@ invoice_agent:
     only_on_changes: true
     title: "Rechnungs-Agent"
     notification_id: "invoice_agent"
+    notify_service: "notify.mobile_app_system_error_404"
+    persistent: true
 
 tax_export:
   output_dir: "./data/invoices/tax"

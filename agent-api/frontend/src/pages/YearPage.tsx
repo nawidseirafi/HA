@@ -26,7 +26,7 @@ export function YearPage({ year, navigate }: { year: number; navigate: (route: R
         <div>
           <span className="eyebrow">Jahr</span>
           <h1>{year}</h1>
-          <p>Monatskarten mit Ausgaben, Belegen und offenen Prüfungen.</p>
+          <p>Monatskarten mit Einnahmen, Ausgaben, Saldo und offenen Prüfungen.</p>
         </div>
         <div className="button-row">
           <button className="button ghost" onClick={() => navigate({ name: 'years' })}><ArrowLeft size={16} /> Zurück</button>

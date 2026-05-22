@@ -60,6 +60,17 @@ class HomeAssistantClient:
         logging.info("Sende Home-Assistant-Benachrichtigung: %s", title)
         return self.call_service("persistent_notification", "create", data)
 
+    def notify(self, service, title, message, data=None):
+        service_name = service.replace("notify.", "")
+        payload = {
+            "title": title,
+            "message": message,
+        }
+        if data:
+            payload["data"] = data
+        logging.info("Sende Home-Assistant-Mobile-Notification: %s", title)
+        return self.call_service("notify", service_name, payload)
+
     def turn_on(self, entity_id):
         domain = entity_id.split(".")[0]
         logging.info(f"Schalte ein: {entity_id}")

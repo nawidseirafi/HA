@@ -13,9 +13,13 @@ from core.invoice_extractor import InvoiceMetadata
 HEADERS = (
     "Datum",
     "Anbieter",
-    "Betrag",
+    "Netto",
+    "MwSt",
+    "Brutto",
     "Waehrung",
     "Rechnungsnummer",
+    "Dokumenttyp",
+    "Art",
     "Kategorie",
     "Quelle",
     "Archivpfad",
@@ -23,6 +27,28 @@ HEADERS = (
     "Konfidenz",
     "Status",
 )
+
+
+EXTRA_COLUMNS: dict[str, str] = {
+    "source": "text",
+    "original_filename": "text",
+    "stored_path": "text",
+    "document_type": "text",
+    "transaction_type": "text not null default 'expense'",
+    "year": "integer",
+    "month": "integer",
+    "payment_method": "text",
+    "net_amount": "real",
+    "tax_amount": "real",
+    "gross_amount": "real",
+    "is_business": "integer not null default 1",
+    "is_tax_relevant": "integer not null default 1",
+    "review_status": "text",
+    "ai_confidence": "real",
+    "ai_raw_json": "text",
+    "notes": "text",
+    "created_at": "text",
+}
 
 
 class InvoiceCatalog:
@@ -93,14 +119,23 @@ class InvoiceCatalog:
 
     def upsert(self, metadata: InvoiceMetadata, archive_path: Path, status: str) -> None:
         data = asdict(metadata)
+        gross_amount = data.get("gross_amount") if data.get("gross_amount") is not None else data["amount"]
+        document_type = data.get("document_type") or ("invoice" if data["is_invoice"] else "document")
+        transaction_type = _normalize_transaction_type(data.get("transaction_type"))
+        invoice_date = data["invoice_date"]
+        review_status = "reviewed" if status == "archived" else (data.get("review_status") or "needs_review")
+        updated_at = datetime.utcnow().isoformat(timespec="seconds")
         self.connection.execute(
             """
             insert into invoices (
                 file_hash, source_path, archive_path, is_invoice, confidence, vendor,
                 invoice_date, amount, currency, invoice_number, category, status,
-                reason, updated_at
+                reason, updated_at, source, original_filename, stored_path,
+                document_type, transaction_type, year, month, net_amount, tax_amount,
+                gross_amount, is_business, is_tax_relevant, review_status,
+                ai_confidence, ai_raw_json, created_at
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             on conflict(file_hash) do update set
                 source_path = excluded.source_path,
                 archive_path = excluded.archive_path,
@@ -114,7 +149,22 @@ class InvoiceCatalog:
                 category = excluded.category,
                 status = excluded.status,
                 reason = excluded.reason,
-                updated_at = excluded.updated_at
+                updated_at = excluded.updated_at,
+                source = excluded.source,
+                original_filename = excluded.original_filename,
+                stored_path = excluded.stored_path,
+                document_type = excluded.document_type,
+                transaction_type = excluded.transaction_type,
+                year = excluded.year,
+                month = excluded.month,
+                net_amount = excluded.net_amount,
+                tax_amount = excluded.tax_amount,
+                gross_amount = excluded.gross_amount,
+                is_business = excluded.is_business,
+                is_tax_relevant = excluded.is_tax_relevant,
+                review_status = excluded.review_status,
+                ai_confidence = excluded.ai_confidence,
+                ai_raw_json = excluded.ai_raw_json
             """,
             (
                 data["file_hash"],
@@ -123,14 +173,30 @@ class InvoiceCatalog:
                 int(data["is_invoice"]),
                 data["confidence"],
                 data["vendor"],
-                data["invoice_date"].isoformat(),
-                data["amount"],
+                invoice_date.isoformat(),
+                gross_amount,
                 data["currency"],
                 data["invoice_number"],
                 data["category"],
                 status,
                 data["reason"],
-                datetime.utcnow().isoformat(timespec="seconds"),
+                updated_at,
+                "agent",
+                Path(data["source_path"]).name,
+                str(archive_path),
+                document_type,
+                transaction_type,
+                invoice_date.year,
+                invoice_date.month,
+                data.get("net_amount"),
+                data.get("tax_amount"),
+                gross_amount,
+                int(bool(data.get("is_business", True))),
+                int(bool(data.get("is_tax_relevant", True))),
+                review_status,
+                data["confidence"],
+                data.get("ai_raw_json") or "",
+                updated_at,
             ),
         )
         self.connection.commit()
@@ -191,6 +257,34 @@ class InvoiceCatalog:
             )
             """
         )
+        existing = {row["name"] for row in self.connection.execute("pragma table_info(invoices)").fetchall()}
+        for column, definition in EXTRA_COLUMNS.items():
+            if column not in existing:
+                self.connection.execute(f"alter table invoices add column {column} {definition}")
+        self.connection.execute(
+            """
+            update invoices
+            set
+                source = coalesce(source, 'agent'),
+                original_filename = coalesce(original_filename, nullif(source_path, '')),
+                stored_path = coalesce(stored_path, archive_path, source_path),
+                document_type = coalesce(document_type, case when is_invoice = 1 then 'invoice' else 'document' end),
+                transaction_type = coalesce(transaction_type, 'expense'),
+                year = coalesce(year, cast(substr(invoice_date, 1, 4) as integer)),
+                month = coalesce(month, cast(substr(invoice_date, 6, 2) as integer)),
+                gross_amount = coalesce(gross_amount, amount),
+                review_status = coalesce(
+                    review_status,
+                    case
+                        when status = 'archived' then 'reviewed'
+                        when status = 'review' then 'needs_review'
+                        else status
+                    end
+                ),
+                ai_confidence = coalesce(ai_confidence, confidence),
+                created_at = coalesce(created_at, updated_at)
+            """
+        )
         self.connection.commit()
 
 
@@ -201,9 +295,13 @@ def _rows_for_export(rows: Iterable[sqlite3.Row]) -> list[list[object]]:
             [
                 row["invoice_date"],
                 row["vendor"],
-                row["amount"] if row["amount"] is not None else "",
+                row["net_amount"] if "net_amount" in row.keys() and row["net_amount"] is not None else "",
+                row["tax_amount"] if "tax_amount" in row.keys() and row["tax_amount"] is not None else "",
+                (row["gross_amount"] if "gross_amount" in row.keys() and row["gross_amount"] is not None else row["amount"]) or "",
                 row["currency"],
                 row["invoice_number"] or "",
+                row["document_type"] if "document_type" in row.keys() else "",
+                row["transaction_type"] if "transaction_type" in row.keys() else "expense",
                 row["category"],
                 row["source_path"],
                 row["archive_path"],
@@ -248,6 +346,13 @@ def _column_name(index: int) -> str:
         index, remainder = divmod(index - 1, 26)
         name = chr(65 + remainder) + name
     return name
+
+
+def _normalize_transaction_type(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"income", "einnahme", "revenue", "credit", "erstattung", "gutschrift"}:
+        return "income"
+    return "expense"
 
 
 def _content_types_xml() -> str:
