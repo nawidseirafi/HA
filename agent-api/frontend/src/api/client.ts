@@ -14,16 +14,32 @@ export type AgentStatus = {
   last_mode?: 'prepare' | 'book';
 };
 
-export type MyWellnessCourse = {
+export type CourseStatus = 'available' | 'booked' | 'full' | 'waitlist';
+
+export type Course = {
   id: string;
-  name: string;
-  starts_at: string | null;
-  ends_at: string | null;
-  location: string | null;
-  booking_status: string;
+  title: string;
+  studio: string;
+  trainer?: string | null;
+  startTime: string | null;
+  endTime?: string | null;
+  availableSlots?: number | null;
+  waitingList?: boolean | null;
+  booked: boolean;
+  bookable: boolean;
+  cancellable: boolean;
+  status: CourseStatus;
+  category?: string | null;
+  name?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  location?: string | null;
+  booking_status?: string;
   is_desired?: boolean;
   is_participant?: boolean;
 };
+
+export type MyWellnessCourse = Course;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -65,7 +81,12 @@ export const api = {
     request<AgentStatus>('/api/agent/start', { method: 'POST', body: JSON.stringify({ mode }) }),
   stopMywellnessAgent: () => request<AgentStatus>('/api/agent/stop', { method: 'POST' }),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
-  mywellnessBookings: async () => (await request<{ bookings: MyWellnessCourse[] }>('/api/mywellness/bookings')).bookings,
+  mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
+  mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,
+  bookMywellnessCourse: (courseId: string) =>
+    request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/book', { method: 'POST', body: JSON.stringify({ courseId }) }),
+  cancelMywellnessCourse: (courseId: string) =>
+    request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/cancel', { method: 'POST', body: JSON.stringify({ courseId }) }),
   mywellnessLogs: async () => (await request<{ logs: string[] }>('/api/mywellness/logs')).logs,
   upload: async (file: File) => {
     const data = new FormData();

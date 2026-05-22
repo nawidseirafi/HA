@@ -97,11 +97,16 @@ GET  /api/agent/status
 POST /api/agent/start
 POST /api/agent/stop
 GET  /api/mywellness/courses
+GET  /api/mywellness/courses/upcoming
+POST /api/mywellness/book
+POST /api/mywellness/cancel
 GET  /api/mywellness/bookings
 GET  /api/mywellness/logs
 ```
 
 `POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Der lokale Status wird in `backend/storage/mywellness_status.json` gespeichert, Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
+
+`GET /api/mywellness/courses/upcoming` liefert das einheitliche Course-Modell fuer die naechsten 48 Stunden. `POST /api/mywellness/book` und `POST /api/mywellness/cancel` erwarten `{"courseId":"..."}` und fuehren Buchung oder Stornierung ausschliesslich ueber das Backend aus.
 
 Kompatible alte Endpunkte bleiben aktiv:
 
@@ -118,7 +123,7 @@ Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/i
 
 ## MyWellness Agent
 
-Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse und die letzten Logs. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal oder laden API-Daten neu.
+Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse aus dem Prepare-Cache, verfuegbare Kurse der naechsten 48 Stunden und die letzten Logs. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal, laden API-Daten neu oder buchen/stornieren Kurse. Verfuegbare Kurse, Buchungen und Status werden automatisch alle 30 Sekunden aktualisiert.
 
 Erforderliche ENV-Werte werden aus der Umgebung oder aus `../ai-agent/.env` gelesen:
 

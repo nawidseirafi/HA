@@ -14,6 +14,10 @@ class StartAgentPayload(BaseModel):
     mode: Optional[Literal["prepare", "book"]] = "prepare"
 
 
+class CourseActionPayload(BaseModel):
+    courseId: str
+
+
 @router.get("/api/agent/status")
 def agent_status():
     return mywellness_service.status()
@@ -33,6 +37,21 @@ def stop_agent():
 @router.get("/api/mywellness/courses")
 def mywellness_courses():
     return mywellness_service.courses()
+
+
+@router.get("/api/mywellness/courses/upcoming")
+def mywellness_upcoming_courses():
+    return mywellness_service.upcoming_courses()
+
+
+@router.post("/api/mywellness/book")
+def mywellness_book_course(payload: CourseActionPayload):
+    return mywellness_service.book_course(payload.courseId)
+
+
+@router.post("/api/mywellness/cancel")
+def mywellness_cancel_course(payload: CourseActionPayload):
+    return mywellness_service.cancel_course(payload.courseId)
 
 
 @router.get("/api/mywellness/bookings")

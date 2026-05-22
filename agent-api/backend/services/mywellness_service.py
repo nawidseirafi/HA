@@ -72,6 +72,8 @@ class MyWellnessService:
         running = self._is_running()
         state["is_running"] = running
         state["current_status"] = "running" if running else state.get("current_status", "idle")
+        if not running and state.get("current_status") == "error" and not state.get("last_error"):
+            state["current_status"] = "idle"
         state["next_scheduled_run"] = self._next_scheduled_run() if state.get("enabled", True) else None
         if not running and state.get("current_status") == "running":
             state["current_status"] = "idle"
@@ -162,6 +164,29 @@ class MyWellnessService:
             bookings = state.get("current_bookings") or []
             return {"bookings": bookings or self._bookings_from_logs(), "error": str(exc)}
 
+    def upcoming_courses(self) -> dict[str, Any]:
+        state = self._read_status()
+        try:
+            courses = self._upcoming_courses()
+            state["upcoming_courses"] = courses
+            state["current_bookings"] = self._bookings_from_courses(courses)
+            state["last_upcoming_refresh"] = utc_now()
+            state["last_error"] = None
+            self._write_status(state)
+            return {"courses": courses}
+        except Exception as exc:
+            message = f"Kurse konnten nicht geladen werden: {exc}"
+            self._agent_log(message)
+            state["last_error"] = message
+            self._write_status(state)
+            return {"courses": state.get("upcoming_courses", []), "error": message}
+
+    def book_course(self, course_id: str) -> dict[str, Any]:
+        return self._change_booking(course_id=course_id, action="book")
+
+    def cancel_course(self, course_id: str) -> dict[str, Any]:
+        return self._change_booking(course_id=course_id, action="cancel")
+
     def _watch_process(self, process: subprocess.Popen[str], mode: str) -> None:
         output, _ = process.communicate()
         state = self._read_status()
@@ -186,6 +211,72 @@ class MyWellnessService:
         state["last_error"] = None
         self._write_status(state)
         return courses
+
+    def _upcoming_courses(self) -> list[dict[str, Any]]:
+        now = datetime.now()
+        limit_day = now + timedelta(days=2)
+        limit = datetime(limit_day.year, limit_day.month, limit_day.day, 23, 59, 59)
+        return [
+            course
+            for course in self._fetch_courses()
+            if self._course_datetime(course.get("startTime") or course.get("starts_at"), fallback_min=True) <= limit
+        ]
+
+    def _change_booking(self, course_id: str, action: str) -> dict[str, Any]:
+        config = self._mywellness_config()
+        if not config["token"] or not config["user_id"]:
+            raise HTTPException(status_code=400, detail="MY_WELLNESS_TOKEN und MY_WELLNESS_USER_ID sind erforderlich.")
+
+        courses = self._fetch_courses()
+        course = next((item for item in courses if item.get("id") == course_id), None)
+        if not course:
+            message = f"Kurs nicht gefunden: {course_id}"
+            self._agent_log(message)
+            raise HTTPException(status_code=404, detail=message)
+        if action == "book" and course.get("booked"):
+            return {"ok": True, "message": "Kurs ist bereits gebucht.", "course": course}
+        if action == "book" and not course.get("bookable") and course.get("status") != "waitlist":
+            message = f"Kurs ist nicht buchbar: {course.get('title')}"
+            self._agent_log(message)
+            raise HTTPException(status_code=409, detail=message)
+        if action == "cancel" and not course.get("cancellable"):
+            message = f"Kurs ist nicht stornierbar: {course.get('title')}"
+            self._agent_log(message)
+            raise HTTPException(status_code=409, detail=message)
+
+        endpoint_action = "book" if action == "book" else "unbook"
+        url = f"https://services.mywellness.com/core/calendarevent/{course_id}/{endpoint_action}?_c=de-DE"
+        payload = {
+            "partitionDate": course.get("partitionDate"),
+            "userId": config["user_id"],
+        }
+        headers = {"Content-Type": "application/json", "Authorization": config["token"]}
+        try:
+            with httpx.Client(timeout=8) as client:
+                response = client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json() if response.text else {}
+        except Exception as exc:
+            message = f"{'Buchung' if action == 'book' else 'Stornierung'} fehlgeschlagen: {exc}"
+            self._agent_log(message)
+            raise HTTPException(status_code=502, detail=message) from exc
+
+        errors = data.get("errors") if isinstance(data, dict) else None
+        if errors:
+            message = f"{'Buchung' if action == 'book' else 'Stornierung'} fehlgeschlagen: {errors}"
+            self._agent_log(message)
+            raise HTTPException(status_code=409, detail=message)
+
+        verb = "gebucht" if action == "book" else "storniert"
+        message = f"{course.get('title')} erfolgreich {verb}."
+        self._agent_log(message)
+        refreshed = self._upcoming_courses()
+        state = self._read_status()
+        state["upcoming_courses"] = refreshed
+        state["current_bookings"] = self._bookings_from_courses(refreshed)
+        state["last_error"] = None
+        self._write_status(state)
+        return {"ok": True, "message": message, "course": next((item for item in refreshed if item.get("id") == course_id), course)}
 
     def _fetch_courses(self) -> list[dict[str, Any]]:
         config = self._mywellness_config()
@@ -218,23 +309,90 @@ class MyWellnessService:
 
     def _normalize_course(self, item: dict[str, Any], target_date: str, desired: set[str]) -> dict[str, Any]:
         is_participant = bool(item.get("isParticipant"))
-        starts_at = (
-            item.get("startDateTime")
-            or item.get("dateStart")
-            or item.get("startTime")
-            or item.get("start")
-            or target_date
-        )
+        starts_at = self._course_start_time(item, target_date)
+        ends_at = self._course_end_time(item, starts_at)
+        available_slots = item.get("availablePlaces")
+        waiting_list = bool(item.get("bookingHasWaitingList") or item.get("isInWaitingList"))
+        status = self._course_status(item, is_participant, available_slots, waiting_list)
+        cancellable = self._is_cancellable(item, starts_at, is_participant)
         return {
             "id": str(item.get("id", "")),
+            "title": item.get("name", "Unbekannter Kurs"),
+            "studio": item.get("facilityName") or "",
+            "trainer": item.get("assignedTo"),
+            "startTime": starts_at,
+            "endTime": ends_at,
+            "availableSlots": available_slots,
+            "waitingList": waiting_list,
+            "booked": is_participant,
+            "bookable": bool(item.get("bookingAvailable")) and status in {"available", "waitlist"},
+            "cancellable": cancellable,
+            "status": status,
+            "category": item.get("calendarEventType") or item.get("eventTypeId"),
+            "partitionDate": str(item.get("partitionDate") or target_date),
+            "bookingUserStatus": item.get("bookingUserStatus"),
+            "room": item.get("room"),
             "name": item.get("name", "Unbekannter Kurs"),
             "starts_at": starts_at,
-            "ends_at": item.get("endDateTime") or item.get("dateEnd") or item.get("endTime"),
+            "ends_at": ends_at,
             "location": item.get("facilityName") or item.get("locationName") or item.get("roomName") or item.get("room"),
-            "booking_status": "booked" if is_participant else item.get("bookingStatus") or item.get("status") or ("found" if item.get("name") in desired else "available"),
+            "booking_status": status if status != "available" else ("found" if item.get("name") in desired else "available"),
             "is_desired": item.get("name") in desired,
             "is_participant": is_participant,
         }
+
+    def _course_start_time(self, item: dict[str, Any], target_date: str) -> str:
+        if item.get("startDateTime"):
+            return str(item["startDateTime"])
+        date_value = str(item.get("partitionDate") or item.get("dateStart") or target_date)
+        hour = int(item.get("startHour") or 0)
+        minute = int(item.get("startMinutes") or 0)
+        if re.fullmatch(r"\d{8}", date_value):
+            start = datetime(int(date_value[:4]), int(date_value[4:6]), int(date_value[6:8]), hour, minute)
+            return start.isoformat(timespec="minutes")
+        return date_value
+
+    def _course_end_time(self, item: dict[str, Any], starts_at: str) -> Optional[str]:
+        if item.get("endDateTime"):
+            return str(item["endDateTime"])
+        start = self._course_datetime(starts_at)
+        if not start:
+            return None
+        end = start.replace(hour=int(item.get("endHour") or start.hour), minute=int(item.get("endMinutes") or start.minute))
+        if end < start:
+            end += timedelta(days=1)
+        return end.isoformat(timespec="minutes")
+
+    def _course_status(self, item: dict[str, Any], booked: bool, available_slots: Any, waiting_list: bool) -> str:
+        if booked:
+            return "booked"
+        if item.get("isInWaitingList"):
+            return "waitlist"
+        if available_slots is not None and int(available_slots) <= 0:
+            return "waitlist" if waiting_list else "full"
+        if not item.get("bookingAvailable"):
+            return "full"
+        return "available"
+
+    def _is_cancellable(self, item: dict[str, Any], starts_at: str, booked: bool) -> bool:
+        if not booked:
+            return False
+        start = self._course_datetime(starts_at)
+        if not start:
+            return True
+        minutes = int(item.get("cancellationMinutesInAdvance") or 0)
+        return datetime.now() < start - timedelta(minutes=minutes)
+
+    def _course_datetime(self, value: Any, fallback_min: bool = False) -> datetime:
+        if not value:
+            return datetime.min if fallback_min else datetime.max
+        text = str(value)
+        if re.fullmatch(r"\d{8}", text):
+            return datetime(int(text[:4]), int(text[4:6]), int(text[6:8]))
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return datetime.min if fallback_min else datetime.max
 
     def _event_items(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         direct_items = data.get("data", {}).get("eventItems")
@@ -265,6 +423,18 @@ class MyWellnessService:
         return [
             {
                 "id": str(course_id),
+                "title": name,
+                "studio": "",
+                "trainer": None,
+                "startTime": data.get("target_date"),
+                "endTime": None,
+                "availableSlots": None,
+                "waitingList": None,
+                "booked": False,
+                "bookable": True,
+                "cancellable": False,
+                "status": "available",
+                "category": "cached",
                 "name": name,
                 "starts_at": data.get("target_date"),
                 "ends_at": None,
@@ -302,6 +472,17 @@ class MyWellnessService:
     def _booking_item(self, name: str, status: str) -> dict[str, Any]:
         return {
             "id": name,
+            "title": name,
+            "studio": "",
+            "trainer": None,
+            "startTime": None,
+            "endTime": None,
+            "availableSlots": None,
+            "waitingList": None,
+            "booked": status == "booked",
+            "bookable": False,
+            "cancellable": False,
+            "status": status,
             "name": name,
             "starts_at": None,
             "location": None,
@@ -332,6 +513,14 @@ class MyWellnessService:
         today = datetime.now()
         return [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(max(days, 0) + 1)]
 
+    def _agent_log(self, message: str) -> None:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        try:
+            with AGENT_LOG_FILE.open("a", encoding="utf-8") as log_file:
+                log_file.write(f"[{timestamp}] {message}\n")
+        except OSError:
+            pass
+
     def _next_scheduled_run(self) -> Optional[str]:
         config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
         schedule = config.get("schedule") or ["17:00:00", "20:59:58"]
@@ -353,28 +542,39 @@ class MyWellnessService:
 
     def _ensure_status(self) -> None:
         if not STATUS_FILE.exists():
-            self._write_status(
-                {
-                    "enabled": True,
-                    "is_running": False,
-                    "current_status": "idle",
-                    "last_successful_run": None,
-                    "next_scheduled_run": None,
-                    "last_error": None,
-                    "available_courses": [],
-                    "current_bookings": [],
-                }
-            )
+            self._write_status(self._default_status())
 
     def _read_status(self) -> dict[str, Any]:
         self._ensure_status()
         try:
             return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
-            return {"enabled": True, "is_running": False, "current_status": "error", "last_error": "Statusdatei ist defekt."}
+            broken_path = STATUS_FILE.with_suffix(f".broken-{datetime.now().strftime('%Y%m%d%H%M%S')}.json")
+            try:
+                STATUS_FILE.replace(broken_path)
+            except OSError:
+                pass
+            state = self._default_status()
+            state["last_error"] = "Statusdatei war defekt und wurde neu initialisiert."
+            self._write_status(state)
+            self._agent_log(state["last_error"])
+            return state
 
     def _write_status(self, state: dict[str, Any]) -> None:
         STATUS_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _default_status(self) -> dict[str, Any]:
+        return {
+            "enabled": True,
+            "is_running": False,
+            "current_status": "idle",
+            "last_successful_run": None,
+            "next_scheduled_run": None,
+            "last_error": None,
+            "available_courses": [],
+            "current_bookings": [],
+            "upcoming_courses": [],
+        }
 
     def _output_has_error(self, output: str) -> bool:
         return bool(re.search(r"\b(Fehler|Traceback|Exception|Error)\b", output or "", re.IGNORECASE))

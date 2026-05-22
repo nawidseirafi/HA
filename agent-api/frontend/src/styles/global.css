@@ -743,6 +743,7 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .mywellness-status,
+.upcoming-courses-panel,
 .logs-panel {
   grid-column: 1 / -1;
 }
@@ -784,12 +785,14 @@ p { color: var(--muted); line-height: 1.65; }
 
 .agent-state-pill.waiting,
 .booking-pill.cached,
-.booking-pill.found {
+.booking-pill.found,
+.booking-pill.waitlist {
   color: #ffd98a;
   background: rgba(251, 191, 36, 0.13);
 }
 
-.agent-state-pill.error {
+.agent-state-pill.error,
+.booking-pill.full {
   color: #ff9aaa;
   background: rgba(251, 113, 133, 0.13);
 }
@@ -828,6 +831,41 @@ p { color: var(--muted); line-height: 1.65; }
   gap: 14px;
 }
 
+.control-courses {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.control-course-list {
+  display: grid;
+  gap: 8px;
+}
+
+.control-course-row {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+}
+
+.control-course-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-course-row span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .course-list {
   display: grid;
   gap: 10px;
@@ -861,6 +899,79 @@ p { color: var(--muted); line-height: 1.65; }
   align-items: center;
   gap: 5px;
   min-width: 0;
+}
+
+.course-filters {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+}
+
+.course-filters button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.course-filters button.active,
+.course-filters button:hover {
+  color: var(--ink);
+  background: rgba(77, 141, 255, 0.18);
+}
+
+.upcoming-course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.upcoming-course-card {
+  min-height: 190px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+}
+
+.course-card-main {
+  display: grid;
+  gap: 12px;
+}
+
+.course-card-main h3 {
+  margin-top: 10px;
+  font-size: 1.05rem;
+}
+
+.course-card-meta {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.course-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.success-panel {
+  color: #9af0c9;
+  border-color: rgba(52, 211, 153, 0.26);
+  background:
+    linear-gradient(145deg, rgba(52, 211, 153, 0.11), rgba(255,255,255,0.025)),
+    var(--surface);
 }
 
 .logs-panel pre {
