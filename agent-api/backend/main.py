@@ -62,6 +62,20 @@ app.include_router(settings_router)
 app.include_router(market_router)
 
 
+@app.on_event("startup")
+def start_schedulers() -> None:
+    from backend.api.mywellness_routes import mywellness_service
+
+    mywellness_service.start_scheduler()
+
+
+@app.on_event("shutdown")
+def stop_schedulers() -> None:
+    from backend.api.mywellness_routes import mywellness_service
+
+    mywellness_service.stop_scheduler()
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}

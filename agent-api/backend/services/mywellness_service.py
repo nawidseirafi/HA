@@ -1,9 +1,11 @@
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import threading
+import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -26,6 +28,8 @@ if str(AI_AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AI_AGENT_DIR))
 
 from core.mywellness_store import list_prepared_courses, replace_live_courses
+
+DB_PATH = AI_AGENT_DIR / "data" / "mywellness" / "mywellness.db"
 
 
 def utc_now() -> str:
@@ -69,15 +73,32 @@ class MyWellnessService:
         STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
         self.process: Optional[subprocess.Popen[str]] = None
         self.lock = threading.Lock()
+        self.run_lock = threading.Lock()
+        self.scheduler_stop = threading.Event()
+        self.scheduler_thread: Optional[threading.Thread] = None
+        self._ensure_schema()
         self._ensure_status()
 
     def status(self) -> dict[str, Any]:
+        settings = self._settings()
         state = self._read_status()
         running = self._is_running()
         state["is_running"] = running
         state["current_status"] = "running" if running else state.get("current_status", "idle")
         if not running and state.get("current_status") == "error" and not state.get("last_error"):
             state["current_status"] = "idle"
+        state["enabled"] = bool(settings["enabled"])
+        state["prepare_enabled"] = bool(settings["prepare_enabled"])
+        state["booking_enabled"] = bool(settings["booking_enabled"])
+        state["last_prepare_run"] = settings["last_prepare_run"]
+        state["last_booking_run"] = settings["last_booking_run"]
+        state["last_status"] = settings["last_status"]
+        state["prepare_time"] = settings["prepare_time"]
+        state["booking_time"] = settings["booking_time"]
+        state["days"] = settings["days"]
+        state["desired_courses"] = settings["desired_courses"]
+        state["last_error"] = settings["last_error"] or state.get("last_error")
+        state["updated_at"] = settings["updated_at"]
         state["next_scheduled_run"] = self._next_scheduled_run() if state.get("enabled", True) else None
         if not running and state.get("current_status") == "running":
             state["current_status"] = "idle"
@@ -85,44 +106,59 @@ class MyWellnessService:
         return state
 
     def start(self, mode: str = "prepare") -> dict[str, Any]:
+        return self.run_action(mode, dry_run=False, async_run=True)
+
+    def run_action(self, action_type: str, dry_run: bool = False, async_run: bool = False) -> dict[str, Any]:
+        action_type = action_type if action_type in {"prepare", "book"} else "prepare"
+        if async_run:
+            return self._start_async(action_type, dry_run=dry_run)
+        result = self._run_subprocess(action_type, dry_run=dry_run)
+        return {"result": result, "status": self.status()}
+
+    def _start_async(self, mode: str, dry_run: bool = False) -> dict[str, Any]:
         mode = mode if mode in {"prepare", "book"} else "prepare"
         with self.lock:
             state = self._read_status()
-            if not state.get("enabled", True):
-                state["enabled"] = True
+            settings = self._settings()
+            if not settings["enabled"]:
+                self._write_settings(enabled=True, last_status="enabled")
             if self._is_running():
                 return self.status()
             if not AGENT_SCRIPT.exists():
                 raise HTTPException(status_code=500, detail="MyWellness-Agent wurde nicht gefunden.")
 
+            started_at = utc_now()
             state.update(
                 {
                     "is_running": True,
                     "current_status": "running",
-                    "last_started_at": utc_now(),
+                    "last_started_at": started_at,
                     "last_mode": mode,
                     "last_error": None,
                 }
             )
+            self._insert_log(mode, "running", f"{mode} gestartet.")
+            self._write_settings(last_status="running", last_error=None)
             self._write_status(state)
 
             env = os.environ.copy()
             env["PYTHONPATH"] = str(AI_AGENT_DIR)
+            command = self._command(mode, dry_run=dry_run)
             self.process = subprocess.Popen(
-                [sys.executable, str(AGENT_SCRIPT), mode],
+                command,
                 cwd=AI_AGENT_DIR,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
             )
-            threading.Thread(target=self._watch_process, args=(self.process, mode), daemon=True).start()
+            threading.Thread(target=self._watch_process, args=(self.process, mode, started_at), daemon=True).start()
         return self.status()
 
     def stop(self) -> dict[str, Any]:
         with self.lock:
             state = self._read_status()
-            state["enabled"] = False
+            self._write_settings(enabled=False, last_status="disabled")
             state["current_status"] = "stopped"
             if self._is_running() and self.process:
                 self.process.terminate()
@@ -133,17 +169,55 @@ class MyWellnessService:
                 state["last_stopped_at"] = utc_now()
             state["is_running"] = False
             self._write_status(state)
+            self._insert_log("toggle", "ok", "MyWellnessAgent deaktiviert.")
+        return self.status()
+
+    def enable(self) -> dict[str, Any]:
+        self._write_settings(enabled=True, last_status="enabled", last_error=None)
+        self._insert_log("toggle", "ok", "MyWellnessAgent aktiviert.")
+        return self.status()
+
+    def disable(self) -> dict[str, Any]:
+        return self.stop()
+
+    def toggle(self) -> dict[str, Any]:
+        return self.disable() if self._settings()["enabled"] else self.enable()
+
+    def update_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        for field in ("enabled", "prepare_enabled", "booking_enabled"):
+            if field in payload:
+                updates[field] = bool(payload[field])
+        if "prepare_time" in payload:
+            updates["prepare_time"] = self._normalize_time_string(payload["prepare_time"], "prepare_time")
+        if "booking_time" in payload:
+            updates["booking_time"] = self._normalize_time_string(payload["booking_time"], "booking_time")
+        if "days" in payload:
+            days = int(payload["days"])
+            if days < 0 or days > 14:
+                raise HTTPException(status_code=400, detail="days muss zwischen 0 und 14 liegen.")
+            updates["days"] = days
+        if "desired_courses" in payload:
+            courses = payload["desired_courses"]
+            if not isinstance(courses, list):
+                raise HTTPException(status_code=400, detail="desired_courses muss eine Liste sein.")
+            cleaned = [str(course).strip() for course in courses if str(course).strip()]
+            updates["desired_courses"] = cleaned
+        if updates:
+            self._write_settings(**updates, last_status="configured", last_error=None)
+            self._insert_log("settings", "ok", "MyWellness Einstellungen aktualisiert.")
         return self.status()
 
     def logs(self, limit: int = 200) -> dict[str, Any]:
         limit = min(max(limit, 1), 1000)
+        db_logs = self._logs(limit=limit)
         lines: list[str] = []
         if AGENT_LOG_FILE.exists():
             lines = AGENT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
         state = self._read_status()
         if state.get("last_output"):
             lines.extend(str(state["last_output"]).splitlines()[-40:])
-        return {"logs": lines[-limit:]}
+        return {"items": db_logs, "logs": lines[-limit:]}
 
     def courses(self) -> dict[str, Any]:
         state = self._read_status()
@@ -191,10 +265,12 @@ class MyWellnessService:
     def cancel_course(self, course_id: str) -> dict[str, Any]:
         return self._change_booking(course_id=course_id, action="cancel")
 
-    def _watch_process(self, process: subprocess.Popen[str], mode: str) -> None:
+    def _watch_process(self, process: subprocess.Popen[str], mode: str, started_at: str) -> None:
+        start_time = time_module.monotonic()
         output, _ = process.communicate()
         state = self._read_status()
         has_error = process.returncode not in (0, None) or self._output_has_error(output)
+        duration = time_module.monotonic() - start_time
         state["is_running"] = False
         state["last_finished_at"] = utc_now()
         state["last_output"] = output[-8000:] if output else ""
@@ -205,7 +281,125 @@ class MyWellnessService:
         if mode == "book":
             bookings = self._bookings_from_courses(state.get("available_courses", []))
             state["current_bookings"] = bookings or self._bookings_from_output(output)
+        status = "error" if has_error else "ok"
+        message = state["last_error"] if has_error else f"{mode} abgeschlossen in {duration:.1f}s."
+        self._record_action_result(mode, status, message or "", duration, started_at)
         self._write_status(state)
+
+    def _run_subprocess(self, action_type: str, dry_run: bool = False) -> dict[str, Any]:
+        if not self.run_lock.acquire(blocking=False):
+            message = "Uebersprungen, MyWellnessAgent laeuft bereits."
+            self._insert_log(action_type, "skipped", message)
+            return {
+                "action_type": action_type,
+                "status": "skipped",
+                "message": message,
+                "duration_seconds": 0,
+                "returncode": None,
+                "dry_run": dry_run,
+            }
+        started_at = utc_now()
+        start_time = time_module.monotonic()
+        try:
+            self._insert_log(action_type, "running", f"{action_type} gestartet.")
+            self._write_settings(last_status="running", last_error=None)
+            if dry_run:
+                duration = time_module.monotonic() - start_time
+                message = f"Dry Run: {action_type} wuerde ausgefuehrt."
+                self._record_action_result(action_type, "ok", message, duration, started_at)
+                return {
+                    "action_type": action_type,
+                    "status": "ok",
+                    "message": message,
+                    "duration_seconds": round(duration, 2),
+                    "returncode": 0,
+                    "dry_run": True,
+                }
+            if not AGENT_SCRIPT.exists():
+                raise FileNotFoundError("MyWellness-Agent wurde nicht gefunden.")
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(AI_AGENT_DIR)
+            result = subprocess.run(
+                self._command(action_type, dry_run=dry_run),
+                cwd=AI_AGENT_DIR,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+            has_error = result.returncode != 0 or self._output_has_error(output)
+            status = "error" if has_error else "ok"
+            message = self._extract_error(output) if has_error else f"{action_type} abgeschlossen."
+            duration = time_module.monotonic() - start_time
+            self._record_action_result(action_type, status, message or "", duration, started_at)
+            if output:
+                self._agent_log(output[-2000:])
+            return {
+                "action_type": action_type,
+                "status": status,
+                "message": message,
+                "duration_seconds": round(duration, 2),
+                "returncode": result.returncode,
+                "dry_run": dry_run,
+            }
+        except Exception as exc:
+            duration = time_module.monotonic() - start_time
+            message = str(exc)
+            self._record_action_result(action_type, "error", message, duration, started_at)
+            return {
+                "action_type": action_type,
+                "status": "error",
+                "message": message,
+                "duration_seconds": round(duration, 2),
+                "returncode": None,
+                "dry_run": dry_run,
+            }
+        finally:
+            self.run_lock.release()
+
+    def start_scheduler(self) -> None:
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            return
+        self.scheduler_stop.clear()
+        self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
+        self.scheduler_thread.start()
+        self._insert_log("scheduler", "ok", "MyWellness scheduler gestartet.")
+
+    def stop_scheduler(self) -> None:
+        self.scheduler_stop.set()
+
+    def _scheduler_loop(self) -> None:
+        last_run: dict[str, str] = {}
+        while not self.scheduler_stop.is_set():
+            now = datetime.now().astimezone()
+            settings = self._settings()
+            for action_type, run_time, enabled_key in self._scheduled_actions(now):
+                run_key = f"{action_type}:{now.date().isoformat()}"
+                if not settings["enabled"] or not settings[enabled_key] or run_key in last_run:
+                    continue
+                scheduled_at = datetime.combine(now.date(), run_time, tzinfo=now.tzinfo)
+                seconds_from_schedule = (now - scheduled_at).total_seconds()
+                if 0 <= seconds_from_schedule < 2:
+                    last_run[run_key] = utc_now()
+                    if not self._is_running():
+                        threading.Thread(target=self._run_subprocess, args=(action_type,), daemon=True).start()
+                    else:
+                        self._insert_log(action_type, "skipped", "Uebersprungen, Agent laeuft bereits.")
+            self.scheduler_stop.wait(1)
+
+    def _scheduled_actions(self, now: datetime) -> list[tuple[str, time, str]]:
+        settings = self._settings()
+        prepare = self._parse_time(settings.get("prepare_time"), time(17, 0, 0))
+        book = self._parse_time(settings.get("booking_time"), time(20, 59, 58))
+        return [("prepare", prepare, "prepare_enabled"), ("book", book, "booking_enabled")]
+
+    def _command(self, action_type: str, dry_run: bool = False) -> list[str]:
+        python = PROJECT_DIR / "venv" / "bin" / "python"
+        command = [str(python if python.exists() else sys.executable), str(AGENT_SCRIPT), action_type]
+        if dry_run:
+            command.append("--dry-run")
+        return command
 
     def _refresh_courses_state(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         courses = self._fetch_courses()
@@ -504,6 +698,7 @@ class MyWellnessService:
         env_values = read_env_file(AI_AGENT_DIR / ".env")
         api_config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
         ai_config = read_yaml(AI_CONFIG_PATH).get("myWelness_agent", {})
+        settings = self._settings()
         token = resolve_secret(api_config.get("token_env"), env_values) or resolve_secret(ai_config.get("token"), env_values)
         user_id = resolve_secret(api_config.get("user_id_env"), env_values) or resolve_secret(ai_config.get("user_id"), env_values)
         facility_id = resolve_secret(api_config.get("facility_id_env"), env_values) or resolve_secret(ai_config.get("facility_id"), env_values)
@@ -511,8 +706,8 @@ class MyWellnessService:
             "token": token,
             "user_id": user_id,
             "facility_id": facility_id,
-            "desired_courses": api_config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"],
-            "days": int(api_config.get("days", 2)),
+            "desired_courses": settings.get("desired_courses") or api_config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"],
+            "days": int(settings.get("days") or api_config.get("days", 2)),
         }
 
     def _dates(self) -> tuple[str, str]:
@@ -532,24 +727,236 @@ class MyWellnessService:
         except OSError:
             pass
 
+    def _connect(self) -> sqlite3.Connection:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(DB_PATH)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                create table if not exists mywellness_settings (
+                    id integer primary key check (id = 1),
+                    enabled integer not null default 1,
+                    prepare_enabled integer not null default 1,
+                    booking_enabled integer not null default 1,
+                    prepare_time text not null default '17:00:00',
+                    booking_time text not null default '20:59:58',
+                    days integer not null default 2,
+                    desired_courses text not null default '[]',
+                    last_prepare_run text,
+                    last_booking_run text,
+                    last_status text not null default 'idle',
+                    last_error text,
+                    updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists mywellness_logs (
+                    id integer primary key autoincrement,
+                    action_type text not null,
+                    status text not null,
+                    message text not null default '',
+                    duration_seconds real,
+                    created_at text not null
+                )
+                """
+            )
+            existing_columns = {row["name"] for row in connection.execute("pragma table_info(mywellness_settings)").fetchall()}
+            extra_columns = {
+                "prepare_time": "text not null default '17:00:00'",
+                "booking_time": "text not null default '20:59:58'",
+                "days": "integer not null default 2",
+                "desired_courses": "text not null default '[]'",
+            }
+            for column, definition in extra_columns.items():
+                if column not in existing_columns:
+                    connection.execute(f"alter table mywellness_settings add column {column} {definition}")
+            connection.execute(
+                """
+                insert or ignore into mywellness_settings
+                (id, enabled, prepare_enabled, booking_enabled, prepare_time, booking_time, days, desired_courses, last_status, updated_at)
+                values (1, 1, 1, 1, ?, ?, ?, ?, 'idle', ?)
+                """,
+                (
+                    self._config_schedule()[0],
+                    self._config_schedule()[1],
+                    self._config_days(),
+                    json.dumps(self._config_desired_courses(), ensure_ascii=False),
+                    utc_now(),
+                ),
+            )
+            connection.execute(
+                """
+                update mywellness_settings
+                set prepare_time = coalesce(nullif(prepare_time, ''), ?),
+                    booking_time = coalesce(nullif(booking_time, ''), ?),
+                    days = coalesce(days, ?),
+                    desired_courses = case when desired_courses is null or desired_courses = '[]' then ? else desired_courses end
+                where id = 1
+                """,
+                (
+                    self._config_schedule()[0],
+                    self._config_schedule()[1],
+                    self._config_days(),
+                    json.dumps(self._config_desired_courses(), ensure_ascii=False),
+                ),
+            )
+            connection.commit()
+
+    def _settings(self) -> dict[str, Any]:
+        self._ensure_schema()
+        with self._connect() as connection:
+            row = connection.execute("select * from mywellness_settings where id = 1").fetchone()
+        if row is None:
+            return {
+                "enabled": True,
+                "prepare_enabled": True,
+                "booking_enabled": True,
+                "prepare_time": "17:00:00",
+                "booking_time": "20:59:58",
+                "days": 2,
+                "desired_courses": [],
+                "last_prepare_run": None,
+                "last_booking_run": None,
+                "last_status": "idle",
+                "last_error": None,
+                "updated_at": utc_now(),
+            }
+        item = dict(row)
+        item["enabled"] = bool(item["enabled"])
+        item["prepare_enabled"] = bool(item["prepare_enabled"])
+        item["booking_enabled"] = bool(item["booking_enabled"])
+        item["days"] = int(item.get("days") or 2)
+        try:
+            item["desired_courses"] = json.loads(item.get("desired_courses") or "[]")
+        except json.JSONDecodeError:
+            item["desired_courses"] = []
+        return item
+
+    def _write_settings(self, **values: Any) -> None:
+        allowed = {
+            "enabled",
+            "prepare_enabled",
+            "booking_enabled",
+            "prepare_time",
+            "booking_time",
+            "days",
+            "desired_courses",
+            "last_prepare_run",
+            "last_booking_run",
+            "last_status",
+            "last_error",
+        }
+        fields = [field for field in values if field in allowed]
+        if not fields:
+            return
+        assignments = ", ".join(f"{field} = ?" for field in fields)
+        params = [self._setting_value(values[field]) for field in fields]
+        params.extend([utc_now(), 1])
+        with self._connect() as connection:
+            connection.execute(
+                f"update mywellness_settings set {assignments}, updated_at = ? where id = ?",
+                tuple(params),
+            )
+            connection.commit()
+
+    def _setting_value(self, value: Any) -> Any:
+        if isinstance(value, bool):
+            return 1 if value else 0
+        if isinstance(value, list):
+            return json.dumps(value, ensure_ascii=False)
+        return value
+
+    def _insert_log(self, action_type: str, status: str, message: str, duration_seconds: float | None = None) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                insert into mywellness_logs (action_type, status, message, duration_seconds, created_at)
+                values (?, ?, ?, ?, ?)
+                """,
+                (action_type, status, message[-2000:], duration_seconds, utc_now()),
+            )
+            connection.commit()
+
+    def _logs(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "select * from mywellness_logs order by created_at desc, id desc limit ?",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def _record_action_result(self, action_type: str, status: str, message: str, duration: float, started_at: str) -> None:
+        updates: dict[str, Any] = {
+            "last_status": status,
+            "last_error": message if status == "error" else None,
+        }
+        if action_type == "prepare":
+            updates["last_prepare_run"] = started_at
+        if action_type == "book":
+            updates["last_booking_run"] = started_at
+        self._write_settings(**updates)
+        self._insert_log(action_type, status, f"{message} Laufzeit: {duration:.1f}s", duration_seconds=duration)
+
     def _next_scheduled_run(self) -> Optional[str]:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
-        schedule = config.get("schedule") or ["17:00:00", "20:59:58"]
         now = datetime.now().astimezone()
+        settings = self._settings()
         candidates = []
-        for item in schedule:
-            try:
-                hour, minute, second = [int(part) for part in str(item).split(":")]
-                run_time = datetime.combine(now.date(), time(hour, minute, second), tzinfo=now.tzinfo)
-                if run_time <= now:
-                    run_time += timedelta(days=1)
-                candidates.append(run_time)
-            except ValueError:
+        for _action_type, item, enabled_key in self._scheduled_actions(now):
+            if not settings[enabled_key]:
                 continue
+            run_time = datetime.combine(now.date(), item, tzinfo=now.tzinfo)
+            if run_time <= now:
+                run_time += timedelta(days=1)
+            candidates.append(run_time)
         return min(candidates).isoformat(timespec="seconds") if candidates else None
 
+    def _parse_time(self, value: Any, default: time) -> time:
+        try:
+            parts = [int(part) for part in str(value).split(":")]
+            if len(parts) == 2:
+                parts.append(0)
+            return time(parts[0], parts[1], parts[2])
+        except (TypeError, ValueError, IndexError):
+            return default
+
+    def _normalize_time_string(self, value: Any, field_name: str) -> str:
+        parts = str(value).strip().split(":")
+        if len(parts) == 2:
+            parts.append("0")
+        if len(parts) != 3:
+            raise HTTPException(status_code=400, detail=f"{field_name} muss HH:MM oder HH:MM:SS sein.")
+        try:
+            hour, minute, second = [int(part) for part in parts]
+            parsed = time(hour, minute, second)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"{field_name} ist ungueltig.") from exc
+        return parsed.isoformat()
+
+    def _config_schedule(self) -> list[str]:
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        schedule = config.get("schedule") or ["17:00:00", "20:59:58"]
+        return [
+            self._normalize_time_string(schedule[0] if len(schedule) > 0 else "17:00:00", "prepare_time"),
+            self._normalize_time_string(schedule[1] if len(schedule) > 1 else "20:59:58", "booking_time"),
+        ]
+
+    def _config_days(self) -> int:
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        return int(config.get("days", 2) or 2)
+
+    def _config_desired_courses(self) -> list[str]:
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        courses = config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"]
+        return [str(course).strip() for course in courses if str(course).strip()]
+
     def _is_running(self) -> bool:
-        return self.process is not None and self.process.poll() is None
+        return self.run_lock.locked() or (self.process is not None and self.process.poll() is None)
 
     def _ensure_status(self) -> None:
         if not STATUS_FILE.exists():

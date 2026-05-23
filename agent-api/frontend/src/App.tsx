@@ -7,7 +7,10 @@ import { InvoiceDetailPage } from './pages/InvoiceDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
-import { MyWellnessPage } from './pages/MyWellnessPage';
+import { MyWellnessDashboardPage } from './pages/MyWellnessDashboardPage';
+import { MyWellnessCoursesPage } from './pages/MyWellnessCoursesPage';
+import { MyWellnessBookingsPage } from './pages/MyWellnessBookingsPage';
+import { MyWellnessHistoryPage } from './pages/MyWellnessHistoryPage';
 import { MarketDashboardPage } from './pages/MarketDashboardPage';
 import { MarketReportsPage } from './pages/MarketReportsPage';
 import { MarketSymbolPage } from './pages/MarketSymbolPage';
@@ -17,7 +20,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 export type Route =
   | { name: 'agents' }
-  | { name: 'mywellness' }
+  | { name: 'mywellnessDashboard' }
+  | { name: 'mywellnessCourses' }
+  | { name: 'mywellnessBookings' }
+  | { name: 'mywellnessHistory' }
   | { name: 'marketDashboard' }
   | { name: 'marketWatchlist' }
   | { name: 'marketReports' }
@@ -50,7 +56,10 @@ function parseRoute(): Route {
   if (parts[0] === 'market') return { name: 'marketDashboard' };
   if (parts[0] === 'years') return { name: 'years' };
   if (parts[0] === 'agents') return { name: 'agents' };
-  if (parts[0] === 'mywellness') return { name: 'mywellness' };
+  if (parts[0] === 'mywellness' && parts[1] === 'courses') return { name: 'mywellnessCourses' };
+  if (parts[0] === 'mywellness' && parts[1] === 'bookings') return { name: 'mywellnessBookings' };
+  if (parts[0] === 'mywellness' && parts[1] === 'history') return { name: 'mywellnessHistory' };
+  if (parts[0] === 'mywellness') return { name: 'mywellnessDashboard' };
   return { name: 'invoiceDashboard' };
 }
 
@@ -80,7 +89,10 @@ function AppContent() {
 
   const page = useMemo(() => {
     if (route.name === 'agents') return <AgentsPage navigate={navigate} />;
-    if (route.name === 'mywellness') return <MyWellnessPage />;
+    if (route.name === 'mywellnessDashboard') return <MyWellnessDashboardPage navigate={navigate} />;
+    if (route.name === 'mywellnessCourses') return <MyWellnessCoursesPage navigate={navigate} />;
+    if (route.name === 'mywellnessBookings') return <MyWellnessBookingsPage navigate={navigate} />;
+    if (route.name === 'mywellnessHistory') return <MyWellnessHistoryPage navigate={navigate} />;
     if (route.name === 'marketDashboard') return <MarketDashboardPage navigate={navigate} />;
     if (route.name === 'marketWatchlist') return <MarketWatchlistPage navigate={navigate} />;
     if (route.name === 'marketReports') return <MarketReportsPage navigate={navigate} />;
@@ -106,7 +118,10 @@ function AppContent() {
 
 function routeToPath(route: Route) {
   if (route.name === 'agents') return '/agents';
-  if (route.name === 'mywellness') return '/mywellness';
+  if (route.name === 'mywellnessDashboard') return '/mywellness';
+  if (route.name === 'mywellnessCourses') return '/mywellness/courses';
+  if (route.name === 'mywellnessBookings') return '/mywellness/bookings';
+  if (route.name === 'mywellnessHistory') return '/mywellness/history';
   if (route.name === 'marketDashboard') return '/market';
   if (route.name === 'marketWatchlist') return '/market/watchlist';
   if (route.name === 'marketReports') return '/market/reports';

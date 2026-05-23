@@ -18,6 +18,20 @@ class CourseActionPayload(BaseModel):
     courseId: str
 
 
+class RunPayload(BaseModel):
+    dry_run: bool = False
+
+
+class SettingsPayload(BaseModel):
+    enabled: Optional[bool] = None
+    prepare_enabled: Optional[bool] = None
+    booking_enabled: Optional[bool] = None
+    prepare_time: Optional[str] = None
+    booking_time: Optional[str] = None
+    days: Optional[int] = None
+    desired_courses: Optional[list[str]] = None
+
+
 @router.get("/api/agent/status")
 def agent_status():
     return mywellness_service.status()
@@ -32,6 +46,42 @@ def start_agent(payload: StartAgentPayload | None = None):
 @router.post("/api/agent/stop")
 def stop_agent():
     return mywellness_service.stop()
+
+
+@router.get("/api/mywellness/status")
+def mywellness_status():
+    return mywellness_service.status()
+
+
+@router.post("/api/mywellness/run/prepare")
+def mywellness_run_prepare(payload: RunPayload | None = None):
+    return mywellness_service.run_action("prepare", dry_run=payload.dry_run if payload else False)
+
+
+@router.post("/api/mywellness/run/book")
+def mywellness_run_book(payload: RunPayload | None = None):
+    return mywellness_service.run_action("book", dry_run=payload.dry_run if payload else False)
+
+
+@router.post("/api/mywellness/enable")
+def mywellness_enable():
+    return mywellness_service.enable()
+
+
+@router.post("/api/mywellness/disable")
+def mywellness_disable():
+    return mywellness_service.disable()
+
+
+@router.post("/api/mywellness/toggle")
+def mywellness_toggle():
+    return mywellness_service.toggle()
+
+
+@router.put("/api/mywellness/settings")
+def mywellness_update_settings(payload: SettingsPayload):
+    data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    return mywellness_service.update_settings(data)
 
 
 @router.get("/api/mywellness/courses")

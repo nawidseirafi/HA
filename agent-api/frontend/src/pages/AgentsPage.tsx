@@ -32,7 +32,7 @@ export function AgentsPage({ navigate }: Props) {
           </div>
         </button>
 
-        <button className="agent-card active-agent" onClick={() => navigate({ name: 'mywellness' })}>
+        <button className="agent-card active-agent" onClick={() => navigate({ name: 'mywellnessDashboard' })}>
           <div className="agent-icon"><Dumbbell size={24} /></div>
           <div>
             <span className="eyebrow">Aktiv</span>

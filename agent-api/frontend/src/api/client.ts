@@ -28,14 +28,42 @@ export function clearAuthToken() {
 
 export type AgentStatus = {
   enabled: boolean;
+  prepare_enabled?: boolean;
+  booking_enabled?: boolean;
+  prepare_time?: string;
+  booking_time?: string;
+  days?: number;
+  desired_courses?: string[];
   is_running: boolean;
   current_status: string;
+  last_status?: string;
   last_successful_run: string | null;
+  last_prepare_run?: string | null;
+  last_booking_run?: string | null;
   next_scheduled_run: string | null;
   last_error: string | null;
   last_started_at?: string | null;
   last_finished_at?: string | null;
   last_mode?: 'prepare' | 'book';
+};
+
+export type MyWellnessSettingsPayload = {
+  enabled?: boolean;
+  prepare_enabled?: boolean;
+  booking_enabled?: boolean;
+  prepare_time?: string;
+  booking_time?: string;
+  days?: number;
+  desired_courses?: string[];
+};
+
+export type MyWellnessLog = {
+  id: number;
+  action_type: string;
+  status: string;
+  message: string;
+  duration_seconds?: number | null;
+  created_at: string;
 };
 
 export type CourseStatus = 'available' | 'booked' | 'full' | 'waitlist';
@@ -270,10 +298,19 @@ export const api = {
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
   runAgent: () => request('/api/invoices/run', { method: 'POST' }),
-  mywellnessStatus: () => request<AgentStatus>('/api/agent/status'),
+  mywellnessStatus: () => request<AgentStatus>('/api/mywellness/status'),
   startMywellnessAgent: (mode: 'prepare' | 'book' = 'prepare') =>
     request<AgentStatus>('/api/agent/start', { method: 'POST', body: JSON.stringify({ mode }) }),
   stopMywellnessAgent: () => request<AgentStatus>('/api/agent/stop', { method: 'POST' }),
+  enableMywellnessAgent: () => request<AgentStatus>('/api/mywellness/enable', { method: 'POST' }),
+  disableMywellnessAgent: () => request<AgentStatus>('/api/mywellness/disable', { method: 'POST' }),
+  toggleMywellnessAgent: () => request<AgentStatus>('/api/mywellness/toggle', { method: 'POST' }),
+  updateMywellnessSettings: (payload: MyWellnessSettingsPayload) =>
+    request<AgentStatus>('/api/mywellness/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  runMywellnessPrepare: (dryRun = false) =>
+    request<{ result: unknown; status: AgentStatus }>('/api/mywellness/run/prepare', { method: 'POST', body: JSON.stringify({ dry_run: dryRun }) }),
+  runMywellnessBook: (dryRun = false) =>
+    request<{ result: unknown; status: AgentStatus }>('/api/mywellness/run/book', { method: 'POST', body: JSON.stringify({ dry_run: dryRun }) }),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
   mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
   mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,
@@ -281,7 +318,7 @@ export const api = {
     request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/book', { method: 'POST', body: JSON.stringify({ courseId }) }),
   cancelMywellnessCourse: (courseId: string) =>
     request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/cancel', { method: 'POST', body: JSON.stringify({ courseId }) }),
-  mywellnessLogs: async () => (await request<{ logs: string[] }>('/api/mywellness/logs')).logs,
+  mywellnessLogs: async () => request<{ items?: MyWellnessLog[]; logs: string[] }>('/api/mywellness/logs'),
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);

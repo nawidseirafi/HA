@@ -16,7 +16,8 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const isMarketArea = route.name === 'marketDashboard' || route.name === 'marketWatchlist' || route.name === 'marketReports' || route.name === 'marketSymbol';
-  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || route.name === 'mywellness' || isMarketArea;
+  const isMyWellnessArea = route.name === 'mywellnessDashboard' || route.name === 'mywellnessCourses' || route.name === 'mywellnessBookings' || route.name === 'mywellnessHistory';
+  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || isMyWellnessArea || isMarketArea;
 
   const runAgent = async () => {
     setBusy(true);
@@ -54,10 +55,21 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
         <button className={route.name === 'agents' ? 'active' : ''} onClick={() => navigate({ name: 'agents' })}>
           <Bot size={18} /> Agenten
         </button>
-        {route.name === 'mywellness' && (
-          <button className="active" onClick={() => navigate({ name: 'mywellness' })}>
-            <Dumbbell size={18} /> MyWellness
-          </button>
+        {isMyWellnessArea && (
+          <>
+            <button className={route.name === 'mywellnessDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessDashboard' })}>
+              <Dumbbell size={18} /> Dashboard
+            </button>
+            <button className={route.name === 'mywellnessCourses' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessCourses' })}>
+              <CalendarDays size={18} /> Kurse
+            </button>
+            <button className={route.name === 'mywellnessBookings' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessBookings' })}>
+              <ListChecks size={18} /> Buchungen
+            </button>
+            <button className={route.name === 'mywellnessHistory' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessHistory' })}>
+              <BarChart3 size={18} /> Verlauf
+            </button>
+          </>
         )}
         {isMarketArea && (
           <>
