@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MarketReport, MarketSignal } from '../api/client';
-import { api } from '../api/client';
-import type { Route } from '../App';
-import { MarketReportCard } from '../components/market/MarketReportCard';
+import type { MarketReport, MarketSignal } from '../../api/client';
+import { api } from '../../api/client';
+import type { Route } from '../../App';
+import { MarketReportCard } from '../../components/market/MarketReportCard';
 
 export function MarketReportsPage({ navigate }: { navigate: (route: Route) => void }) {
   const [reports, setReports] = useState<MarketReport[]>([]);

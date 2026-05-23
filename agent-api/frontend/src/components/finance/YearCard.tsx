@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays } from 'lucide-react';
-import type { YearSummary } from '../types/invoice';
-import { currency } from '../lib/format';
+import type { YearSummary } from '../../types/invoice';
+import { currency } from '../../lib/format';
 
 export function YearCard({ year, onOpen }: { year: YearSummary; onOpen: () => void }) {
   return (

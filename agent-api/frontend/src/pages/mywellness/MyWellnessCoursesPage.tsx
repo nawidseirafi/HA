@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Settings } from 'lucide-react';
-import type { Route } from '../App';
-import { api, type AgentStatus, type Course, type MyWellnessSettingsPayload } from '../api/client';
-import { WellnessCourseGrid } from '../components/mywellness/WellnessCourseGrid';
-import { WellnessDaySelector, type WellnessDay } from '../components/mywellness/WellnessDaySelector';
-import { WellnessSettingsDrawer } from '../components/mywellness/WellnessSettingsDrawer';
+import type { Route } from '../../App';
+import { api, type AgentStatus, type Course, type MyWellnessSettingsPayload } from '../../api/client';
+import { WellnessCourseGrid } from '../../components/mywellness/WellnessCourseGrid';
+import { WellnessDaySelector, type WellnessDay } from '../../components/mywellness/WellnessDaySelector';
+import { WellnessSettingsDrawer } from '../../components/mywellness/WellnessSettingsDrawer';
 
 export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (route: Route) => void }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);

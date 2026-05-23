@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react';
-import { api } from '../api/client';
+import { api } from '../../api/client';
 
 interface Props {
   year: number;

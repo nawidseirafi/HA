@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, AlertTriangle, Bell, BrainCircuit, CheckCircle2, Database, Euro, FileText, Moon, Play, Server, Upload, WalletCards } from 'lucide-react';
-import { api } from '../api/client';
-import type { Route } from '../App';
-import type { Invoice, MonthSummary, Summary } from '../types/invoice';
-import { currency, monthNames, shortDate } from '../lib/format';
-import { InvoiceTable } from '../components/InvoiceTable';
-import { ExportButtons } from '../components/ExportButtons';
+import { api } from '../../api/client';
+import type { Route } from '../../App';
+import type { Invoice, MonthSummary, Summary } from '../../types/invoice';
+import { currency, monthNames, shortDate } from '../../lib/format';
+import { InvoiceTable } from '../../components/finance/InvoiceTable';
+import { ExportButtons } from '../../components/finance/ExportButtons';
 
 export function DashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [summary, setSummary] = useState<Summary | null>(null);

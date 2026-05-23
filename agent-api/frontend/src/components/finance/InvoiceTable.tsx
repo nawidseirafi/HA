@@ -1,6 +1,6 @@
 import { Eye, FileSearch, Trash2 } from 'lucide-react';
-import type { Invoice } from '../types/invoice';
-import { currency, shortDate } from '../lib/format';
+import type { Invoice } from '../../types/invoice';
+import { currency, shortDate } from '../../lib/format';
 
 interface Props {
   invoices: Invoice[];

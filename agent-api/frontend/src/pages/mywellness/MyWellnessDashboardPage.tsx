@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CalendarCheck, Dumbbell, Settings } from 'lucide-react';
-import type { Route } from '../App';
-import { api, type AgentStatus, type Course, type MyWellnessLog, type MyWellnessSettingsPayload } from '../api/client';
-import { WellnessActivityFeed } from '../components/mywellness/WellnessActivityFeed';
-import { WellnessControlCenter } from '../components/mywellness/WellnessControlCenter';
-import { WellnessDashboardCards } from '../components/mywellness/WellnessDashboardCards';
-import { WellnessSettingsDrawer } from '../components/mywellness/WellnessSettingsDrawer';
-import { formatCourseDate } from '../components/mywellness/courseFormat';
+import type { Route } from '../../App';
+import { api, type AgentStatus, type Course, type MyWellnessLog, type MyWellnessSettingsPayload } from '../../api/client';
+import { WellnessActivityFeed } from '../../components/mywellness/WellnessActivityFeed';
+import { WellnessControlCenter } from '../../components/mywellness/WellnessControlCenter';
+import { WellnessDashboardCards } from '../../components/mywellness/WellnessDashboardCards';
+import { WellnessSettingsDrawer } from '../../components/mywellness/WellnessSettingsDrawer';
+import { formatCourseDate } from '../../components/mywellness/courseFormat';
 
 export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);

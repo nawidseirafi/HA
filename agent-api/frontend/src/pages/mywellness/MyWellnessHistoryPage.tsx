@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, Settings } from 'lucide-react';
-import type { Route } from '../App';
-import { api, type AgentStatus, type MyWellnessLog, type MyWellnessSettingsPayload } from '../api/client';
-import { WellnessActivityFeed } from '../components/mywellness/WellnessActivityFeed';
-import { WellnessSettingsDrawer } from '../components/mywellness/WellnessSettingsDrawer';
+import type { Route } from '../../App';
+import { api, type AgentStatus, type MyWellnessLog, type MyWellnessSettingsPayload } from '../../api/client';
+import { WellnessActivityFeed } from '../../components/mywellness/WellnessActivityFeed';
+import { WellnessSettingsDrawer } from '../../components/mywellness/WellnessSettingsDrawer';
 
 export function MyWellnessHistoryPage({ navigate: _navigate }: { navigate: (route: Route) => void }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);

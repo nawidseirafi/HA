@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { api } from '../api/client';
-import { ExportButtons } from '../components/ExportButtons';
-import { InvoiceTable } from '../components/InvoiceTable';
-import { PdfPreview } from '../components/PdfPreview';
-import type { Route } from '../App';
-import type { Invoice } from '../types/invoice';
-import { monthNames } from '../lib/format';
+import { api } from '../../api/client';
+import { ExportButtons } from '../../components/finance/ExportButtons';
+import { InvoiceTable } from '../../components/finance/InvoiceTable';
+import { PdfPreview } from '../../components/finance/PdfPreview';
+import type { Route } from '../../App';
+import type { Invoice } from '../../types/invoice';
+import { monthNames } from '../../lib/format';
 
 export function MonthPage({ year, month, navigate }: { year: number; month: number; navigate: (route: Route) => void }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);

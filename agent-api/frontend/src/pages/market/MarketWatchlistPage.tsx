@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { MarketReport, MarketWatchlistItem, MarketWatchlistPayload } from '../api/client';
-import { api } from '../api/client';
-import type { Route } from '../App';
-import { WatchlistForm } from '../components/market/WatchlistForm';
-import { WatchlistTable } from '../components/market/WatchlistTable';
+import type { MarketReport, MarketWatchlistItem, MarketWatchlistPayload } from '../../api/client';
+import { api } from '../../api/client';
+import type { Route } from '../../App';
+import { WatchlistForm } from '../../components/market/WatchlistForm';
+import { WatchlistTable } from '../../components/market/WatchlistTable';
 
 export function MarketWatchlistPage({ navigate }: { navigate: (route: Route) => void }) {
   const [items, setItems] = useState<MarketWatchlistItem[]>([]);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Save, Wand2 } from 'lucide-react';
-import type { Invoice } from '../types/invoice';
+import type { Invoice } from '../../types/invoice';
 
 interface Props {
   invoice: Invoice;

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { MarketNews, MarketReport } from '../api/client';
-import { api } from '../api/client';
-import { MarketNewsList } from '../components/market/MarketNewsList';
-import { MarketReportCard, formatPercent, formatPrice } from '../components/market/MarketReportCard';
-import { MarketSignalBadge } from '../components/market/MarketSignalBadge';
-import { MarketTrendChart } from '../components/market/MarketTrendChart';
+import type { MarketNews, MarketReport } from '../../api/client';
+import { api } from '../../api/client';
+import { MarketNewsList } from '../../components/market/MarketNewsList';
+import { MarketReportCard, formatPercent, formatPrice } from '../../components/market/MarketReportCard';
+import { MarketSignalBadge } from '../../components/market/MarketSignalBadge';
+import { MarketTrendChart } from '../../components/market/MarketTrendChart';
 
 export function MarketSymbolPage({ symbol }: { symbol: string }) {
   const [reports, setReports] = useState<MarketReport[]>([]);

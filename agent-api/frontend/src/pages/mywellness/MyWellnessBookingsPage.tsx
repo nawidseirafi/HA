@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
-import type { Route } from '../App';
-import { api, type AgentStatus, type Course, type MyWellnessSettingsPayload } from '../api/client';
-import { WellnessBookingsList } from '../components/mywellness/WellnessBookingsList';
-import { WellnessSettingsDrawer } from '../components/mywellness/WellnessSettingsDrawer';
+import type { Route } from '../../App';
+import { api, type AgentStatus, type Course, type MyWellnessSettingsPayload } from '../../api/client';
+import { WellnessBookingsList } from '../../components/mywellness/WellnessBookingsList';
+import { WellnessSettingsDrawer } from '../../components/mywellness/WellnessSettingsDrawer';
 
 type BookingFilter = 'active' | 'past' | 'cancelled';
 

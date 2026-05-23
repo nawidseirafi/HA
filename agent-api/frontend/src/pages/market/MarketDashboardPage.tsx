@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { MarketReport, MarketSummary } from '../api/client';
-import { api } from '../api/client';
-import type { Route } from '../App';
-import { formatPercent, formatPrice, sourceLabel } from '../components/market/MarketReportCard';
-import { MarketRunButton } from '../components/market/MarketRunButton';
-import { MarketPerformanceChart, MarketSentimentDonut, MiniSparkline, type MarketRange } from '../components/market/MarketCharts';
-import { MarketSignalBadge } from '../components/market/MarketSignalBadge';
+import type { MarketReport, MarketSummary } from '../../api/client';
+import { api } from '../../api/client';
+import type { Route } from '../../App';
+import { formatPercent, formatPrice, sourceLabel } from '../../components/market/MarketReportCard';
+import { MarketRunButton } from '../../components/market/MarketRunButton';
+import { MarketPerformanceChart, MarketSentimentDonut, MiniSparkline, type MarketRange } from '../../components/market/MarketCharts';
+import { MarketSignalBadge } from '../../components/market/MarketSignalBadge';
 
 export function MarketDashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [summary, setSummary] = useState<MarketSummary | null>(null);

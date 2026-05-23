@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { api } from '../api/client';
-import { ExportButtons } from '../components/ExportButtons';
-import { MonthCard } from '../components/MonthCard';
-import type { Route } from '../App';
-import type { MonthSummary } from '../types/invoice';
+import { api } from '../../api/client';
+import { ExportButtons } from '../../components/finance/ExportButtons';
+import { MonthCard } from '../../components/finance/MonthCard';
+import type { Route } from '../../App';
+import type { MonthSummary } from '../../types/invoice';
 
 export function YearPage({ year, navigate }: { year: number; navigate: (route: Route) => void }) {
   const [months, setMonths] = useState<MonthSummary[]>([]);

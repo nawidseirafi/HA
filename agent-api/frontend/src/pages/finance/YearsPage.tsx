@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
-import { YearCard } from '../components/YearCard';
-import type { Route } from '../App';
-import type { YearSummary } from '../types/invoice';
+import { api } from '../../api/client';
+import { YearCard } from '../../components/finance/YearCard';
+import type { Route } from '../../App';
+import type { YearSummary } from '../../types/invoice';
 
 export function YearsPage({ navigate }: { navigate: (route: Route) => void }) {
   const [years, setYears] = useState<YearSummary[]>([]);

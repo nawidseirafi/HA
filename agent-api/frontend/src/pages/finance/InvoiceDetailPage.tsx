@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { api } from '../api/client';
-import { InvoiceDetailPanel } from '../components/InvoiceDetailPanel';
-import { PdfPreview } from '../components/PdfPreview';
-import type { Route } from '../App';
-import type { Invoice } from '../types/invoice';
+import { api } from '../../api/client';
+import { InvoiceDetailPanel } from '../../components/finance/InvoiceDetailPanel';
+import { PdfPreview } from '../../components/finance/PdfPreview';
+import type { Route } from '../../App';
+import type { Invoice } from '../../types/invoice';
 
 export function InvoiceDetailPage({ id, navigate }: { id: number; navigate: (route: Route) => void }) {
   const [invoice, setInvoice] = useState<Invoice | null>(null);

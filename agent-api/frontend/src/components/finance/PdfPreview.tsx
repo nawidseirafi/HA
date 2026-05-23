@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Invoice } from '../types/invoice';
-import { api, getAuthToken } from '../api/client';
+import type { Invoice } from '../../types/invoice';
+import { api, getAuthToken } from '../../api/client';
 
 export function PdfPreview({ invoice }: { invoice: Invoice }) {
   const [src, setSrc] = useState('');
