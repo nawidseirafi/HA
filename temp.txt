@@ -1,0 +1,181 @@
+Refine the existing login page inputs to feel significantly more premium, modern and minimal.
+
+Current issue:
+The underline inputs still feel unfinished and slightly too flat/heavy.
+The underline itself needs better visual design and focus behavior.
+
+Goals:
+- Elegant premium dark UI
+- Minimal but polished
+- More “alive”
+- More Apple / Linear / Arc Browser feeling
+- Less generic SaaS
+
+Please improve the input fields with the following ideas:
+
+--------------------------------------------------
+INPUT STYLE
+--------------------------------------------------
+
+Current:
+- simple underline
+- feels too static
+- too visually heavy
+
+New direction:
+- soft illuminated underline
+- subtle glass surface
+- modern floating labels
+- animated focus states
+
+--------------------------------------------------
+DEFAULT STATE
+--------------------------------------------------
+
+Inputs should:
+- have transparent or near-transparent background
+- use a very subtle thin underline
+- no visible boxed border
+- no harsh outlines
+
+Underline:
+- 1px
+- rgba(255,255,255,0.08)
+- elegant and subtle
+
+Background:
+- slight translucent glass effect
+- extremely subtle
+- not a visible input box
+
+Example feeling:
+- soft glass layer floating in dark UI
+
+--------------------------------------------------
+FOCUS STATE
+--------------------------------------------------
+
+On focus:
+- animated underline transition
+- gradient underline:
+  blue → violet
+- subtle glow beneath input
+- smooth animation
+- elegant modern feeling
+
+Please add:
+- soft outer glow
+- slightly brighter text
+- placeholder fades smoothly
+
+Focus should feel:
+- responsive
+- premium
+- modern
+- alive
+
+--------------------------------------------------
+FLOATING LABELS
+--------------------------------------------------
+
+Replace static labels with floating labels.
+
+Behavior:
+- label starts inside input
+- on focus or when text exists:
+  - label animates upward
+  - becomes smaller
+  - slightly brighter
+
+Style:
+- smooth transitions
+- subtle opacity changes
+- premium SaaS feeling
+
+Inspired by:
+- Linear
+- Stripe
+- Vercel
+- Arc Browser
+
+--------------------------------------------------
+PASSWORD FIELD
+--------------------------------------------------
+
+Improve password visibility icon:
+- softer appearance
+- aligned better vertically
+- subtle hover animation
+- better opacity behavior
+
+--------------------------------------------------
+SPACING
+--------------------------------------------------
+
+Please refine:
+- vertical rhythm
+- spacing between logo, inputs and button
+- input padding
+- label spacing
+
+Current layout still feels slightly too empty and disconnected.
+
+--------------------------------------------------
+BUTTON
+--------------------------------------------------
+
+Keep current button direction, but:
+- slightly softer gradient
+- stronger hover state
+- subtle glow
+- smoother hover animation
+
+--------------------------------------------------
+ANIMATIONS
+--------------------------------------------------
+
+Please add:
+- smooth transitions everywhere
+- subtle hover scale
+- elegant focus motion
+- modern easing curves
+
+Nothing flashy.
+Everything should feel:
+- calm
+- premium
+- confident
+
+--------------------------------------------------
+DESIGN DIRECTION
+--------------------------------------------------
+
+Target aesthetic:
+- Apple
+- Arc Browser
+- Linear
+- modern AI operating system
+- premium dark glass UI
+
+Avoid:
+- traditional form UI
+- thick borders
+- obvious input boxes
+- generic Tailwind form appearance
+
+--------------------------------------------------
+TECHNICAL
+--------------------------------------------------
+
+Keep:
+- React
+- Tailwind CSS
+- existing dark theme
+- existing functionality
+
+Do NOT:
+- change backend logic
+- break authentication
+- redesign entire page
+
+Only refine and elevate the visual quality of the login form.
