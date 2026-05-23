@@ -1,0 +1,34 @@
+Refactor the existing MyWellness dashboard UX.
+
+Goals:
+- Remove the large Control Center card.
+- Make the top KPI cards directly interactive.
+- Entire cards should be clickable/touch-friendly.
+- Agent Status card toggles enable/disable.
+- Scan card triggers course scan.
+- Booking card triggers booking action.
+- Move current bookings directly below KPI cards.
+- Move available courses below bookings.
+- Keep settings inside a right-side drawer.
+- Reduce empty space.
+- Increase information density.
+- Make the UI feel like a premium wellness booking app instead of an admin dashboard.
+
+Design direction:
+- Apple Fitness+
+- modern wellness app
+- glassmorphism
+- smooth hover animations
+- touch-friendly iPad UX
+- compact cards
+- modern segmented controls
+- subtle gradients
+
+Keep:
+- existing APIs
+- existing backend logic
+- existing dark theme
+
+Do not:
+- create backend breaking changes
+- introduce unnecessary complexity
