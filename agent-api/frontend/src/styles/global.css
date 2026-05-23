@@ -175,7 +175,7 @@ p { color: var(--muted); line-height: 1.65; }
 .login-form {
   width: min(100%, 520px);
   display: grid;
-  gap: 26px;
+  gap: 22px;
   padding: 34px;
   border-radius: 28px;
   border: 0;
@@ -199,9 +199,9 @@ p { color: var(--muted); line-height: 1.65; }
 .login-form-header {
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
   perspective: 900px;
 }
 
@@ -238,112 +238,165 @@ p { color: var(--muted); line-height: 1.65; }
 .auth-field {
   position: relative;
   display: block;
-  padding-top: 22px;
+  padding: 18px 14px 0;
+  border-radius: 14px 14px 6px 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--ink);
+  transition: background 320ms cubic-bezier(.2,.7,.2,1), transform 320ms cubic-bezier(.2,.7,.2,1);
 }
 
-.auth-field.has-trailing {
-  padding-right: 40px;
+.auth-field.has-trailing { padding-right: 48px; }
+
+/* Soft outer glow halo that fades in on focus */
+.auth-field::before {
+  content: '';
+  position: absolute;
+  inset: -8px -10px -14px;
+  border-radius: 22px;
+  pointer-events: none;
+  background: radial-gradient(60% 80% at 50% 100%,
+              rgba(77, 141, 255, 0.18),
+              rgba(139, 92, 246, 0.10) 55%,
+              transparent 78%);
+  opacity: 0;
+  transition: opacity 360ms cubic-bezier(.2,.7,.2,1);
+  z-index: 0;
 }
+
+.auth-field:focus-within::before { opacity: 1; }
+.auth-field > * { position: relative; z-index: 1; }
 
 .auth-field input {
   width: 100%;
   display: block;
-  padding: 10px 0 12px;
+  padding: 8px 0 11px;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 500;
   letter-spacing: 0.005em;
   caret-color: var(--blue);
   outline: none;
-  /* base underline */
-  border-bottom: 1px solid rgba(190, 208, 235, 0.18);
-  transition: border-color 200ms ease, color 200ms ease;
+  /* base underline: 1px rgba(255,255,255,0.08) */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 240ms cubic-bezier(.2,.7,.2,1), color 240ms ease;
+}
+
+.auth-field:hover input {
+  border-bottom-color: rgba(255, 255, 255, 0.14);
 }
 
 .auth-field input::placeholder {
   color: transparent;
+  transition: color 200ms ease;
 }
 
 .auth-field-label {
   position: absolute;
-  left: 0;
-  top: 32px;
+  left: 14px;
+  top: 28px;
   pointer-events: none;
-  color: rgba(153, 168, 195, 0.78);
-  font-size: 1rem;
+  color: rgba(180, 196, 224, 0.55);
+  font-size: 1.02rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   transform-origin: left center;
-  transition: transform 220ms cubic-bezier(.2,.7,.2,1), color 200ms ease, opacity 200ms ease;
+  transition:
+    transform 260ms cubic-bezier(.2,.7,.2,1),
+    color 220ms ease,
+    opacity 220ms ease;
 }
 
 /* Float when focused or filled */
 .auth-field input:focus + .auth-field-label,
 .auth-field input:not(:placeholder-shown) + .auth-field-label {
-  transform: translateY(-26px) scale(0.78);
-  color: rgba(207, 224, 255, 0.85);
+  transform: translateY(-22px) scale(0.78);
+  color: rgba(214, 226, 248, 0.82);
 }
 
 .auth-field input:focus + .auth-field-label {
-  color: #b7d1ff;
+  color: #c8d6ff;
 }
 
 /* Animated gradient underline that grows on focus */
 .auth-field-underline {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 14px;
+  right: 14px;
   bottom: 0;
-  height: 2px;
+  height: 1.5px;
   pointer-events: none;
   border-radius: 2px;
-  background: linear-gradient(90deg, #4d8dff, #8b5cf6 55%, #4d8dff);
-  background-size: 200% 100%;
+  background: linear-gradient(90deg,
+              rgba(77, 141, 255, 0) 0%,
+              #4d8dff 18%,
+              #8b5cf6 50%,
+              #4d8dff 82%,
+              rgba(77, 141, 255, 0) 100%);
+  background-size: 220% 100%;
+  background-position: 50% 50%;
   transform: scaleX(0);
-  transform-origin: left center;
+  transform-origin: center;
   opacity: 0;
-  transition: transform 320ms cubic-bezier(.2,.7,.2,1), opacity 200ms ease;
+  filter: drop-shadow(0 0 6px rgba(77, 141, 255, 0.5))
+          drop-shadow(0 0 14px rgba(139, 92, 246, 0.35));
+  transition:
+    transform 420ms cubic-bezier(.2,.7,.2,1),
+    opacity 260ms ease;
 }
+
+.auth-field.has-trailing .auth-field-underline { right: 48px; }
 
 .auth-field:focus-within .auth-field-underline {
   transform: scaleX(1);
   opacity: 1;
-  animation: auth-field-underline-shimmer 3s ease-in-out infinite;
+  animation: auth-field-underline-shimmer 4.5s ease-in-out infinite;
 }
 
 @keyframes auth-field-underline-shimmer {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%, 100% { background-position: 30% 50%; }
+  50% { background-position: 70% 50%; }
 }
 
-/* Soft blue/violet glow on focus */
+/* Subtle outer glow + brighter glass surface on focus */
 .auth-field:focus-within {
-  filter: drop-shadow(0 6px 18px rgba(77, 141, 255, 0.18))
-          drop-shadow(0 0 14px rgba(139, 92, 246, 0.14));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
 }
 
 .auth-field:focus-within input {
   border-bottom-color: transparent;
-  color: #eaf1ff;
+  color: #f1f5ff;
+}
+
+.auth-field:focus-within input::placeholder {
+  color: rgba(180, 196, 224, 0.35);
 }
 
 /* Error state */
 .auth-field.invalid input {
-  border-bottom-color: rgba(255, 122, 132, 0.55);
+  border-bottom-color: rgba(255, 122, 132, 0.45);
 }
 
 .auth-field.invalid .auth-field-underline {
-  background: linear-gradient(90deg, #ff7a84, #ff9aaa, #ff7a84);
+  background: linear-gradient(90deg,
+              rgba(255, 122, 132, 0) 0%,
+              #ff7a84 20%,
+              #ff9aaa 50%,
+              #ff7a84 80%,
+              rgba(255, 122, 132, 0) 100%);
+  filter: drop-shadow(0 0 6px rgba(255, 122, 132, 0.5));
   transform: scaleX(1);
   opacity: 1;
   animation: none;
 }
 
-.auth-field.invalid:focus-within {
-  filter: drop-shadow(0 4px 14px rgba(255, 122, 132, 0.22));
+.auth-field.invalid::before {
+  background: radial-gradient(60% 80% at 50% 100%,
+              rgba(255, 122, 132, 0.18),
+              transparent 70%);
 }
 
 .auth-field.invalid .auth-field-label,
@@ -362,17 +415,22 @@ p { color: var(--muted); line-height: 1.65; }
 
 .field-icon-button {
   position: absolute;
-  right: -4px;
-  bottom: 4px;
-  width: 36px;
-  height: 36px;
+  right: 8px;
+  bottom: 6px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 0;
   border-radius: 10px;
-  color: var(--muted);
+  color: rgba(190, 208, 235, 0.55);
   background: transparent;
-  transition: color 160ms ease, background 160ms ease;
+  opacity: 0.7;
+  transition:
+    color 220ms ease,
+    background 220ms ease,
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(.2,.7,.2,1);
 }
 
 .field-row {
@@ -383,8 +441,26 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .field-icon-button:hover {
-  color: var(--ink);
-  background: rgba(255,255,255,0.06);
+  color: #eaf1ff;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.field-icon-button:active {
+  transform: scale(0.94);
+}
+
+.field-icon-button:focus-visible {
+  outline: none;
+  opacity: 1;
+  color: #eaf1ff;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.45);
+}
+
+.auth-field:focus-within .field-icon-button {
+  opacity: 0.95;
+  color: rgba(220, 232, 255, 0.85);
 }
 
 .login-options {
@@ -486,14 +562,57 @@ p { color: var(--muted); line-height: 1.65; }
 .login-hint { font-size: 0.86rem; }
 
 .login-button {
+  position: relative;
   width: 100%;
-  min-height: 58px;
+  min-height: 56px;
   display: grid;
   grid-template-columns: 1fr auto;
   justify-items: center;
-  padding: 0 20px;
-  margin-top: 6px;
-  border-radius: 10px;
+  padding: 0 22px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 14px;
+  color: #f1f5ff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(135deg, #4d8dff 0%, #6f7bff 45%, #8b5cf6 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 10px 30px rgba(77, 141, 255, 0.28),
+    0 4px 14px rgba(139, 92, 246, 0.22);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition:
+    transform 260ms cubic-bezier(.2,.7,.2,1),
+    box-shadow 260ms cubic-bezier(.2,.7,.2,1),
+    filter 260ms ease,
+    background-position 600ms ease;
+}
+
+.login-button:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.005);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.24) inset,
+    0 16px 40px rgba(77, 141, 255, 0.38),
+    0 6px 22px rgba(139, 92, 246, 0.34);
+  filter: brightness(1.05);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.995);
+  filter: brightness(0.98);
+}
+
+.login-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(139, 92, 246, 0.45),
+    0 12px 32px rgba(77, 141, 255, 0.32);
+}
+
+.login-button:disabled {
+  opacity: 0.72;
+  cursor: progress;
 }
 
 .login-button span {
@@ -505,6 +624,11 @@ p { color: var(--muted); line-height: 1.65; }
   justify-self: end;
   grid-column: 2;
   grid-row: 1;
+  transition: transform 260ms cubic-bezier(.2,.7,.2,1);
+}
+
+.login-button:hover:not(:disabled) svg {
+  transform: translateX(3px);
 }
 
 .app-shell {
