@@ -1274,13 +1274,58 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .wellness-stat-card {
+  position: relative;
   min-height: 124px;
   display: grid;
   align-content: space-between;
-  gap: 10px;
+  gap: 8px;
   padding: 16px;
+  overflow: hidden;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+.wellness-stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.06), transparent 60%),
+    linear-gradient(135deg, rgba(77,141,255,0.10), rgba(52,211,153,0.04) 50%, rgba(139,92,246,0.08));
+  opacity: 0.55;
+}
+
+.wellness-stat-card > * { position: relative; z-index: 1; }
+
+.wellness-stat-card.interactive {
+  cursor: pointer;
+}
+
+.wellness-stat-card.interactive:hover {
+  transform: translateY(-2px);
+  border-color: rgba(143, 172, 220, 0.32);
+  box-shadow: 0 24px 55px rgba(0, 0, 0, 0.32);
+}
+
+.wellness-stat-card.interactive:active {
+  transform: translateY(0);
+}
+
+.wellness-stat-card.interactive:focus-visible {
+  outline: 2px solid rgba(143, 172, 220, 0.55);
+  outline-offset: 2px;
+}
+
+.wellness-stat-card.interactive:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.wellness-stat-icon,
 .wellness-stat-card > div {
   width: 38px;
   height: 38px;
@@ -1291,11 +1336,40 @@ p { color: var(--muted); line-height: 1.65; }
   color: #b7d1ff;
 }
 
-.wellness-stat-card.success > div { color: #9af0c9; background: rgba(52, 211, 153, 0.13); }
-.wellness-stat-card.warning > div { color: #ffd98a; background: rgba(251, 191, 36, 0.13); }
-.wellness-stat-card.muted > div { color: var(--muted); background: rgba(153, 168, 195, 0.12); }
-.wellness-stat-card span { color: var(--muted); }
-.wellness-stat-card strong { font-size: 1rem; overflow-wrap: anywhere; }
+.wellness-stat-card.success .wellness-stat-icon,
+.wellness-stat-card.success > div { color: #9af0c9; background: rgba(52, 211, 153, 0.16); }
+.wellness-stat-card.warning .wellness-stat-icon,
+.wellness-stat-card.warning > div { color: #ffd98a; background: rgba(251, 191, 36, 0.16); }
+.wellness-stat-card.muted .wellness-stat-icon,
+.wellness-stat-card.muted > div { color: var(--muted); background: rgba(153, 168, 195, 0.14); }
+.wellness-stat-card.info .wellness-stat-icon,
+.wellness-stat-card.info > div { color: #a9c8ff; background: rgba(77, 141, 255, 0.16); }
+
+.wellness-stat-card span { color: var(--muted); font-size: 0.82rem; letter-spacing: 0.02em; text-transform: uppercase; }
+.wellness-stat-card strong { font-size: 1.05rem; overflow-wrap: anywhere; }
+
+.wellness-stat-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 0.78rem;
+  color: rgba(220, 232, 255, 0.7);
+}
+
+.wellness-stat-dot {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #4b5b7a;
+  box-shadow: 0 0 0 4px rgba(75, 91, 122, 0.18);
+  z-index: 1;
+}
+.wellness-stat-dot.on { background: #34d399; box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.22), 0 0 14px rgba(52, 211, 153, 0.45); }
+.wellness-stat-dot.off { background: #ff9aaa; box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.18); }
 
 .wellness-dashboard-grid {
   display: grid;
@@ -1319,6 +1393,26 @@ p { color: var(--muted); line-height: 1.65; }
   align-content: start;
   gap: 10px;
   padding: 18px;
+}
+
+.wellness-booking-summary.dense {
+  padding: 14px 16px;
+}
+
+.wellness-booking-summary.dense .wellness-booking-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.wellness-upcoming-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.wellness-course-grid.dense {
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
 }
 
 .wellness-booking-summary article {
