@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.svg';
 
@@ -34,55 +34,73 @@ export function LoginForm({ onLoggedIn }: Props) {
     }
   };
 
+  const invalid = Boolean(error);
+
   return (
-    <form className="login-form" onSubmit={submit}>
+    <form className={`login-form${invalid ? ' has-error' : ''}`} onSubmit={submit} noValidate>
       <div className="login-form-header">
         <div className="login-icon"><img src={logo} alt="RoboterSteve" /></div>
         <h2>Roboter Steve</h2>
-    
       </div>
 
-      <label className="auth-field">
-        <div>
-          <User size={17} />
-          <input
-            autoFocus
-            type="text"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Benutzername"
-            autoComplete="username"
-          />
-        </div>
+      <label className={`auth-field${invalid ? ' invalid' : ''}`}>
+        <input
+          id="login-username"
+          autoFocus
+          type="text"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          placeholder=" "
+          autoComplete="username"
+          aria-invalid={invalid}
+          aria-label="Benutzername"
+        />
+        <span className="auth-field-label">Benutzername</span>
+        <span className="auth-field-underline" aria-hidden />
       </label>
 
-      <label className="auth-field">
-        <div>
-          <LockKeyhole size={17} />
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Passwort"
-            autoComplete="current-password"
-          />
-          <button type="button" className="field-icon-button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}>
-            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
-        </div>
+      <label className={`auth-field has-trailing${invalid ? ' invalid' : ''}`}>
+        <input
+          id="login-password"
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder=" "
+          autoComplete="current-password"
+          aria-invalid={invalid}
+          aria-label="Passwort"
+        />
+        <span className="auth-field-label">Passwort</span>
+        <button
+          type="button"
+          className="field-icon-button"
+          onClick={() => setShowPassword((value) => !value)}
+          aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+          tabIndex={-1}
+        >
+          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+        </button>
+        <span className="auth-field-underline" aria-hidden />
       </label>
 
       <div className="login-options">
-        <label className="remember-check">
-          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-          <span>Angemeldet bleiben</span>
+        <label className="remember-switch">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(event) => setRemember(event.target.checked)}
+          />
+          <span className="remember-switch-track" aria-hidden>
+            <span className="remember-switch-thumb" />
+          </span>
+          <span className="remember-switch-label">Angemeldet bleiben</span>
         </label>
       </div>
 
-      {error && <div className="login-error">{error}</div>}
+      {error && <div className="login-error" role="alert">{error}</div>}
 
       <button className="button primary login-button" type="submit" disabled={busy}>
-        <span>{busy ? 'Melde an...' : 'Anmelden'}</span>
+        <span>{busy ? 'Melde an…' : 'Anmelden'}</span>
         <ArrowRight size={18} />
       </button>
 
@@ -90,3 +108,4 @@ export function LoginForm({ onLoggedIn }: Props) {
     </form>
   );
 }
+

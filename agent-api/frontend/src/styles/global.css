@@ -175,13 +175,24 @@ p { color: var(--muted); line-height: 1.65; }
 .login-form {
   width: min(100%, 520px);
   display: grid;
-  gap: 18px;
+  gap: 26px;
   padding: 34px;
   border-radius: 28px;
   border: 0;
   background: transparent;
   box-shadow: none;
   margin: 0 auto;
+}
+
+.login-form.has-error .auth-field.invalid {
+  animation: auth-field-shake 360ms cubic-bezier(.36,.07,.19,.97);
+}
+
+@keyframes auth-field-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
 }
 
 .login-panel p, .login-hint { color: var(--muted); line-height: 1.55; }
@@ -225,64 +236,143 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .auth-field {
-  display: grid;
-  gap: 8px;
+  position: relative;
+  display: block;
+  padding-top: 22px;
   color: var(--ink);
-  font-weight: 650;
 }
 
-.auth-field > div {
-  min-height: 54px;
-  display: grid;
-  grid-template-columns: 20px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(190, 208, 235, 0.18);
-  background: rgba(3, 12, 24, 0.28);
-  color: var(--muted);
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
-}
-
-.auth-field > div:focus-within {
-  border-color: rgba(77, 141, 255, 0.58);
-  background: rgba(7, 17, 31, 0.78);
-  box-shadow: 0 0 0 3px rgba(77, 141, 255, 0.13);
-  color: #cfe0ff;
+.auth-field.has-trailing {
+  padding-right: 40px;
 }
 
 .auth-field input {
+  width: 100%;
+  display: block;
+  padding: 10px 0 12px;
   border: 0;
   background: transparent;
-  padding: 0;
   color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
   caret-color: var(--blue);
   outline: none;
+  /* base underline */
+  border-bottom: 1px solid rgba(190, 208, 235, 0.18);
+  transition: border-color 200ms ease, color 200ms ease;
 }
 
 .auth-field input::placeholder {
-  color: rgba(153, 168, 195, 0.72);
+  color: transparent;
+}
+
+.auth-field-label {
+  position: absolute;
+  left: 0;
+  top: 32px;
+  pointer-events: none;
+  color: rgba(153, 168, 195, 0.78);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transform-origin: left center;
+  transition: transform 220ms cubic-bezier(.2,.7,.2,1), color 200ms ease, opacity 200ms ease;
+}
+
+/* Float when focused or filled */
+.auth-field input:focus + .auth-field-label,
+.auth-field input:not(:placeholder-shown) + .auth-field-label {
+  transform: translateY(-26px) scale(0.78);
+  color: rgba(207, 224, 255, 0.85);
+}
+
+.auth-field input:focus + .auth-field-label {
+  color: #b7d1ff;
+}
+
+/* Animated gradient underline that grows on focus */
+.auth-field-underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  pointer-events: none;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4d8dff, #8b5cf6 55%, #4d8dff);
+  background-size: 200% 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 320ms cubic-bezier(.2,.7,.2,1), opacity 200ms ease;
+}
+
+.auth-field:focus-within .auth-field-underline {
+  transform: scaleX(1);
+  opacity: 1;
+  animation: auth-field-underline-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes auth-field-underline-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Soft blue/violet glow on focus */
+.auth-field:focus-within {
+  filter: drop-shadow(0 6px 18px rgba(77, 141, 255, 0.18))
+          drop-shadow(0 0 14px rgba(139, 92, 246, 0.14));
+}
+
+.auth-field:focus-within input {
+  border-bottom-color: transparent;
+  color: #eaf1ff;
+}
+
+/* Error state */
+.auth-field.invalid input {
+  border-bottom-color: rgba(255, 122, 132, 0.55);
+}
+
+.auth-field.invalid .auth-field-underline {
+  background: linear-gradient(90deg, #ff7a84, #ff9aaa, #ff7a84);
+  transform: scaleX(1);
+  opacity: 1;
+  animation: none;
+}
+
+.auth-field.invalid:focus-within {
+  filter: drop-shadow(0 4px 14px rgba(255, 122, 132, 0.22));
+}
+
+.auth-field.invalid .auth-field-label,
+.auth-field.invalid input:focus + .auth-field-label {
+  color: #ffb4bb;
 }
 
 .auth-field input:-webkit-autofill,
 .auth-field input:-webkit-autofill:hover,
 .auth-field input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--ink);
-  box-shadow: 0 0 0 1000px #07111f inset;
+  box-shadow: 0 0 0 1000px transparent inset;
   transition: background-color 9999s ease-in-out 0s;
   caret-color: var(--blue);
 }
 
 .field-icon-button {
-  width: 32px;
-  height: 32px;
+  position: absolute;
+  right: -4px;
+  bottom: 4px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   border: 0;
   border-radius: 10px;
   color: var(--muted);
   background: transparent;
+  transition: color 160ms ease, background 160ms ease;
 }
 
 .field-row {
@@ -302,6 +392,68 @@ p { color: var(--muted); line-height: 1.65; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-top: 4px;
+}
+
+.remember-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.95rem;
+}
+
+.remember-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.remember-switch-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(190, 208, 235, 0.16);
+  transition: background 220ms ease, box-shadow 220ms ease;
+}
+
+.remember-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #e5edff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 240ms cubic-bezier(.2,.7,.2,1), background 200ms ease;
+}
+
+.remember-switch input:checked ~ .remember-switch-track {
+  background: linear-gradient(135deg, rgba(77, 141, 255, 0.85), rgba(139, 92, 246, 0.85));
+  box-shadow: 0 0 0 4px rgba(77, 141, 255, 0.14);
+}
+
+.remember-switch input:checked ~ .remember-switch-track .remember-switch-thumb {
+  transform: translateX(16px);
+  background: #ffffff;
+}
+
+.remember-switch input:focus-visible ~ .remember-switch-track {
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.28);
+}
+
+.remember-switch-label {
+  letter-spacing: 0.01em;
+}
+
+.remember-switch:hover .remember-switch-label {
+  color: var(--ink);
 }
 
 .remember-check {
