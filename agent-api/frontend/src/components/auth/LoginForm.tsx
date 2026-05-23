@@ -43,7 +43,6 @@ export function LoginForm({ onLoggedIn }: Props) {
       </div>
 
       <label className="auth-field">
-        <span>Benutzername</span>
         <div>
           <User size={17} />
           <input
@@ -58,10 +57,6 @@ export function LoginForm({ onLoggedIn }: Props) {
       </label>
 
       <label className="auth-field">
-        <span className="field-row">
-          Passwort
-          <button type="button" className="text-button">Passwort vergessen?</button>
-        </span>
         <div>
           <LockKeyhole size={17} />
           <input
