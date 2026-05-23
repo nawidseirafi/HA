@@ -2875,3 +2875,53 @@ label.check input { width: auto; }
   }
   h1 { font-size: 1.75rem; }
 }
+/* Premium Login Inputs Override */
+.login-form .auth-field input {
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.22) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 18px 0 10px !important;
+}
+
+.login-form .auth-field {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding-top: 18px;
+}
+
+.login-form .auth-field-label {
+  top: 24px;
+  color: rgba(180,196,224,0.62);
+}
+
+.login-form .auth-field input:focus + .auth-field-label,
+.login-form .auth-field input:not(:placeholder-shown) + .auth-field-label {
+  transform: translateY(-24px) scale(0.72);
+  color: rgba(220,232,255,0.92);
+}
+
+.login-form .auth-field-underline {
+  height: 2px;
+  bottom: 0;
+  background: linear-gradient(90deg, #4d8dff, #8b5cf6);
+  box-shadow:
+    0 0 10px rgba(77,141,255,0.45),
+    0 0 18px rgba(139,92,246,0.32);
+}
+
+.login-form .auth-field:focus-within input {
+  border-bottom-color: transparent !important;
+}
+
+.login-form .auth-field::before {
+  bottom: -14px;
+  height: 28px;
+  opacity: 0;
+}
+
+.login-form .auth-field:focus-within::before {
+  opacity: 0.55;
+}
