@@ -109,7 +109,6 @@ export function SettingsPage() {
               </div>
             </div>
             <PathRow label="Uploads" value={settings.storage.uploads} />
-            <PathRow label="Statusdatei" value={settings.storage.status_file} />
             <PathRow label="Logdatei" value={settings.storage.log_file} />
           </article>
 

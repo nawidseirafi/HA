@@ -6,13 +6,13 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.auth_routes import router as auth_router
-from backend.api.export_routes import router as export_router
-from backend.api.invoice_routes import router as invoice_router
-from backend.api.market_routes import router as market_router
-from backend.api.mywellness_routes import router as mywellness_router
-from backend.api.settings_routes import router as settings_router
-from backend.services.auth_service import user_from_request
+from backend.auth.routes import router as auth_router
+from backend.invoice.export_routes import router as export_router
+from backend.invoice.routes import router as invoice_router
+from backend.market.routes import router as market_router
+from backend.mywellness.routes import router as mywellness_router
+from backend.settings.routes import router as settings_router
+from backend.auth.service import user_from_request
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -64,14 +64,14 @@ app.include_router(market_router)
 
 @app.on_event("startup")
 def start_schedulers() -> None:
-    from backend.api.mywellness_routes import mywellness_service
+    from backend.mywellness.routes import mywellness_service
 
     mywellness_service.start_scheduler()
 
 
 @app.on_event("shutdown")
 def stop_schedulers() -> None:
-    from backend.api.mywellness_routes import mywellness_service
+    from backend.mywellness.routes import mywellness_service
 
     mywellness_service.stop_scheduler()
 

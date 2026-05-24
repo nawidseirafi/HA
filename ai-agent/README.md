@@ -4,6 +4,30 @@ Dieses Verzeichnis enthaelt die Python-Agenten fuer Home Assistant und den Rechn
 
 Der Mac ist die Entwicklungsumgebung. Auf dem Zielsystem soll der Code spaeter in der Debian-VM auf dem Mini-PC laufen.
 
+## Struktur
+
+```text
+ai-agent/
+├── invoice/               # Rechnungs-Agent
+│   ├── invoices.py        # CLI-Entry (Scanner, Mailbox, Portal-Downloads)
+│   ├── ai_extractor.py / archiver.py / catalog.py / email.py
+│   ├── extractor.py / portals.py / scanner.py / tax_export.py
+│   └── cleanup_archive.py # Wartungs-CLI: unreferenzierte Archivdateien
+├── mywellness/            # MyWellness-Agent
+│   ├── mywellness.py      # CLI-Entry (Modi: prepare, book)
+│   └── store.py
+├── market/                # Boersen-Agent
+│   ├── market.py          # CLI-Entry (Modi: run, analyze --symbol)
+│   ├── analysis.py / data.py / news.py / report.py / symbol_resolver.py
+├── mailbox/   presence/   vacation/   # weitere Einzelagenten
+├── shared/                # Querschnitt (ha_client.py)
+├── llm/                   # LLM-Client-Factory (Gemini, OpenAI, Llama)
+├── config.yaml
+└── requirements.txt
+```
+
+Jeder Agent besitzt einen eigenen Ordner mit CLI-Entry und Domaenenmodulen. Die FastAPI-Schicht unter `../agent-api/backend/` importiert Read-Module direkt via `sys.path` (`from invoice.…`, `from mywellness.store`, `from market.report`) und startet schwere Laeufe per `subprocess` ueber die jeweiligen `<domain>/<domain>.py`-CLIs.
+
 ## Debian-Pakete
 
 Auf dem Zielrechner zuerst die Systempakete installieren:
@@ -196,7 +220,7 @@ Der MyWellness-Agent speichert vorbereitete und live geladene Kursdaten in:
 ai-agent/data/mywellness/mywellness.db
 ```
 
-`agents/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `agents/mywellness.py book` liest diese Kurs-IDs bevorzugt aus der Datenbank und nutzt `agents/mywellness_cache.json` nur noch als Fallback fuer alte Laeufe. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
+`mywellness/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `mywellness/mywellness.py book` liest diese Kurs-IDs bevorzugt aus der Datenbank und nutzt `mywellness/mywellness_cache.json` nur noch als Fallback fuer alte Laeufe. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
 
 In `config.yaml`:
 
@@ -217,7 +241,7 @@ invoice_agent:
 Einmalig interaktiv einloggen:
 
 ```bash
-../venv/bin/python agents/invoices.py --portal-login huk24
+../venv/bin/python invoice/invoices.py --portal-login huk24
 ```
 
 Dann im Browser bei HUK24 einloggen, ggf. 2FA bestaetigen und bis ins Postfach navigieren. Danach im Terminal Enter druecken. Der Agent speichert die Session unter `session_path`.
@@ -225,13 +249,13 @@ Dann im Browser bei HUK24 einloggen, ggf. 2FA bestaetigen und bis ins Postfach n
 Danach laeuft HUK24 im normalen Scan mit:
 
 ```bash
-../venv/bin/python agents/invoices.py --once
+../venv/bin/python invoice/invoices.py --once
 ```
 
 Nur HUK24 pruefen, ohne den kompletten Rechnungsbestand zu scannen:
 
 ```bash
-../venv/bin/python agents/invoices.py --portal-check huk24
+../venv/bin/python invoice/invoices.py --portal-check huk24
 ```
 
 Der HUK24-Check schreibt Debug-Dateien nach `data/invoices/portal_debug/huk24`, damit man sehen kann, welche Postfach-Seite Playwright wirklich sieht.
@@ -251,19 +275,19 @@ Die Meldung enthaelt den passenden `--portal-login huk24` Befehl.
 Einmaliger Lauf:
 
 ```bash
-../venv/bin/python agents/invoices.py --once
+../venv/bin/python invoice/invoices.py --once
 ```
 
 Dauerbetrieb:
 
 ```bash
-../venv/bin/python agents/invoices.py --watch
+../venv/bin/python invoice/invoices.py --watch
 ```
 
 Bereits bekannte Dateien erneut auswerten, zum Beispiel nach Verbesserungen an der Erkennung:
 
 ```bash
-../venv/bin/python agents/invoices.py --once --reprocess
+../venv/bin/python invoice/invoices.py --once --reprocess
 ```
 
 ## Archiv aufraeumen
@@ -273,13 +297,13 @@ Wenn nach Testlaeufen oder neu aufgebauter Datenbank mehrfach archivierte Dateie
 Nur pruefen:
 
 ```bash
-../venv/bin/python agents/cleanup_archive.py
+../venv/bin/python invoice/cleanup_archive.py
 ```
 
 Unreferenzierte Dateien in ein Backup verschieben:
 
 ```bash
-../venv/bin/python agents/cleanup_archive.py --apply
+../venv/bin/python invoice/cleanup_archive.py --apply
 ```
 
 Das Script loescht nichts direkt. Es verschiebt nach `data/invoices/archive_cleanup_backup/<timestamp>/`.
@@ -291,19 +315,19 @@ Der Steuer-Export erzeugt eine Jahresuebersicht aus der bestehenden `invoices.db
 Start:
 
 ```bash
-../venv/bin/python agents/invoices.py --tax-year 2026
+../venv/bin/python invoice/invoices.py --tax-year 2026
 ```
 
 Erst Rechnungen scannen und danach direkt den Steuer-Export erzeugen:
 
 ```bash
-../venv/bin/python agents/invoices.py --once --tax-year 2026
+../venv/bin/python invoice/invoices.py --once --tax-year 2026
 ```
 
 Der separate Agent bleibt als Kurzweg verfuegbar:
 
 ```bash
-../venv/bin/python agents/tax_export.py --year 2026
+../venv/bin/python invoice/tax_export.py --year 2026
 ```
 
 Ausgabe:
@@ -343,7 +367,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/srv/agents/ai-agent
-ExecStart=/srv/agents/ai-agent/venv/bin/python agents/invoices.py --watch
+ExecStart=/srv/agents/ai-agent/venv/bin/python invoice/invoices.py --watch
 Restart=always
 RestartSec=10
 User=agent
