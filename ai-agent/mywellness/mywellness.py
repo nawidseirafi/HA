@@ -2,7 +2,6 @@ import requests
 from datetime import datetime, timedelta
 import time
 import os
-import json
 import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -36,7 +35,6 @@ from shared.ha_client import HomeAssistantClient
 from mywellness.store import prepared_course_ids, record_run, replace_prepared_courses
 
 LOG_FILE = PROJECT_DIR / "logs" / "mywellness.log"
-CACHE_FILE = BASE_DIR / "mywellness_cache.json"
 
 def load_raw_config() -> dict:
     load_dotenv(PROJECT_DIR / ".env")
@@ -106,49 +104,20 @@ def send_ha_notification(title, message):
         log(f"Fehler bei Home Assistant Notification: {e}")
 
 # =====================
-# DATUM / CACHE
+# DATUM / DATENBANK
 # =====================
 def get_dates():
     current_date = datetime.now().strftime("%Y%m%d")
     target_date = (datetime.now() + timedelta(days=days)).strftime("%Y%m%d")
     return current_date, target_date
 
-def save_course_ids(target_date, course_ids):
-    if not course_ids:
-        log("WARNUNG: Keine Kurs-IDs gefunden. Cache wird geleert.")
-        if os.path.exists(CACHE_FILE):
-            os.remove(CACHE_FILE)
-            log("Cache-Datei gelöscht.")
-        return
-    data = {
-        "created_at": datetime.now().isoformat(),
-        "target_date": target_date,
-        "course_ids": course_ids
-    }
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    log(f"Kurs-IDs gespeichert: {course_ids}")
-
 def load_course_ids(target_date):
     stored_course_ids = prepared_course_ids(target_date)
     if stored_course_ids:
         log(f"Kurs-IDs aus Datenbank geladen: {stored_course_ids}")
         return stored_course_ids
-
-    if not os.path.exists(CACHE_FILE):
-        log("Keine Cache-Datei gefunden.")
-        return {}
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if data.get("target_date") != target_date:
-            log(f"Cache-Datum passt nicht: {data.get('target_date')} statt {target_date}")
-            return {}
-        return data.get("course_ids", {})
-
-    except Exception as e:
-        log(f"Fehler beim Lesen vom Cache: {e}")
-        return {}
+    log("Keine Kurs-IDs in der Datenbank gefunden.")
+    return {}
 
 # =====================
 # PREPARE: KURS-IDS HOLEN
@@ -177,7 +146,6 @@ def prepare_course_ids():
             if event.get("name") in desired_courses
         }
         replace_prepared_courses(target_date, event_items, desired_courses)
-        save_course_ids(target_date, course_ids)
         message = "Vorbereitung abgeschlossen.\n\n"
         message += "Gefunden:\n"
         message += "\n".join(f"{k}: {v}" for k, v in course_ids.items()) or "Keine"

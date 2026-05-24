@@ -220,7 +220,7 @@ Der MyWellness-Agent speichert vorbereitete und live geladene Kursdaten in:
 ai-agent/data/mywellness/mywellness.db
 ```
 
-`mywellness/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `mywellness/mywellness.py book` liest diese Kurs-IDs bevorzugt aus der Datenbank und nutzt `mywellness/mywellness_cache.json` nur noch als Fallback fuer alte Laeufe. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
+`mywellness/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `mywellness/mywellness.py book` liest diese Kurs-IDs aus der Datenbank. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
 
 In `config.yaml`:
 

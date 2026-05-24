@@ -156,7 +156,7 @@ MY_WELLNESS_USER_ID
 MY_WELLNESS_FACILITY_ID
 ```
 
-Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. `mywellness_cache.json` bleibt nur noch als Fallback fuer alte Skript-Laeufe; das Dashboard liest vorbereitete Kurse bevorzugt aus `../ai-agent/data/mywellness/mywellness.db`.
+Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. Vorbereitete Kurse und Live-Kurse liegen in `../ai-agent/data/mywellness/mywellness.db`.
 
 Fehler pruefen:
 

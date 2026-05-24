@@ -18,7 +18,6 @@ from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, PROJECT_DIR
 
 AGENT_SCRIPT = AI_AGENT_DIR / "mywellness" / "mywellness.py"
 AGENT_LOG_FILE = AI_AGENT_DIR / "logs" / "mywellness.log"
-AGENT_CACHE_FILE = AI_AGENT_DIR / "mywellness" / "mywellness_cache.json"
 CONFIG_PATH = API_CONFIG_PATH
 AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
 if str(AI_AGENT_DIR) not in sys.path:
@@ -611,40 +610,7 @@ class MyWellnessService:
 
     def _courses_from_cache(self) -> list[dict[str, Any]]:
         _, target_date = self._dates()
-        prepared_courses = list_prepared_courses(target_date)
-        if prepared_courses:
-            return prepared_courses
-
-        if not AGENT_CACHE_FILE.exists():
-            return []
-        try:
-            data = json.loads(AGENT_CACHE_FILE.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            return []
-        return [
-            {
-                "id": str(course_id),
-                "title": name,
-                "studio": "",
-                "trainer": None,
-                "startTime": data.get("target_date"),
-                "endTime": None,
-                "availableSlots": None,
-                "waitingList": None,
-                "booked": False,
-                "bookable": True,
-                "cancellable": False,
-                "status": "available",
-                "category": "cached",
-                "name": name,
-                "starts_at": data.get("target_date"),
-                "ends_at": None,
-                "location": None,
-                "booking_status": "cached",
-                "is_desired": True,
-            }
-            for name, course_id in (data.get("course_ids") or {}).items()
-        ]
+        return list_prepared_courses(target_date)
 
     def _bookings_from_output(self, output: str) -> list[dict[str, Any]]:
         names = re.findall(r"Erfolgreich gebucht:\s*(.+)", output or "")
