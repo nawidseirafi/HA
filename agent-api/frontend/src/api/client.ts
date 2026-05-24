@@ -122,6 +122,7 @@ export type SettingsInfo = {
   };
   storage: {
     uploads: PathSetting;
+    status_file: PathSetting;
     log_file: PathSetting;
   };
   agents: {

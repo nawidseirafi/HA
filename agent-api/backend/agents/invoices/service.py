@@ -12,11 +12,9 @@ from uuid import uuid4
 import yaml
 from fastapi import HTTPException, UploadFile
 
+from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, API_DIR, PROJECT_DIR
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-PROJECT_DIR = BASE_DIR.parent
-CONFIG_PATH = BASE_DIR / "config.yaml"
-AI_AGENT_DIR = PROJECT_DIR / "ai-agent"
+CONFIG_PATH = API_CONFIG_PATH
 DEFAULT_DB_PATH = AI_AGENT_DIR / "data" / "invoices" / "invoices.db"
 DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
 DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
@@ -56,7 +54,7 @@ def load_config() -> dict[str, Any]:
         return yaml.safe_load(config_file) or {}
 
 
-def resolve_path(value: Any, default_base: Path = BASE_DIR) -> Path:
+def resolve_path(value: Any, default_base: Path = API_DIR) -> Path:
     path = Path(value).expanduser()
     if path.is_absolute():
         return path
@@ -404,7 +402,7 @@ class InvoiceService:
     def _reanalyze_with_ai(self, path: Path):
         if str(AI_AGENT_DIR) not in sys.path:
             sys.path.insert(0, str(AI_AGENT_DIR))
-        from agents.invoices import load_raw_config  # type: ignore
+        from invoice.invoices import load_raw_config  # type: ignore
         from invoice.ai_extractor import refine_metadata_with_ai  # type: ignore
         from invoice.extractor import extract_metadata  # type: ignore
         from llm import create_llm_client  # type: ignore

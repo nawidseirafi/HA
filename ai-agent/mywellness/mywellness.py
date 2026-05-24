@@ -35,7 +35,7 @@ if str(PROJECT_DIR) not in sys.path:
 from shared.ha_client import HomeAssistantClient
 from mywellness.store import prepared_course_ids, record_run, replace_prepared_courses
 
-LOG_FILE = BASE_DIR / "mywellness.log"
+LOG_FILE = PROJECT_DIR / "logs" / "mywellness.log"
 CACHE_FILE = BASE_DIR / "mywellness_cache.json"
 
 def load_raw_config() -> dict:

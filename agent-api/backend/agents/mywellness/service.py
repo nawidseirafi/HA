@@ -14,14 +14,12 @@ import httpx
 import yaml
 from fastapi import HTTPException
 
+from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, PROJECT_DIR
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-PROJECT_DIR = BASE_DIR.parent
-AI_AGENT_DIR = PROJECT_DIR / "ai-agent"
 AGENT_SCRIPT = AI_AGENT_DIR / "mywellness" / "mywellness.py"
-AGENT_LOG_FILE = AI_AGENT_DIR / "mywellness" / "mywellness.log"
+AGENT_LOG_FILE = AI_AGENT_DIR / "logs" / "mywellness.log"
 AGENT_CACHE_FILE = AI_AGENT_DIR / "mywellness" / "mywellness_cache.json"
-CONFIG_PATH = BASE_DIR / "config.yaml"
+CONFIG_PATH = API_CONFIG_PATH
 AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
 if str(AI_AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AI_AGENT_DIR))

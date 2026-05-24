@@ -3,8 +3,8 @@ from typing import Optional
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from backend.invoice.files import FileService
-from backend.invoice.service import InvoiceService
+from backend.agents.invoices.file_service import FileService
+from backend.agents.invoices.service import InvoiceService
 
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])

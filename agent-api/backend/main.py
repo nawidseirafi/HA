@@ -1,23 +1,20 @@
 import logging
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.auth.routes import router as auth_router
-from backend.invoice.export_routes import router as export_router
-from backend.invoice.routes import router as invoice_router
-from backend.market.routes import router as market_router
-from backend.mywellness.routes import router as mywellness_router
-from backend.settings.routes import router as settings_router
-from backend.auth.service import user_from_request
+from backend.agents.invoices.export_routes import router as export_router
+from backend.agents.invoices.routes import router as invoice_router
+from backend.agents.market.routes import router as market_router
+from backend.agents.mywellness.routes import router as mywellness_router
+from backend.api.auth_routes import router as auth_router
+from backend.api.settings_routes import router as settings_router
+from backend.paths import FRONTEND_DIST, LOG_DIR
+from backend.services.auth_service import user_from_request
 
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-LOG_DIR = BASE_DIR / "logs"
-FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
@@ -64,14 +61,14 @@ app.include_router(market_router)
 
 @app.on_event("startup")
 def start_schedulers() -> None:
-    from backend.mywellness.routes import mywellness_service
+    from backend.agents.mywellness.routes import mywellness_service
 
     mywellness_service.start_scheduler()
 
 
 @app.on_event("shutdown")
 def stop_schedulers() -> None:
-    from backend.mywellness.routes import mywellness_service
+    from backend.agents.mywellness.routes import mywellness_service
 
     mywellness_service.stop_scheduler()
 

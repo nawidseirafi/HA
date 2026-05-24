@@ -9,20 +9,23 @@ Lokale FastAPI-Schnittstelle und React-Weboberflaeche fuer lokale Agenten. Der R
 ```text
 agent-api/
 ├── backend/
-│   ├── main.py              # FastAPI-App + Router-Registrierung (Uvicorn-Entry)
-│   ├── auth/                # Login, JWT
-│   ├── settings/            # Diagnose/Konfiguration
-│   ├── invoice/             # Rechnungs-API + Export
-│   ├── market/              # Boersen-API (ruft ai-agent/market/market.py)
-│   └── mywellness/          # Booking-API (ruft ai-agent/mywellness/mywellness.py)
+│   ├── main.py
+│   ├── paths.py
+│   ├── api/                  # Querschnitts-APIs: Auth, Settings
+│   ├── services/             # Querschnitts-Services
+│   └── agents/
+│       ├── invoices/         # InvoiceAgent API, Service, Exporte, Dateien
+│       ├── market/           # MarketAgent API, Agent, Analyse-/Datenservices
+│       └── mywellness/       # MyWellness API, Agent, Scheduler-Service
 ├── frontend/
-│   └── src/                 # React + Vite UI
+│   └── src/
 ├── logs/
 ├── config.yaml
+├── main.py
 └── requirements.txt
 ```
 
-Die eigentliche Domaenenlogik der Agenten liegt unter `../ai-agent/`. Das Backend importiert Read-Module direkt via `sys.path` und startet schwere Laeufe per `subprocess` ueber die CLIs unter `../ai-agent/<domain>/<domain>.py` (z.B. `mywellness/mywellness.py`, `market/market.py`, `invoice/invoices.py`).
+`main.py` im Root bleibt als kleiner Kompatibilitaets-Einstieg fuer `uvicorn main:app`. Der eigentliche Backend-Code liegt unter `backend/`. Agent-spezifische Routen und Services liegen jeweils zusammen unter `backend/agents/<agent>/`; neue KI-Agenten sollten dort als eigenes Package ergaenzt werden.
 
 Backend:
 
@@ -124,11 +127,22 @@ GET  /api/mywellness/bookings
 GET  /api/mywellness/logs
 ```
 
-`POST /api/agent/start` startet den bestehenden `../ai-agent/mywellness/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Persistenter Zustand (Settings, History) liegt in der SQLite-DB `../ai-agent/data/mywellness/mywellness.db`, der Lauf-Status (`is_running`, letzter Output, Kurs-Cache) wird ausschliesslich im Arbeitsspeicher gehalten. Agent-Logs bleiben bei `../ai-agent/mywellness/mywellness.log`.
+`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Persistenter Zustand (Settings, History) liegt in der SQLite-DB `../ai-agent/data/mywellness/mywellness.db`, der Lauf-Status (`is_running`, letzter Output, Kurs-Cache) wird ausschliesslich im Arbeitsspeicher gehalten. Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
 
 `GET /api/mywellness/courses/upcoming` liefert das einheitliche Course-Modell fuer die naechsten 48 Stunden. `POST /api/mywellness/book` und `POST /api/mywellness/cancel` erwarten `{"courseId":"..."}` und fuehren Buchung oder Stornierung ausschliesslich ueber das Backend aus.
 
-Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
+Kompatible alte Endpunkte bleiben aktiv:
+
+```text
+GET  /health
+GET  /agents
+GET  /agents/status
+POST /agents/invoices/run
+POST /agents/invoices/upload
+POST /agents/vacation/run
+```
+
+Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status liegt unter `backend/storage/status.json`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
 
 ## MyWellness Agent
 
@@ -151,7 +165,7 @@ cd agent-api
 ../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in der DB-Tabelle `mywellness_logs` (`../ai-agent/data/mywellness/mywellness.db`), in `../ai-agent/mywellness/mywellness.log` und im UI-Panel "Agent Logs".
+Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in der DB-Tabelle `mywellness_logs` (`../ai-agent/data/mywellness/mywellness.db`), in `../ai-agent/agents/mywellness.log` und im UI-Panel "Agent Logs".
 
 ## Hinweise
 

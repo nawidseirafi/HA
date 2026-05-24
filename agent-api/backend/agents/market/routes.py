@@ -3,11 +3,13 @@ from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.market import service as market_service
-from backend.market.service import store
+from backend.agents.market.agent import MarketAgent
+from backend.agents.market.report_service import MarketReportService
 
 
 router = APIRouter(prefix="/api/market", tags=["market"])
+store = MarketReportService()
+agent = MarketAgent()
 
 
 def payload_dict(payload: BaseModel) -> dict:
@@ -57,12 +59,12 @@ def delete_watchlist_item(item_id: int):
 
 @router.post("/run")
 def run_market_agent():
-    return market_service.run()
+    return agent.run()
 
 
 @router.post("/analyze/{symbol}")
 def analyze_symbol(symbol: str):
-    return market_service.analyze_symbol(symbol)
+    return agent.analyze_symbol(symbol)
 
 
 @router.get("/reports")
