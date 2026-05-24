@@ -123,7 +123,7 @@ GET  /api/mywellness/bookings
 GET  /api/mywellness/logs
 ```
 
-`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Der lokale Status wird in `backend/storage/mywellness_status.json` gespeichert, Kursdaten liegen in `../ai-agent/data/mywellness/mywellness.db`, Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
+`POST /api/agent/start` startet den bestehenden `../ai-agent/agents/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Persistenter Zustand (Settings, History) liegt in der SQLite-DB `../ai-agent/data/mywellness/mywellness.db`, der Lauf-Status (`is_running`, letzter Output, Kurs-Cache) wird ausschliesslich im Arbeitsspeicher gehalten. Agent-Logs bleiben bei `../ai-agent/agents/mywellness.log`.
 
 `GET /api/mywellness/courses/upcoming` liefert das einheitliche Course-Modell fuer die naechsten 48 Stunden. `POST /api/mywellness/book` und `POST /api/mywellness/cancel` erwarten `{"courseId":"..."}` und fuehren Buchung oder Stornierung ausschliesslich ueber das Backend aus.
 
@@ -161,7 +161,7 @@ cd agent-api
 ../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in `backend/storage/mywellness_status.json`, `../ai-agent/agents/mywellness.log` und im UI-Panel "Agent Logs".
+Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in der DB-Tabelle `mywellness_logs` (`../ai-agent/data/mywellness/mywellness.db`), in `../ai-agent/agents/mywellness.log` und im UI-Panel "Agent Logs".
 
 ## Hinweise
 

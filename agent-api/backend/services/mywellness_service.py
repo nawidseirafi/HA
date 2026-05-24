@@ -23,7 +23,6 @@ AGENT_LOG_FILE = AI_AGENT_DIR / "agents" / "mywellness.log"
 AGENT_CACHE_FILE = AI_AGENT_DIR / "agents" / "mywellness_cache.json"
 CONFIG_PATH = BASE_DIR / "config.yaml"
 AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
-STATUS_FILE = BASE_DIR / "backend" / "storage" / "mywellness_status.json"
 if str(AI_AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AI_AGENT_DIR))
 
@@ -70,14 +69,13 @@ def resolve_secret(value: Any, env_values: dict[str, str]) -> str:
 
 class MyWellnessService:
     def __init__(self) -> None:
-        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
         self.process: Optional[subprocess.Popen[str]] = None
         self.lock = threading.Lock()
         self.run_lock = threading.Lock()
         self.scheduler_stop = threading.Event()
         self.scheduler_thread: Optional[threading.Thread] = None
+        self._state: dict[str, Any] = self._default_status()
         self._ensure_schema()
-        self._ensure_status()
 
     def status(self) -> dict[str, Any]:
         settings = self._settings()
@@ -959,27 +957,17 @@ class MyWellnessService:
         return self.run_lock.locked() or (self.process is not None and self.process.poll() is None)
 
     def _ensure_status(self) -> None:
-        if not STATUS_FILE.exists():
-            self._write_status(self._default_status())
+        # legacy no-op: state lives in-memory now.
+        return
 
     def _read_status(self) -> dict[str, Any]:
-        self._ensure_status()
-        try:
-            return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            broken_path = STATUS_FILE.with_suffix(f".broken-{datetime.now().strftime('%Y%m%d%H%M%S')}.json")
-            try:
-                STATUS_FILE.replace(broken_path)
-            except OSError:
-                pass
-            state = self._default_status()
-            state["last_error"] = "Statusdatei war defekt und wurde neu initialisiert."
-            self._write_status(state)
-            self._agent_log(state["last_error"])
-            return state
+        return self._state
 
     def _write_status(self, state: dict[str, Any]) -> None:
-        STATUS_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        # `state` is the same dict as self._state in normal flow; rebind defensively
+        # so callers that build a fresh dict also work.
+        if state is not self._state:
+            self._state = state
 
     def _default_status(self) -> dict[str, Any]:
         return {
