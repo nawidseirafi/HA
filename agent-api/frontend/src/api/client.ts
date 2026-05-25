@@ -334,6 +334,6 @@ export const api = {
   fileUrl: (id: number) => `${API_BASE}/api/invoices/${id}/file`,
   exportUrl: (scope: 'year' | 'month', year: number, month: number | null, type: 'excel' | 'pdf' | 'zip') =>
     scope === 'year'
-      ? `${API_BASE}/api/exports/year/${year}/${type}`
-      : `${API_BASE}/api/exports/month/${year}/${month}/${type}`,
+      ? `${API_BASE}/api/invoices/exports/year/${year}/${type}`
+      : `${API_BASE}/api/invoices/exports/month/${year}/${month}/${type}`,
 };

@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.agents.invoices.export_routes import router as export_router
 from backend.agents.invoices.routes import router as invoice_router
 from backend.agents.market.routes import router as market_router
 from backend.agents.mywellness.routes import router as mywellness_router
@@ -53,7 +52,6 @@ async def require_api_auth(request, call_next):
 
 app.include_router(auth_router)
 app.include_router(invoice_router)
-app.include_router(export_router)
 app.include_router(mywellness_router)
 app.include_router(settings_router)
 app.include_router(market_router)

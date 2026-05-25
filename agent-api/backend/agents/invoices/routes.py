@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
 
+from backend.agents.invoices.export_service import ExportService
 from backend.agents.invoices.file_service import FileService
 from backend.agents.invoices.service import InvoiceService
 
@@ -10,6 +11,7 @@ from backend.agents.invoices.service import InvoiceService
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 invoice_service = InvoiceService()
 file_service = FileService(invoice_service)
+export_service = ExportService(invoice_service)
 
 
 @router.get("/summary")
@@ -50,6 +52,42 @@ def invoice_month(
             "search": search,
         },
     )
+
+
+@router.get("/exports/year/{year}/excel")
+def export_year_excel(year: int) -> FileResponse:
+    path = export_service.excel(year)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get("/exports/year/{year}/pdf")
+def export_year_pdf(year: int) -> FileResponse:
+    path = export_service.pdf_summary(year)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get("/exports/year/{year}/zip")
+def export_year_zip(year: int) -> FileResponse:
+    path = export_service.zip_documents(year)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get("/exports/month/{year}/{month}/excel")
+def export_month_excel(year: int, month: int) -> FileResponse:
+    path = export_service.excel(year, month)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get("/exports/month/{year}/{month}/pdf")
+def export_month_pdf(year: int, month: int) -> FileResponse:
+    path = export_service.pdf_summary(year, month)
+    return FileResponse(path, filename=path.name)
+
+
+@router.get("/exports/month/{year}/{month}/zip")
+def export_month_zip(year: int, month: int) -> FileResponse:
+    path = export_service.zip_documents(year, month)
+    return FileResponse(path, filename=path.name)
 
 
 @router.get("/{invoice_id}")
