@@ -204,8 +204,8 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
               <span className="eyebrow">Prepare</span>
               <h2>Vorgemerkt zur Buchung</h2>
             </div>
-            <button className="button ghost" type="button" onClick={() => navigate({ name: 'mywellnessCourses' })}>
-              Kursliste <ChevronRight size={14} />
+            <button className="button ghost" type="button" onClick={() => navigate({ name: 'mywellnessBookings' })}>
+              Alle ansehen <ChevronRight size={14} />
             </button>
           </div>
           <div className="wellness-booking-timeline">
