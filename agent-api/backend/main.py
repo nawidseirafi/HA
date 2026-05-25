@@ -5,6 +5,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.agents.invoices.routes import router as invoice_router
 from backend.agents.market.routes import router as market_router
@@ -22,6 +23,16 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+
+
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404 and "." not in path.rsplit("/", 1)[-1]:
+                return await super().get_response("index.html", scope)
+            raise
 
 app = FastAPI(
     title="RoboterSteve Agent API",
@@ -112,4 +123,4 @@ def health() -> dict[str, str]:
 
 
 if FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
