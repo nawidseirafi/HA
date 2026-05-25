@@ -99,9 +99,6 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
             <button onClick={runAgent} disabled={busy}>
               <Play size={18} /> Invoice Agent starten
             </button>
-            <button disabled>
-              <BarChart3 size={18} /> Exports
-            </button>
           </>
         )}
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}>
