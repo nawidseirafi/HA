@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,6 +27,7 @@ app = FastAPI(
     title="RoboterSteve Agent API",
     description="Lokale API fuer InvoiceAgent, Verwaltung, Exporte und Uploads.",
     version="0.2.0",
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 app.add_middleware(
@@ -55,6 +57,39 @@ app.include_router(invoice_router)
 app.include_router(mywellness_router)
 app.include_router(settings_router)
 app.include_router(market_router)
+
+
+SECURITY_SCHEME_NAME = "BearerAuth"
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    components = schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes[SECURITY_SCHEME_NAME] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT aus POST /api/auth/login als Bearer Token verwenden.",
+    }
+    for path, methods in schema.get("paths", {}).items():
+        if not path.startswith("/api/") or path in PUBLIC_API_PATHS:
+            continue
+        for operation in methods.values():
+            if isinstance(operation, dict):
+                operation.setdefault("security", [{SECURITY_SCHEME_NAME: []}])
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 @app.on_event("startup")
