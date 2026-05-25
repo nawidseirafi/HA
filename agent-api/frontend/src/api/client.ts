@@ -60,6 +60,9 @@ export type MyWellnessSettingsPayload = {
 export type MyWellnessHealthSettings = {
   id?: number;
   enabled: boolean;
+  profile_birth_date?: string;
+  profile_supplements?: string;
+  profile_notes?: string;
   ha_entity_steps?: string;
   ha_entity_active_calories?: string;
   ha_entity_resting_heart_rate?: string;

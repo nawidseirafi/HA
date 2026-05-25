@@ -194,6 +194,50 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
         <div className="wellness-settings-section-head">
           <span><Activity size={18} /></span>
           <div>
+            <h3>Wellness-Profil</h3>
+            <p>Diese Angaben nutzt nur die Wellness-Analyse als Kontext.</p>
+          </div>
+        </div>
+        <div className="wellness-settings-grid">
+          <label className="wellness-field">
+            <small>Geburtsdatum</small>
+            <input
+              type="date"
+              value={healthSettings?.profile_birth_date ?? ''}
+              onChange={(event) => setHealthField('profile_birth_date', event.target.value)}
+            />
+          </label>
+          <label className="wellness-field wide">
+            <small>Supplements</small>
+            <textarea
+              value={healthSettings?.profile_supplements ?? ''}
+              onChange={(event) => setHealthField('profile_supplements', event.target.value)}
+              rows={4}
+              placeholder="B12, Vitamin D, Magnesium"
+            />
+          </label>
+          <label className="wellness-field wide">
+            <small>Notizen</small>
+            <textarea
+              value={healthSettings?.profile_notes ?? ''}
+              onChange={(event) => setHealthField('profile_notes', event.target.value)}
+              rows={3}
+              placeholder="z. B. Trainingsziel, Alltag, Schlafrhythmus"
+            />
+          </label>
+        </div>
+        <div className="wellness-settings-footer">
+          <button className="button secondary" type="button" disabled={healthLoading || !healthSettings} onClick={saveHealthSettings}>
+            <Save size={18} />
+            Profil speichern
+          </button>
+        </div>
+      </section>
+
+      <section className="wellness-settings-section">
+        <div className="wellness-settings-section-head">
+          <span><Activity size={18} /></span>
+          <div>
             <h3>Health / Home Assistant</h3>
             <p>Ordne Home-Assistant-Entities den Health-Metriken zu. Fehlende Werte bleiben leer.</p>
           </div>

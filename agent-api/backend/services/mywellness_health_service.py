@@ -14,6 +14,9 @@ def utc_now() -> str:
 
 class MyWellnessHealthService:
     entity_fields = (
+        "profile_birth_date",
+        "profile_supplements",
+        "profile_notes",
         "ha_entity_steps",
         "ha_entity_active_calories",
         "ha_entity_resting_heart_rate",
@@ -232,6 +235,7 @@ class MyWellnessHealthService:
         scores = self._scores(metrics)
         courses = self._recent_courses()
         payload = {
+            "user_profile": self._profile_payload(),
             "metrics": self._ai_metrics(metrics),
             "withings": self._withings_payload(metrics),
             "recovery_score": scores["recovery_score"],
@@ -347,6 +351,9 @@ class MyWellnessHealthService:
                 create table if not exists mywellness_health_settings (
                     id integer primary key check (id = 1),
                     enabled integer not null default 1,
+                    profile_birth_date text,
+                    profile_supplements text,
+                    profile_notes text,
                     ha_entity_steps text,
                     ha_entity_active_calories text,
                     ha_entity_resting_heart_rate text,
@@ -389,7 +396,12 @@ class MyWellnessHealthService:
             self._ensure_columns(
                 connection,
                 "mywellness_health_settings",
-                {field: "text" for field in self.withings_metric_fields.values()},
+                {
+                    "profile_birth_date": "text",
+                    "profile_supplements": "text",
+                    "profile_notes": "text",
+                    **{field: "text" for field in self.withings_metric_fields.values()},
+                },
             )
             connection.execute(
                 """
@@ -405,6 +417,9 @@ class MyWellnessHealthService:
         return {
             "id": 1,
             "enabled": True,
+            "profile_birth_date": "",
+            "profile_supplements": "",
+            "profile_notes": "",
             "ha_entity_steps": "",
             "ha_entity_active_calories": "",
             "ha_entity_resting_heart_rate": "",
@@ -589,6 +604,16 @@ class MyWellnessHealthService:
 
     def _ai_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
         return {field: metrics.get(field) for field in self.metric_fields}
+
+    def _profile_payload(self) -> dict[str, Any]:
+        settings = self.settings()
+        supplements_text = str(settings.get("profile_supplements") or "")
+        supplements = [item.strip() for item in supplements_text.replace("\n", ",").split(",") if item.strip()]
+        return {
+            "birth_date": settings.get("profile_birth_date") or None,
+            "supplements": supplements,
+            "notes": settings.get("profile_notes") or None,
+        }
 
     def _withings_payload(self, metrics: dict[str, Any]) -> dict[str, Any]:
         return {

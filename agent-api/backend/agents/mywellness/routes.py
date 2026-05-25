@@ -36,6 +36,9 @@ class SettingsPayload(BaseModel):
 
 class HealthSettingsPayload(BaseModel):
     enabled: Optional[bool] = None
+    profile_birth_date: Optional[str] = None
+    profile_supplements: Optional[str] = None
+    profile_notes: Optional[str] = None
     ha_entity_steps: Optional[str] = None
     ha_entity_active_calories: Optional[str] = None
     ha_entity_resting_heart_rate: Optional[str] = None
