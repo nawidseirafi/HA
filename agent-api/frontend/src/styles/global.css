@@ -2165,6 +2165,18 @@ label.check input[type="checkbox"]:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
+.settings-section-title {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 2px 0;
+}
+.settings-section-title h2 {
+  margin-top: 4px;
+  font-size: 18px;
+}
 .settings-card {
   display: grid;
   gap: 12px;
@@ -2195,6 +2207,24 @@ label.check input[type="checkbox"]:disabled {
 .settings-row span {
   color: var(--muted);
   text-align: right;
+  overflow-wrap: anywhere;
+}
+.settings-path-row {
+  align-items: start;
+}
+.settings-path-value {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.settings-path-value code {
+  max-width: 100%;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .settings-badge {

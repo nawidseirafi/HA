@@ -4,7 +4,6 @@ server:
 
 storage:
   uploads_dir: ../ai-agent/data/invoices/inbox
-  status_file: backend/storage/status.json
 
 logging:
   file: logs/agent-api.log

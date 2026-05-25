@@ -8,15 +8,26 @@ function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
 
 function PathRow({ label, value }: { label: string; value: PathSetting }) {
   return (
-    <div className="settings-row">
+    <div className="settings-row settings-path-row">
       <strong>{label}</strong>
-      <span title={value.path}>{value.path || '-'} <StatusBadge ok={value.exists} label={value.exists ? 'vorhanden' : 'fehlt'} /></span>
+      <span className="settings-path-value" title={value.path}>
+        <code>{value.path || '-'}</code>
+        <StatusBadge ok={value.exists} label={value.exists ? 'vorhanden' : 'fehlt'} />
+      </span>
     </div>
   );
 }
 
 function SettingRow({ label, value }: { label: string; value: string | number | boolean | null | undefined }) {
-  const display = typeof value === 'boolean' ? (value ? 'Ja' : 'Nein') : (value ?? '-');
+  if (typeof value === 'boolean') {
+    return (
+      <div className="settings-row">
+        <strong>{label}</strong>
+        <span><StatusBadge ok={value} label={value ? 'Ja' : 'Nein'} /></span>
+      </div>
+    );
+  }
+  const display = value ?? '-';
   return (
     <div className="settings-row">
       <strong>{label}</strong>
@@ -62,6 +73,11 @@ export function SettingsPage() {
       {!settings && !error && <section className="panel settings-list">Settings werden geladen...</section>}
       {settings && (
         <section className="settings-grid">
+          <div className="settings-section-title">
+            <span className="eyebrow">System</span>
+            <h2>API, Auth und Dateien</h2>
+          </div>
+
           <article className="panel settings-card">
             <div className="settings-card-head">
               <div>
@@ -109,9 +125,13 @@ export function SettingsPage() {
               </div>
             </div>
             <PathRow label="Uploads" value={settings.storage.uploads} />
-            <PathRow label="Statusdatei" value={settings.storage.status_file} />
             <PathRow label="Logdatei" value={settings.storage.log_file} />
           </article>
+
+          <div className="settings-section-title">
+            <span className="eyebrow">Agenten</span>
+            <h2>Konfiguration und Speicherorte</h2>
+          </div>
 
           <article className="panel settings-card">
             <div className="settings-card-head">
@@ -148,21 +168,6 @@ export function SettingsPage() {
             </div>
           </article>
 
-          <article className="panel settings-card">
-            <div className="settings-card-head">
-              <div>
-                <span className="eyebrow">Integration</span>
-                <h2>KI & Home Assistant</h2>
-              </div>
-            </div>
-            <SettingRow label="LLM Provider" value={settings.integrations.llm.provider} />
-            <SettingRow label="LLM Modell" value={settings.integrations.llm.model} />
-            <SettingRow label="API Key gesetzt" value={settings.integrations.llm.api_key_configured} />
-            <SettingRow label="HA Token gesetzt" value={settings.integrations.home_assistant.configured} />
-            <SettingRow label="HA Notifications" value={settings.integrations.home_assistant.notifications_enabled} />
-            <SettingRow label="Notify Service" value={settings.integrations.home_assistant.notify_service || '-'} />
-          </article>
-
           {settings.agents.market && (
             <article className="panel settings-card">
               <div className="settings-card-head">
@@ -179,6 +184,26 @@ export function SettingsPage() {
               <SettingRow label="Hinweis" value={settings.agents.market.disclaimer} />
             </article>
           )}
+
+          <div className="settings-section-title">
+            <span className="eyebrow">Integrationen</span>
+            <h2>KI, Home Assistant und Sicherheit</h2>
+          </div>
+
+          <article className="panel settings-card">
+            <div className="settings-card-head">
+              <div>
+                <span className="eyebrow">Integration</span>
+                <h2>KI & Home Assistant</h2>
+              </div>
+            </div>
+            <SettingRow label="LLM Provider" value={settings.integrations.llm.provider} />
+            <SettingRow label="LLM Modell" value={settings.integrations.llm.model} />
+            <SettingRow label="API Key gesetzt" value={settings.integrations.llm.api_key_configured} />
+            <SettingRow label="HA Token gesetzt" value={settings.integrations.home_assistant.configured} />
+            <SettingRow label="HA Notifications" value={settings.integrations.home_assistant.notifications_enabled} />
+            <SettingRow label="Notify Service" value={settings.integrations.home_assistant.notify_service || '-'} />
+          </article>
 
           <article className="panel settings-card">
             <div className="settings-card-head">

@@ -144,7 +144,7 @@ POST /agents/invoices/upload
 POST /agents/vacation/run
 ```
 
-Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Der Agent-Status liegt unter `backend/storage/status.json`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
+Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Persistente Agent-Daten liegen in den jeweiligen SQLite-Datenbanken unter `../ai-agent/data`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
 
 ## MyWellness Agent
 

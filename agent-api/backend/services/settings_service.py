@@ -121,7 +121,6 @@ def get_settings() -> dict[str, Any]:
         },
         "storage": {
             "uploads": _path_info(BASE_DIR, storage_config.get("uploads_dir")),
-            "status_file": _path_info(BASE_DIR, storage_config.get("status_file")),
             "log_file": _path_info(BASE_DIR, api_config.get("logging", {}).get("file")),
         },
         "agents": {
