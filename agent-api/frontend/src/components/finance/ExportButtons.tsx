@@ -35,7 +35,7 @@ export function ExportButtons({ year, month, compact = false }: Props) {
   };
 
   return (
-    <div className={compact ? 'export-compact' : 'button-row'}>
+    <div className={compact ? 'export-compact' : 'export-actions'}>
       <button className="button secondary" type="button" onClick={() => exportFile('excel')} disabled={busy !== null}>
         <Download size={16} /> {busy === `${scope}-excel` ? 'Exportiere...' : compact ? 'Monats-Excel' : 'Excel'}
       </button>
