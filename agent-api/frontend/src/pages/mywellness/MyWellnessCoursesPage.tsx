@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Settings } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import type { Route } from '../../App';
-import { api, type AgentStatus, type Course, type MyWellnessSettingsPayload } from '../../api/client';
+import { api, type Course } from '../../api/client';
 import { WellnessCourseGrid } from '../../components/mywellness/WellnessCourseGrid';
 import { WellnessDaySelector, type WellnessDay } from '../../components/mywellness/WellnessDaySelector';
-import { WellnessSettingsDrawer } from '../../components/mywellness/WellnessSettingsDrawer';
 
 export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (route: Route) => void }) {
-  const [status, setStatus] = useState<AgentStatus | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [day, setDay] = useState<WellnessDay>('today');
   const [actionCourseId, setActionCourseId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -20,8 +17,7 @@ export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (rout
     if (!silent) setLoading(true);
     setError('');
     try {
-      const [nextStatus, nextCourses] = await Promise.all([api.mywellnessStatus(), api.mywellnessUpcomingCourses()]);
-      setStatus(nextStatus);
+      const nextCourses = await api.mywellnessUpcomingCourses();
       setCourses(nextCourses);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kurse konnten nicht geladen werden.');
@@ -62,12 +58,6 @@ export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (rout
     }
   };
 
-  const saveSettings = async (payload: MyWellnessSettingsPayload) => {
-    setStatus(await api.updateMywellnessSettings(payload));
-    setDrawerOpen(false);
-    await load(true);
-  };
-
   return (
     <div className="page-stack wellness-app">
       <header className="wellness-hero-header compact">
@@ -78,14 +68,12 @@ export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (rout
         </div>
         <div className="button-row">
           <button className="icon-button" type="button" onClick={() => load()} disabled={loading} aria-label="Kurse aktualisieren"><RefreshCw size={19} /></button>
-          <button className="icon-button" type="button" onClick={() => setDrawerOpen(true)} aria-label="Einstellungen öffnen"><Settings size={19} /></button>
         </div>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
       {notice && <section className="panel success-panel">{notice}</section>}
       <WellnessDaySelector value={day} courses={courses} onChange={setDay} />
       <WellnessCourseGrid courses={courses} day={day} actionCourseId={actionCourseId} onBook={bookCourse} onCancel={cancelCourse} />
-      <WellnessSettingsDrawer open={drawerOpen} status={status} loading={loading} onClose={() => setDrawerOpen(false)} onSave={saveSettings} />
     </div>
   );
 }
