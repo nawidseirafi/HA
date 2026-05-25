@@ -10,15 +10,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # KONFIGURATION
 # =====================
 HA_URL = "http://homeassistant.local:8123"
-HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI3ZTEzNGQ3MTg0MDY0OGVjODI1MTZiMzE5YTI5ZGMzNyIsImlhdCI6MTc3NzcwMDAwOCwiZXhwIjoyMDkzMDYwMDA4fQ.10lZSyvgqa5bNU26YfPQ2IXiGTzbf9wb5heevOGdNVc"
+HA_TOKEN = os.getenv("HA_TOKEN", "")
 HA_NOTIFY_SERVICE = "notify.mobile_app_system_error_404"
 
-auth_token = 'MjAyNjAzMjcwODE3NTZ8NTAzZjA4MjQzOTRlNGNiNGFhZDk4OWUxMmQ3ZGI2MDZ8ZWMxZDM4ZDdkMzU5NDhkMGE2MGNkOGMwYjhmYjlkZjl8M3xXLiBFdXJvcGUgU3RhbmRhcmQgVGltZXxkZS1ERXxiNDdjMjMzMmNkMDM0YmFhYjBmZGEyNmIzMmVhZGMzYXx8fHwxfDF8MHwxMDB8fHw1OHw1OTI0fDB8Y29tLm15d2VsbG5lc3M1.FE4BFC3113662FA448A2B44154CAB6CA28363BE996FA1A4E599438029EE6A32185BAFA31EBFD7ECD22512618E2B3BEC36103B9D82961F32857BA0FD173B5518A'
-userId = 'b47c2332-cd03-4baa-b0fd-a26b32eadc3a'
+auth_token = os.getenv("MY_WELLNESS_TOKEN", "")
+userId = os.getenv("MY_WELLNESS_USER_ID", "")
 desired_courses = ['Cross-Power', 'Body Workout', 'Functional Training']  # Kurse die gebucht werden sollen
 days = 2  # Anzahl der Tage im Voraus
 
-FACILITY_ID = "0273e18b-52bf-404e-afa6-8bfb2eeccbad"
+FACILITY_ID = os.getenv("MY_WELLNESS_FACILITY_ID", "")
 
 # Empfehlung:
 # 20:58:00 -> MODE = "prepare"
