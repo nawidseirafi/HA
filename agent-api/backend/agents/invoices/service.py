@@ -327,9 +327,7 @@ class InvoiceService:
 
     def reanalyze(self, invoice_id: int) -> dict[str, Any]:
         invoice = self.get(invoice_id)
-        path = Path(invoice.get("stored_path") or invoice.get("archive_path") or invoice.get("source_path") or "")
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Document file not found")
+        path = self._resolve_document_path(invoice.get("stored_path") or invoice.get("archive_path") or invoice.get("source_path"))
         try:
             metadata = self._reanalyze_with_ai(path)
         except Exception as exc:
@@ -392,12 +390,35 @@ class InvoiceService:
     def document_path(self, invoice_id: int) -> Path:
         invoice = self.get(invoice_id)
         raw_path = invoice.get("stored_path") or invoice.get("archive_path") or invoice.get("source_path")
+        return self._resolve_document_path(raw_path)
+
+    def _resolve_document_path(self, raw_path: Any) -> Path:
         if not raw_path:
             raise HTTPException(status_code=404, detail="No document path stored")
-        path = Path(raw_path)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Document file not found")
-        return path
+
+        path = Path(str(raw_path)).expanduser()
+        candidates = [path]
+
+        if not path.is_absolute():
+            candidates.append((AI_AGENT_DIR / path).resolve())
+            candidates.append((API_DIR / path).resolve())
+
+        parts = path.parts
+        for index in range(len(parts) - 1):
+            if parts[index] == "data" and parts[index + 1] == "invoices":
+                candidates.append((AI_AGENT_DIR / Path(*parts[index:])).resolve())
+                break
+
+        if path.name:
+            for root in (self.archive_dir, self.inbox_dir, AI_AGENT_DIR / "data" / "invoices" / "review"):
+                if root.exists():
+                    candidates.extend(root.rglob(path.name))
+
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return candidate
+
+        raise HTTPException(status_code=404, detail=f"Document file not found: {path.name or raw_path}")
 
     def _reanalyze_with_ai(self, path: Path):
         if str(AI_AGENT_DIR) not in sys.path:

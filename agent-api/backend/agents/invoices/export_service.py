@@ -53,8 +53,12 @@ class ExportService:
             for row in rows:
                 writer.writerow(_invoice_row(row))
                 stored_path = row.get("stored_path") or row.get("archive_path") or row.get("source_path")
-                if stored_path and Path(stored_path).exists():
-                    archive.write(stored_path, arcname=Path(stored_path).name)
+                if stored_path:
+                    try:
+                        document_path = self.invoice_service._resolve_document_path(stored_path)
+                    except Exception:
+                        continue
+                    archive.write(document_path, arcname=document_path.name)
             archive.writestr("index.csv", csv_buffer.getvalue())
         return path
 
