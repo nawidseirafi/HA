@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -64,9 +65,33 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     connection.commit()
 
 
+def load_agent_settings() -> dict[str, Any]:
+    try:
+        with connect() as connection:
+            row = connection.execute(
+                "select days, desired_courses from mywellness_settings where id = 1"
+            ).fetchone()
+    except sqlite3.Error:
+        row = None
+    if row is None:
+        return {"days": 2, "desired_courses": []}
+    try:
+        desired_courses = json.loads(row["desired_courses"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        desired_courses = []
+    return {
+        "days": int(row["days"] or 2),
+        "desired_courses": [str(course).strip() for course in desired_courses if str(course).strip()],
+    }
+
+
 def replace_prepared_courses(target_date: str, event_items: Iterable[dict[str, Any]], desired_courses: Iterable[str]) -> None:
-    desired = set(desired_courses)
-    courses = [course_from_event(item, source="prepare", is_desired=item.get("name") in desired) for item in event_items if item.get("name") in desired]
+    desired = [str(course).strip() for course in desired_courses if str(course).strip()]
+    courses = [
+        course_from_event(item, source="prepare", is_desired=True)
+        for item in event_items
+        if desired and _matches_desired_course(str(item.get("name") or ""), desired)
+    ]
     with connect() as connection:
         connection.execute("delete from courses where source = 'prepare' and partition_date = ?", (target_date,))
         upsert_courses(connection, courses)
@@ -253,7 +278,19 @@ def course_row_to_api(row: sqlite3.Row) -> dict[str, Any]:
         "booking_status": row["status"],
         "is_desired": bool(row["is_desired"]),
         "is_participant": bool(row["booked"]),
+        "source": row["source"],
     }
+
+
+def _normalize_course_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def _matches_desired_course(course_name: str, desired_courses: Iterable[str]) -> bool:
+    normalized_name = _normalize_course_name(course_name)
+    if not normalized_name:
+        return False
+    return any(_normalize_course_name(desired) in normalized_name for desired in desired_courses)
 
 
 def record_run(mode: str, status: str, started_at: str, finished_at: Optional[str] = None, message: str = "") -> None:

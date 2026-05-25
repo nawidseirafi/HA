@@ -12,8 +12,7 @@ import yaml
 # KONFIGURATION
 # =====================
 HA_NOTIFY_SERVICE = "notify.mobile_app_system_error_404"
-desired_courses = ['Cross-Power', 'Body Workout', 'Functional Training']  # Kurse die gebucht werden sollen
-days = 2  # Anzahl der Tage im Voraus
+DEFAULT_DESIRED_COURSES = ['Cross-Power', 'Body Workout', 'Functional Training']
 
 
 # Empfehlung:
@@ -28,11 +27,18 @@ RETRY_DELAY = 0.1  # Schneller Retry
 REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
-if str(PROJECT_DIR) not in sys.path:
-    sys.path.insert(0, str(PROJECT_DIR))
+if str(BASE_DIR) in sys.path:
+    sys.path.remove(str(BASE_DIR))
+if str(PROJECT_DIR) in sys.path:
+    sys.path.remove(str(PROJECT_DIR))
+sys.path.insert(0, str(PROJECT_DIR))
 
 from shared.ha_client import HomeAssistantClient
-from mywellness.store import prepared_course_ids, record_run, replace_prepared_courses
+from mywellness.store import load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
+
+agent_settings = load_agent_settings()
+desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES
+days = int(agent_settings["days"] or 2)
 
 LOG_FILE = PROJECT_DIR / "logs" / "mywellness.log"
 
@@ -124,6 +130,7 @@ def load_course_ids(target_date):
 # =====================
 def prepare_course_ids():
     current_date, target_date = get_dates()
+    log(f"Prepare sucht Kurse fuer {target_date}: {', '.join(desired_courses)}")
     facility_id = mywellness_config().get("facility_id", "")
     search_url = (
         f"https://services.mywellness.com/Core/Facility/{facility_id}/"
@@ -140,15 +147,14 @@ def prepare_course_ids():
         response.raise_for_status()
         data = response.json()
         event_items = data.get("data", {}).get("eventItems", [])
-        course_ids = {
-            event["name"]: event["id"]
-            for event in event_items
-            if event.get("name") in desired_courses
-        }
         replace_prepared_courses(target_date, event_items, desired_courses)
+        course_ids = prepared_course_ids(target_date)
         message = "Vorbereitung abgeschlossen.\n\n"
         message += "Gefunden:\n"
         message += "\n".join(f"{k}: {v}" for k, v in course_ids.items()) or "Keine"
+        if not course_ids:
+            names = [str(event.get("name")) for event in event_items if event.get("name")]
+            log("Keine Wunschkurse gefunden. Geladene Kurse: " + (", ".join(names[:40]) if names else "Keine"))
         log(message)
         if course_ids:
             send_ha_notification("Kurs-IDs vorbereitet", message)
@@ -227,21 +233,18 @@ def book_saved_course_ids():
     
     all_results = []
     successful_bookings = []
-    max_workers = max(1, len(desired_courses))
+    max_workers = max(1, len(course_ids))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {}
-        for course_name in desired_courses:
-            if course_name in course_ids:
-                futures[
-                    executor.submit(
-                        try_booking_course,
-                        course_name,
-                        course_ids[course_name],
-                        target_date
-                    )
-                ] = course_name
-            else:
-                all_results.append(f"{course_name}: Keine Kurs-ID gespeichert.")
+        for course_name, course_id in course_ids.items():
+            futures[
+                executor.submit(
+                    try_booking_course,
+                    course_name,
+                    course_id,
+                    target_date
+                )
+            ] = course_name
         for future in as_completed(futures):
             course_name = futures[future]
             try:

@@ -28,7 +28,8 @@ function category(course: Course) {
 
 function badges(course: Course) {
   const result = [];
-  if (course.is_desired) result.push('Empfohlen');
+  if (course.source === 'prepare') result.push('Vorgemerkt');
+  else if (course.is_desired) result.push('Empfohlen');
   if ((course.availableSlots ?? 99) <= 2 && course.status === 'available') result.push('Fast ausgebucht');
   if (course.waitingList) result.push('Warteliste');
   return result;
@@ -36,7 +37,7 @@ function badges(course: Course) {
 
 export function WellnessCourseCard({ course, busy, onBook, onCancel }: Props) {
   return (
-    <article className={`wellness-course-card ${course.status}`}>
+    <article className={`wellness-course-card ${course.status} ${course.source === 'prepare' ? 'prepared' : ''}`}>
       <div className="wellness-course-top">
         <span className={`booking-pill ${course.status}`}>{statusLabel[course.status] ?? course.status}</span>
         <small>{category(course)}</small>

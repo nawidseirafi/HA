@@ -951,6 +951,15 @@ class MyWellnessService:
 
     def _extract_error(self, output: str) -> Optional[str]:
         for line in reversed((output or "").splitlines()):
-            if self._output_has_error(line):
-                return line[-500:]
+            cleaned = line.strip()
+            if not cleaned:
+                continue
+            if cleaned.startswith(("File ", "Traceback ")):
+                continue
+            if self._output_has_error(cleaned):
+                return cleaned[-500:]
+        for line in reversed((output or "").splitlines()):
+            cleaned = line.strip()
+            if cleaned:
+                return cleaned[-500:]
         return None

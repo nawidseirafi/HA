@@ -11,6 +11,7 @@ import { formatCourseDate, parseCourseDate } from '../../components/mywellness/c
 export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [bookings, setBookings] = useState<Course[]>([]);
+  const [prepared, setPrepared] = useState<Course[]>([]);
   const [upcoming, setUpcoming] = useState<Course[]>([]);
   const [logs, setLogs] = useState<MyWellnessLog[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -23,15 +24,17 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
     if (!silent) setLoading(true);
     setError('');
     try {
-      const [nextStatus, nextBookings, nextLogs, nextUpcoming] = await Promise.all([
+      const [nextStatus, nextBookings, nextLogs, nextPrepared, nextUpcoming] = await Promise.all([
         api.mywellnessStatus(),
         api.mywellnessBookings(),
         api.mywellnessLogs(),
+        api.mywellnessCourses().catch(() => [] as Course[]),
         api.mywellnessUpcomingCourses().catch(() => [] as Course[]),
       ]);
       setStatus(nextStatus);
       setBookings(nextBookings);
       setLogs(nextLogs.items ?? []);
+      setPrepared(nextPrepared);
       setUpcoming(nextUpcoming);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'MyWellness konnte nicht geladen werden.');
@@ -139,6 +142,16 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
       .slice(0, 6);
   }, [upcoming]);
 
+  const preparedPreview = useMemo(() => {
+    return [...prepared]
+      .sort((left, right) => {
+        const a = parseCourseDate(left.startTime ?? left.starts_at)?.getTime() ?? 0;
+        const b = parseCourseDate(right.startTime ?? right.starts_at)?.getTime() ?? 0;
+        return a - b;
+      })
+      .slice(0, 6);
+  }, [prepared]);
+
   return (
     <div className="page-stack wellness-app">
       <header className="wellness-hero-header compact">
@@ -160,27 +173,53 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
         onBook={() => run('book')}
       />
 
-      <section className="wellness-booking-summary dense">
-        <div className="section-title">
-          <div>
-            <span className="eyebrow">Aktuell</span>
-            <h2>Deine Buchungen</h2>
+      <section className="wellness-summary-grid">
+        <div className="wellness-booking-summary dense">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">Aktuell</span>
+              <h2>Deine Buchungen</h2>
+            </div>
+            <button className="button ghost" type="button" onClick={() => navigate({ name: 'mywellnessBookings' })}>
+              Alle ansehen <ChevronRight size={14} />
+            </button>
           </div>
-          <button className="button ghost" type="button" onClick={() => navigate({ name: 'mywellnessBookings' })}>
-            Alle ansehen <ChevronRight size={14} />
-          </button>
+          <div className="wellness-booking-timeline">
+            {bookings.slice(0, 4).map((booking) => (
+              <article key={`${booking.id}-${booking.startTime ?? booking.starts_at}`}>
+                <span><CalendarCheck size={16} /></span>
+                <div>
+                  <strong>{booking.title}</strong>
+                  <small>{formatCourseDate(booking.startTime ?? booking.starts_at)}</small>
+                </div>
+              </article>
+            ))}
+            {bookings.length === 0 && <div className="wellness-empty-state"><Dumbbell size={18} /> Keine aktuellen Buchungen.</div>}
+          </div>
         </div>
-        <div className="wellness-booking-timeline">
-          {bookings.slice(0, 4).map((booking) => (
-            <article key={`${booking.id}-${booking.startTime ?? booking.starts_at}`}>
-              <span><CalendarCheck size={16} /></span>
-              <div>
-                <strong>{booking.title}</strong>
-                <small>{formatCourseDate(booking.startTime ?? booking.starts_at)}</small>
-              </div>
-            </article>
-          ))}
-          {bookings.length === 0 && <div className="wellness-empty-state"><Dumbbell size={18} /> Keine aktuellen Buchungen.</div>}
+
+        <div className="wellness-booking-summary dense">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">Prepare</span>
+              <h2>Vorgemerkt zur Buchung</h2>
+            </div>
+            <button className="button ghost" type="button" onClick={() => navigate({ name: 'mywellnessCourses' })}>
+              Kursliste <ChevronRight size={14} />
+            </button>
+          </div>
+          <div className="wellness-booking-timeline">
+            {preparedPreview.map((course) => (
+              <article key={`${course.id}-${course.startTime ?? course.starts_at}-prepared`}>
+                <span><Dumbbell size={16} /></span>
+                <div>
+                  <strong>{course.title}</strong>
+                  <small>{formatCourseDate(course.startTime ?? course.starts_at)}</small>
+                </div>
+              </article>
+            ))}
+            {preparedPreview.length === 0 && <div className="wellness-empty-state"><Dumbbell size={18} /> Noch keine vorgemerkten Kurse.</div>}
+          </div>
         </div>
       </section>
 

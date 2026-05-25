@@ -89,6 +89,7 @@ export type Course = {
   booking_status?: string;
   is_desired?: boolean;
   is_participant?: boolean;
+  source?: 'prepare' | 'live' | string;
 };
 
 export type MyWellnessCourse = Course;

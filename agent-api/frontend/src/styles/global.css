@@ -1659,6 +1659,12 @@ p { color: var(--muted); line-height: 1.65; }
 .wellness-control-copy h2 { font-size: 1.45rem; margin: 8px 0; }
 .wellness-control-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
+.wellness-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .wellness-booking-summary {
   display: grid;
   align-content: start;
@@ -1788,6 +1794,11 @@ p { color: var(--muted); line-height: 1.65; }
   transform: translateY(-2px);
   border-color: rgba(143, 172, 220, 0.3);
   background: linear-gradient(145deg, rgba(77, 141, 255, 0.13), rgba(255,255,255,0.035)), var(--wellness-glass-strong);
+}
+
+.wellness-course-card.prepared {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.12), rgba(255,255,255,0.035)), var(--wellness-glass);
 }
 
 .wellness-course-top,
@@ -2828,8 +2839,7 @@ label.check input[type="checkbox"]:disabled {
   .wellness-dashboard-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .wellness-control-card,
-  .wellness-booking-summary {
+  .wellness-control-card {
     grid-column: 1 / -1;
   }
 }
@@ -2943,6 +2953,7 @@ label.check input[type="checkbox"]:disabled {
   .wellness-hero-header.compact,
   .wellness-card-grid,
   .wellness-dashboard-grid,
+  .wellness-summary-grid,
   .wellness-settings-grid,
   .wellness-setting-row {
     grid-template-columns: 1fr;
