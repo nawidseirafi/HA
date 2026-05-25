@@ -1197,6 +1197,11 @@ p { color: var(--muted); line-height: 1.65; }
   background: transparent;
 }
 
+.wellness-settings-form {
+  display: grid;
+  gap: 16px;
+}
+
 .wellness-settings-section {
   display: grid;
   gap: 14px;
@@ -1327,11 +1332,45 @@ p { color: var(--muted); line-height: 1.65; }
   resize: vertical;
   line-height: 1.45;
 }
+
+.wellness-inline-success {
+  color: #9af0c9;
+  font-size: 0.86rem;
+}
+
 .wellness-settings-footer {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   height: fit-content;
+}
+
+.wellness-settings-footer.with-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wellness-candidate-list {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.wellness-candidate-list button {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(190, 208, 235, 0.12);
+  border-radius: 14px;
+  color: var(--ink);
+  background: rgba(3, 12, 24, 0.28);
+  text-align: left;
+}
+
+.wellness-candidate-list small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 
@@ -1663,6 +1702,75 @@ p { color: var(--muted); line-height: 1.65; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.wellness-health-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(190, 208, 235, 0.13);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025)), var(--wellness-glass);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
+}
+
+.wellness-health-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.45fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.wellness-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wellness-stat-card.compact {
+  min-height: 112px;
+}
+
+.wellness-report-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(190, 208, 235, 0.13);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.045);
+}
+
+.wellness-report-head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.wellness-report-head > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #b7d1ff;
+  background: rgba(77, 141, 255, 0.14);
+}
+
+.wellness-report-head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.wellness-report-panel p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.wellness-report-warning {
+  color: #ffd98a;
 }
 
 .wellness-booking-summary {
@@ -2836,8 +2944,12 @@ label.check input[type="checkbox"]:disabled {
   .preview-pane { height: 460px; min-height: 320px; }
   .quick-stack { grid-template-columns: 1fr; }
   .wellness-card-grid,
-  .wellness-dashboard-grid {
+  .wellness-dashboard-grid,
+  .wellness-health-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .wellness-health-layout {
+    grid-template-columns: 1fr;
   }
   .wellness-control-card {
     grid-column: 1 / -1;
@@ -2953,6 +3065,8 @@ label.check input[type="checkbox"]:disabled {
   .wellness-hero-header.compact,
   .wellness-card-grid,
   .wellness-dashboard-grid,
+  .wellness-health-layout,
+  .wellness-health-grid,
   .wellness-summary-grid,
   .wellness-settings-grid,
   .wellness-setting-row {

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, ChevronRight, Dumbbell, Settings } from 'lucide-react';
 import type { Route } from '../../App';
-import { api, type AgentStatus, type Course, type MyWellnessLog, type MyWellnessSettingsPayload } from '../../api/client';
+import {
+  api,
+  type AgentStatus,
+  type Course,
+  type MyWellnessLog,
+  type MyWellnessSettingsPayload,
+} from '../../api/client';
 import { WellnessActivityFeed } from '../../components/mywellness/WellnessActivityFeed';
 import { WellnessCourseCard } from '../../components/mywellness/WellnessCourseCard';
 import { WellnessDashboardCards } from '../../components/mywellness/WellnessDashboardCards';
@@ -251,7 +257,7 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
       </section>
 
       <WellnessActivityFeed items={logs} compact />
-      <WellnessSettingsDrawer open={drawerOpen} status={status} loading={loading} onClose={() => setDrawerOpen(false)} onSave={saveSettings} />
+      <WellnessSettingsDrawer open={drawerOpen} status={status} loading={loading} mode="booking" onClose={() => setDrawerOpen(false)} onSave={saveSettings} />
     </div>
   );
 }

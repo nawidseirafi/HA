@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
+import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, HeartPulse, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -16,7 +16,7 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const isMarketArea = route.name === 'marketDashboard' || route.name === 'marketWatchlist' || route.name === 'marketReports' || route.name === 'marketSymbol';
-  const isMyWellnessArea = route.name === 'mywellnessDashboard' || route.name === 'mywellnessCourses' || route.name === 'mywellnessBookings' || route.name === 'mywellnessHistory';
+  const isMyWellnessArea = route.name === 'mywellnessDashboard' || route.name === 'mywellnessCourses' || route.name === 'mywellnessBookings' || route.name === 'mywellnessHistory' || route.name === 'mywellnessHealth';
   const isNeutralArea = route.name === 'agents' || route.name === 'settings' || isMyWellnessArea || isMarketArea;
 
   const runAgent = async () => {
@@ -68,6 +68,9 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
             </button>
             <button className={route.name === 'mywellnessHistory' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessHistory' })}>
               <BarChart3 size={18} /> Verlauf
+            </button>
+            <button className={route.name === 'mywellnessHealth' ? 'active' : ''} onClick={() => navigate({ name: 'mywellnessHealth' })}>
+              <HeartPulse size={18} /> Health
             </button>
           </>
         )}

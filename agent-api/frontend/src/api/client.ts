@@ -57,6 +57,92 @@ export type MyWellnessSettingsPayload = {
   desired_courses?: string[];
 };
 
+export type MyWellnessHealthSettings = {
+  id?: number;
+  enabled: boolean;
+  ha_entity_steps?: string;
+  ha_entity_active_calories?: string;
+  ha_entity_resting_heart_rate?: string;
+  ha_entity_hrv?: string;
+  ha_entity_sleep_hours?: string;
+  ha_entity_weight?: string;
+  ha_entity_blood_pressure_systolic?: string;
+  ha_entity_blood_pressure_diastolic?: string;
+  ha_entity_withings_weight?: string;
+  ha_entity_withings_bmi?: string;
+  ha_entity_withings_fat_mass?: string;
+  ha_entity_withings_muscle_mass?: string;
+  ha_entity_withings_body_water?: string;
+  ha_entity_withings_heart_rate?: string;
+  ha_entity_withings_systolic_blood_pressure?: string;
+  ha_entity_withings_diastolic_blood_pressure?: string;
+  ha_entity_withings_sleep_score?: string;
+  ha_entity_withings_sleep_duration?: string;
+  ha_entity_withings_deep_sleep?: string;
+  ha_entity_withings_light_sleep?: string;
+  ha_entity_withings_rem_sleep?: string;
+  updated_at?: string;
+};
+
+export type MyWellnessHealthMetrics = {
+  id: number;
+  metric_date: string;
+  source: string;
+  steps?: number | null;
+  active_calories?: number | null;
+  resting_heart_rate?: number | null;
+  hrv?: number | null;
+  sleep_hours?: number | null;
+  weight?: number | null;
+  blood_pressure_systolic?: number | null;
+  blood_pressure_diastolic?: number | null;
+  bmi?: number | null;
+  fat_mass?: number | null;
+  muscle_mass?: number | null;
+  body_water?: number | null;
+  sleep_score?: number | null;
+  deep_sleep_hours?: number | null;
+  light_sleep_hours?: number | null;
+  rem_sleep_hours?: number | null;
+  raw_json?: unknown;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MyWellnessRecoveryReport = {
+  id: number;
+  report_date: string;
+  recovery_score: number;
+  stress_score: number;
+  training_readiness: number;
+  recovery_state: 'low' | 'medium' | 'high';
+  stress_level: 'low' | 'medium' | 'high';
+  should_train_today: boolean;
+  recommended_workout_type?: string | null;
+  summary?: string | null;
+  recommendation?: string | null;
+  warnings?: string[];
+  ai_raw_json?: unknown;
+  created_at: string;
+};
+
+export type MyWellnessHealthStatus = {
+  enabled: boolean;
+  ha_configured: boolean;
+  settings: MyWellnessHealthSettings;
+  latest_metrics: MyWellnessHealthMetrics | null;
+  latest_report: MyWellnessRecoveryReport | null;
+};
+
+export type WithingsEntityCandidate = {
+  entity_id: string;
+  name?: string;
+  state?: string | number | null;
+  unit?: string | null;
+  device_class?: string | null;
+  suggested_metric?: keyof MyWellnessHealthSettings | '';
+};
+
 export type MyWellnessLog = {
   id: number;
   action_type: string;
@@ -336,6 +422,24 @@ export const api = {
   cancelMywellnessCourse: (courseId: string) =>
     request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/cancel', { method: 'POST', body: JSON.stringify({ courseId }) }),
   mywellnessLogs: async () => request<{ items?: MyWellnessLog[]; logs: string[] }>('/api/mywellness/logs'),
+  mywellnessHealthStatus: () => request<MyWellnessHealthStatus>('/api/mywellness/health/status'),
+  mywellnessHealthMetrics: async () =>
+    (await request<{ metrics: MyWellnessHealthMetrics[] }>('/api/mywellness/health/metrics')).metrics,
+  importMywellnessHealthFromHa: () =>
+    request<{ metrics: MyWellnessHealthMetrics; errors: string[] }>('/api/mywellness/health/import-from-ha', { method: 'POST' }),
+  analyzeMywellnessHealth: () =>
+    request<{ report: MyWellnessRecoveryReport; metrics: MyWellnessHealthMetrics }>('/api/mywellness/health/analyze', { method: 'POST' }),
+  mywellnessLatestHealthReport: () => request<{ report: MyWellnessRecoveryReport | null }>('/api/mywellness/health/latest-report'),
+  mywellnessHealthReports: async () =>
+    (await request<{ reports: MyWellnessRecoveryReport[] }>('/api/mywellness/health/reports')).reports,
+  updateMywellnessHealthSettings: (payload: Partial<MyWellnessHealthSettings>) =>
+    request<MyWellnessHealthSettings>('/api/mywellness/health/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  mywellnessWithingsEntities: () => request<{ entities: Record<string, string>; configured: boolean }>('/api/mywellness/health/withings/entities'),
+  discoverMywellnessWithingsEntities: () =>
+    request<{ candidates: WithingsEntityCandidate[]; error?: string }>('/api/mywellness/health/withings/discover', { method: 'POST' }),
+  importMywellnessWithings: () =>
+    request<{ metrics: MyWellnessHealthMetrics; missing: string[]; mapping_source?: string }>('/api/mywellness/health/withings/import', { method: 'POST' }),
+  mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);

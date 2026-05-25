@@ -1,0 +1,766 @@
+import json
+import sqlite3
+from datetime import date, datetime, timezone
+from typing import Any
+
+from backend.agents.mywellness.service import DB_PATH
+from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.mywellness_ai_service import MyWellnessAIService
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class MyWellnessHealthService:
+    entity_fields = (
+        "ha_entity_steps",
+        "ha_entity_active_calories",
+        "ha_entity_resting_heart_rate",
+        "ha_entity_hrv",
+        "ha_entity_sleep_hours",
+        "ha_entity_weight",
+        "ha_entity_blood_pressure_systolic",
+        "ha_entity_blood_pressure_diastolic",
+        "ha_entity_withings_weight",
+        "ha_entity_withings_bmi",
+        "ha_entity_withings_fat_mass",
+        "ha_entity_withings_muscle_mass",
+        "ha_entity_withings_body_water",
+        "ha_entity_withings_heart_rate",
+        "ha_entity_withings_systolic_blood_pressure",
+        "ha_entity_withings_diastolic_blood_pressure",
+        "ha_entity_withings_sleep_score",
+        "ha_entity_withings_sleep_duration",
+        "ha_entity_withings_deep_sleep",
+        "ha_entity_withings_light_sleep",
+        "ha_entity_withings_rem_sleep",
+    )
+
+    metric_fields = {
+        "steps": "ha_entity_steps",
+        "active_calories": "ha_entity_active_calories",
+        "resting_heart_rate": "ha_entity_resting_heart_rate",
+        "hrv": "ha_entity_hrv",
+        "sleep_hours": "ha_entity_sleep_hours",
+        "weight": "ha_entity_weight",
+        "blood_pressure_systolic": "ha_entity_blood_pressure_systolic",
+        "blood_pressure_diastolic": "ha_entity_blood_pressure_diastolic",
+    }
+
+    withings_metric_fields = {
+        "weight": "ha_entity_withings_weight",
+        "bmi": "ha_entity_withings_bmi",
+        "fat_mass": "ha_entity_withings_fat_mass",
+        "muscle_mass": "ha_entity_withings_muscle_mass",
+        "body_water": "ha_entity_withings_body_water",
+        "resting_heart_rate": "ha_entity_withings_heart_rate",
+        "blood_pressure_systolic": "ha_entity_withings_systolic_blood_pressure",
+        "blood_pressure_diastolic": "ha_entity_withings_diastolic_blood_pressure",
+        "sleep_score": "ha_entity_withings_sleep_score",
+        "sleep_hours": "ha_entity_withings_sleep_duration",
+        "deep_sleep_hours": "ha_entity_withings_deep_sleep",
+        "light_sleep_hours": "ha_entity_withings_light_sleep",
+        "rem_sleep_hours": "ha_entity_withings_rem_sleep",
+    }
+
+    default_withings_entities = {
+        "ha_entity_withings_weight": "sensor.withings_gewicht",
+        "ha_entity_withings_bmi": "sensor.withings_bmi",
+        "ha_entity_withings_fat_mass": "sensor.withings_fettmasse",
+        "ha_entity_withings_muscle_mass": "sensor.withings_muskelmasse",
+        "ha_entity_withings_body_water": "sensor.withings_body_water",
+        "ha_entity_withings_heart_rate": "sensor.withings_herzschlag",
+        "ha_entity_withings_systolic_blood_pressure": "sensor.withings_systolic_blood_pressure",
+        "ha_entity_withings_diastolic_blood_pressure": "sensor.withings_diastolic_blood_pressure",
+        "ha_entity_withings_sleep_score": "sensor.withings_sleep_score",
+        "ha_entity_withings_sleep_duration": "sensor.withings_sleep_duration",
+        "ha_entity_withings_deep_sleep": "sensor.withings_deep_sleep",
+        "ha_entity_withings_light_sleep": "sensor.withings_light_sleep",
+        "ha_entity_withings_rem_sleep": "sensor.withings_rem_sleep",
+    }
+
+    withings_entity_aliases = {
+        "ha_entity_withings_weight": ("sensor.withings_gewicht", "sensor.withings_weight"),
+        "ha_entity_withings_bmi": ("sensor.withings_bmi",),
+        "ha_entity_withings_fat_mass": ("sensor.withings_fettmasse", "sensor.withings_fat_mass"),
+        "ha_entity_withings_muscle_mass": ("sensor.withings_muskelmasse", "sensor.withings_muscle_mass"),
+        "ha_entity_withings_body_water": ("sensor.withings_korperwasser", "sensor.withings_koerperwasser", "sensor.withings_body_water"),
+        "ha_entity_withings_heart_rate": ("sensor.withings_herzschlag", "sensor.withings_heart_rate"),
+        "ha_entity_withings_systolic_blood_pressure": (
+            "sensor.withings_systolischer_blutdruck",
+            "sensor.withings_systolic_blood_pressure",
+        ),
+        "ha_entity_withings_diastolic_blood_pressure": (
+            "sensor.withings_diastolischer_blutdruck",
+            "sensor.withings_diastolic_blood_pressure",
+        ),
+        "ha_entity_withings_sleep_score": ("sensor.withings_schlafscore", "sensor.withings_sleep_score"),
+        "ha_entity_withings_sleep_duration": ("sensor.withings_schlafdauer", "sensor.withings_sleep_duration"),
+        "ha_entity_withings_deep_sleep": ("sensor.withings_tiefschlaf", "sensor.withings_deep_sleep"),
+        "ha_entity_withings_light_sleep": ("sensor.withings_leichtschlaf", "sensor.withings_light_sleep"),
+        "ha_entity_withings_rem_sleep": ("sensor.withings_rem_schlaf", "sensor.withings_rem_sleep"),
+    }
+
+    def __init__(self) -> None:
+        self.ha = HomeAssistantService()
+        self.ai = MyWellnessAIService()
+        self._ensure_schema()
+
+    def status(self) -> dict[str, Any]:
+        settings = self.settings()
+        return {
+            "enabled": settings["enabled"],
+            "ha_configured": self.ha.configured(),
+            "settings": settings,
+            "latest_metrics": self.latest_metrics(),
+            "latest_report": self.latest_report(),
+        }
+
+    def settings(self) -> dict[str, Any]:
+        self._ensure_schema()
+        with self._connect() as connection:
+            row = connection.execute("select * from mywellness_health_settings where id = 1").fetchone()
+        if not row:
+            return self._default_settings()
+        item = dict(row)
+        item["enabled"] = bool(item.get("enabled"))
+        for field, entity_id in self.default_withings_entities.items():
+            if not item.get(field):
+                item[field] = entity_id
+        return item
+
+    def update_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"enabled", *self.entity_fields}
+        updates = {key: payload[key] for key in payload if key in allowed}
+        if not updates:
+            return self.settings()
+        fields = ", ".join(f"{key} = ?" for key in updates)
+        values = [1 if value is True else 0 if value is False else str(value or "").strip() for value in updates.values()]
+        with self._connect() as connection:
+            connection.execute(
+                f"update mywellness_health_settings set {fields}, updated_at = ? where id = 1",
+                (*values, utc_now()),
+            )
+            connection.commit()
+        return self.settings()
+
+    def import_from_ha(self) -> dict[str, Any]:
+        settings = self.settings()
+        raw_states: dict[str, Any] = {}
+        metrics: dict[str, Any] = {
+            "metric_date": date.today().isoformat(),
+            "source": "home_assistant",
+        }
+        errors: list[str] = []
+        for metric_name, entity_field in self.metric_fields.items():
+            entity_id = settings.get(entity_field)
+            try:
+                state = self.ha.get_state(entity_id)
+            except Exception as exc:
+                errors.append(str(exc))
+                state = None
+            raw_states[entity_field] = {
+                "entity_id": entity_id,
+                "state": state,
+            }
+            metrics[metric_name] = self._numeric_state(state)
+
+        item = self._insert_metrics(metrics, raw_states)
+        return {"metrics": item, "errors": errors}
+
+    def withings_entities(self) -> dict[str, Any]:
+        settings = self.settings()
+        return {
+            "entities": {field: settings.get(field) or "" for field in self.withings_metric_fields.values()},
+            "configured": any(settings.get(field) for field in self.withings_metric_fields.values()),
+        }
+
+    def import_withings_metrics_from_ha(self) -> dict[str, Any]:
+        settings = self.settings()
+        mapping, mapping_source = self._withings_mapping(settings)
+        raw_states: dict[str, Any] = {}
+        metrics: dict[str, Any] = {
+            "metric_date": date.today().isoformat(),
+            "source": "home_assistant_withings",
+        }
+        missing: list[str] = []
+        for metric_name, entity_field in self.withings_metric_fields.items():
+            entity_id, state = self._first_available_state(entity_field, mapping.get(entity_field))
+            if not state and (mapping.get(entity_field) or self.withings_entity_aliases.get(entity_field)):
+                missing.append(entity_field)
+            raw_states[entity_field] = self._raw_state(entity_id, state)
+            metrics[metric_name] = self._metric_value(state, metric_name)
+        raw_states["mapping_source"] = mapping_source
+        item = self._insert_metrics(metrics, raw_states)
+        return {"metrics": item, "missing": missing, "mapping_source": mapping_source}
+
+    def latest_withings(self) -> dict[str, Any]:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                select * from mywellness_health_metrics
+                where source = 'home_assistant_withings'
+                order by metric_date desc, id desc
+                limit 1
+                """
+            ).fetchone()
+        return {"metrics": self._decode_metric(dict(row)) if row else None}
+
+    def discover_withings_entities(self) -> dict[str, Any]:
+        try:
+            states = self.ha.get_states()
+        except Exception as exc:
+            return {"candidates": [], "error": str(exc)}
+        return {"candidates": self._discover_candidates_from_states(states)}
+
+    def metrics(self, limit: int = 30) -> dict[str, Any]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "select * from mywellness_health_metrics order by metric_date desc, id desc limit ?",
+                (min(max(limit, 1), 365),),
+            ).fetchall()
+        return {"metrics": [self._decode_metric(dict(row)) for row in rows]}
+
+    def analyze(self) -> dict[str, Any]:
+        metrics = self.latest_metrics()
+        if metrics is None:
+            metrics = self._insert_metrics(
+                {"metric_date": date.today().isoformat(), "source": "manual"},
+                {"note": "Keine Health-Metriken vorhanden."},
+            )
+        scores = self._scores(metrics)
+        courses = self._recent_courses()
+        payload = {
+            "metrics": self._ai_metrics(metrics),
+            "withings": self._withings_payload(metrics),
+            "recovery_score": scores["recovery_score"],
+            "stress_score": scores["stress_score"],
+            "training_readiness": scores["training_readiness"],
+            "last_mywellness_courses": courses["recent_courses"],
+            "desired_courses": courses["desired_courses"],
+        }
+        ai_raw: dict[str, Any]
+        try:
+            ai_raw = self.ai.analyze(payload)
+            ai_error = ""
+        except Exception as exc:
+            ai_error = str(exc)
+            ai_raw = self.ai.fallback(scores, ai_error)
+
+        report = {
+            "report_date": date.today().isoformat(),
+            "recovery_score": scores["recovery_score"],
+            "stress_score": scores["stress_score"],
+            "training_readiness": ai_raw.get("training_readiness", scores["training_readiness"]),
+            "recovery_state": ai_raw.get("recovery_state"),
+            "stress_level": ai_raw.get("stress_level"),
+            "should_train_today": bool(ai_raw.get("should_train_today")),
+            "recommended_workout_type": ai_raw.get("recommended_workout_type"),
+            "summary": ai_raw.get("summary"),
+            "recommendation": ai_raw.get("recommendation"),
+            "warnings_json": json.dumps(ai_raw.get("warnings") or [], ensure_ascii=False),
+            "ai_raw_json": json.dumps({**ai_raw, "error": ai_error} if ai_error else ai_raw, ensure_ascii=False),
+        }
+        return {"report": self._insert_report(report), "metrics": metrics}
+
+    def latest_report(self) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "select * from mywellness_recovery_reports order by report_date desc, id desc limit 1"
+            ).fetchone()
+        return self._decode_report(dict(row)) if row else None
+
+    def reports(self, limit: int = 30) -> dict[str, Any]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "select * from mywellness_recovery_reports order by report_date desc, id desc limit ?",
+                (min(max(limit, 1), 365),),
+            ).fetchall()
+        return {"reports": [self._decode_report(dict(row)) for row in rows]}
+
+    def latest_metrics(self) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "select * from mywellness_health_metrics order by metric_date desc, id desc limit 1"
+            ).fetchone()
+        return self._decode_metric(dict(row)) if row else None
+
+    def _connect(self) -> sqlite3.Connection:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(DB_PATH)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                create table if not exists mywellness_health_metrics (
+                    id integer primary key autoincrement,
+                    metric_date text not null,
+                    source text not null,
+                    steps real,
+                    active_calories real,
+                    resting_heart_rate real,
+                    hrv real,
+                    sleep_hours real,
+                    weight real,
+                    blood_pressure_systolic real,
+                    blood_pressure_diastolic real,
+                    bmi real,
+                    fat_mass real,
+                    muscle_mass real,
+                    body_water real,
+                    sleep_score real,
+                    deep_sleep_hours real,
+                    light_sleep_hours real,
+                    rem_sleep_hours real,
+                    raw_json text not null default '{}',
+                    created_at text not null,
+                    updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists mywellness_recovery_reports (
+                    id integer primary key autoincrement,
+                    report_date text not null,
+                    recovery_score integer not null,
+                    stress_score integer not null,
+                    training_readiness integer not null,
+                    recovery_state text not null,
+                    stress_level text not null,
+                    should_train_today integer not null default 0,
+                    recommended_workout_type text,
+                    summary text,
+                    recommendation text,
+                    warnings_json text not null default '[]',
+                    ai_raw_json text not null default '{}',
+                    created_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists mywellness_health_settings (
+                    id integer primary key check (id = 1),
+                    enabled integer not null default 1,
+                    ha_entity_steps text,
+                    ha_entity_active_calories text,
+                    ha_entity_resting_heart_rate text,
+                    ha_entity_hrv text,
+                    ha_entity_sleep_hours text,
+                    ha_entity_weight text,
+                    ha_entity_blood_pressure_systolic text,
+                    ha_entity_blood_pressure_diastolic text,
+                    ha_entity_withings_weight text,
+                    ha_entity_withings_bmi text,
+                    ha_entity_withings_fat_mass text,
+                    ha_entity_withings_muscle_mass text,
+                    ha_entity_withings_body_water text,
+                    ha_entity_withings_heart_rate text,
+                    ha_entity_withings_systolic_blood_pressure text,
+                    ha_entity_withings_diastolic_blood_pressure text,
+                    ha_entity_withings_sleep_score text,
+                    ha_entity_withings_sleep_duration text,
+                    ha_entity_withings_deep_sleep text,
+                    ha_entity_withings_light_sleep text,
+                    ha_entity_withings_rem_sleep text,
+                    updated_at text not null
+                )
+                """
+            )
+            self._ensure_columns(
+                connection,
+                "mywellness_health_metrics",
+                {
+                    "bmi": "real",
+                    "fat_mass": "real",
+                    "muscle_mass": "real",
+                    "body_water": "real",
+                    "sleep_score": "real",
+                    "deep_sleep_hours": "real",
+                    "light_sleep_hours": "real",
+                    "rem_sleep_hours": "real",
+                },
+            )
+            self._ensure_columns(
+                connection,
+                "mywellness_health_settings",
+                {field: "text" for field in self.withings_metric_fields.values()},
+            )
+            connection.execute(
+                """
+                insert or ignore into mywellness_health_settings
+                (id, enabled, updated_at)
+                values (1, 1, ?)
+                """,
+                (utc_now(),),
+            )
+            connection.commit()
+
+    def _default_settings(self) -> dict[str, Any]:
+        return {
+            "id": 1,
+            "enabled": True,
+            "ha_entity_steps": "",
+            "ha_entity_active_calories": "",
+            "ha_entity_resting_heart_rate": "",
+            "ha_entity_hrv": "",
+            "ha_entity_sleep_hours": "",
+            "ha_entity_weight": "",
+            "ha_entity_blood_pressure_systolic": "",
+            "ha_entity_blood_pressure_diastolic": "",
+            **self.default_withings_entities,
+            "updated_at": utc_now(),
+        }
+
+    def _numeric_state(self, state: dict[str, Any] | None) -> float | None:
+        if not state:
+            return None
+        value = state.get("state")
+        if value in (None, "", "unknown", "unavailable"):
+            return None
+        try:
+            return float(str(value).replace(",", "."))
+        except ValueError:
+            return None
+
+    def _metric_value(self, state: dict[str, Any] | None, metric_name: str) -> float | None:
+        value = self._numeric_state(state)
+        if value is None:
+            return None
+        if metric_name not in {"sleep_hours", "deep_sleep_hours", "light_sleep_hours", "rem_sleep_hours"}:
+            return value
+        attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        unit = str(attributes.get("unit_of_measurement") or "").lower()
+        if unit in {"s", "sec", "secs", "second", "seconds", "sek", "sekunden"}:
+            return round(value / 3600, 2)
+        if unit in {"min", "mins", "minute", "minutes", "minuten"}:
+            return round(value / 60, 2)
+        return value
+
+    def _insert_metrics(self, values: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
+        fields = [
+            "metric_date",
+            "source",
+            "steps",
+            "active_calories",
+            "resting_heart_rate",
+            "hrv",
+            "sleep_hours",
+            "weight",
+            "blood_pressure_systolic",
+            "blood_pressure_diastolic",
+            "bmi",
+            "fat_mass",
+            "muscle_mass",
+            "body_water",
+            "sleep_score",
+            "deep_sleep_hours",
+            "light_sleep_hours",
+            "rem_sleep_hours",
+        ]
+        item = {field: values.get(field) for field in fields}
+        now = utc_now()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                f"""
+                insert into mywellness_health_metrics
+                ({", ".join(fields)}, raw_json, created_at, updated_at)
+                values ({", ".join("?" for _ in fields)}, ?, ?, ?)
+                """,
+                (*[item[field] for field in fields], json.dumps(raw, ensure_ascii=False), now, now),
+            )
+            connection.commit()
+            row = connection.execute("select * from mywellness_health_metrics where id = ?", (cursor.lastrowid,)).fetchone()
+        return self._decode_metric(dict(row))
+
+    def _insert_report(self, report: dict[str, Any]) -> dict[str, Any]:
+        fields = [
+            "report_date",
+            "recovery_score",
+            "stress_score",
+            "training_readiness",
+            "recovery_state",
+            "stress_level",
+            "should_train_today",
+            "recommended_workout_type",
+            "summary",
+            "recommendation",
+            "warnings_json",
+            "ai_raw_json",
+        ]
+        with self._connect() as connection:
+            cursor = connection.execute(
+                f"""
+                insert into mywellness_recovery_reports
+                ({", ".join(fields)}, created_at)
+                values ({", ".join("?" for _ in fields)}, ?)
+                """,
+                (*[report[field] for field in fields], utc_now()),
+            )
+            connection.commit()
+            row = connection.execute("select * from mywellness_recovery_reports where id = ?", (cursor.lastrowid,)).fetchone()
+        return self._decode_report(dict(row))
+
+    def _scores(self, metrics: dict[str, Any]) -> dict[str, int]:
+        sleep = self._float(metrics.get("sleep_hours"))
+        hrv = self._float(metrics.get("hrv"))
+        rhr = self._float(metrics.get("resting_heart_rate"))
+        active = self._float(metrics.get("active_calories"))
+        steps = self._float(metrics.get("steps"))
+        sleep_score = self._float(metrics.get("sleep_score"))
+
+        recovery = 70
+        stress = 30
+        if sleep_score is not None:
+            if sleep_score < 55:
+                recovery -= 15
+                stress += 12
+            elif sleep_score >= 80:
+                recovery += 8
+                stress -= 6
+        if sleep is not None:
+            if sleep < 5.5:
+                recovery -= 25
+                stress += 25
+            elif sleep < 7:
+                recovery -= 10
+                stress += 10
+            elif sleep >= 8:
+                recovery += 10
+        if hrv is not None:
+            if hrv < 30:
+                recovery -= 15
+                stress += 20
+            elif hrv >= 60:
+                recovery += 10
+                stress -= 10
+        if rhr is not None:
+            if rhr > 75:
+                recovery -= 15
+                stress += 18
+            elif rhr < 58:
+                recovery += 5
+                stress -= 5
+        if active is not None and active > 900:
+            recovery -= 10
+            stress += 10
+        if steps is not None and steps > 15000:
+            recovery -= 8
+            stress += 8
+
+        recovery = self._clamp(recovery)
+        stress = self._clamp(stress)
+        readiness = self._clamp(round(recovery * 0.65 + (100 - stress) * 0.35))
+        return {"recovery_score": recovery, "stress_score": stress, "training_readiness": readiness}
+
+    def _recent_courses(self) -> dict[str, Any]:
+        with self._connect() as connection:
+            prepared = connection.execute(
+                """
+                select title, start_time, studio, status, source
+                from courses
+                order by start_time desc
+                limit 10
+                """
+            ).fetchall() if self._table_exists(connection, "courses") else []
+            settings = connection.execute("select desired_courses from mywellness_settings where id = 1").fetchone()
+        desired: list[str] = []
+        if settings:
+            try:
+                desired = json.loads(settings["desired_courses"] or "[]")
+            except json.JSONDecodeError:
+                desired = []
+        return {
+            "recent_courses": [dict(row) for row in prepared],
+            "desired_courses": desired,
+        }
+
+    def _table_exists(self, connection: sqlite3.Connection, table_name: str) -> bool:
+        row = connection.execute(
+            "select name from sqlite_master where type = 'table' and name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    def _ai_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        return {field: metrics.get(field) for field in self.metric_fields}
+
+    def _withings_payload(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "weight": metrics.get("weight"),
+            "bmi": metrics.get("bmi"),
+            "fat_mass": metrics.get("fat_mass"),
+            "muscle_mass": metrics.get("muscle_mass"),
+            "body_water": metrics.get("body_water"),
+            "resting_heart_rate": metrics.get("resting_heart_rate"),
+            "blood_pressure_systolic": metrics.get("blood_pressure_systolic"),
+            "blood_pressure_diastolic": metrics.get("blood_pressure_diastolic"),
+            "sleep_score": metrics.get("sleep_score"),
+            "sleep_hours": metrics.get("sleep_hours"),
+            "deep_sleep_hours": metrics.get("deep_sleep_hours"),
+            "light_sleep_hours": metrics.get("light_sleep_hours"),
+            "rem_sleep_hours": metrics.get("rem_sleep_hours"),
+        }
+
+    def _raw_state(self, entity_id: Any, state: dict[str, Any] | None) -> dict[str, Any]:
+        attributes = state.get("attributes") if state and isinstance(state.get("attributes"), dict) else {}
+        return {
+            "entity_id": entity_id,
+            "state": state,
+            "unit": attributes.get("unit_of_measurement"),
+        }
+
+    def _withings_mapping(self, settings: dict[str, Any]) -> tuple[dict[str, str], str]:
+        configured = {
+            field: str(settings.get(field) or "").strip()
+            for field in self.withings_metric_fields.values()
+            if str(settings.get(field) or "").strip()
+        }
+        if configured:
+            return configured, "settings"
+        defaults = {field: entity_id for field, entity_id in self.default_withings_entities.items() if entity_id}
+        if defaults:
+            return defaults, "default_withings"
+        try:
+            states = self.ha.get_states()
+        except Exception:
+            return {}, "none"
+        mapping: dict[str, str] = {}
+        for candidate in self._discover_candidates_from_states(states):
+            suggested = str(candidate.get("suggested_metric") or "")
+            entity_id = str(candidate.get("entity_id") or "")
+            if suggested and entity_id and suggested not in mapping:
+                mapping[suggested] = entity_id
+        return mapping, "auto_discovery" if mapping else "none"
+
+    def _discover_candidates_from_states(self, states: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        keywords = (
+            "withings",
+            "weight",
+            "gewicht",
+            "bmi",
+            "blood_pressure",
+            "blood pressure",
+            "blutdruck",
+            "sleep",
+            "schlaf",
+            "heart",
+            "pulse",
+            "puls",
+            "fat",
+            "fett",
+            "muscle",
+            "muskel",
+            "water",
+            "wasser",
+        )
+        candidates = []
+        for state in states:
+            entity_id = str(state.get("entity_id") or "")
+            attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+            friendly = str(attributes.get("friendly_name") or "")
+            haystack = f"{entity_id} {friendly}".lower()
+            if "withings" not in haystack:
+                continue
+            if not any(keyword in haystack for keyword in keywords):
+                continue
+            value = state.get("state")
+            if value in (None, "", "unknown", "unavailable"):
+                continue
+            candidates.append(
+                {
+                    "entity_id": entity_id,
+                    "name": friendly,
+                    "state": value,
+                    "unit": attributes.get("unit_of_measurement"),
+                    "device_class": attributes.get("device_class"),
+                    "suggested_metric": self._suggest_withings_metric(haystack),
+                }
+            )
+        return candidates
+
+    def _first_available_state(self, entity_field: str, configured_entity: str | None) -> tuple[str | None, dict[str, Any] | None]:
+        candidates: list[str] = []
+        if configured_entity:
+            candidates.append(str(configured_entity).strip())
+        candidates.extend(self.withings_entity_aliases.get(entity_field, ()))
+        seen: set[str] = set()
+        for entity_id in candidates:
+            if not entity_id or entity_id in seen:
+                continue
+            seen.add(entity_id)
+            state = self.ha.fetch_entity_state(entity_id)
+            if state is not None:
+                return entity_id, state
+        return (candidates[0] if candidates else None), None
+
+    def _ensure_columns(self, connection: sqlite3.Connection, table_name: str, columns: dict[str, str]) -> None:
+        existing = {row["name"] for row in connection.execute(f"pragma table_info({table_name})").fetchall()}
+        for column, definition in columns.items():
+            if column not in existing:
+                connection.execute(f"alter table {table_name} add column {column} {definition}")
+
+    def _suggest_withings_metric(self, value: str) -> str:
+        if "bmi" in value:
+            return "ha_entity_withings_bmi"
+        if "fettmasse" in value or "fat_mass" in value or "fat mass" in value:
+            return "ha_entity_withings_fat_mass"
+        if "fettanteil" in value:
+            return ""
+        if "fettfreie" in value:
+            return ""
+        if "muscle" in value or "muskel" in value:
+            return "ha_entity_withings_muscle_mass"
+        if "water" in value or "wasser" in value:
+            return "ha_entity_withings_body_water"
+        if "systolic" in value:
+            return "ha_entity_withings_systolic_blood_pressure"
+        if "diastolic" in value:
+            return "ha_entity_withings_diastolic_blood_pressure"
+        if "blood_pressure" in value or "blood pressure" in value or "blutdruck" in value:
+            return "ha_entity_withings_systolic_blood_pressure"
+        if ("sleep" in value or "schlaf" in value) and "score" in value:
+            return "ha_entity_withings_sleep_score"
+        if ("deep" in value or "tief" in value) and ("sleep" in value or "schlaf" in value):
+            return "ha_entity_withings_deep_sleep"
+        if ("light" in value or "leicht" in value) and ("sleep" in value or "schlaf" in value):
+            return "ha_entity_withings_light_sleep"
+        if "rem" in value and ("sleep" in value or "schlaf" in value):
+            return "ha_entity_withings_rem_sleep"
+        if "sleep" in value or "schlaf" in value:
+            return "ha_entity_withings_sleep_duration"
+        if "heart" in value or "pulse" in value or "puls" in value or "herzschlag" in value:
+            return "ha_entity_withings_heart_rate"
+        if "weight" in value or "gewicht" in value:
+            return "ha_entity_withings_weight"
+        return ""
+
+    def _decode_metric(self, row: dict[str, Any]) -> dict[str, Any]:
+        row["raw_json"] = self._json_value(row.get("raw_json"), {})
+        return row
+
+    def _decode_report(self, row: dict[str, Any]) -> dict[str, Any]:
+        row["should_train_today"] = bool(row.get("should_train_today"))
+        row["warnings"] = self._json_value(row.pop("warnings_json", "[]"), [])
+        row["ai_raw_json"] = self._json_value(row.get("ai_raw_json"), {})
+        return row
+
+    def _json_value(self, value: Any, default: Any) -> Any:
+        try:
+            return json.loads(value or "")
+        except (TypeError, json.JSONDecodeError):
+            return default
+
+    def _float(self, value: Any) -> float | None:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _clamp(self, value: float) -> int:
+        return max(0, min(100, int(round(value))))
