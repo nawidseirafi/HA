@@ -742,6 +742,7 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .button-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 10px; }
+.inline-error { color: #ff9aaa; font-size: 0.86rem; }
 .button {
   min-height: 42px;
   padding: 0 14px;

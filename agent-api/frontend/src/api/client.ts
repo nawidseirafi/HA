@@ -265,6 +265,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function download(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Download failed: ${response.status}`);
+  }
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob: await response.blob(),
+    filename: filenameMatch?.[1] || path.split('/').filter(Boolean).pop() || 'export',
+  };
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -336,4 +353,8 @@ export const api = {
     scope === 'year'
       ? `${API_BASE}/api/invoices/exports/year/${year}/${type}`
       : `${API_BASE}/api/invoices/exports/month/${year}/${month}/${type}`,
+  downloadExport: (scope: 'year' | 'month', year: number, month: number | null, type: 'excel' | 'pdf' | 'zip') =>
+    download(scope === 'year'
+      ? `/api/invoices/exports/year/${year}/${type}`
+      : `/api/invoices/exports/month/${year}/${month}/${type}`),
 };
