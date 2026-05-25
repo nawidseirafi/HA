@@ -608,12 +608,27 @@ class MyWellnessHealthService:
     def _profile_payload(self) -> dict[str, Any]:
         settings = self.settings()
         supplements_text = str(settings.get("profile_supplements") or "")
-        supplements = [item.strip() for item in supplements_text.replace("\n", ",").split(",") if item.strip()]
+        if "\n" in supplements_text:
+            supplements = [item.strip(" -\t") for item in supplements_text.splitlines() if item.strip(" -\t")]
+        else:
+            supplements = [item.strip() for item in supplements_text.split(",") if item.strip()]
+        birth_date = settings.get("profile_birth_date") or None
         return {
-            "birth_date": settings.get("profile_birth_date") or None,
+            "birth_date": birth_date,
+            "age": self._age_from_birth_date(birth_date),
             "supplements": supplements,
             "notes": settings.get("profile_notes") or None,
         }
+
+    def _age_from_birth_date(self, value: Any) -> int | None:
+        if not value:
+            return None
+        try:
+            born = date.fromisoformat(str(value))
+        except ValueError:
+            return None
+        today = date.today()
+        return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
     def _withings_payload(self, metrics: dict[str, Any]) -> dict[str, Any]:
         return {

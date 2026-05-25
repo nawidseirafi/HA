@@ -329,30 +329,80 @@ views:
                   - domain: sensor
                     attributes:
                       device_class: battery
-                    options:
+                    options: &battery_options
                       type: custom:mushroom-template-card
                       layout: horizontal
                       fill_container: true
                       primary: "{{ state_attr(entity, 'friendly_name') }}"
-                      secondary: "Akkustand: {{ states(entity) }} %"
-                      icon: |
-                        {% set b = states(entity) | int(0) %}
-                        {% if b <= 10 %} mdi:battery-alert-variant-outline
-                        {% elif b <= 25 %} mdi:battery-20
-                        {% elif b <= 50 %} mdi:battery-50
-                        {% elif b <= 75 %} mdi:battery-70
-                        {% else %} mdi:battery-check
+                      secondary: >
+                        {% set raw = states(entity) %}
+                        {% if raw | is_number %}
+                          Akkustand: {{ raw }} %
+                        {% else %}
+                          Status: {{ raw }}
                         {% endif %}
-                      icon_color: |
-                        {% set b = states(entity) | int(0) %}
-                        {% if b <= 15 %} red
-                        {% elif b <= 30 %} deep-orange
-                        {% elif b <= 60 %} amber
-                        {% else %} green
+
+                      icon: >
+                        {% set raw = states(entity) %}
+                        {% if raw | is_number %}
+                          {% set b = raw | int(0) %}
+                          {% if b <= 10 %} mdi:battery-alert-variant-outline
+                          {% elif b <= 25 %} mdi:battery-20
+                          {% elif b <= 50 %} mdi:battery-50
+                          {% elif b <= 75 %} mdi:battery-70
+                          {% else %} mdi:battery-check
+                          {% endif %}
+                        {% elif raw in ['high', 'High'] %}
+                          mdi:battery-high
+                        {% elif raw in ['medium', 'Medium'] %}
+                          mdi:battery-medium
+                        {% elif raw in ['low', 'Low'] %}
+                          mdi:battery-low
+                        {% else %}
+                          mdi:battery-unknown
                         {% endif %}
+
+                      icon_color: >
+                        {% set raw = states(entity) %}
+                        {% if raw | is_number %}
+                          {% set b = raw | int(0) %}
+                          {% if b <= 15 %} red
+                          {% elif b <= 30 %} deep-orange
+                          {% elif b <= 60 %} amber
+                          {% else %} green
+                          {% endif %}
+                        {% elif raw in ['high', 'High'] %}
+                          green
+                        {% elif raw in ['medium', 'Medium'] %}
+                          amber
+                        {% elif raw in ['low', 'Low'] %}
+                          red
+                        {% else %}
+                          disabled
+                        {% endif %}
+                      tap_action:
+                        action: more-info
+
+                  - entity_id: sensor.*batterie*
+                    options: *battery_options
+
+                  - entity_id: sensor.*battery*
+                    options: *battery_options
+
+                  - entity_id: sensor.*akku*
+                    options: *battery_options
+
                 exclude:
+                  - entity_id: sensor.*battery_state*
+                  - entity_id: sensor.*batteriespannung*
+                  - entity_id: sensor.*battery_voltage*
+                  - attributes:
+                      device_class: voltage
                   - state: unavailable
                   - state: unknown
+                  - state: none
+                  - state: "Not Charging"
+                  - state: "Charging"
               sort:
                 method: state
                 numeric: true
@@ -361,6 +411,7 @@ views:
 
             cards:
               - type: custom:auto-entities
+                show_empty: false
                 card_param: cards
                 card:
                   type: grid
@@ -371,32 +422,72 @@ views:
                     - domain: sensor
                       attributes:
                         device_class: battery
-                      options:
-                        type: custom:mushroom-template-card
-                        layout: horizontal
-                        fill_container: true
-                        primary: "{{ state_attr(entity, 'friendly_name') }}"
-                        secondary: "Akkustand: {{ states(entity) }} %"
-                        icon: |
-                          {% set b = states(entity) | int(0) %}
-                          {% if b <= 10 %} mdi:battery-alert-variant-outline
-                          {% elif b <= 25 %} mdi:battery-20
-                          {% elif b <= 50 %} mdi:battery-50
-                          {% elif b <= 75 %} mdi:battery-70
-                          {% else %} mdi:battery-check
-                          {% endif %}
-                        icon_color: |
-                          {% set b = states(entity) | int(0) %}
-                          {% if b <= 15 %} red
-                          {% elif b <= 30 %} deep-orange
-                          {% elif b <= 60 %} amber
-                          {% else %} green
-                          {% endif %}
-                        tap_action:
-                          action: more-info
+                      state: low
+                      options: *battery_options
+                    - domain: sensor
+                      attributes:
+                        device_class: battery
+                      state: Low
+                      options: *battery_options
+                    - entity_id: sensor.*batterie*
+                      state: low
+                      options: *battery_options
+                    - entity_id: sensor.*battery*
+                      state: low
+                      options: *battery_options
+                    - entity_id: sensor.*akku*
+                      state: low
+                      options: *battery_options
                   exclude:
+                    - entity_id: sensor.*battery_state*
+                    - entity_id: sensor.*batteriespannung*
+                    - entity_id: sensor.*battery_voltage*
+                    - attributes:
+                        device_class: voltage
                     - state: unavailable
                     - state: unknown
+                    - state: none
+
+              - type: custom:auto-entities
+                show_empty: false
+                card_param: cards
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                filter:
+                  include:
+                    - domain: sensor
+                      attributes:
+                        device_class: battery
+                      options: *battery_options
+
+                    - entity_id: sensor.*batterie*
+                      options: *battery_options
+
+                    - entity_id: sensor.*battery*
+                      options: *battery_options
+
+                    - entity_id: sensor.*akku*
+                      options: *battery_options
+
+                  exclude:
+                    - entity_id: sensor.*battery_state*
+                    - entity_id: sensor.*batteriespannung*
+                    - entity_id: sensor.*battery_voltage*
+                    - attributes:
+                        device_class: voltage
+                    - state: unavailable
+                    - state: unknown
+                    - state: none
+                    - state: "Not Charging"
+                    - state: "Charging"
+                    - state: low
+                    - state: Low
+                    - state: medium
+                    - state: Medium
+                    - state: high
+                    - state: High
                 sort:
                   method: state
                   numeric: true
