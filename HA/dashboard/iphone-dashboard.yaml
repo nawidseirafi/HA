@@ -401,3 +401,93 @@ views:
                   method: state
                   numeric: true
                   reverse: false
+
+      # ─────────────────────────────────────────────────────────
+      # 8) Nicht erreichbar / defekt
+      # ─────────────────────────────────────────────────────────
+      - type: vertical-stack
+        view_layout:
+          grid-column: span 6
+        cards:
+          - type: custom:expander-card
+            clear: true
+            title-card:
+              type: custom:mushroom-template-card
+              primary: >
+                {% set offline = states | selectattr('state', 'in', ['unavailable', 'unknown']) | list | count %}
+                {% set problems = states.binary_sensor | selectattr('attributes.device_class', 'eq', 'problem') | selectattr('state', 'eq', 'on') | list | count %}
+                {% set total = offline + problems %}
+                {% if total == 0 %}
+                  Keine Geräte auffällig
+                {% elif total == 1 %}
+                  1 Gerät prüfen
+                {% else %}
+                  {{ total }} Geräte prüfen
+                {% endif %}
+              secondary: >
+                Nicht erreichbar, unbekannt oder als Problem gemeldet
+              icon: >
+                {% set offline = states | selectattr('state', 'in', ['unavailable', 'unknown']) | list | count %}
+                {% set problems = states.binary_sensor | selectattr('attributes.device_class', 'eq', 'problem') | selectattr('state', 'eq', 'on') | list | count %}
+                {{ 'mdi:check-network-outline' if offline + problems == 0 else 'mdi:alert-circle-outline' }}
+              icon_color: >
+                {% set offline = states | selectattr('state', 'in', ['unavailable', 'unknown']) | list | count %}
+                {% set problems = states.binary_sensor | selectattr('attributes.device_class', 'eq', 'problem') | selectattr('state', 'eq', 'on') | list | count %}
+                {{ 'green' if offline + problems == 0 else 'red' }}
+
+            cards:
+              - type: custom:auto-entities
+                show_empty: false
+                card_param: cards
+                card:
+                  type: grid
+                  columns: 1
+                  square: false
+                filter:
+                  include:
+                    - state: unavailable
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') or entity }}"
+                        secondary: "{{ entity }} · nicht erreichbar"
+                        icon: mdi:cloud-off-outline
+                        icon_color: red
+                        tap_action:
+                          action: more-info
+                    - state: unknown
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') or entity }}"
+                        secondary: "{{ entity }} · Status unbekannt"
+                        icon: mdi:help-circle-outline
+                        icon_color: amber
+                        tap_action:
+                          action: more-info
+                    - domain: binary_sensor
+                      attributes:
+                        device_class: problem
+                      state: "on"
+                      options:
+                        type: custom:mushroom-template-card
+                        layout: horizontal
+                        fill_container: true
+                        primary: "{{ state_attr(entity, 'friendly_name') or entity }}"
+                        secondary: "{{ entity }} · Problem gemeldet"
+                        icon: mdi:alert-outline
+                        icon_color: red
+                        tap_action:
+                          action: more-info
+                  exclude:
+                    - domain: update
+                    - domain: button
+                    - domain: event
+                    - domain: scene
+                    - entity_id: "*.last_seen"
+                    - entity_id: "*.last_updated"
+                    - entity_id: "*.last_triggered"
+                sort:
+                  method: name
