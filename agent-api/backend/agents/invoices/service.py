@@ -19,6 +19,7 @@ DEFAULT_DB_PATH = AI_AGENT_DIR / "data" / "invoices" / "invoices.db"
 DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
 DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
 DEFAULT_EXPORT_DIR = AI_AGENT_DIR / "data" / "invoices" / "exports"
+DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 
 
 EXTRA_COLUMNS: dict[str, str] = {
@@ -378,12 +379,19 @@ class InvoiceService:
         }
 
     def run_agent(self) -> dict[str, Any]:
-        script = AI_AGENT_DIR / "invoice" / "invoices.py"
         python = PROJECT_DIR / "venv" / "bin" / "python"
-        command = [str(python if python.exists() else "python3"), str(script), "--once"]
-        result = subprocess.run(command, cwd=AI_AGENT_DIR, capture_output=True, text=True, timeout=300)
+        command = [str(python if python.exists() else sys.executable), "-m", "invoice.invoices", "--once"]
+        invoice_config = load_config().get("agents", {}).get("invoices", {})
+        timeout_seconds = int(invoice_config.get("run_timeout_seconds", DEFAULT_AGENT_TIMEOUT_SECONDS))
+        try:
+            result = subprocess.run(command, cwd=AI_AGENT_DIR, capture_output=True, text=True, timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=504, detail=f"InvoiceAgent Timeout nach {timeout_seconds} Sekunden.") from exc
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"InvoiceAgent konnte nicht gestartet werden: {exc}") from exc
         if result.returncode != 0:
-            raise HTTPException(status_code=500, detail=result.stderr.strip() or "InvoiceAgent failed")
+            detail = (result.stderr.strip() or result.stdout.strip() or "InvoiceAgent failed")[-3000:]
+            raise HTTPException(status_code=500, detail=detail)
         self._ensure_schema()
         return {"status": "completed", "stdout": result.stdout.strip(), "stderr": result.stderr.strip()}
 

@@ -12,6 +12,8 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const [months, setMonths] = useState<MonthSummary[]>([]);
   const [yearInvoices, setYearInvoices] = useState<Invoice[]>([]);
   const [busy, setBusy] = useState(false);
+  const [agentStatus, setAgentStatus] = useState('');
+  const [agentError, setAgentError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -35,9 +37,20 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
 
   const run = async () => {
     setBusy(true);
-    await api.runAgent();
-    await load();
-    setBusy(false);
+    setAgentError('');
+    setAgentStatus('Invoice Agent startet. Inbox, E-Mail und vorhandene Belege werden geprüft...');
+    try {
+      setAgentStatus('Invoice Agent läuft. Dokumente werden gescannt und Metadaten ermittelt...');
+      await api.runAgent();
+      setAgentStatus('Scan abgeschlossen. Dashboard wird aktualisiert...');
+      await load();
+      setAgentStatus('Invoice Agent fertig. Neue Belege wurden einsortiert oder zur Prüfung markiert.');
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'Invoice Agent konnte nicht gestartet werden.');
+      setAgentStatus('');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const upload = async (file?: File) => {
@@ -73,6 +86,15 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
         <Kpi icon={AlertTriangle} label="Offene Prüfungen" value={summary?.needs_review_count ?? 0} note="Manuelle Kontrolle" tone="yellow" />
         <Kpi icon={BrainCircuit} label="KI-Erkennungsrate" value={`${confidence}%`} note={`${summary?.ai_error_count ?? 0} KI-Fehler`} tone="blue" />
       </section>
+
+      {(agentStatus || agentError) && (
+        <section className={`panel ${agentError ? 'error-panel' : busy ? 'status-panel' : 'success-panel'}`}>
+          <div className="agent-run-status">
+            {agentError ? <AlertTriangle size={18} /> : busy ? <Activity size={18} /> : <CheckCircle2 size={18} />}
+            <span>{agentError || agentStatus}</span>
+          </div>
+        </section>
+      )}
 
       <section className="dashboard-grid">
         <div className="panel chart-panel wide-panel spend-trend-panel">
@@ -146,7 +168,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             </div>
             <div className="quick-actions">
               <button className="button primary" onClick={() => fileRef.current?.click()} disabled={busy}><Upload size={16} /> Beleg hochladen</button>
-              <button className="button secondary" onClick={run} disabled={busy}><Play size={16} /> Invoice Agent starten</button>
+              <button className="button secondary" onClick={run} disabled={busy}>
+                {busy ? <Activity size={16} /> : <Play size={16} />}
+                {busy ? 'Agent läuft...' : 'Invoice Agent starten'}
+              </button>
               <ExportButtons year={currentYear} month={currentMonth} compact />
               <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
             </div>
@@ -159,7 +184,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                 <h2>RoboterSteve</h2>
               </div>
             </div>
-            <StatusRow icon={Activity} label="Invoice Agent" value={busy ? 'aktiv' : 'bereit'} tone={busy ? 'yellow' : 'green'} />
+            <StatusRow icon={Activity} label="Invoice Agent" value={busy ? 'scannt Belege' : 'bereit'} tone={busy ? 'yellow' : 'green'} />
             <StatusRow icon={Database} label="Datenbank" value="verbunden" tone="green" />
             <StatusRow icon={Server} label="Speicherplatz" value="lokal" tone="blue" />
             <StatusRow icon={CheckCircle2} label="Letzter Lauf" value={invoices[0]?.updated_at ? shortDate(invoices[0].updated_at) : 'noch keiner'} tone="blue" />

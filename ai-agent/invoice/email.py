@@ -1,12 +1,17 @@
 import logging
 import imaplib
+import re
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
 from dataclasses import dataclass
 
 
-DEFAULT_ATTACHMENT_EXTENSIONS = (".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv")
+DEFAULT_ATTACHMENT_EXTENSIONS = (".pdf",)
+CONTENT_TYPE_EXTENSIONS = {
+    "application/pdf": ".pdf"
+}
+AUTO_ATTACHMENT_CONTENT_TYPES = {"application/pdf"}
 
 
 @dataclass
@@ -60,9 +65,20 @@ def fetch_imap_attachments(
 
         uids = data[0].split()
         result.messages_seen = len(uids)
-        for uid_bytes in uids[-config.max_messages:]:
+        import_key = _import_key(config)
+        selected_uids = uids[-config.max_messages:]
+        first_uid = selected_uids[0].decode("ascii", errors="ignore") if selected_uids else "-"
+        last_uid = selected_uids[-1].decode("ascii", errors="ignore") if selected_uids else "-"
+        logging.info(
+            "E-Mail Suche: %s Treffer, pruefe letzte %s UIDs (%s bis %s).",
+            len(uids),
+            len(selected_uids),
+            first_uid,
+            last_uid,
+        )
+        for uid_bytes in selected_uids:
             uid = uid_bytes.decode("ascii", errors="ignore")
-            message_key = f"{config.host}:{config.mailbox}:{uid}"
+            message_key = f"{config.host}:{config.mailbox}:{uid}:{import_key}"
             if is_processed(message_key):
                 continue
 
@@ -76,6 +92,8 @@ def fetch_imap_attachments(
                 continue
 
             message = BytesParser(policy=policy.default).parsebytes(raw_message)
+            subject = str(message.get("subject", "")).strip()
+            sender = str(message.get("from", "")).strip()
             saved = _extract_attachments_from_message(
                 message=message,
                 output_dir=output_dir,
@@ -90,7 +108,19 @@ def fetch_imap_attachments(
             if config.mark_seen:
                 mailbox.uid("store", uid, "+FLAGS", "(\\Seen)")
 
-            logging.info("E-Mail UID %s verarbeitet, %s Anhaenge gespeichert.", uid, len(saved))
+            logging.info(
+                "E-Mail UID %s verarbeitet, %s Anhaenge gespeichert. Von=%s Betreff=%s",
+                uid,
+                len(saved),
+                sender or "-",
+                subject or "-",
+            )
+            if not saved:
+                logging.info(
+                    "E-Mail UID %s hatte keine passenden Anhaenge. Erlaubte Endungen=%s",
+                    uid,
+                    ", ".join(config.attachment_extensions),
+                )
 
     return result
 
@@ -113,20 +143,50 @@ def extract_attachments_from_eml(eml_path: Path, output_dir: Path) -> list[Path]
 
 def _extract_attachments_from_message(message, output_dir: Path, attachment_extensions: tuple[str, ...], prefix: str) -> list[Path]:
     extracted = []
-    for part in message.iter_attachments():
+    for index, part in enumerate(message.walk(), start=1):
+        if part.is_multipart():
+            continue
         filename = part.get_filename()
-        if not filename:
+        content_type = part.get_content_type().lower()
+        disposition = (part.get_content_disposition() or "").lower()
+        suffix = Path(filename or "").suffix.lower()
+        inferred_suffix = CONTENT_TYPE_EXTENSIONS.get(content_type, "")
+        is_named_attachment = bool(filename)
+        is_attachment_part = disposition in {"attachment", "inline"}
+        is_auto_attachment_content = content_type in AUTO_ATTACHMENT_CONTENT_TYPES and inferred_suffix in attachment_extensions
+
+        if not is_named_attachment and not is_attachment_part and not is_auto_attachment_content:
             continue
-        if Path(filename).suffix.lower() not in attachment_extensions:
-            logging.info("E-Mail-Anhang mit nicht unterstuetzter Endung uebersprungen: %s", filename)
+
+        if not suffix and inferred_suffix:
+            suffix = inferred_suffix
+
+        if suffix not in attachment_extensions:
+            label = filename or f"part-{index} ({content_type})"
+            logging.info("E-Mail-Anhang mit nicht unterstuetzter Endung uebersprungen: %s", label)
             continue
-        target = _unique_path(output_dir / f"{prefix}{filename}")
+
+        safe_name = _safe_attachment_filename(filename or f"attachment_{index}{suffix}", suffix)
         payload = part.get_payload(decode=True)
         if not payload:
             continue
+        target = _unique_path(output_dir / f"{prefix}{safe_name}")
         target.write_bytes(payload)
         extracted.append(target)
     return extracted
+
+
+def _import_key(config: EmailConfig) -> str:
+    extensions = ",".join(sorted(ext.lower() for ext in config.attachment_extensions))
+    return f"v3:{extensions}"
+
+
+def _safe_attachment_filename(filename: str, suffix: str) -> str:
+    path_name = Path(filename).name.strip() or f"attachment{suffix}"
+    stem = Path(path_name).stem.strip()
+    current_suffix = Path(path_name).suffix.lower() or suffix
+    safe_stem = re.sub(r"[^A-Za-z0-9._ -]+", "_", stem).strip(" ._-") or "attachment"
+    return f"{safe_stem}{current_suffix}"
 
 
 def _message_bytes(message_data) -> bytes:

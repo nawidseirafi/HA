@@ -1,4 +1,4 @@
-import { BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, HeartPulse, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
+import { Activity, BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, HeartPulse, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -100,7 +100,7 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
             </button>
             <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
             <button onClick={runAgent} disabled={busy}>
-              <Play size={18} /> Invoice Agent starten
+              {busy ? <Activity size={18} /> : <Play size={18} />} {busy ? 'Agent läuft...' : 'Invoice Agent starten'}
             </button>
           </>
         )}

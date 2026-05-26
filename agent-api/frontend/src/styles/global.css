@@ -1542,6 +1542,25 @@ p { color: var(--muted); line-height: 1.65; }
     var(--surface);
 }
 
+.status-panel {
+  color: #ffd983;
+  border-color: rgba(251, 191, 36, 0.28);
+  background:
+    linear-gradient(145deg, rgba(251, 191, 36, 0.12), rgba(255,255,255,0.025)),
+    var(--surface);
+}
+
+.agent-run-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+}
+
+.agent-run-status svg {
+  flex: 0 0 auto;
+}
+
 .logs-panel pre {
   max-height: 360px;
   overflow: auto;
