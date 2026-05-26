@@ -11,8 +11,8 @@ interface Props {
 
 export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
   return (
-    <div className="table-wrap">
-      <table>
+    <div className="table-wrap invoice-table-wrap">
+      <table className="invoice-table">
         <thead>
           <tr>
             <th>Datum</th>

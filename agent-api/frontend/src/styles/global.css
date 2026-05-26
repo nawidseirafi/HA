@@ -25,6 +25,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); }
+#root { min-width: 0; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
@@ -1103,6 +1104,7 @@ p { color: var(--muted); line-height: 1.65; }
   padding: 22px;
   max-width: 1620px;
   width: 100%;
+  min-width: 0;
 }
 
 .page-stack { display: grid; gap: 16px; }
@@ -1111,6 +1113,15 @@ p { color: var(--muted); line-height: 1.65; }
   justify-content: space-between;
   gap: 18px;
   align-items: flex-start;
+  min-width: 0;
+}
+
+.page-header > div,
+.dashboard-hero > div,
+.section-title > div,
+.wellness-course-title > div,
+.market-report-head > div {
+  min-width: 0;
 }
 
 .page-header p, .dashboard-hero p { margin-top: 10px; }
@@ -1171,6 +1182,8 @@ p { color: var(--muted); line-height: 1.65; }
   color: var(--ink);
   background: rgba(255,255,255,0.06);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  max-width: 100%;
+  text-align: center;
 }
 .button.primary { background: linear-gradient(135deg, var(--blue), var(--violet)); border-color: rgba(111, 154, 255, 0.5); color: #fff; }
 .button.secondary { background: rgba(77, 141, 255, 0.12); border-color: rgba(77, 141, 255, 0.26); color: #d9e8ff; }
@@ -2339,6 +2352,12 @@ p { color: var(--muted); line-height: 1.65; }
 }
 
 .wellness-course-title h3 { font-size: 1.05rem; line-height: 1.25; }
+.wellness-course-title h3,
+.market-report-card h3,
+.market-news-list strong,
+.market-flow-list strong {
+  overflow-wrap: anywhere;
+}
 
 .wellness-course-meta,
 .wellness-course-badges {
@@ -2555,6 +2574,11 @@ tr:hover td { background: rgba(77, 141, 255, 0.07); }
   text-underline-offset: 4px;
 }
 .table-link:hover { color: #b8d2ff; }
+
+.invoice-table .table-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 
 .status {
   display: inline-flex;
@@ -2929,10 +2953,12 @@ label.check input[type="checkbox"]:disabled {
 .market-intel-panel {
   padding: 12px;
   border-radius: 18px;
+  overflow-x: auto;
 }
 .market-intel-table {
   display: grid;
   gap: 6px;
+  min-width: 620px;
 }
 .market-intel-head,
 .market-intel-row {
@@ -3332,7 +3358,10 @@ label.check input[type="checkbox"]:disabled {
   .sidebar-note { position: static; margin-top: 16px; }
   .nav-list { grid-template-columns: 1fr; }
   .main-panel { padding: 72px 18px 18px; }
-  .dashboard-hero, .page-header { display: grid; }
+  .dashboard-hero, .page-header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
   .top-tools { width: 100%; }
   .search-box { width: 100%; }
   .filters, .detail-layout { grid-template-columns: 1fr; }
@@ -3366,6 +3395,12 @@ label.check input[type="checkbox"]:disabled {
   .wellness-health-layout {
     grid-template-columns: 1fr;
   }
+  .wellness-summary-grid,
+  .market-factor-grid,
+  .market-watchlist-layout,
+  .market-symbol-grid {
+    grid-template-columns: 1fr;
+  }
   .wellness-control-card {
     grid-column: 1 / -1;
   }
@@ -3373,6 +3408,7 @@ label.check input[type="checkbox"]:disabled {
 
 @media (max-width: 640px) {
   .nav-list, .form-grid { grid-template-columns: 1fr; }
+  body { overflow-x: hidden; }
   .login-visual { display: none; }
   .login-panel {
     min-height: 100vh;
@@ -3381,22 +3417,83 @@ label.check input[type="checkbox"]:disabled {
   .login-copy h1 { font-size: 2.25rem; }
   .login-form { padding: 22px; border-radius: 22px; }
   .login-options { align-items: flex-start; flex-direction: column; }
+  .main-panel { padding: 68px 12px 14px; }
+  .page-stack { gap: 12px; }
+  .page-header,
+  .dashboard-hero,
+  .section-title,
+  .card-topline,
+  .metric-row,
+  .market-report-head,
+  .market-price-row,
+  .wellness-course-top,
+  .wellness-course-title {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .section-title {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
   .top-tools { display: none; }
+  .button-row,
+  .export-actions,
+  .wellness-control-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .button-row .button,
+  .export-actions .button,
+  .wellness-control-actions .button {
+    width: 100%;
+  }
   .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 10px;
   }
   .kpi-card {
-    min-height: 108px;
+    min-height: 92px;
     padding: 12px;
     border-radius: 18px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    align-content: center;
+    gap: 8px 12px;
   }
-  .kpi-card small { display: none; }
-  .kpi-card strong { font-size: 1.25rem; }
+  .kpi-card span,
+  .kpi-card strong,
+  .kpi-card small {
+    grid-column: 2;
+    min-width: 0;
+  }
+  .kpi-card span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kpi-card strong {
+    font-size: 1.28rem;
+    overflow-wrap: anywhere;
+  }
+  .kpi-card small {
+    display: block;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+  .kpi-card::after {
+    width: 90px;
+    height: 90px;
+    right: -42px;
+    top: -34px;
+  }
   .kpi-icon {
     width: 34px;
     height: 34px;
     border-radius: 12px;
+    grid-column: 1;
+    grid-row: 1 / span 3;
   }
   .kpi-icon svg {
     width: 18px;
@@ -3405,9 +3502,33 @@ label.check input[type="checkbox"]:disabled {
   .dashboard-grid {
     gap: 12px;
   }
+  .invoice-list-panel,
+  .quick-stack,
+  .spend-trend-panel,
+  .category-chart-panel {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .quick-stack {
+    order: -1;
+  }
+  .latest-panel {
+    display: none;
+  }
   .panel {
     padding: 12px;
     border-radius: 18px;
+  }
+  .card-grid,
+  .month-grid,
+  .agent-grid,
+  .market-card-grid,
+  .market-ticker-strip,
+  .upcoming-course-grid,
+  .wellness-course-grid,
+  .wellness-course-grid.dense,
+  .wellness-booking-summary.dense .wellness-booking-timeline {
+    grid-template-columns: 1fr;
   }
   .course-row {
     grid-template-columns: 1fr;
@@ -3420,57 +3541,117 @@ label.check input[type="checkbox"]:disabled {
     min-height: auto;
   }
   .bar-chart {
-    height: 160px;
-    gap: 4px;
+    height: 132px;
+    gap: 3px;
     padding-top: 8px;
   }
-  .bar-chart { gap: 5px; }
-  .bar-item span { font-size: 0.68rem; }
+  .bar-item { gap: 6px; }
+  .bar-item span { font-size: 0.62rem; }
   .donut-wrap { grid-template-columns: 1fr; }
-  .donut { margin: 0 auto; }
+  .donut {
+    width: 112px;
+    height: 112px;
+    margin: 0 auto;
+  }
+  .donut::after {
+    inset: 22px;
+  }
+  .donut-legend {
+    gap: 7px;
+  }
+  .donut-legend div {
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .donut-legend b {
+    grid-column: 2;
+    text-align: left;
+    font-size: 0.82rem;
+  }
   .table-wrap {
+    overflow-x: auto;
+    border-radius: 18px;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { min-width: 620px; }
+  th, td { padding: 10px; }
+  .invoice-table-wrap {
     overflow: visible;
     border: 0;
     background: transparent;
   }
-  table,
-  thead,
-  tbody,
-  tr,
-  td {
-    display: block;
-    width: 100%;
+  .invoice-table {
     min-width: 0;
   }
-  thead { display: none; }
-  tr {
-    margin-bottom: 10px;
-    padding: 10px;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: rgba(255,255,255,0.045);
+  .invoice-table,
+  .invoice-table thead,
+  .invoice-table tbody,
+  .invoice-table tr,
+  .invoice-table td {
+    display: block;
+    width: 100%;
   }
-  td {
-    display: flex;
-    justify-content: space-between;
-    gap: 14px;
+  .invoice-table thead {
+    display: none;
+  }
+  .invoice-table tr {
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background:
+      linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025)),
+      var(--surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  }
+  .invoice-table td {
+    display: grid;
+    grid-template-columns: minmax(82px, 0.34fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
     padding: 8px 0;
     border-bottom: 1px solid rgba(190, 208, 235, 0.08);
     white-space: normal;
   }
-  td:last-child {
+  .invoice-table td:last-child {
     border-bottom: 0;
+    padding-bottom: 0;
   }
-  td::before {
+  .invoice-table td::before {
     content: attr(data-label);
     color: var(--muted);
-    flex: 0 0 92px;
+    font-size: 0.78rem;
+    font-weight: 700;
   }
-  td[data-label="Aktionen"] {
-    align-items: center;
+  .invoice-table td[data-label="Anbieter"] {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-top: 0;
   }
-  td[data-label="Aktionen"]::before {
-    align-self: center;
+  .invoice-table td[data-label="Anbieter"]::before {
+    display: none;
+  }
+  .invoice-table td[data-label="Anbieter"] .table-link {
+    font-size: 1.05rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+  .invoice-table td[data-label="Aktionen"] {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+  .invoice-table td[data-label="Aktionen"]::before {
+    display: none;
+  }
+  .invoice-table .icon-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  .invoice-table .icon-actions button {
+    width: 100%;
+    min-height: 42px;
   }
   .icon-actions {
     justify-content: flex-end;
@@ -3492,6 +3673,9 @@ label.check input[type="checkbox"]:disabled {
     padding: 18px;
     border-radius: 20px;
   }
+  .wellness-hero-header .icon-button {
+    justify-self: start;
+  }
   .wellness-day-selector,
   .wellness-filter-row {
     width: 100%;
@@ -3512,6 +3696,43 @@ label.check input[type="checkbox"]:disabled {
     inset: 10px;
     width: auto;
     border-radius: 22px;
+  }
+  .wellness-course-top small,
+  .wellness-course-title strong {
+    white-space: normal;
+  }
+  .market-chart-large,
+  .market-trend-chart {
+    height: 220px;
+  }
+  .market-intel-panel {
+    margin-inline: -2px;
+  }
+  .market-filter-bar {
+    grid-template-columns: 1fr;
+  }
+  .detail-layout {
+    gap: 12px;
+  }
+  .preview-pane {
+    height: 360px;
+    min-height: 280px;
+    border-radius: 18px;
+  }
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .modal {
+    width: calc(100vw - 20px);
+    height: min(620px, calc(100vh - 20px));
+  }
+  .settings-card-head,
+  .settings-section-title {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .settings-badge {
+    justify-self: start;
   }
   h1 { font-size: 1.75rem; }
 }
