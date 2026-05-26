@@ -50,6 +50,14 @@ def refine_metadata_with_ai(
     is_tax_relevant = _parse_bool(data.get("is_tax_relevant"), metadata.is_tax_relevant)
     reason = _clean_text(data.get("reason")) or "KI-Belegextraktion"
     confidence = max(0.0, min(confidence, 1.0))
+    if (
+        gross_amount == 0
+        and metadata.amount is not None
+        and metadata.amount > 0
+        and document_type in {"invoice", "receipt", "assessment", "statement"}
+    ):
+        gross_amount = metadata.amount
+        reason = f"{reason}; 0-Betrag der KI ignoriert, lokale Voranalyse hatte {metadata.amount}"
     amount = gross_amount if gross_amount is not None else metadata.amount
     review_status = "needs_review" if confidence < 0.9 or document_type in {"document", "unknown"} else "reviewed"
 
@@ -107,6 +115,9 @@ Wichtige Regeln:
 - Bei Lohn-/Gehaltsabrechnung oder Lohnsteuerbescheinigung: document_type = "payroll" oder "certificate", transaction_type = "income", category = "Gehalt".
 - Bei Steuerbescheid: document_type = "assessment", category = "Steuer", transaction_type nach Geldfluss: Nachzahlung expense, Erstattung income.
 - Verwende bei Belegen den TOTAL/Gesamt/Brutto/Kartenzahlungs-Betrag als gross_amount und amount.
+- Bei Rechnungen mit "Rechnungsbetrag" und danach "abzueglich Vorschuesse", "berechnete Vorschuesse" oder "zu zahlender Betrag 0,00": Verwende den Rechnungsbetrag/Bruttobetrag als gross_amount und amount, nicht den offenen Zahlbetrag 0,00. Das bleibt transaction_type="expense".
+- Eine Rechnung ist keine Gutschrift nur weil Woerter wie "gutgeschrieben", "abgetreten" oder "schuldbefreiend" vorkommen. credit_note/income nur verwenden, wenn das Dokument eindeutig eine Gutschrift, Erstattung oder Zahlung an den Nutzer ist.
+- Bei Steuerberater, Steuerberatung, StBVV, Finanzbuchhaltung, Buchhaltung: category = "Steuer", document_type = "invoice", transaction_type = "expense".
 - Verwende keine Uhrzeit, Kundennummer, PLZ, Datum oder Rechnungsnummer als Betrag.
 - Wenn kein sicherer Betrag erkennbar ist, setze gross_amount und amount auf null.
 - Wenn das Dokument nicht sicher lesbar ist, setze document_type="unknown", is_invoice=false, category="Review", confidence <= 0.4.
