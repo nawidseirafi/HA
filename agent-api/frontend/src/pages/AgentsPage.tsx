@@ -13,12 +13,15 @@ const plannedAgents = [
 ];
 
 export function AgentsPage({ navigate }: Props) {
+  const greeting = getGreeting();
+
   return (
     <div className="page-stack">
       <header className="page-header">
         <div>
           <span className="eyebrow">Agent Console</span>
-          <h1>Agenten</h1>
+          <h1>{greeting}, Nawid</h1>
+          <p>Wähle einen Agenten oder prüfe den aktuellen Systembereich.</p>
         </div>
       </header>
 
@@ -71,4 +74,11 @@ export function AgentsPage({ navigate }: Props) {
       </section>
     </div>
   );
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Guten Morgen';
+  if (hour < 18) return 'Guten Tag';
+  return 'Guten Abend';
 }

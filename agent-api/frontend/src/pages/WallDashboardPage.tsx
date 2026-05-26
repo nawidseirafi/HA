@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Activity,
@@ -25,6 +25,8 @@ export function WallDashboardPage() {
   const [busyEntity, setBusyEntity] = useState('');
   const [error, setError] = useState('');
   const [now, setNow] = useState(new Date());
+  const brightnessTimers = useRef<Record<string, number>>({});
+  const refreshTimer = useRef<number | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -32,15 +34,17 @@ export function WallDashboardPage() {
     try {
       const next = await api.wallDashboard();
       setData(next);
-      if (!next.light_groups.some((group) => group.area === selectedFloor)) {
-        setSelectedFloor('Alle Etagen');
-      }
+      setSelectedFloor((currentFloor) => (
+        currentFloor === 'Alle Etagen' || next.light_groups.some((group) => group.area === currentFloor)
+          ? currentFloor
+          : 'Alle Etagen'
+      ));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Wall-Dashboard konnte nicht geladen werden.');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [selectedFloor]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -49,6 +53,8 @@ export function WallDashboardPage() {
     return () => {
       window.clearInterval(refresh);
       window.clearInterval(clock);
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+      Object.values(brightnessTimers.current).forEach((timer) => window.clearTimeout(timer));
     };
   }, [load]);
 
@@ -60,21 +66,51 @@ export function WallDashboardPage() {
 
   const allSelectedLights = useMemo(() => visibleGroups.flatMap((group) => group.items), [visibleGroups]);
 
+  const scheduleRefresh = () => {
+    if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => load(true), 900);
+  };
+
   const callLight = async (service: 'turn_on' | 'turn_off', entity_id: string | string[], payload: Record<string, unknown> = {}) => {
+    const ids = Array.isArray(entity_id) ? entity_id : [entity_id];
+    setData((current) => patchWallLights(current, ids, {
+      on: service === 'turn_on',
+      brightness_pct: typeof payload.brightness_pct === 'number' ? payload.brightness_pct : service === 'turn_off' ? 0 : undefined,
+    }));
     setBusyEntity(Array.isArray(entity_id) ? 'bulk' : entity_id);
     setError('');
     try {
       await api.callHomeAssistantService({ domain: 'light', service, entity_id, data: payload });
-      await load(true);
+      scheduleRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Aktion fehlgeschlagen.');
+      await load(true);
     } finally {
       setBusyEntity('');
     }
   };
 
-  const setBrightness = async (light: WallLight, value: number) => {
-    await callLight('turn_on', light.entity_id, { brightness_pct: value });
+  const setBrightness = (light: WallLight, value: number) => {
+    setData((current) => patchWallLights(current, [light.entity_id], { on: true, brightness_pct: value }));
+    if (brightnessTimers.current[light.entity_id]) {
+      window.clearTimeout(brightnessTimers.current[light.entity_id]);
+    }
+    brightnessTimers.current[light.entity_id] = window.setTimeout(async () => {
+      try {
+        await api.callHomeAssistantService({
+          domain: 'light',
+          service: 'turn_on',
+          entity_id: light.entity_id,
+          data: { brightness_pct: value },
+        });
+        delete brightnessTimers.current[light.entity_id];
+        scheduleRefresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Helligkeit konnte nicht gesetzt werden.');
+        delete brightnessTimers.current[light.entity_id];
+        await load(true);
+      }
+    }, 220);
   };
 
   const turnSelected = async (on: boolean) => {
@@ -362,4 +398,36 @@ function labelState(state: string) {
 function formatNumber(value?: number | null) {
   if (value === null || value === undefined) return '--';
   return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+}
+
+function patchWallLights(
+  current: WallDashboardData | null,
+  entityIds: string[],
+  patch: Partial<Pick<WallLight, 'on' | 'brightness_pct'>>,
+): WallDashboardData | null {
+  if (!current) return current;
+  const ids = new Set(entityIds);
+  const patchLight = (light: WallLight): WallLight => {
+    if (!ids.has(light.entity_id)) return light;
+    const next = { ...light, ...patch };
+    next.state = next.on ? 'on' : 'off';
+    return next;
+  };
+  const countOn = (items: WallLight[]) => items.filter((item) => item.on).length;
+  const lights = current.lights.map(patchLight);
+  const light_groups = current.light_groups.map((group) => {
+    const rooms = (group.rooms ?? []).map((room) => {
+      const items = room.items.map(patchLight);
+      return { ...room, items, on: countOn(items), total: items.length };
+    });
+    const items = group.items.map(patchLight);
+    return {
+      ...group,
+      items,
+      rooms,
+      on: rooms.length ? rooms.reduce((sum, room) => sum + room.on, 0) : countOn(items),
+      total: rooms.length ? rooms.reduce((sum, room) => sum + room.total, 0) : items.length,
+    };
+  });
+  return { ...current, lights, light_groups };
 }
