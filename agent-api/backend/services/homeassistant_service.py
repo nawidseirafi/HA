@@ -70,6 +70,18 @@ class HomeAssistantService:
             data = response.json()
         return data if isinstance(data, list) else []
 
+    def render_template(self, template: str) -> str:
+        if not self.configured():
+            raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
+        with httpx.Client(timeout=8) as client:
+            response = client.post(
+                f"{self.base_url}/api/template",
+                headers={**self._headers(), "Content-Type": "application/json"},
+                json={"template": template},
+            )
+            response.raise_for_status()
+            return response.text
+
     def get_state(self, entity_id: str | None) -> dict[str, Any] | None:
         entity = (entity_id or "").strip()
         if not entity:
@@ -98,6 +110,23 @@ class HomeAssistantService:
         if value in (None, "", "unknown", "unavailable"):
             return None
         return state
+
+    def call_service(self, domain: str, service: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.configured():
+            raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
+        clean_domain = str(domain or "").strip()
+        clean_service = str(service or "").strip()
+        if not clean_domain or not clean_service:
+            raise RuntimeError("Home Assistant Service ist unvollstaendig.")
+        with httpx.Client(timeout=8) as client:
+            response = client.post(
+                f"{self.base_url}/api/services/{clean_domain}/{clean_service}",
+                headers={**self._headers(), "Content-Type": "application/json"},
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+        return {"ok": True, "result": data}
 
     def _headers(self) -> dict[str, str]:
         return {

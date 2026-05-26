@@ -330,6 +330,69 @@ export type MarketSummary = {
   disclaimer: string;
 };
 
+export type WallEntity = {
+  entity_id: string;
+  name: string;
+  state: string;
+  area: string;
+  device_class?: string | null;
+  unit?: string | null;
+};
+
+export type WallLight = WallEntity & {
+  on: boolean;
+  brightness_pct?: number | null;
+  supported_color_modes?: string[];
+};
+
+export type WallLightGroup = {
+  area: string;
+  total: number;
+  on: number;
+  items: WallLight[];
+  rooms: WallLightRoom[];
+};
+
+export type WallLightRoom = {
+  area: string;
+  total: number;
+  on: number;
+  items: WallLight[];
+};
+
+export type WallClimate = WallEntity & {
+  current_temperature?: number | null;
+  target_temperature?: number | null;
+  humidity?: number | null;
+  hvac_action?: string | null;
+};
+
+export type WallDashboardData = {
+  updated_at: string;
+  home_assistant: { configured: boolean; entity_count: number };
+  weather: WallEntity | null;
+  lights: WallLight[];
+  light_groups: WallLightGroup[];
+  switches: WallEntity[];
+  climate: WallClimate[];
+  security: {
+    openings_total: number;
+    openings_open: number;
+    openings: WallEntity[];
+    problems: WallEntity[];
+  };
+  health: {
+    battery_total: number;
+    low_batteries: Array<WallEntity & { level?: number | null }>;
+    unavailable: WallEntity[];
+  };
+  agents: {
+    invoices: { status: string; total?: number; needs_review?: number; errors?: number; error?: string };
+    mywellness: Partial<AgentStatus> & { status?: string; error?: string };
+    market: { status: string; watchlist_count?: number; enabled_count?: number; signals?: Record<string, number>; error?: string };
+  };
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE}${path}`, {
@@ -376,6 +439,9 @@ export const api = {
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
   settings: () => request<SettingsInfo>('/api/settings'),
+  wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
+  callHomeAssistantService: (payload: { domain: string; service: string; entity_id?: string | string[]; data?: Record<string, unknown> }) =>
+    request<{ ok: boolean; result: unknown }>('/api/homeassistant/service', { method: 'POST', body: JSON.stringify(payload) }),
   marketSummary: () => request<MarketSummary>('/api/market/summary'),
   marketWatchlist: async () => (await request<{ items: MarketWatchlistItem[]; disclaimer: string }>('/api/market/watchlist')).items,
   createMarketWatchlistItem: (payload: MarketWatchlistPayload) =>

@@ -11,6 +11,7 @@ from backend.agents.invoices.routes import router as invoice_router
 from backend.agents.market.routes import router as market_router
 from backend.agents.mywellness.routes import router as mywellness_router
 from backend.api.auth_routes import router as auth_router
+from backend.api.homeassistant_routes import router as homeassistant_router
 from backend.api.settings_routes import router as settings_router
 from backend.paths import FRONTEND_DIST, LOG_DIR
 from backend.services.auth_service import user_from_request
@@ -64,6 +65,7 @@ async def require_api_auth(request, call_next):
 
 
 app.include_router(auth_router)
+app.include_router(homeassistant_router)
 app.include_router(invoice_router)
 app.include_router(mywellness_router)
 app.include_router(settings_router)

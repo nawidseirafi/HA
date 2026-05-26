@@ -16,10 +16,12 @@ import { MarketDashboardPage } from './pages/market/MarketDashboardPage';
 import { MarketReportsPage } from './pages/market/MarketReportsPage';
 import { MarketSymbolPage } from './pages/market/MarketSymbolPage';
 import { MarketWatchlistPage } from './pages/market/MarketWatchlistPage';
+import { WallDashboardPage } from './pages/WallDashboardPage';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 export type Route =
+  | { name: 'wall' }
   | { name: 'agents' }
   | { name: 'mywellnessDashboard' }
   | { name: 'mywellnessCourses' }
@@ -39,6 +41,7 @@ export type Route =
 
 function parseRoute(): Route {
   const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'wall') return { name: 'wall' };
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2] && parts[3] === 'months' && parts[4]) {
     return { name: 'month', year: Number(parts[2]), month: Number(parts[4]) };
   }
@@ -91,6 +94,7 @@ function AppContent() {
   };
 
   const page = useMemo(() => {
+    if (route.name === 'wall') return <WallDashboardPage />;
     if (route.name === 'agents') return <AgentsPage navigate={navigate} />;
     if (route.name === 'mywellnessDashboard') return <MyWellnessDashboardPage navigate={navigate} />;
     if (route.name === 'mywellnessCourses') return <MyWellnessCoursesPage navigate={navigate} />;
@@ -110,7 +114,11 @@ function AppContent() {
   }, [route]);
 
   if (!isAuthenticated) {
-    return <LoginPage onLoggedIn={() => navigate({ name: 'agents' })} />;
+    return <LoginPage onLoggedIn={() => setRoute(parseRoute())} />;
+  }
+
+  if (route.name === 'wall') {
+    return page;
   }
 
   return (
@@ -121,6 +129,7 @@ function AppContent() {
 }
 
 function routeToPath(route: Route) {
+  if (route.name === 'wall') return '/wall';
   if (route.name === 'agents') return '/agents';
   if (route.name === 'mywellnessDashboard') return '/mywellness';
   if (route.name === 'mywellnessCourses') return '/mywellness/courses';
