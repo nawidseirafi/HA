@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import {
   Activity,
   BatteryWarning,
@@ -18,12 +18,21 @@ import { api, type WallDashboardData, type WallLight, type WallLightGroup } from
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents';
 
 export function WallDashboardPage() {
+  return (
+    <WallErrorBoundary>
+      <WallDashboardContent />
+    </WallErrorBoundary>
+  );
+}
+
+function WallDashboardContent() {
   const [data, setData] = useState<WallDashboardData | null>(null);
   const [section, setSection] = useState<WallSection>('home');
   const [selectedFloor, setSelectedFloor] = useState('Alle Etagen');
   const [loading, setLoading] = useState(false);
   const [busyEntity, setBusyEntity] = useState('');
   const [error, setError] = useState('');
+  const [runtimeError, setRuntimeError] = useState('');
   const [now, setNow] = useState(new Date());
   const brightnessTimers = useRef<Record<string, number>>({});
   const refreshTimer = useRef<number | null>(null);
@@ -50,9 +59,20 @@ export function WallDashboardPage() {
     load();
     const refresh = window.setInterval(() => load(true), 15000);
     const clock = window.setInterval(() => setNow(new Date()), 1000);
+    const onError = (event: ErrorEvent) => {
+      setRuntimeError(event.error instanceof Error ? `${event.error.name}: ${event.error.message}` : event.message);
+    };
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      setRuntimeError(reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason));
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
     return () => {
       window.clearInterval(refresh);
       window.clearInterval(clock);
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
       if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
       Object.values(brightnessTimers.current).forEach((timer) => window.clearTimeout(timer));
     };
@@ -91,7 +111,8 @@ export function WallDashboardPage() {
   };
 
   const setBrightness = (light: WallLight, value: number) => {
-    setData((current) => patchWallLights(current, [light.entity_id], { on: true, brightness_pct: value }));
+    const brightness = clampPercent(value);
+    setData((current) => patchWallLights(current, [light.entity_id], { on: true, brightness_pct: brightness }));
     if (brightnessTimers.current[light.entity_id]) {
       window.clearTimeout(brightnessTimers.current[light.entity_id]);
     }
@@ -101,7 +122,7 @@ export function WallDashboardPage() {
           domain: 'light',
           service: 'turn_on',
           entity_id: light.entity_id,
-          data: { brightness_pct: value },
+          data: { brightness_pct: brightness },
         });
         delete brightnessTimers.current[light.entity_id];
         scheduleRefresh();
@@ -135,12 +156,12 @@ export function WallDashboardPage() {
       <main className="wall-main">
         <header className="wall-header">
           <div>
-            <span>{now.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+            <span>{formatWallDate(now)}</span>
             <h1>{titleFor(section)}</h1>
             <p>{subtitleFor(section, activeLights, totalLights, problemCount)}</p>
           </div>
           <div className="wall-header-side">
-            <strong>{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</strong>
+            <strong>{formatClock(now)}</strong>
             <button type="button" onClick={() => load()} disabled={loading} aria-label="Aktualisieren">
               <RefreshCw size={18} /> Aktualisieren
             </button>
@@ -148,6 +169,7 @@ export function WallDashboardPage() {
         </header>
 
         {error && <section className="wall-error">{error}</section>}
+        {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
         {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
 
         {data && section === 'home' && <HomeSection data={data} />}
@@ -200,7 +222,7 @@ function HomeSection({ data }: { data: WallDashboardData }) {
       <section className="wall-panel">
         <div className="wall-section-title">
           <span>Letztes Update</span>
-          <strong>{new Date(data.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</strong>
+          <strong>{formatTime(data.updated_at)}</strong>
         </div>
         <p>{data.home_assistant.entity_count} Home-Assistant-Entities verbunden.</p>
       </section>
@@ -262,24 +284,13 @@ function LightsSection({
             </div>
             <div className="wall-light-list">
               {room.items.map((light) => (
-                <article key={light.entity_id} className="wall-light-row">
-                  <div className={`wall-dot ${light.on ? 'on' : ''}`} />
-                  <div>
-                    <strong>{light.name}</strong>
-                    <label>
-                      <span>Helligkeit</span>
-                      <span>{light.brightness_pct ?? (light.on ? 100 : 0)}%</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      value={light.brightness_pct ?? (light.on ? 100 : 1)}
-                      onChange={(event) => onBrightness(light, Number(event.target.value))}
-                    />
-                  </div>
-                  <button className={`wall-switch ${light.on ? 'on' : ''}`} onClick={() => onToggle(light)} disabled={busyEntity === light.entity_id} aria-label={`${light.name} schalten`} />
-                </article>
+                <LightRow
+                  key={light.entity_id}
+                  light={light}
+                  busy={busyEntity === light.entity_id}
+                  onToggle={onToggle}
+                  onBrightness={onBrightness}
+                />
               ))}
             </div>
           </section>
@@ -337,7 +348,7 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
       <section className="wall-panel">
         <div className="wall-section-title"><span>MyWellness</span><Activity size={20} /></div>
         <h2>{wellness.is_running ? 'Läuft' : wellness.enabled === false ? 'Pausiert' : 'Bereit'}</h2>
-        <p>Nächster Lauf: {wellness.next_scheduled_run ? new Date(wellness.next_scheduled_run).toLocaleString('de-DE') : 'nicht geplant'}</p>
+        <p>Nächster Lauf: {wellness.next_scheduled_run ? formatDateTime(wellness.next_scheduled_run) : 'nicht geplant'}</p>
       </section>
       <section className="wall-panel">
         <div className="wall-section-title"><span>Market Agent</span><Zap size={20} /></div>
@@ -345,6 +356,41 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
         <p>{market.enabled_count ?? 0}/{market.watchlist_count ?? 0} Watchlist aktiv</p>
       </section>
     </div>
+  );
+}
+
+function LightRow({
+  light,
+  busy,
+  onToggle,
+  onBrightness,
+}: {
+  light: WallLight;
+  busy: boolean;
+  onToggle: (light: WallLight) => void;
+  onBrightness: (light: WallLight, value: number) => void;
+}) {
+  const brightness = clampPercent(light.brightness_pct ?? (light.on ? 100 : 0));
+  return (
+    <article className="wall-light-row">
+      <div className={`wall-dot ${light.on ? 'on' : ''}`} />
+      <div>
+        <strong>{light.name}</strong>
+        <label>
+          <span>Helligkeit</span>
+          <span>{brightness}%</span>
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={brightness}
+          onChange={(event) => onBrightness(light, Number(event.target.value))}
+        />
+      </div>
+      <button className={`wall-switch ${light.on ? 'on' : ''}`} onClick={() => onToggle(light)} disabled={busy} aria-label={`${light.name} schalten`} />
+    </article>
   );
 }
 
@@ -359,6 +405,35 @@ function MetricCard({ icon, label, value, detail, tone = 'info' }: { icon: React
       </div>
     </section>
   );
+}
+
+class WallErrorBoundary extends Component<{ children: ReactNode }, { message: string; stack: string }> {
+  state = { message: '', stack: '' };
+
+  static getDerivedStateFromError(error: Error) {
+    return { message: `${error.name}: ${error.message}`, stack: '' };
+  }
+
+  componentDidCatch(_error: Error, info: ErrorInfo) {
+    this.setState({ stack: info.componentStack || '' });
+  }
+
+  render() {
+    if (this.state.message) {
+      return (
+        <div className="wall-shell">
+          <main className="wall-main">
+            <section className="wall-error">
+              <strong>Wall-Dashboard Fehler</strong>
+              <p>{this.state.message}</p>
+              {this.state.stack && <pre>{this.state.stack}</pre>}
+            </section>
+          </main>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function ListPanel({ title, items }: { title: string; items: Array<{ entity_id: string; name: string; state: string; area?: string }> }) {
@@ -397,7 +472,40 @@ function labelState(state: string) {
 
 function formatNumber(value?: number | null) {
   if (value === null || value === undefined) return '--';
-  return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '--';
+  return `${Math.round(number * 10) / 10}`.replace('.', ',');
+}
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '--:--';
+  return formatClock(date);
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'nicht geplant';
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${formatClock(date)}`;
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function formatClock(date: Date) {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatWallDate(date: Date) {
+  const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  const months = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  return `${weekdays[date.getDay()]}, ${pad(date.getDate())}. ${months[date.getMonth()]}`;
+}
+
+function pad(value: number) {
+  return String(value).padStart(2, '0');
 }
 
 function patchWallLights(

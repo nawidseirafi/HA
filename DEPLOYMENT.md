@@ -86,6 +86,10 @@ Der zweite Requirements-Schritt ist wichtig, weil `ai-agent` z.B. `requests`, `p
 
 ## Frontend bauen
 
+Empfohlen ist eine von zwei Varianten.
+
+### Variante A: Frontend auf dem Zielrechner bauen
+
 ```bash
 cd /opt/roboterSteve/agent-api/frontend
 npm install
@@ -93,6 +97,37 @@ npm run build
 ```
 
 Wenn `agent-api/frontend/dist` existiert, liefert FastAPI die GUI direkt unter Port `8080` aus.
+
+### Variante B: Frontend auf dem Entwicklungsrechner bauen
+
+Auf dem Entwicklungsrechner:
+
+```bash
+cd agent-api/frontend
+npm install
+npm run build
+```
+
+Danach muss `dist/` mit auf den Zielrechner kopiert werden. Wichtig: Bei dieser Variante `frontend/dist` nicht vom Sync ausschliessen:
+
+```bash
+rsync -av --delete \
+  --exclude 'frontend/node_modules' \
+  --exclude '__pycache__' \
+  agent-api/ user@ziel:/opt/roboterSteve/agent-api/
+```
+
+Alternativ nur den gebauten Frontend-Ordner aktualisieren:
+
+```bash
+rsync -av --delete agent-api/frontend/dist/ user@ziel:/opt/roboterSteve/agent-api/frontend/dist/
+```
+
+Danach den Service neu starten, damit FastAPI die aktuellen statischen Dateien ausliefert:
+
+```bash
+sudo systemctl restart agent-api
+```
 
 ## Umgebungsvariablen
 
@@ -108,6 +143,9 @@ Beispiel:
 AGENT_API_USERNAME=admin
 AGENT_API_PASSWORD=change-me
 AGENT_API_JWT_SECRET=change-me-long-random-secret
+
+HA_URL=http://homeassistant.local:8123
+HA_TOKEN=change-me
 
 MY_WELLNESS_TOKEN=change-me
 MY_WELLNESS_USER_ID=change-me
@@ -128,7 +166,7 @@ Rechte setzen:
 sudo chmod 600 /etc/robotersteve-agent-api.env
 ```
 
-Hinweis: Environment-Variablennamen mit Bindestrich sind ungueltig. Verwende z.B. `HA_TOKEN`, nicht `HA-TOKEN`.
+Hinweis: Environment-Variablennamen mit Bindestrich sind ungueltig. Verwende `HA_TOKEN`, nicht `HA-TOKEN`.
 
 ## systemd-Service
 
@@ -226,7 +264,7 @@ curl http://robotersteve.local:8080/health
 
 ## Update-Deployment
 
-Auf dem Entwicklungsrechner:
+Wenn das Frontend auf dem Zielrechner gebaut wird, auf dem Entwicklungsrechner:
 
 ```bash
 rsync -av --delete \
@@ -248,6 +286,22 @@ cd /opt/roboterSteve
 ./venv/bin/pip install -r ai-agent/requirements.txt
 
 sudo systemctl restart agent-api
+```
+
+Wenn das Frontend auf dem Entwicklungsrechner gebaut wird:
+
+```bash
+cd agent-api/frontend
+npm install
+npm run build
+
+cd ../..
+rsync -av --delete \
+  --exclude 'frontend/node_modules' \
+  --exclude '__pycache__' \
+  agent-api/ user@ziel:/opt/roboterSteve/agent-api/
+
+ssh user@ziel 'sudo systemctl restart agent-api'
 ```
 
 ## Typische Fehler
@@ -301,4 +355,3 @@ ping robotersteve.local
 ```
 
 Falls es weiter nicht geht, pruefe Router, VLAN/Gastnetz und Firewall.
-

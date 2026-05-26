@@ -393,16 +393,34 @@ export type WallDashboardData = {
   };
 };
 
+function apiUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (!API_BASE) return normalizedPath;
+  try {
+    return new URL(normalizedPath, API_BASE).toString();
+  } catch {
+    throw new Error(`API-Adresse ist ungueltig: ${API_BASE}`);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(message === 'The string did not match the expected pattern.'
+      ? 'API-Adresse konnte vom Browser nicht verarbeitet werden. Bitte VITE_API_BASE pruefen oder leer lassen, wenn Frontend und Backend auf demselben Port laufen.'
+      : message + 'hallo');
+  }
   if (!response.ok) {
     const text = await response.text();
     let detail = '';
@@ -419,7 +437,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 async function download(path: string): Promise<{ blob: Blob; filename: string }> {
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(apiUrl(path), {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) {
@@ -513,7 +531,7 @@ export const api = {
     const data = new FormData();
     data.append('file', file);
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE}/api/invoices/upload`, {
+    const response = await fetch(apiUrl('/api/invoices/upload'), {
       method: 'POST',
       body: data,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -521,11 +539,11 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
-  fileUrl: (id: number) => `${API_BASE}/api/invoices/${id}/file`,
+  fileUrl: (id: number) => apiUrl(`/api/invoices/${id}/file`),
   exportUrl: (scope: 'year' | 'month', year: number, month: number | null, type: 'excel' | 'pdf' | 'zip') =>
     scope === 'year'
-      ? `${API_BASE}/api/invoices/exports/year/${year}/${type}`
-      : `${API_BASE}/api/invoices/exports/month/${year}/${month}/${type}`,
+      ? apiUrl(`/api/invoices/exports/year/${year}/${type}`)
+      : apiUrl(`/api/invoices/exports/month/${year}/${month}/${type}`),
   downloadExport: (scope: 'year' | 'month', year: number, month: number | null, type: 'excel' | 'pdf' | 'zip') =>
     download(scope === 'year'
       ? `/api/invoices/exports/year/${year}/${type}`

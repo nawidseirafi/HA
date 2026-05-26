@@ -62,7 +62,7 @@ def _setting_present(value: str | None, env_values: dict[str, str]) -> bool:
         return False
     if value in env_values or value.upper() in env_values or os.getenv(value) or os.getenv(value.upper()):
         return True
-    placeholders = {"HA-TOKEN", "GEMINI_API_KEY", "OPENAI_API_KEY", "CLAUDE_API_KEY", "MY_WELLNESS_KEY", "MY_WELLNESS_FACILITY_ID"}
+    placeholders = {"HA_TOKEN", "GEMINI_API_KEY", "OPENAI_API_KEY", "CLAUDE_API_KEY", "MY_WELLNESS_KEY", "MY_WELLNESS_FACILITY_ID"}
     return value not in placeholders and not value.endswith("_KEY") and not value.endswith("_TOKEN")
 
 

@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # =====================
 # KONFIGURATION
 # =====================
-HA_URL = "http://homeassistant.local:8123"
+HA_URL = os.getenv("HA_URL", "")
 HA_TOKEN = os.getenv("HA_TOKEN", "")
 HA_NOTIFY_SERVICE = "notify.mobile_app_system_error_404"
 

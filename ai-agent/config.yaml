@@ -1,6 +1,6 @@
 home_assistant:
-  url: "http://192.168.178.159:8123"
-  token: HA-TOKEN
+  url: HA_URL
+  token: HA_TOKEN
 
 llm:
   provider: "openai"  # Options: gemini, openai, claude, llama
