@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api, type AgentStatus, type WallDashboardData, type WallLight, type WallLightGroup } from '../api/client';
+import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents';
 
