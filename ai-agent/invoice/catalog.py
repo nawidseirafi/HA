@@ -16,6 +16,8 @@ HEADERS = (
     "Netto",
     "MwSt",
     "Brutto",
+    "Offen",
+    "Bezahlt",
     "Waehrung",
     "Rechnungsnummer",
     "Dokumenttyp",
@@ -41,6 +43,8 @@ EXTRA_COLUMNS: dict[str, str] = {
     "net_amount": "real",
     "tax_amount": "real",
     "gross_amount": "real",
+    "open_amount": "real",
+    "paid_amount": "real",
     "is_business": "integer not null default 1",
     "is_tax_relevant": "integer not null default 1",
     "review_status": "text",
@@ -132,10 +136,10 @@ class InvoiceCatalog:
                 invoice_date, amount, currency, invoice_number, category, status,
                 reason, updated_at, source, original_filename, stored_path,
                 document_type, transaction_type, year, month, net_amount, tax_amount,
-                gross_amount, is_business, is_tax_relevant, review_status,
+                gross_amount, open_amount, paid_amount, is_business, is_tax_relevant, review_status,
                 ai_confidence, ai_raw_json, created_at
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             on conflict(file_hash) do update set
                 source_path = excluded.source_path,
                 archive_path = excluded.archive_path,
@@ -160,6 +164,8 @@ class InvoiceCatalog:
                 net_amount = excluded.net_amount,
                 tax_amount = excluded.tax_amount,
                 gross_amount = excluded.gross_amount,
+                open_amount = excluded.open_amount,
+                paid_amount = excluded.paid_amount,
                 is_business = excluded.is_business,
                 is_tax_relevant = excluded.is_tax_relevant,
                 review_status = excluded.review_status,
@@ -191,6 +197,8 @@ class InvoiceCatalog:
                 data.get("net_amount"),
                 data.get("tax_amount"),
                 gross_amount,
+                data.get("open_amount"),
+                data.get("paid_amount"),
                 int(bool(data.get("is_business", True))),
                 int(bool(data.get("is_tax_relevant", True))),
                 review_status,
@@ -273,6 +281,8 @@ class InvoiceCatalog:
                 year = coalesce(year, cast(substr(invoice_date, 1, 4) as integer)),
                 month = coalesce(month, cast(substr(invoice_date, 6, 2) as integer)),
                 gross_amount = coalesce(gross_amount, amount),
+                open_amount = case when abs(coalesce(open_amount, -1) - coalesce(gross_amount, amount, -2)) < 0.005 and coalesce(paid_amount, 0) = 0 then null else open_amount end,
+                paid_amount = case when abs(coalesce(open_amount, -1) - coalesce(gross_amount, amount, -2)) < 0.005 and coalesce(paid_amount, 0) = 0 then null else paid_amount end,
                 review_status = coalesce(
                     review_status,
                     case
@@ -298,6 +308,8 @@ def _rows_for_export(rows: Iterable[sqlite3.Row]) -> list[list[object]]:
                 row["net_amount"] if "net_amount" in row.keys() and row["net_amount"] is not None else "",
                 row["tax_amount"] if "tax_amount" in row.keys() and row["tax_amount"] is not None else "",
                 (row["gross_amount"] if "gross_amount" in row.keys() and row["gross_amount"] is not None else row["amount"]) or "",
+                row["open_amount"] if "open_amount" in row.keys() and row["open_amount"] is not None else "",
+                row["paid_amount"] if "paid_amount" in row.keys() and row["paid_amount"] is not None else "",
                 row["currency"],
                 row["invoice_number"] or "",
                 row["document_type"] if "document_type" in row.keys() else "",

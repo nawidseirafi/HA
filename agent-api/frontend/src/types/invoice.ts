@@ -20,6 +20,8 @@ export interface Invoice {
   net_amount?: number | null;
   tax_amount?: number | null;
   gross_amount?: number | null;
+  open_amount?: number | null;
+  paid_amount?: number | null;
   amount?: number | null;
   currency: string;
   is_business: boolean;

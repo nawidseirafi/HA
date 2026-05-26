@@ -14,6 +14,8 @@ export function InvoiceDetailPanel({ invoice, onSave, onReanalyze, onMarkReviewe
   const [amountInputs, setAmountInputs] = useState({
     net_amount: formatAmountInput(invoice.net_amount),
     gross_amount: formatAmountInput(invoice.gross_amount ?? invoice.amount),
+    open_amount: formatAmountInput(invoice.open_amount),
+    paid_amount: formatAmountInput(invoice.paid_amount),
     tax_amount: formatAmountInput(invoice.tax_amount),
   });
   const [showRaw, setShowRaw] = useState(false);
@@ -26,12 +28,14 @@ export function InvoiceDetailPanel({ invoice, onSave, onReanalyze, onMarkReviewe
     setAmountInputs({
       net_amount: formatAmountInput(invoice.net_amount),
       gross_amount: formatAmountInput(invoice.gross_amount ?? invoice.amount),
+      open_amount: formatAmountInput(invoice.open_amount),
+      paid_amount: formatAmountInput(invoice.paid_amount),
       tax_amount: formatAmountInput(invoice.tax_amount),
     });
   }, [invoice]);
 
   const update = (key: keyof Invoice, value: string | number | boolean | null) => setForm((current) => ({ ...current, [key]: value }));
-  const updateAmount = (key: 'net_amount' | 'gross_amount' | 'tax_amount', value: string) => {
+  const updateAmount = (key: 'net_amount' | 'gross_amount' | 'open_amount' | 'paid_amount' | 'tax_amount', value: string) => {
     setAmountInputs((current) => ({ ...current, [key]: value }));
     update(key, parseAmountInput(value));
   };
@@ -43,6 +47,8 @@ export function InvoiceDetailPanel({ invoice, onSave, onReanalyze, onMarkReviewe
         ...form,
         net_amount: parseAmountInput(amountInputs.net_amount),
         gross_amount: parseAmountInput(amountInputs.gross_amount),
+        open_amount: parseAmountInput(amountInputs.open_amount),
+        paid_amount: parseAmountInput(amountInputs.paid_amount),
         tax_amount: parseAmountInput(amountInputs.tax_amount),
       });
     } finally {
@@ -86,6 +92,8 @@ export function InvoiceDetailPanel({ invoice, onSave, onReanalyze, onMarkReviewe
         <label>Betrag netto<input inputMode="decimal" value={amountInputs.net_amount} onChange={(event) => updateAmount('net_amount', event.target.value)} /></label>
         <label>MwSt<input inputMode="decimal" value={amountInputs.tax_amount} onChange={(event) => updateAmount('tax_amount', event.target.value)} /></label>
         <label>Betrag brutto<input inputMode="decimal" value={amountInputs.gross_amount} onChange={(event) => updateAmount('gross_amount', event.target.value)} /></label>
+        <label>Offen<input inputMode="decimal" value={amountInputs.open_amount} onChange={(event) => updateAmount('open_amount', event.target.value)} /></label>
+        <label>Bezahlt/verrechnet<input inputMode="decimal" value={amountInputs.paid_amount} onChange={(event) => updateAmount('paid_amount', event.target.value)} /></label>
         <label>Art<select value={form.transaction_type ?? 'expense'} onChange={(event) => update('transaction_type', event.target.value)}>
           <option value="expense">Ausgabe</option>
           <option value="income">Einnahme</option>

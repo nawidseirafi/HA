@@ -19,6 +19,7 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
             <th>Anbieter/Händler</th>
             <th>Kategorie</th>
             <th>Betrag</th>
+            <th>Offen</th>
             <th>Status</th>
             <th>Aktionen</th>
           </tr>
@@ -34,6 +35,7 @@ export function InvoiceTable({ invoices, onOpen, onPreview, onDelete }: Props) {
               </td>
               <td data-label="Kategorie">{invoice.category}</td>
               <td data-label="Betrag">{currency(invoice.gross_amount ?? invoice.amount, invoice.currency)}</td>
+              <td data-label="Offen">{invoice.open_amount === null || invoice.open_amount === undefined ? '-' : currency(invoice.open_amount, invoice.currency)}</td>
               <td data-label="Status"><span className={`status status-${invoice.review_status}`}>{statusLabel(invoice.review_status)}</span></td>
               <td data-label="Aktionen">
                 <div className="icon-actions">

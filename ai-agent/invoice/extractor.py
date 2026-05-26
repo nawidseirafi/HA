@@ -135,6 +135,8 @@ class InvoiceMetadata:
     net_amount: Optional[float] = None
     tax_amount: Optional[float] = None
     gross_amount: Optional[float] = None
+    open_amount: Optional[float] = None
+    paid_amount: Optional[float] = None
     is_business: bool = True
     is_tax_relevant: bool = True
     review_status: str = "needs_review"
