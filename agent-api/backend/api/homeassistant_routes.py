@@ -78,6 +78,7 @@ def wall_dashboard():
         },
         "health": {
             "battery_total": len(battery_items),
+            "batteries": sorted(battery_items, key=lambda item: (item.get("level") is None, item.get("level") or 999, item.get("name") or "")),
             "low_batteries": low_batteries[:30],
             "unavailable": unavailable,
         },

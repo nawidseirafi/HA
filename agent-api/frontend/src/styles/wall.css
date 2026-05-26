@@ -217,6 +217,22 @@
   padding: 18px;
 }
 
+.wall-click-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  color: inherit;
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.wall-click-card:hover {
+  border-color: oklch(0.62 0.18 255 / 0.35);
+  box-shadow: 0 1px 2px oklch(0.5 0.05 250 / 0.04), 0 10px 26px -12px oklch(0.62 0.18 255 / 0.28);
+  transform: translateY(-1px);
+}
+
 .wall-metric > span,
 .wall-room-head > span {
   width: 46px;
@@ -231,6 +247,11 @@
 
 .wall-metric.warn > span {
   background: var(--gradient-warm);
+}
+
+.wall-metric.light > span,
+.wall-room-head > span {
+  background: linear-gradient(135deg, oklch(0.82 0.17 58), oklch(0.72 0.18 35));
 }
 
 .wall-metric.ok > span {
@@ -286,10 +307,22 @@
   gap: 12px;
 }
 
-.wall-area-strip div {
+.wall-area-strip button {
+  display: block;
   padding: 14px;
+  border: 0;
   border-radius: var(--radius-lg);
+  color: var(--foreground);
   background: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.wall-area-strip button:hover {
+  background: oklch(0.93 0.04 230 / 0.65);
+  box-shadow: inset 0 0 0 1px oklch(0.62 0.18 255 / 0.22);
+  transform: translateY(-1px);
 }
 
 .wall-area-strip strong,
@@ -360,12 +393,21 @@
   overflow: hidden;
 }
 
+button.wall-room-card {
+  padding: 0;
+}
+
 .wall-room-head {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
+}
+
+.wall-room-head > svg:last-child {
+  margin-left: auto;
+  color: var(--muted-foreground);
 }
 
 .wall-room-head h2 {
@@ -388,6 +430,131 @@
 
 .wall-light-row:last-child {
   border-bottom: 0;
+}
+
+.wall-page-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.wall-back-button {
+  width: fit-content;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  font-weight: 800;
+}
+
+.wall-room-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 16px 22px;
+  color: var(--muted-foreground);
+}
+
+.wall-room-summary strong {
+  color: var(--foreground);
+  font-size: 1.5rem;
+}
+
+.wall-room-detail-card {
+  max-width: 920px;
+}
+
+.wall-device-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wall-device-row:last-child {
+  border-bottom: 0;
+}
+
+.wall-device-row strong,
+.wall-device-row span {
+  display: block;
+}
+
+.wall-device-row strong {
+  color: var(--foreground);
+  font-size: 0.92rem;
+}
+
+.wall-device-row span,
+.wall-device-row b {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+}
+
+.wall-battery-panel {
+  max-width: 980px;
+}
+
+.wall-battery-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 18px;
+}
+
+.wall-battery-row strong,
+.wall-battery-row span {
+  display: block;
+}
+
+.wall-battery-row span {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+}
+
+.wall-battery-status {
+  display: grid;
+  gap: 8px;
+}
+
+.wall-battery-status b {
+  color: var(--foreground);
+  text-align: right;
+}
+
+.wall-battery-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--input);
+}
+
+.wall-battery-bar i {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: var(--gradient-energy);
+}
+
+.wall-battery-bar.warn i {
+  background: var(--gradient-warm);
+}
+
+.wall-battery-bar.danger i {
+  background: var(--destructive);
+}
+
+.wall-battery-bar.unknown i {
+  background: var(--muted-foreground);
 }
 
 .wall-light-row strong,

@@ -2,8 +2,10 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState } from 're
 import type { ErrorInfo, ReactNode } from 'react';
 import {
   Activity,
+  ArrowLeft,
   BatteryWarning,
   Bot,
+  ChevronRight,
   CloudSun,
   DoorOpen,
   Home,
@@ -13,10 +15,10 @@ import {
   Thermometer,
   Zap,
 } from 'lucide-react';
-import { api, type AgentStatus, type WallDashboardData, type WallLight, type WallLightGroup } from '../api/client';
+import { api, type AgentStatus, type WallDashboardData, type WallEntity, type WallLight, type WallLightGroup, type WallLightRoom } from '../api/client';
 import '../styles/wall.css';
 
-type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents';
+type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
 
 export function WallDashboardPage() {
   return (
@@ -30,6 +32,8 @@ function WallDashboardContent() {
   const [data, setData] = useState<WallDashboardData | null>(null);
   const [section, setSection] = useState<WallSection>('home');
   const [selectedFloor, setSelectedFloor] = useState('Alle Etagen');
+  const [floorView, setFloorView] = useState('');
+  const [roomView, setRoomView] = useState('');
   const [loading, setLoading] = useState(false);
   const [busyEntity, setBusyEntity] = useState('');
   const [error, setError] = useState('');
@@ -140,25 +144,57 @@ function WallDashboardContent() {
     if (ids.length) await callLight(on ? 'turn_on' : 'turn_off', ids);
   };
 
+  const goSection = (next: WallSection) => {
+    setSection(next);
+    if (next !== 'floor') setFloorView('');
+    if (next !== 'room') setRoomView('');
+  };
+
+  const openLights = () => {
+    setSelectedFloor('Alle Etagen');
+    goSection('lights');
+  };
+
+  const openFloor = (floor: string) => {
+    setFloorView(floor);
+    setSelectedFloor(floor);
+    setRoomView('');
+    setSection('floor');
+  };
+
+  const openBatteries = () => {
+    setFloorView('');
+    setRoomView('');
+    setSection('batteries');
+  };
+
+  const openRoom = (floor: string, room: string) => {
+    setFloorView(floor);
+    setSelectedFloor(floor);
+    setRoomView(room);
+    setSection('room');
+  };
+
   const activeLights = data?.lights.filter((light) => light.on).length ?? 0;
   const totalLights = data?.lights.length ?? 0;
   const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
+  const headerTitle = section === 'floor' ? floorView || 'Etage' : section === 'room' ? roomView || 'Raum' : titleFor(section);
 
   return (
     <div className="wall-shell">
       <aside className="wall-nav">
-        <button className={section === 'home' ? 'active' : ''} onClick={() => setSection('home')} aria-label="Home"><Home size={24} /></button>
-        <button className={section === 'lights' ? 'active' : ''} onClick={() => setSection('lights')} aria-label="Lampen"><Lightbulb size={24} /></button>
-        <button className={section === 'climate' ? 'active' : ''} onClick={() => setSection('climate')} aria-label="Klima"><Thermometer size={24} /></button>
-        <button className={section === 'security' ? 'active' : ''} onClick={() => setSection('security')} aria-label="Sicherheit"><ShieldAlert size={24} /></button>
-        <button className={section === 'agents' ? 'active' : ''} onClick={() => setSection('agents')} aria-label="Agenten"><Bot size={24} /></button>
+        <button className={section === 'home' ? 'active' : ''} onClick={() => goSection('home')} aria-label="Home"><Home size={24} /></button>
+        <button className={section === 'lights' ? 'active' : ''} onClick={openLights} aria-label="Lampen"><Lightbulb size={24} /></button>
+        <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')} aria-label="Klima"><Thermometer size={24} /></button>
+        <button className={section === 'security' ? 'active' : ''} onClick={() => goSection('security')} aria-label="Sicherheit"><ShieldAlert size={24} /></button>
+        <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')} aria-label="Agenten"><Bot size={24} /></button>
       </aside>
 
       <main className="wall-main">
         <header className="wall-header">
           <div>
             <span>{formatWallDate(now)}</span>
-            <h1>{titleFor(section)}</h1>
+            <h1>{headerTitle}</h1>
             <p>{subtitleFor(section, activeLights, totalLights, problemCount)}</p>
           </div>
           <div className="wall-header-side">
@@ -173,7 +209,7 @@ function WallDashboardContent() {
         {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
         {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
 
-        {data && section === 'home' && <HomeSection data={data} />}
+        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} />}
         {data && section === 'lights' && (
           <LightsSection
             groups={data.light_groups}
@@ -189,21 +225,41 @@ function WallDashboardContent() {
         {data && section === 'climate' && <ClimateSection data={data} />}
         {data && section === 'security' && <SecuritySection data={data} />}
         {data && section === 'agents' && <AgentsSection data={data} />}
+        {data && section === 'batteries' && <BatteriesSection data={data} onBack={() => goSection('home')} />}
+        {data && section === 'floor' && (
+          <FloorSection
+            data={data}
+            floor={floorView}
+            onBack={() => goSection('home')}
+            onRoom={openRoom}
+          />
+        )}
+        {data && section === 'room' && (
+          <RoomSection
+            data={data}
+            floor={floorView}
+            room={roomView}
+            busyEntity={busyEntity}
+            onBack={() => setSection('floor')}
+            onToggle={(light) => callLight(light.on ? 'turn_off' : 'turn_on', light.entity_id)}
+            onBrightness={setBrightness}
+          />
+        )}
       </main>
     </div>
   );
 }
 
-function HomeSection({ data }: { data: WallDashboardData }) {
+function HomeSection({ data, onLights, onFloor, onBatteries }: { data: WallDashboardData; onLights: () => void; onFloor: (floor: string) => void; onBatteries: () => void }) {
   const activeLights = data.lights.filter((light) => light.on).length;
   const open = data.security.openings_open;
   const issues = data.security.problems.length + data.health.unavailable.length;
   return (
     <div className="wall-home-grid">
       <MetricCard icon={<CloudSun size={24} />} label="Wetter" value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'} detail={data.weather?.name ?? 'Home Assistant'} />
-      <MetricCard icon={<Lightbulb size={24} />} label="Lampen" value={`${activeLights}/${data.lights.length}`} detail="aktiv" />
+      <MetricCard icon={<Lightbulb size={24} />} label="Lampen" value={`${activeLights}/${data.lights.length}`} detail="aktiv" tone="light" onClick={onLights} />
       <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'warn' : 'ok'} />
-      <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail="niedrig" tone={data.health.low_batteries.length ? 'warn' : 'ok'} />
+      <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={data.health.low_batteries.length ? 'warn' : 'ok'} onClick={onBatteries} />
       <MetricCard icon={<ShieldAlert size={24} />} label="System" value={`${issues}`} detail="auffällig" tone={issues ? 'warn' : 'ok'} />
       <MetricCard icon={<Bot size={24} />} label="Agenten" value={data.agents.mywellness.is_running ? 'Aktiv' : 'Bereit'} detail="MyWellness" />
       <section className="wall-panel wall-span-2">
@@ -213,10 +269,10 @@ function HomeSection({ data }: { data: WallDashboardData }) {
         </div>
         <div className="wall-area-strip">
           {data.light_groups.map((group) => (
-            <div key={group.area}>
+            <button key={group.area} type="button" onClick={() => onFloor(group.area)}>
               <strong>{group.area}</strong>
               <span>{group.on}/{group.total} Lampen an</span>
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -226,6 +282,95 @@ function HomeSection({ data }: { data: WallDashboardData }) {
           <strong>{formatTime(data.updated_at)}</strong>
         </div>
         <p>{data.home_assistant.entity_count} Home-Assistant-Entities verbunden.</p>
+      </section>
+    </div>
+  );
+}
+
+function FloorSection({
+  data,
+  floor,
+  onBack,
+  onRoom,
+}: {
+  data: WallDashboardData;
+  floor: string;
+  onBack: () => void;
+  onRoom: (floor: string, room: string) => void;
+}) {
+  const group = data.light_groups.find((item) => item.area === floor);
+  const rooms = group?.rooms?.length ? group.rooms : group ? [{ area: group.area, total: group.total, on: group.on, items: group.items }] : [];
+
+  return (
+    <div className="wall-page-stack">
+      <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> Dashboard</button>
+      <div className="wall-room-grid">
+        {rooms.map((room) => (
+          <button className="wall-room-card wall-click-card" type="button" key={`${floor}-${room.area}`} onClick={() => onRoom(floor, room.area)}>
+            <div className="wall-room-head">
+              <span><Lightbulb size={24} /></span>
+              <div>
+                <h2>{room.area}</h2>
+                <p>{floor} · {room.on}/{room.total} Lampen an</p>
+              </div>
+              <ChevronRight size={20} />
+            </div>
+            <div className="wall-room-summary">
+              <strong>{room.items.length}</strong>
+              <span>Lampen und Geräte anzeigen</span>
+            </div>
+          </button>
+        ))}
+        {rooms.length === 0 && <section className="wall-panel">Keine Räume für diese Etage gefunden.</section>}
+      </div>
+    </div>
+  );
+}
+
+function RoomSection({
+  data,
+  floor,
+  room,
+  busyEntity,
+  onBack,
+  onToggle,
+  onBrightness,
+}: {
+  data: WallDashboardData;
+  floor: string;
+  room: string;
+  busyEntity: string;
+  onBack: () => void;
+  onToggle: (light: WallLight) => void;
+  onBrightness: (light: WallLight, value: number) => void;
+}) {
+  const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
+  const otherDevices = roomDevices(data, room, new Set(lights.map((light) => light.entity_id)));
+
+  return (
+    <div className="wall-page-stack">
+      <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> {floor}</button>
+      <section className="wall-room-card wall-room-detail-card">
+        <div className="wall-room-head">
+          <span><Lightbulb size={24} /></span>
+          <div>
+            <h2>{room}</h2>
+            <p>{floor} · {lights.filter((light) => light.on).length}/{lights.length} Lampen an · {otherDevices.length} weitere Geräte</p>
+          </div>
+        </div>
+        <div className="wall-light-list">
+          {lights.map((light) => (
+            <LightRow
+              key={light.entity_id}
+              light={light}
+              busy={busyEntity === light.entity_id}
+              onToggle={onToggle}
+              onBrightness={onBrightness}
+            />
+          ))}
+          {otherDevices.map((device) => <DeviceRow key={device.entity_id} device={device} />)}
+          {lights.length === 0 && otherDevices.length === 0 && <p>Keine Geräte für diesen Raum gefunden.</p>}
+        </div>
       </section>
     </div>
   );
@@ -335,6 +480,35 @@ function SecuritySection({ data }: { data: WallDashboardData }) {
   );
 }
 
+function BatteriesSection({ data, onBack }: { data: WallDashboardData; onBack: () => void }) {
+  const batteries = data.health.batteries ?? data.health.low_batteries;
+  return (
+    <div className="wall-page-stack">
+      <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> Dashboard</button>
+      <section className="wall-panel wall-list-panel wall-battery-panel">
+        <div className="wall-section-title">
+          <span>Batterien</span>
+          <strong>{batteries.length}</strong>
+        </div>
+        {batteries.length === 0 ? <p>Keine Batterie-Entities gefunden.</p> : batteries.map((battery) => (
+          <article className="wall-battery-row" key={battery.entity_id}>
+            <div>
+              <strong>{battery.name}</strong>
+              <span>{battery.area || 'Haus'} · {battery.entity_id}</span>
+            </div>
+            <div className="wall-battery-status">
+              <b>{formatBatteryLevel(battery)}</b>
+              <span className={`wall-battery-bar ${batteryTone(battery)}`}>
+                <i style={{ width: `${batteryBarWidth(battery)}%` }} />
+              </span>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
 function AgentsSection({ data }: { data: WallDashboardData }) {
   const wellness = data.agents.mywellness;
   const invoices = data.agents.invoices;
@@ -395,17 +569,34 @@ function LightRow({
   );
 }
 
-function MetricCard({ icon, label, value, detail, tone = 'info' }: { icon: ReactNode; label: string; value: string; detail: string; tone?: 'info' | 'ok' | 'warn' }) {
+function DeviceRow({ device }: { device: WallEntity }) {
   return (
-    <section className={`wall-metric ${tone}`}>
+    <article className="wall-device-row">
+      <div className={`wall-dot ${device.state === 'on' ? 'on' : ''}`} />
+      <div>
+        <strong>{device.name}</strong>
+        <span>{device.entity_id}</span>
+      </div>
+      <b>{device.unit ? `${device.state} ${device.unit}` : labelState(device.state)}</b>
+    </article>
+  );
+}
+
+function MetricCard({ icon, label, value, detail, tone = 'info', onClick }: { icon: ReactNode; label: string; value: string; detail: string; tone?: 'info' | 'ok' | 'warn' | 'light'; onClick?: () => void }) {
+  const content = (
+    <>
       <span>{icon}</span>
       <div>
         <small>{label}</small>
         <strong>{value}</strong>
         <p>{detail}</p>
       </div>
-    </section>
+    </>
   );
+  if (onClick) {
+    return <button className={`wall-metric wall-click-card ${tone}`} type="button" onClick={onClick}>{content}</button>;
+  }
+  return <section className={`wall-metric ${tone}`}>{content}</section>;
 }
 
 class WallErrorBoundary extends Component<{ children: ReactNode }, { message: string; stack: string }> {
@@ -456,15 +647,70 @@ function titleFor(section: WallSection) {
   if (section === 'climate') return 'Klima';
   if (section === 'security') return 'Sicherheit';
   if (section === 'agents') return 'Agenten';
+  if (section === 'batteries') return 'Batterien';
   return 'Zuhause';
 }
 
 function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number) {
   if (section === 'lights') return `${activeLights} von ${totalLights} aktiv`;
+  if (section === 'floor') return 'Räume dieser Etage';
+  if (section === 'room') return 'Geräte in diesem Raum';
+  if (section === 'batteries') return 'Batteriestände und Status aller Batterie-Geräte';
   if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
   if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
   if (section === 'climate') return 'Temperaturen, Luftfeuchte und Thermostate';
   return 'Hausstatus, Geräte und Agenten auf einen Blick';
+}
+
+function formatBatteryLevel(battery: WallEntity & { level?: number | null }) {
+  if (battery.level !== null && battery.level !== undefined) return `${Math.round(battery.level)}%`;
+  return labelState(battery.state);
+}
+
+function batteryBarWidth(battery: WallEntity & { level?: number | null }) {
+  if (battery.level === null || battery.level === undefined || !Number.isFinite(Number(battery.level))) {
+    return battery.state?.toLowerCase() === 'low' ? 12 : 100;
+  }
+  return Math.max(0, Math.min(100, Math.round(Number(battery.level))));
+}
+
+function batteryTone(battery: WallEntity & { level?: number | null }) {
+  const level = battery.level;
+  if (battery.state?.toLowerCase() === 'low') return 'warn';
+  if (level === null || level === undefined) return 'unknown';
+  if (level <= 15) return 'danger';
+  if (level <= 25) return 'warn';
+  return 'ok';
+}
+
+function findRoom(data: WallDashboardData, floor: string, room: string): WallLightRoom | undefined {
+  const group = data.light_groups.find((item) => item.area === floor);
+  return group?.rooms?.find((item) => sameArea(item.area, room));
+}
+
+function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
+  const devices: WallEntity[] = [
+    ...data.switches,
+    ...data.climate,
+    ...data.security.openings,
+    ...data.security.problems,
+    ...(data.health.batteries ?? data.health.low_batteries),
+    ...data.health.unavailable,
+  ];
+  const unique = new Map<string, WallEntity>();
+  for (const device of devices) {
+    if (exclude.has(device.entity_id) || !sameArea(device.area, room)) continue;
+    unique.set(device.entity_id, device);
+  }
+  return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function sameArea(left?: string, right?: string) {
+  return normalizeArea(left) === normalizeArea(right);
+}
+
+function normalizeArea(value?: string) {
+  return String(value || '').trim().toLowerCase();
 }
 
 function labelState(state: string) {

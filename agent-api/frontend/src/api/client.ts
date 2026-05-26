@@ -384,6 +384,7 @@ export type WallDashboardData = {
   };
   health: {
     battery_total: number;
+    batteries: Array<WallEntity & { level?: number | null }>;
     low_batteries: Array<WallEntity & { level?: number | null }>;
     unavailable: WallEntity[];
   };
