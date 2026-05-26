@@ -13,7 +13,7 @@ import {
   Thermometer,
   Zap,
 } from 'lucide-react';
-import { api, type WallDashboardData, type WallLight, type WallLightGroup } from '../api/client';
+import { api, type AgentStatus, type WallDashboardData, type WallLight, type WallLightGroup } from '../api/client';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents';
 
@@ -348,7 +348,7 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
       <section className="wall-panel">
         <div className="wall-section-title"><span>MyWellness</span><Activity size={20} /></div>
         <h2>{wellness.is_running ? 'Läuft' : wellness.enabled === false ? 'Pausiert' : 'Bereit'}</h2>
-        <p>Nächster Lauf: {wellness.next_scheduled_run ? formatDateTime(wellness.next_scheduled_run) : 'nicht geplant'}</p>
+        <p>Nächster Lauf: {formatWellnessNextRun(wellness)}</p>
       </section>
       <section className="wall-panel">
         <div className="wall-section-title"><span>Market Agent</span><Zap size={20} /></div>
@@ -487,6 +487,26 @@ function formatDateTime(value: string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'nicht geplant';
   return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${formatClock(date)}`;
+}
+
+function formatWellnessNextRun(wellness: Partial<AgentStatus> & { status?: string; error?: string }) {
+  const action = nextWellnessAction(wellness);
+  if (action === 'book' && wellness.booking_time) return wellness.booking_time.slice(0, 5);
+  if (action === 'prepare' && wellness.prepare_time) return wellness.prepare_time.slice(0, 5);
+  return wellness.next_scheduled_run ? formatDateTime(wellness.next_scheduled_run) : 'nicht geplant';
+}
+
+function nextWellnessAction(wellness: Partial<AgentStatus>) {
+  if (wellness.next_scheduled_action) return wellness.next_scheduled_action;
+  if (!wellness.next_scheduled_run) return null;
+  if (wellness.prepare_enabled !== false && wellness.booking_enabled === false) return 'prepare';
+  if (wellness.booking_enabled !== false && wellness.prepare_enabled === false) return 'book';
+  const planned = new Date(wellness.next_scheduled_run);
+  if (!Number.isFinite(planned.getTime())) return null;
+  const plannedTime = `${pad(planned.getHours())}:${pad(planned.getMinutes())}`;
+  if (wellness.prepare_time?.slice(0, 5) === plannedTime) return 'prepare';
+  if (wellness.booking_time?.slice(0, 5) === plannedTime) return 'book';
+  return null;
 }
 
 function clampPercent(value: number) {

@@ -1,4 +1,6 @@
+import json
 import os
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +80,38 @@ def _llm_info(agent_config: dict[str, Any], env_values: dict[str, str]) -> dict[
     }
 
 
+def _mywellness_runtime_settings(db_path: Path) -> dict[str, Any]:
+    if not db_path.exists():
+        return {}
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                select enabled, prepare_enabled, booking_enabled, prepare_time, booking_time, days, desired_courses
+                from mywellness_settings
+                where id = 1
+                """
+            ).fetchone()
+    except sqlite3.Error:
+        return {}
+    if row is None:
+        return {}
+    try:
+        desired_courses = json.loads(row["desired_courses"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        desired_courses = []
+    return {
+        "enabled": bool(row["enabled"]),
+        "prepare_enabled": bool(row["prepare_enabled"]),
+        "booking_enabled": bool(row["booking_enabled"]),
+        "days": int(row["days"] or 2),
+        "schedule": [row["prepare_time"], row["booking_time"]],
+        "desired_courses": desired_courses if isinstance(desired_courses, list) else [],
+        "source": "database",
+    }
+
+
 def get_settings() -> dict[str, Any]:
     api_config = _load_yaml(API_CONFIG_PATH)
     agent_config = _load_yaml(AGENT_CONFIG_PATH)
@@ -95,6 +129,7 @@ def get_settings() -> dict[str, Any]:
 
     token_ttl_seconds = int(auth_config.get("token_ttl_seconds", 0) or 0)
     mywellness_db = AGENT_DIR / "data" / "mywellness" / "mywellness.db"
+    mywellness_runtime = _mywellness_runtime_settings(mywellness_db)
     invoice_db = _path_info(AGENT_DIR, invoice_config.get("database_path"))
 
     return {
@@ -134,11 +169,11 @@ def get_settings() -> dict[str, Any]:
                 "poll_interval_seconds": invoice_config.get("poll_interval_seconds"),
             },
             "mywellness": {
-                "enabled": bool(mywellness_config.get("enabled", False)),
+                "enabled": bool(mywellness_runtime.get("enabled", mywellness_config.get("enabled", False))),
                 "database": {"path": str(mywellness_db), "exists": mywellness_db.exists()},
-                "days": mywellness_config.get("days", 2),
-                "schedule": mywellness_config.get("schedule", []),
-                "desired_courses": mywellness_config.get("desired_courses", []),
+                "days": mywellness_runtime.get("days", mywellness_config.get("days", 2)),
+                "schedule": mywellness_runtime.get("schedule", mywellness_config.get("schedule", [])),
+                "desired_courses": mywellness_runtime.get("desired_courses", mywellness_config.get("desired_courses", [])),
                 "token_configured": _env_present(mywellness_config.get("token_env"), env_values),
                 "user_id_configured": _env_present(mywellness_config.get("user_id_env"), env_values),
                 "facility_id_configured": _env_present(mywellness_config.get("facility_id_env"), env_values),

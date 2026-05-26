@@ -41,6 +41,7 @@ export type AgentStatus = {
   last_prepare_run?: string | null;
   last_booking_run?: string | null;
   next_scheduled_run: string | null;
+  next_scheduled_action?: 'prepare' | 'book' | null;
   last_error: string | null;
   last_started_at?: string | null;
   last_finished_at?: string | null;

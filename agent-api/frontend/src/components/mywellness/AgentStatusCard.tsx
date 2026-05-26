@@ -12,6 +12,32 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
+function formatTime(value?: string | null) {
+  if (!value) return '-';
+  return value.slice(0, 5);
+}
+
+function nextScheduledTime(status: AgentStatus | null) {
+  const action = nextScheduledAction(status);
+  if (action === 'book') return formatTime(status?.booking_time);
+  if (action === 'prepare') return formatTime(status?.prepare_time);
+  return formatDate(status?.next_scheduled_run);
+}
+
+function nextScheduledAction(status: AgentStatus | null) {
+  if (status?.next_scheduled_action) return status.next_scheduled_action;
+  if (!status?.next_scheduled_run) return null;
+  if (status.prepare_enabled !== false && status.booking_enabled === false) return 'prepare';
+  if (status.booking_enabled !== false && status.prepare_enabled === false) return 'book';
+  const planned = new Date(status.next_scheduled_run);
+  if (!Number.isNaN(planned.getTime())) {
+    const plannedTime = `${String(planned.getHours()).padStart(2, '0')}:${String(planned.getMinutes()).padStart(2, '0')}`;
+    if (status.prepare_time?.slice(0, 5) === plannedTime) return 'prepare';
+    if (status.booking_time?.slice(0, 5) === plannedTime) return 'book';
+  }
+  return null;
+}
+
 function statusClass(status?: string) {
   if (status === 'running' || status === 'ok') return 'ok';
   if (status === 'error') return 'error';
@@ -21,6 +47,8 @@ function statusClass(status?: string) {
 export function AgentStatusCard({ status }: Props) {
   const current = status?.current_status ?? 'loading';
   const tone = statusClass(current);
+  const action = nextScheduledAction(status);
+  const nextLabel = action === 'book' ? 'Nächste Buchung' : action === 'prepare' ? 'Nächster Kurs-Scan' : 'Nächster geplanter Lauf';
 
   return (
     <section className={`panel mywellness-status status-${tone}`}>
@@ -48,8 +76,8 @@ export function AgentStatusCard({ status }: Props) {
         </div>
         <div>
           <CalendarClock size={18} />
-          <span>Nächster geplanter Lauf</span>
-          <strong>{formatDate(status?.next_scheduled_run)}</strong>
+          <span>{nextLabel}</span>
+          <strong>{nextScheduledTime(status)}</strong>
         </div>
       </div>
 

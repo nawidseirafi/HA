@@ -94,7 +94,9 @@ class MyWellnessService:
         state["desired_courses"] = settings["desired_courses"]
         state["last_error"] = settings["last_error"] or state.get("last_error")
         state["updated_at"] = settings["updated_at"]
-        state["next_scheduled_run"] = self._next_scheduled_run() if state.get("enabled", True) else None
+        next_scheduled = self._next_scheduled() if state.get("enabled", True) else None
+        state["next_scheduled_run"] = next_scheduled["run_at"] if next_scheduled else None
+        state["next_scheduled_action"] = next_scheduled["action_type"] if next_scheduled else None
         if not running and state.get("current_status") == "running":
             state["current_status"] = "idle"
         self._write_status(state)
@@ -866,17 +868,24 @@ class MyWellnessService:
         self._insert_log(action_type, status, f"{message} Laufzeit: {duration:.1f}s", duration_seconds=duration)
 
     def _next_scheduled_run(self) -> Optional[str]:
+        next_scheduled = self._next_scheduled()
+        return next_scheduled["run_at"] if next_scheduled else None
+
+    def _next_scheduled(self) -> Optional[dict[str, str]]:
         now = datetime.now().astimezone()
         settings = self._settings()
         candidates = []
-        for _action_type, item, enabled_key in self._scheduled_actions(now):
+        for action_type, item, enabled_key in self._scheduled_actions(now):
             if not settings[enabled_key]:
                 continue
             run_time = datetime.combine(now.date(), item, tzinfo=now.tzinfo)
             if run_time <= now:
                 run_time += timedelta(days=1)
-            candidates.append(run_time)
-        return min(candidates).isoformat(timespec="seconds") if candidates else None
+            candidates.append((run_time, action_type))
+        if not candidates:
+            return None
+        run_at, action_type = min(candidates, key=lambda item: item[0])
+        return {"run_at": run_at.isoformat(timespec="seconds"), "action_type": action_type}
 
     def _parse_time(self, value: Any, default: time) -> time:
         try:

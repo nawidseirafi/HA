@@ -8,6 +8,32 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
+function formatTime(value?: string | null) {
+  if (!value) return '–';
+  return value.slice(0, 5);
+}
+
+function nextScheduledTime(status: AgentStatus | null) {
+  const action = nextScheduledAction(status);
+  if (action === 'book') return formatTime(status?.booking_time);
+  if (action === 'prepare') return formatTime(status?.prepare_time);
+  return formatDate(status?.next_scheduled_run);
+}
+
+function nextScheduledAction(status: AgentStatus | null) {
+  if (status?.next_scheduled_action) return status.next_scheduled_action;
+  if (!status?.next_scheduled_run) return null;
+  if (status.prepare_enabled !== false && status.booking_enabled === false) return 'prepare';
+  if (status.booking_enabled !== false && status.prepare_enabled === false) return 'book';
+  const planned = new Date(status.next_scheduled_run);
+  if (!Number.isNaN(planned.getTime())) {
+    const plannedTime = `${String(planned.getHours()).padStart(2, '0')}:${String(planned.getMinutes()).padStart(2, '0')}`;
+    if (status.prepare_time?.slice(0, 5) === plannedTime) return 'prepare';
+    if (status.booking_time?.slice(0, 5) === plannedTime) return 'book';
+  }
+  return null;
+}
+
 interface Props {
   status: AgentStatus | null;
   loading?: boolean;
@@ -18,6 +44,8 @@ interface Props {
 
 export function WellnessDashboardCards({ status, loading, onToggleAgent, onScan, onBook }: Props) {
   const active = status?.enabled !== false;
+  const action = nextScheduledAction(status);
+  const nextLabel = action === 'book' ? 'Nächste Buchung' : action === 'prepare' ? 'Nächster Kurs-Scan' : 'Nächste Aktion';
 
   return (
     <section className="wellness-card-grid">
@@ -42,7 +70,7 @@ export function WellnessDashboardCards({ status, loading, onToggleAgent, onScan,
         disabled={loading}
       >
         <div className="wellness-stat-icon"><Sparkles size={20} /></div>
-        <span>Kurs-Scan</span>
+        <span>Letzter Kurs-Scan</span>
         <strong>{formatDate(status?.last_prepare_run)}</strong>
         <em className="wellness-stat-hint">Jetzt scannen <CheckCircle2 size={12} /></em>
       </button>
@@ -54,15 +82,15 @@ export function WellnessDashboardCards({ status, loading, onToggleAgent, onScan,
         disabled={loading}
       >
         <div className="wellness-stat-icon"><CalendarCheck size={20} /></div>
-        <span>Buchung</span>
+        <span>Letzte Buchung</span>
         <strong>{formatDate(status?.last_booking_run)}</strong>
         <em className="wellness-stat-hint">Jetzt buchen <Clock size={12} /></em>
       </button>
 
       <article className="wellness-stat-card warning">
         <div className="wellness-stat-icon"><CalendarClock size={20} /></div>
-        <span>Nächste Aktion</span>
-        <strong>{formatDate(status?.next_scheduled_run)}</strong>
+        <span>{nextLabel}</span>
+        <strong>{nextScheduledTime(status)}</strong>
         <em className="wellness-stat-hint">automatisch geplant</em>
       </article>
     </section>
