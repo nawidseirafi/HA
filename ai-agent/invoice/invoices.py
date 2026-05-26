@@ -137,8 +137,10 @@ def _path(value) -> Path:
 def _load_email_config(email_config: dict) -> EmailConfig:
     extensions = email_config.get("attachment_extensions")
     if extensions:
-        attachment_extensions = tuple(ext.lower() for ext in extensions)
+        attachment_extensions = tuple(ext.lower() for ext in extensions if ext.lower() == ".pdf")
     else:
+        attachment_extensions = EmailConfig().attachment_extensions
+    if not attachment_extensions:
         attachment_extensions = EmailConfig().attachment_extensions
 
     return EmailConfig(
