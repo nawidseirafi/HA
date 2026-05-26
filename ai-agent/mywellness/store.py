@@ -111,6 +111,25 @@ def prepared_course_ids(target_date: str) -> dict[str, str]:
     return {row["title"]: row["id"] for row in rows}
 
 
+def delete_prepared_courses(target_date: str, course_ids: Iterable[str]) -> int:
+    ids = [str(course_id).strip() for course_id in course_ids if str(course_id).strip()]
+    if not ids:
+        return 0
+    placeholders = ",".join("?" for _ in ids)
+    with connect() as connection:
+        cursor = connection.execute(
+            f"""
+            delete from courses
+            where source = 'prepare'
+              and partition_date = ?
+              and id in ({placeholders})
+            """,
+            (target_date, *ids),
+        )
+        connection.commit()
+        return int(cursor.rowcount or 0)
+
+
 def list_prepared_courses(target_date: Optional[str] = None) -> list[dict[str, Any]]:
     with connect() as connection:
         if target_date:

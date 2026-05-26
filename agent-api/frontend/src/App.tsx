@@ -66,7 +66,7 @@ function parseRoute(): Route {
   if (parts[0] === 'mywellness' && parts[1] === 'history') return { name: 'mywellnessHistory' };
   if (parts[0] === 'mywellness' && parts[1] === 'health') return { name: 'mywellnessHealth' };
   if (parts[0] === 'mywellness') return { name: 'mywellnessDashboard' };
-  return { name: 'invoiceDashboard' };
+  return { name: 'agents' };
 }
 
 export function App() {
@@ -146,5 +146,5 @@ function routeToPath(route: Route) {
   if (route.name === 'month') return `/invoices/years/${route.year}/months/${route.month}`;
   if (route.name === 'invoice') return `/invoices/${route.id}`;
   if (route.name === 'settings') return '/settings';
-  return '/';
+  return '/agents';
 }

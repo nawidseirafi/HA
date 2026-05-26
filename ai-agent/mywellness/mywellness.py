@@ -34,7 +34,7 @@ if str(PROJECT_DIR) in sys.path:
 sys.path.insert(0, str(PROJECT_DIR))
 
 from shared.ha_client import HomeAssistantClient
-from mywellness.store import load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
+from mywellness.store import delete_prepared_courses, load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
 
 agent_settings = load_agent_settings()
 desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES
@@ -233,6 +233,7 @@ def book_saved_course_ids():
     
     all_results = []
     successful_bookings = []
+    successful_course_ids = []
     max_workers = max(1, len(course_ids))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {}
@@ -252,12 +253,16 @@ def book_saved_course_ids():
                 all_results.append(result["message"])
                 if result["success"]:
                     successful_bookings.append(result["course_name"])
+                    if result["course_name"] in course_ids:
+                        successful_course_ids.append(course_ids[result["course_name"]])
             except Exception as e:
                 all_results.append(f"{course_name}: Fehler: {e}")
     log("\n\n".join(all_results))
     if successful_bookings:
         message = "Erfolgreich gebucht:\n" + "\n".join(successful_bookings)
         log("Erfolgreich gebucht: " + ", ".join(successful_bookings))
+        deleted = delete_prepared_courses(target_date, successful_course_ids)
+        log(f"Vorgemerkte Kurse geloescht: {deleted}")
         send_ha_notification("Buchung erfolgreich", message)
     else:
         log("Keine erfolgreiche Buchung erkannt. Keine Push gesendet.")

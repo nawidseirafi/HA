@@ -23,7 +23,7 @@ AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
 if str(AI_AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AI_AGENT_DIR))
 
-from mywellness.store import list_prepared_courses, replace_live_courses
+from mywellness.store import delete_prepared_courses, list_prepared_courses, replace_live_courses
 
 DB_PATH = AI_AGENT_DIR / "data" / "mywellness" / "mywellness.db"
 
@@ -429,6 +429,7 @@ class MyWellnessService:
             self._agent_log(message)
             raise HTTPException(status_code=404, detail=message)
         if action == "book" and course.get("booked"):
+            delete_prepared_courses(str(course.get("partitionDate") or ""), [course_id])
             return {"ok": True, "message": "Kurs ist bereits gebucht.", "course": course}
         if action == "book" and not course.get("bookable") and course.get("status") != "waitlist":
             message = f"Kurs ist nicht buchbar: {course.get('title')}"
@@ -465,6 +466,8 @@ class MyWellnessService:
         verb = "gebucht" if action == "book" else "storniert"
         message = f"{course.get('title')} erfolgreich {verb}."
         self._agent_log(message)
+        if action == "book":
+            delete_prepared_courses(str(course.get("partitionDate") or ""), [course_id])
         refreshed = self._upcoming_courses()
         state = self._read_status()
         state["upcoming_courses"] = refreshed
@@ -502,7 +505,21 @@ class MyWellnessService:
 
         deduped = self._dedupe_courses(courses)
         replace_live_courses(deduped)
+        self._delete_booked_prepared_courses(deduped)
         return deduped
+
+    def _delete_booked_prepared_courses(self, courses: list[dict[str, Any]]) -> int:
+        deleted = 0
+        for course in courses:
+            if not course.get("booked") and not course.get("is_participant"):
+                continue
+            partition_date = str(course.get("partitionDate") or "")
+            course_id = str(course.get("id") or "")
+            if partition_date and course_id:
+                deleted += delete_prepared_courses(partition_date, [course_id])
+        if deleted:
+            self._agent_log(f"Vorgemerkte gebuchte Kurse geloescht: {deleted}")
+        return deleted
 
     def _normalize_course(self, item: dict[str, Any], target_date: str, desired: set[str]) -> dict[str, Any]:
         is_participant = bool(item.get("isParticipant"))
