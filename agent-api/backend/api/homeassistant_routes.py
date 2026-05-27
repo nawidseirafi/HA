@@ -32,8 +32,8 @@ def wall_dashboard():
     lights = [_light_item(state) for state in states if _domain(state) == "light"]
     switches = [_simple_item(state) for state in states if _domain(state) == "switch"]
     climate = [_climate_item(state) for state in states if _domain(state) == "climate"]
-    temperature_sensors = [_temperature_item(state) for state in states if _is_temperature_state(state)]
-    weather = next((_simple_item(state) for state in states if _domain(state) == "weather"), None)
+    temperature_sensors = _temperature_items(states)
+    weather = next((_weather_item(state) for state in states if _domain(state) == "weather"), None)
     post = next(
         (_simple_item(state) for state in states if state.get("entity_id") == "input_boolean.post_im_briefkasten"),
         None,
@@ -65,6 +65,7 @@ def wall_dashboard():
     ]
 
     agents = _agent_summary()
+    climate_summary = _climate_summary()
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -75,6 +76,7 @@ def wall_dashboard():
         "switches": switches,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
+        "climate_summary": climate_summary,
         "security": {
             "openings_total": len(openings),
             "openings_open": len([item for item in openings if item["state"] == "on"]),
@@ -202,9 +204,40 @@ def _climate_item(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _weather_item(state: dict[str, Any]) -> dict[str, Any]:
+    attributes = state.get("attributes", {})
+    return {
+        **_simple_item(state),
+        "temperature": _numeric_value(attributes.get("temperature")),
+        "humidity": _numeric_value(attributes.get("humidity")),
+    }
+
+
 def _temperature_item(state: dict[str, Any]) -> dict[str, Any]:
     item = _simple_item(state)
-    return {**item, "temperature": _numeric_value(state.get("state"))}
+    return {**item, "temperature": _numeric_value(state.get("state")), "humidity": None}
+
+
+def _humidity_item(state: dict[str, Any]) -> dict[str, Any]:
+    item = _simple_item(state)
+    return {**item, "temperature": None, "humidity": _numeric_value(state.get("state"))}
+
+
+def _temperature_items(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_area: dict[str, list[dict[str, Any]]] = {}
+    for state in states:
+        if _is_temperature_state(state):
+            item = _temperature_item(state)
+        elif _is_humidity_state(state):
+            item = _humidity_item(state)
+        else:
+            continue
+        by_area.setdefault(item.get("area") or "Haus", []).append(item)
+
+    combined = []
+    for items in by_area.values():
+        combined.extend(items)
+    return combined
 
 
 def _is_temperature_state(state: dict[str, Any]) -> bool:
@@ -215,6 +248,19 @@ def _is_temperature_state(state: dict[str, Any]) -> bool:
     unit = str(attributes.get("unit_of_measurement") or "").strip().lower()
     if device_class != "temperature" and unit not in {"°c", "c", "°f", "f"}:
         return False
+    return _numeric_value(state.get("state")) is not None
+
+
+def _is_humidity_state(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes", {})
+    if _domain(state) != "sensor":
+        return False
+    device_class = str(attributes.get("device_class") or "").lower()
+    unit = str(attributes.get("unit_of_measurement") or "").strip().lower()
+    if device_class != "humidity":
+        text = f"{state.get('entity_id', '')} {_name(state)}".lower()
+        if unit != "%" or not any(needle in text for needle in ("humidity", "luftfeuchtigkeit", "feuchtigkeit")):
+            return False
     return _numeric_value(state.get("state")) is not None
 
 
@@ -332,6 +378,92 @@ def _rooms_from_lights(lights: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for light in lights:
         rooms.setdefault(light.get("area") or "Raum", []).append(light)
     return [_light_room(area, room_lights) for area, room_lights in rooms.items()]
+
+
+def _climate_summary() -> dict[str, float | None]:
+    template = """
+{% set basement_temps = namespace(values=[]) %}
+{% set basement_hums = namespace(values=[]) %}
+{% for area in floor_areas('Basement') %}
+  {% for entity_id in area_entities(area) %}
+    {% set state = states(entity_id) %}
+    {% if state not in ['unknown', 'unavailable', 'none'] %}
+      {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+        {% set val = state | float(none) %}
+        {% if val is not none %}
+          {% set basement_temps.values = basement_temps.values + [val] %}
+        {% endif %}
+      {% endif %}
+      {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+        {% set val = state | float(none) %}
+        {% if val is not none %}
+          {% set basement_hums.values = basement_hums.values + [val] %}
+        {% endif %}
+      {% endif %}
+      {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+      {% if h_temp is not none %}
+        {% set basement_temps.values = basement_temps.values + [h_temp | float] %}
+      {% endif %}
+      {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+      {% if h_hum is not none %}
+        {% set basement_hums.values = basement_hums.values + [h_hum | float] %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% set house_temps = namespace(values=[]) %}
+{% set house_hums = namespace(values=[]) %}
+{% for floor in floors() %}
+  {% if floor != 'Basement' %}
+    {% for area in floor_areas(floor) %}
+      {% for entity_id in area_entities(area) %}
+        {% set state = states(entity_id) %}
+        {% if state not in ['unknown', 'unavailable', 'none'] %}
+          {% if state_attr(entity_id, 'device_class') == 'temperature' %}
+            {% set val = state | float(none) %}
+            {% if val is not none %}
+              {% set house_temps.values = house_temps.values + [val] %}
+            {% endif %}
+          {% endif %}
+          {% if state_attr(entity_id, 'device_class') == 'humidity' %}
+            {% set val = state | float(none) %}
+            {% if val is not none %}
+              {% set house_hums.values = house_hums.values + [val] %}
+            {% endif %}
+          {% endif %}
+          {% set h_temp = state_attr(entity_id, 'current_temperature') %}
+          {% if h_temp is not none %}
+            {% set house_temps.values = house_temps.values + [h_temp | float] %}
+          {% endif %}
+          {% set h_hum = state_attr(entity_id, 'current_humidity') %}
+          {% if h_hum is not none %}
+            {% set house_hums.values = house_hums.values + [h_hum | float] %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+{{ {
+  'house_temp': ((house_temps.values | sum) / (house_temps.values | length)) | round(1) if house_temps.values | length > 0 else none,
+  'house_humidity': ((house_hums.values | sum) / (house_hums.values | length)) | round(0) if house_hums.values | length > 0 else none,
+  'basement_temp': ((basement_temps.values | sum) / (basement_temps.values | length)) | round(1) if basement_temps.values | length > 0 else none,
+  'basement_humidity': ((basement_hums.values | sum) / (basement_hums.values | length)) | round(0) if basement_hums.values | length > 0 else none
+} | to_json }}
+"""
+    try:
+        rendered = ha_service.render_template(template).strip()
+        data = json.loads(rendered)
+    except Exception:
+        return {"house_temp": None, "house_humidity": None, "basement_temp": None, "basement_humidity": None}
+    if not isinstance(data, dict):
+        return {"house_temp": None, "house_humidity": None, "basement_temp": None, "basement_humidity": None}
+    return {
+        "house_temp": _numeric_value(data.get("house_temp")),
+        "house_humidity": _numeric_value(data.get("house_humidity")),
+        "basement_temp": _numeric_value(data.get("basement_temp")),
+        "basement_humidity": _numeric_value(data.get("basement_humidity")),
+    }
 
 
 def _floor_area_entity_map() -> dict[str, dict[str, list[str]]]:

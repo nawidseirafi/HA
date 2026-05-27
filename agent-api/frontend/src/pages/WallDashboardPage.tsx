@@ -38,7 +38,18 @@ function isBasementArea(area?: string) {
 }
 
 function houseClimateSummary(data: WallDashboardData) {
+  const fromHa = data.climate_summary;
+  if (fromHa) {
+    return {
+      houseTemp: fromHa.house_temp ?? null,
+      houseHumidity: fromHa.house_humidity ?? null,
+      basementTemp: fromHa.basement_temp ?? null,
+      basementHumidity: fromHa.basement_humidity ?? null,
+    };
+  }
+
   const houseTemps: number[] = [];
+  const houseHums: number[] = [];
   const basementTemps: number[] = [];
   const basementHums: number[] = [];
 
@@ -52,8 +63,9 @@ function houseClimateSummary(data: WallDashboardData) {
       else houseTemps.push(temp);
     }
 
-    if (isBasementArea(area) && Number.isFinite(hum)) {
-      basementHums.push(hum);
+    if (Number.isFinite(hum)) {
+      if (isBasementArea(area)) basementHums.push(hum);
+      else houseHums.push(hum);
     }
   }
 
@@ -66,13 +78,15 @@ function houseClimateSummary(data: WallDashboardData) {
       else houseTemps.push(temp);
     }
 
-    if (isBasementArea(item.area) && Number.isFinite(hum)) {
-      basementHums.push(hum);
+    if (Number.isFinite(hum)) {
+      if (isBasementArea(item.area)) basementHums.push(hum);
+      else houseHums.push(hum);
     }
   }
 
   return {
     houseTemp: avg(houseTemps),
+    houseHumidity: avg(houseHums),
     basementTemp: avg(basementTemps),
     basementHumidity: avg(basementHums),
   };
@@ -197,6 +211,23 @@ function WallDashboardContent() {
     if (ids.length) await callLight(on ? 'turn_on' : 'turn_off', ids);
   };
 
+  const clearPost = async () => {
+    const entityId = data?.post?.entity_id;
+    if (!entityId || data?.post?.state !== 'on') return;
+    setData((current) => current ? { ...current, post: current.post ? { ...current.post, state: 'off' } : current.post } : current);
+    setBusyEntity(entityId);
+    setError('');
+    try {
+      await api.callHomeAssistantService({ domain: 'input_boolean', service: 'turn_off', entity_id: entityId });
+      scheduleRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Post-Status konnte nicht zurückgesetzt werden.');
+      await load(true);
+    } finally {
+      setBusyEntity('');
+    }
+  };
+
   const goSection = (next: WallSection) => {
     setSection(next);
     if (next !== 'floor') setFloorView('');
@@ -219,6 +250,18 @@ function WallDashboardContent() {
     setFloorView('');
     setRoomView('');
     setSection('batteries');
+  };
+
+  const openClimates = () => {
+    setFloorView('');
+    setRoomView('');
+    setSection('climate');
+  };
+
+    const openAgents = () => {
+    setFloorView('');
+    setRoomView('');
+    setSection('agents');
   };
 
   const openRoom = (floor: string, room: string) => {
@@ -262,7 +305,7 @@ function WallDashboardContent() {
         {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
         {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
 
-        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} />}
+        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates} onClearPost={clearPost} />}
         {data && section === 'lights' && (
           <LightsSection
             groups={data.light_groups}
@@ -303,35 +346,57 @@ function WallDashboardContent() {
   );
 }
 
-function HomeSection({ data, onLights, onFloor, onBatteries }: { data: WallDashboardData; onLights: () => void; onFloor: (floor: string) => void; onBatteries: () => void }) {
+function HomeSection({
+  data,
+  onLights,
+  onFloor,
+  onBatteries,
+  onAgents,
+  onClimate,
+  onClearPost,
+}: {
+  data: WallDashboardData;
+  onLights: () => void;
+  onFloor: (floor: string) => void;
+  onBatteries: () => void;
+  onAgents: () => void;
+  onClimate: () => void;
+  onClearPost: () => void;
+}) {
   const hasPost = postStatus(data);
   const climate = houseClimateSummary(data);
   const activeLights = data.lights.filter((light) => light.on).length;
   const open = data.security.openings_open;
   const issues = data.security.problems.length + data.health.unavailable.length;
-  const avgTemp = averageHouseTemperature(data);
   return (
     <div className="wall-home-grid">
-      <MetricCard icon={<CloudSun size={24} />} label="Wetter" value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'} detail={data.weather?.name ?? 'Home Assistant'} />
+      <MetricCard
+        icon={<CloudSun size={24} />}
+        label="Wetter"
+        value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'}
+        detail={`${formatNumber(data.weather?.temperature)}°C · ${formatNumber(data.weather?.humidity)}%`}
+      />
+      <MetricCard
+        icon={<Thermometer size={24} />}
+        label="Haus ohne Keller"
+        value={`Ø ${formatNumber(climate.houseTemp)}°C · ${formatNumber(climate.houseHumidity)}%`}
+        detail={`Keller Ø ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
+        tone="ok"
+        onClick={onClimate}
+      />
       <MetricCard icon={<Lightbulb size={24} />} label="Lampen" value={`${activeLights}/${data.lights.length}`} detail="aktiv" tone="light" onClick={onLights} />
       <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'warn' : 'ok'} />
       <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={data.health.low_batteries.length ? 'warn' : 'ok'} onClick={onBatteries} />
       <MetricCard icon={<ShieldAlert size={24} />} label="System" value={`${issues}`} detail="auffällig" tone={issues ? 'warn' : 'ok'} />
       <MetricCard
-        icon={<Thermometer size={24} />}
-        label="Klima"
-        value={`${formatNumber(climate.houseTemp)}°C`}
-        detail={`Haus ohne Keller · Keller ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
-        tone="ok"
-      />
-      <MetricCard
         icon={<Mailbox size={24} />}
         label="Posteingang"
         value={hasPost ? 'Post da' : 'Leer'}
-        detail="Briefkasten"
+        detail={hasPost ? 'Antippen zum Zurücksetzen' : 'Briefkasten'}
         tone={hasPost ? 'warn' : 'ok'}
+        onClick={hasPost ? onClearPost : undefined}
       />
-      <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} />
+      <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} onClick={onAgents}/>
       <section className="wall-panel wall-span-2">
         <div className="wall-section-title">
           <span>Etagen</span>

@@ -391,18 +391,30 @@ export type WallClimate = WallEntity & {
 
 export type WallTemperatureSensor = WallEntity & {
   temperature?: number | null;
+  humidity?: number | null;
+};
+
+export type WallWeather = WallEntity & {
+  temperature?: number | null;
+  humidity?: number | null;
 };
 
 export type WallDashboardData = {
   updated_at: string;
   home_assistant: { configured: boolean; entity_count: number };
-  weather: WallEntity | null;
+  weather: WallWeather | null;
   post?: WallEntity | null;
   lights: WallLight[];
   light_groups: WallLightGroup[];
   switches: WallEntity[];
   climate: WallClimate[];
   temperature_sensors: WallTemperatureSensor[];
+  climate_summary?: {
+    house_temp?: number | null;
+    house_humidity?: number | null;
+    basement_temp?: number | null;
+    basement_humidity?: number | null;
+  };
   security: {
     openings_total: number;
     openings_open: number;
