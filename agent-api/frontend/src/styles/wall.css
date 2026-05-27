@@ -626,6 +626,40 @@ button.wall-room-card {
   font-weight: 900;
 }
 
+.wall-temperature-room {
+  display: grid;
+  align-content: start;
+}
+
+.wall-temperature-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wall-temperature-list article {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.wall-temperature-list span {
+  min-width: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-temperature-list strong {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
 .wall-list-panel {
   grid-column: span 2;
 }

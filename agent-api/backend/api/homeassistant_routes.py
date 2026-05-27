@@ -32,12 +32,16 @@ def wall_dashboard():
     lights = [_light_item(state) for state in states if _domain(state) == "light"]
     switches = [_simple_item(state) for state in states if _domain(state) == "switch"]
     climate = [_climate_item(state) for state in states if _domain(state) == "climate"]
+    temperature_sensors = [_temperature_item(state) for state in states if _is_temperature_state(state)]
     weather = next((_simple_item(state) for state in states if _domain(state) == "weather"), None)
-
+    post = next(
+        (_simple_item(state) for state in states if state.get("entity_id") == "input_boolean.post_im_briefkasten"),
+        None,
+    )
     battery_items = [
         _battery_item(state)
         for state in states
-        if state.get("attributes", {}).get("device_class") == "battery"
+        if _is_battery_state(state)
     ]
     low_batteries = [
         item for item in battery_items
@@ -70,6 +74,7 @@ def wall_dashboard():
         "light_groups": _group_lights_by_floor(lights),
         "switches": switches,
         "climate": climate,
+        "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "security": {
             "openings_total": len(openings),
             "openings_open": len([item for item in openings if item["state"] == "on"]),
@@ -83,6 +88,7 @@ def wall_dashboard():
             "unavailable": unavailable,
         },
         "agents": agents,
+        "post": post,
     }
 
 
@@ -196,13 +202,73 @@ def _climate_item(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _temperature_item(state: dict[str, Any]) -> dict[str, Any]:
+    item = _simple_item(state)
+    return {**item, "temperature": _numeric_value(state.get("state"))}
+
+
+def _is_temperature_state(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes", {})
+    if _domain(state) != "sensor":
+        return False
+    device_class = str(attributes.get("device_class") or "").lower()
+    unit = str(attributes.get("unit_of_measurement") or "").strip().lower()
+    if device_class != "temperature" and unit not in {"°c", "c", "°f", "f"}:
+        return False
+    return _numeric_value(state.get("state")) is not None
+
+
 def _battery_item(state: dict[str, Any]) -> dict[str, Any]:
     item = _simple_item(state)
-    try:
-        level = float(state.get("state"))
-    except (TypeError, ValueError):
-        level = None
+    level = _battery_level(state)
     return {**item, "level": level}
+
+
+def _is_battery_state(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes", {})
+    device_class = str(attributes.get("device_class") or "").lower()
+    entity_id = str(state.get("entity_id") or "").lower()
+    name = str(_name(state) or "").lower()
+    unit = str(attributes.get("unit_of_measurement") or "").strip()
+    state_value = str(state.get("state") or "").strip().lower()
+
+    if device_class == "battery":
+        return True
+    if "batterie" in entity_id or "battery" in entity_id or "batterie" in name or "battery" in name:
+        if "voltage" in entity_id or "batteriespannung" in entity_id or device_class == "voltage" or unit.lower() in {"v", "mv"}:
+            return False
+        return unit == "%" or _is_numeric_state(state_value) or state_value in {"low", "normal", "high", "ok", "unknown", "unavailable"}
+    return False
+
+
+def _battery_level(state: dict[str, Any]) -> float | None:
+    raw_state = state.get("state")
+    value = _numeric_value(raw_state)
+    if value is None:
+        return None
+    unit = str(state.get("attributes", {}).get("unit_of_measurement") or "").strip().lower()
+    if unit in {"v", "mv"}:
+        return None
+    if 0 <= value <= 100:
+        return value
+    return None
+
+
+def _numeric_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip().replace(",", ".")
+    if not _is_numeric_state(text):
+        return None
+    return float(text)
+
+
+def _is_numeric_state(value: str) -> bool:
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
 
 
 def _group_by_area(items: list[dict[str, Any]]) -> list[dict[str, Any]]:

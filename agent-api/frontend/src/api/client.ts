@@ -389,14 +389,20 @@ export type WallClimate = WallEntity & {
   hvac_action?: string | null;
 };
 
+export type WallTemperatureSensor = WallEntity & {
+  temperature?: number | null;
+};
+
 export type WallDashboardData = {
   updated_at: string;
   home_assistant: { configured: boolean; entity_count: number };
   weather: WallEntity | null;
+  post?: WallEntity | null;
   lights: WallLight[];
   light_groups: WallLightGroup[];
   switches: WallEntity[];
   climate: WallClimate[];
+  temperature_sensors: WallTemperatureSensor[];
   security: {
     openings_total: number;
     openings_open: number;

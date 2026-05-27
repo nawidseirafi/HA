@@ -3,6 +3,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
+  Mailbox,
   BatteryWarning,
   Bot,
   ChevronRight,
@@ -15,7 +16,7 @@ import {
   Thermometer,
   Zap,
 } from 'lucide-react';
-import { api, type AgentStatus, type WallDashboardData, type WallEntity, type WallLight, type WallLightGroup, type WallLightRoom } from '../api/client';
+import { api, type AgentStatus, type WallDashboardData, type WallEntity, type WallLight, type WallLightGroup, type WallLightRoom, type WallTemperatureSensor } from '../api/client';
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
@@ -28,6 +29,58 @@ export function WallDashboardPage() {
   );
 }
 
+function postStatus(data: WallDashboardData) {
+  return data.post?.state === 'on';
+}
+function isBasementArea(area?: string) {
+  const value = normalizeArea(area);
+  return value.includes('basement') || value.includes('keller');
+}
+
+function houseClimateSummary(data: WallDashboardData) {
+  const houseTemps: number[] = [];
+  const basementTemps: number[] = [];
+  const basementHums: number[] = [];
+
+  for (const sensor of data.temperature_sensors ?? []) {
+    const area = sensor.area || '';
+    const temp = Number(sensor.temperature);
+    const hum = Number((sensor as WallTemperatureSensor & { humidity?: number | null }).humidity);
+
+    if (Number.isFinite(temp)) {
+      if (isBasementArea(area)) basementTemps.push(temp);
+      else houseTemps.push(temp);
+    }
+
+    if (isBasementArea(area) && Number.isFinite(hum)) {
+      basementHums.push(hum);
+    }
+  }
+
+  for (const item of data.climate ?? []) {
+    const temp = Number(item.current_temperature);
+    const hum = Number(item.humidity);
+
+    if (Number.isFinite(temp)) {
+      if (isBasementArea(item.area)) basementTemps.push(temp);
+      else houseTemps.push(temp);
+    }
+
+    if (isBasementArea(item.area) && Number.isFinite(hum)) {
+      basementHums.push(hum);
+    }
+  }
+
+  return {
+    houseTemp: avg(houseTemps),
+    basementTemp: avg(basementTemps),
+    basementHumidity: avg(basementHums),
+  };
+}
+
+function avg(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
 function WallDashboardContent() {
   const [data, setData] = useState<WallDashboardData | null>(null);
   const [section, setSection] = useState<WallSection>('home');
@@ -251,9 +304,12 @@ function WallDashboardContent() {
 }
 
 function HomeSection({ data, onLights, onFloor, onBatteries }: { data: WallDashboardData; onLights: () => void; onFloor: (floor: string) => void; onBatteries: () => void }) {
+  const hasPost = postStatus(data);
+  const climate = houseClimateSummary(data);
   const activeLights = data.lights.filter((light) => light.on).length;
   const open = data.security.openings_open;
   const issues = data.security.problems.length + data.health.unavailable.length;
+  const avgTemp = averageHouseTemperature(data);
   return (
     <div className="wall-home-grid">
       <MetricCard icon={<CloudSun size={24} />} label="Wetter" value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'} detail={data.weather?.name ?? 'Home Assistant'} />
@@ -261,6 +317,20 @@ function HomeSection({ data, onLights, onFloor, onBatteries }: { data: WallDashb
       <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'warn' : 'ok'} />
       <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={data.health.low_batteries.length ? 'warn' : 'ok'} onClick={onBatteries} />
       <MetricCard icon={<ShieldAlert size={24} />} label="System" value={`${issues}`} detail="auffällig" tone={issues ? 'warn' : 'ok'} />
+      <MetricCard
+        icon={<Thermometer size={24} />}
+        label="Klima"
+        value={`${formatNumber(climate.houseTemp)}°C`}
+        detail={`Haus ohne Keller · Keller ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
+        tone="ok"
+      />
+      <MetricCard
+        icon={<Mailbox size={24} />}
+        label="Posteingang"
+        value={hasPost ? 'Post da' : 'Leer'}
+        detail="Briefkasten"
+        tone={hasPost ? 'warn' : 'ok'}
+      />
       <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} />
       <section className="wall-panel wall-span-2">
         <div className="wall-section-title">
@@ -445,8 +515,21 @@ function LightsSection({
     </div>
   );
 }
+function averageHouseTemperature(data: WallDashboardData) {
+  const values = [
+    ...(data.temperature_sensors ?? [])
+      .map((sensor) => sensor.temperature)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+    ...data.climate
+      .map((item) => item.current_temperature)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+  ];
 
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + Number(value), 0) / values.length;
+}
 function ClimateSection({ data }: { data: WallDashboardData }) {
+  const rooms = temperatureRooms(data.temperature_sensors ?? []);
   return (
     <div className="wall-card-grid">
       {data.climate.map((item) => (
@@ -460,7 +543,25 @@ function ClimateSection({ data }: { data: WallDashboardData }) {
           <p>Ziel {formatNumber(item.target_temperature)}°C · {item.humidity ?? '--'}% · {labelState(item.state)}</p>
         </section>
       ))}
-      {data.climate.length === 0 && <section className="wall-panel">Keine Klima-Entities gefunden.</section>}
+      {rooms.map((room) => (
+        <section className="wall-panel wall-temperature-room" key={room.area}>
+          <div className="wall-section-title">
+            <span>{room.area}</span>
+            <Thermometer size={20} />
+          </div>
+          <h2>{room.area}</h2>
+          <div className="wall-climate-value">{formatNumber(room.average)}°C</div>
+          <div className="wall-temperature-list">
+            {room.items.map((item) => (
+              <article key={item.entity_id}>
+                <span>{item.name}</span>
+                <strong>{formatNumber(item.temperature)}°C</strong>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+      {data.climate.length === 0 && rooms.length === 0 && <section className="wall-panel">Keine Temperaturdaten gefunden.</section>}
     </div>
   );
 }
@@ -741,6 +842,21 @@ function formatNumber(value?: number | null) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '--';
   return `${Math.round(number * 10) / 10}`.replace('.', ',');
+}
+
+function temperatureRooms(sensors: WallTemperatureSensor[]) {
+  const groups = new Map<string, WallTemperatureSensor[]>();
+  for (const sensor of sensors) {
+    if (sensor.temperature === null || sensor.temperature === undefined) continue;
+    groups.set(sensor.area || 'Haus', [...(groups.get(sensor.area || 'Haus') ?? []), sensor]);
+  }
+  return [...groups.entries()]
+    .map(([area, items]) => ({
+      area,
+      items: items.sort((left, right) => left.name.localeCompare(right.name)),
+      average: items.reduce((sum, item) => sum + Number(item.temperature ?? 0), 0) / items.length,
+    }))
+    .sort((left, right) => left.area.localeCompare(right.area));
 }
 
 function formatTime(value: string) {
