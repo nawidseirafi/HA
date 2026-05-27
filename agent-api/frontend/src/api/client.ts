@@ -367,6 +367,11 @@ export type WallLight = WallEntity & {
   supported_color_modes?: string[];
 };
 
+export type WallCover = WallEntity & {
+  position?: number | null;
+  supported_features?: number | null;
+};
+
 export type WallLightGroup = {
   area: string;
   total: number;
@@ -437,6 +442,8 @@ export type WallDashboardData = {
   waste?: WasteStatus | null;
   lights: WallLight[];
   light_groups: WallLightGroup[];
+  covers?: WallCover[];
+  sensors?: WallEntity[];
   switches: WallEntity[];
   climate: WallClimate[];
   temperature_sensors: WallTemperatureSensor[];

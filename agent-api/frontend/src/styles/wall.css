@@ -7,9 +7,9 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  --background: oklch(0.99 0.003 240);
+  --background: #eef2f7;
   --foreground: oklch(0.22 0.04 250);
-  --card: oklch(1 0 0);
+  --card: #ffffff;
   --card-foreground: oklch(0.22 0.04 250);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.04 250);
@@ -23,7 +23,7 @@
   --accent-foreground: oklch(0.3 0.06 250);
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.99 0.003 240);
-  --border: oklch(0.92 0.015 245);
+  --border: rgba(15, 23, 42, 0.08);
   --input: oklch(0.92 0.015 245);
   --ring: oklch(0.62 0.18 255);
   --chart-1: oklch(0.62 0.18 255);
@@ -39,11 +39,20 @@
   --sidebar-accent-foreground: oklch(0.22 0.04 250);
   --sidebar-border: oklch(0.91 0.015 245);
   --sidebar-ring: oklch(0.62 0.18 255);
-  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.18 255), oklch(0.7 0.14 220));
-  --gradient-warm: linear-gradient(135deg, oklch(0.82 0.16 75), oklch(0.72 0.18 35));
-  --gradient-cool: linear-gradient(135deg, oklch(0.78 0.12 200), oklch(0.65 0.15 250));
-  --gradient-energy: linear-gradient(135deg, oklch(0.82 0.16 145), oklch(0.7 0.15 180));
-  --shadow-card: 0 1px 2px oklch(0.5 0.05 250 / 0.04), 0 8px 24px -8px oklch(0.5 0.08 250 / 0.12);
+  --state-ok: #22c55e;
+  --state-active: #2563eb;
+  --state-warn: #f59e0b;
+  --state-critical: #ef4444;
+  --state-neutral: #94a3b8;
+  --state-climate: #14b8a6;
+  --state-weather-cloudy: #64748b;
+  --state-weather-night: #4c1d95;
+  --state-waste-rest: #334155;
+  --gradient-primary: linear-gradient(135deg, #2563eb, #38bdf8);
+  --gradient-warm: linear-gradient(135deg, #f59e0b, #f97316);
+  --gradient-cool: linear-gradient(135deg, #14b8a6, #22d3ee);
+  --gradient-energy: linear-gradient(135deg, #22c55e, #10b981);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
   --shadow-glow: 0 0 0 1px oklch(0.62 0.18 255 / 0.12), 0 12px 32px -8px oklch(0.62 0.18 255 / 0.25);
   color-scheme: light;
   min-height: 100vh;
@@ -96,7 +105,8 @@
   gap: 14px;
   padding: 28px 8px;
   border-right: 1px solid var(--border);
-  background: oklch(0.985 0.005 240);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px);
 }
 
 .wall-nav button {
@@ -228,8 +238,8 @@
 }
 
 .wall-click-card:hover {
-  border-color: oklch(0.62 0.18 255 / 0.35);
-  box-shadow: 0 1px 2px oklch(0.5 0.05 250 / 0.04), 0 10px 26px -12px oklch(0.62 0.18 255 / 0.28);
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 10px 26px -12px rgba(37, 99, 235, 0.24);
   transform: translateY(-1px);
 }
 
@@ -242,20 +252,70 @@
   flex: 0 0 auto;
   border-radius: var(--radius-xl);
   color: var(--primary-foreground);
-  background: var(--gradient-primary);
+  background: var(--state-active);
+}
+
+.wall-metric.neutral > span {
+  background: var(--state-neutral);
+}
+
+.wall-metric.active > span {
+  background: var(--state-active);
 }
 
 .wall-metric.warn > span {
-  background: var(--gradient-warm);
+  background: var(--state-warn);
 }
 
-.wall-metric.light > span,
+.wall-metric.critical > span {
+  background: var(--state-critical);
+}
+
+.wall-metric.light > span {
+  background: var(--state-warn);
+}
+
 .wall-room-head > span {
-  background: linear-gradient(135deg, oklch(0.82 0.17 58), oklch(0.72 0.18 35));
+  background: var(--state-neutral);
+}
+
+.wall-room-card.room-active .wall-room-head > span {
+  background: var(--state-warn);
 }
 
 .wall-metric.ok > span {
-  background: var(--gradient-energy);
+  background: var(--state-ok);
+}
+
+.wall-metric.climate > span {
+  background: var(--state-climate);
+}
+
+.wall-metric.weather-sunny > span,
+.wall-metric.waste-yellow > span {
+  background: #facc15;
+  color: #1f2937;
+}
+
+.wall-metric.weather-cloudy > span {
+  background: var(--state-weather-cloudy);
+}
+
+.wall-metric.weather-rainy > span,
+.wall-metric.waste-paper > span {
+  background: var(--state-active);
+}
+
+.wall-metric.weather-night > span {
+  background: var(--state-weather-night);
+}
+
+.wall-metric.waste-bio > span {
+  background: var(--state-ok);
+}
+
+.wall-metric.waste-rest > span {
+  background: var(--state-waste-rest);
 }
 
 .wall-metric small,
@@ -542,19 +602,19 @@ button.wall-room-card {
   height: 100%;
   min-width: 4px;
   border-radius: inherit;
-  background: var(--gradient-energy);
+  background: var(--state-ok);
 }
 
 .wall-battery-bar.warn i {
-  background: var(--gradient-warm);
+  background: var(--state-warn);
 }
 
 .wall-battery-bar.danger i {
-  background: var(--destructive);
+  background: var(--state-critical);
 }
 
 .wall-battery-bar.unknown i {
-  background: var(--muted-foreground);
+  background: var(--state-neutral);
 }
 
 .wall-light-row strong,

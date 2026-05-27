@@ -31,10 +31,14 @@ def wall_dashboard():
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    lights = [_light_item(state) for state in states if _domain(state) == "light"]
-    switches = [_simple_item(state) for state in states if _domain(state) == "switch"]
-    climate = [_climate_item(state) for state in states if _domain(state) == "climate"]
-    temperature_sensors = _temperature_items(states)
+    floor_map = _floor_area_entity_map()
+    area_lookup = _entity_area_lookup(floor_map)
+    lights = [_with_area_lookup(_light_item(state), area_lookup) for state in states if _domain(state) == "light"]
+    covers = [_with_area_lookup(_cover_item(state), area_lookup) for state in states if _domain(state) == "cover"]
+    sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "sensor"]
+    switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "switch"]
+    climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _domain(state) == "climate"]
+    temperature_sensors = [_with_area_lookup(item, area_lookup) for item in _temperature_items(states)]
     weather = next((_weather_item(state) for state in states if _domain(state) == "weather"), None)
     post = next(
         (_simple_item(state) for state in states if state.get("entity_id") == "input_boolean.post_im_briefkasten"),
@@ -75,7 +79,9 @@ def wall_dashboard():
         "home_assistant": {"configured": ha_service.configured(), "entity_count": len(states)},
         "weather": weather,
         "lights": lights,
-        "light_groups": _group_lights_by_floor(lights),
+        "light_groups": _group_lights_by_floor(lights, floor_map),
+        "covers": covers,
+        "sensors": sorted(sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "switches": switches,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
@@ -194,6 +200,17 @@ def _light_item(state: dict[str, Any]) -> dict[str, Any]:
         "on": state.get("state") == "on",
         "brightness_pct": brightness_pct,
         "supported_color_modes": attributes.get("supported_color_modes") or [],
+    }
+
+
+def _cover_item(state: dict[str, Any]) -> dict[str, Any]:
+    attributes = state.get("attributes", {})
+    position = attributes.get("current_position")
+    return {
+        **_simple_item(state),
+        "position": _numeric_value(position),
+        "supported_features": attributes.get("supported_features"),
+        "device_class": attributes.get("device_class") or "cover",
     }
 
 
@@ -331,8 +348,8 @@ def _group_by_area(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _group_lights_by_floor(lights: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    floor_map = _floor_area_entity_map()
+def _group_lights_by_floor(lights: list[dict[str, Any]], floor_map: dict[str, dict[str, list[str]]] | None = None) -> list[dict[str, Any]]:
+    floor_map = floor_map or _floor_area_entity_map()
     if not floor_map:
         return _group_by_area(lights)
 
@@ -356,6 +373,23 @@ def _group_lights_by_floor(lights: list[dict[str, Any]]) -> list[dict[str, Any]]
     if remaining:
         groups.append(_light_group("Ohne Etage", remaining))
     return groups
+
+
+def _entity_area_lookup(floor_map: dict[str, dict[str, list[str]]]) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for areas in floor_map.values():
+        for area, entity_ids in areas.items():
+            for entity_id in entity_ids:
+                lookup[entity_id] = area
+    return lookup
+
+
+def _with_area_lookup(item: dict[str, Any], area_lookup: dict[str, str]) -> dict[str, Any]:
+    entity_id = str(item.get("entity_id") or "")
+    area = area_lookup.get(entity_id)
+    if area:
+        return {**item, "area": area}
+    return item
 
 
 def _light_group(label: str, lights: list[dict[str, Any]], rooms: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -480,7 +514,8 @@ def _floor_area_entity_map() -> dict[str, dict[str, list[str]]]:
     {% for entity_id in area_entities(area) %}
       {% set area_ns.entities = area_ns.entities + [entity_id] %}
     {% endfor %}
-    {% set floor_ns.areas = floor_ns.areas + [{'area': area, 'entities': area_ns.entities}] %}
+    {% set display_name = area_name(area) or area %}
+    {% set floor_ns.areas = floor_ns.areas + [{'area': display_name, 'area_id': area, 'entities': area_ns.entities}] %}
   {% endfor %}
   {% set ns.items = ns.items + [{'floor': floor, 'areas': floor_ns.areas}] %}
 {% endfor %}

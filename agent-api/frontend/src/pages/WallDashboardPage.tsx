@@ -3,7 +3,10 @@ import type { ErrorInfo, ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
-  Mailbox,
+  Battery,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
   BatteryWarning,
   Bot,
   ChevronRight,
@@ -11,6 +14,8 @@ import {
   DoorOpen,
   Home,
   Lightbulb,
+  Mailbox,
+  Plane,
   Trash2,
   RefreshCw,
   ShieldAlert,
@@ -21,6 +26,23 @@ import { api, type AgentStatus, type WallDashboardData, type WallEntity, type Wa
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
+type MetricTone =
+  | 'info'
+  | 'ok'
+  | 'warn'
+  | 'critical'
+  | 'neutral'
+  | 'active'
+  | 'light'
+  | 'climate'
+  | 'weather-sunny'
+  | 'weather-cloudy'
+  | 'weather-rainy'
+  | 'weather-night'
+  | 'waste-bio'
+  | 'waste-paper'
+  | 'waste-yellow'
+  | 'waste-rest';
 
 export function WallDashboardPage() {
   return (
@@ -32,6 +54,10 @@ export function WallDashboardPage() {
 
 function postStatus(data: WallDashboardData) {
   return data.post?.state === 'on';
+}
+
+function vacationStatus(data: WallDashboardData) {
+  return data.waste?.context?.vacation_mode === true;
 }
 
 function wasteTitle(data: WallDashboardData) {
@@ -50,11 +76,25 @@ function wasteDetail(data: WallDashboardData) {
   return `${waste.next.date_de || waste.next.date || ''} · ${waste.next.label}`.trim();
 }
 
-function wasteTone(data: WallDashboardData): 'info' | 'ok' | 'warn' | 'light' {
-  const days = data.waste?.next?.days_until;
-  if (days === 0 || days === 1) return 'warn';
-  if (typeof days === 'number') return 'ok';
+function weatherTone(data: WallDashboardData): MetricTone {
+  const state = String(data.weather?.state || '').toLowerCase();
+  if (state.includes('clear-night')) return 'weather-night';
+  if (state.includes('sunny') || state.includes('clear')) return 'weather-sunny';
+  if (state.includes('rain') || state.includes('pouring') || state.includes('lightning')) return 'weather-rainy';
+  if (state.includes('cloud')) return 'weather-cloudy';
   return 'info';
+}
+
+function wasteTone(data: WallDashboardData): MetricTone {
+  const waste = data.waste;
+  if (!waste?.ok || !waste.next) return 'neutral';
+  const sameDate = waste.items.filter((item) => item.date && item.date === waste.next?.date);
+  const types = (sameDate.length ? sameDate : [waste.next]).map((item) => String(item.type || '').toLowerCase());
+  if (types.some((type) => type.includes('bio'))) return 'waste-bio';
+  if (types.some((type) => type.includes('gelb') || type.includes('leicht') || type.includes('verpackung'))) return 'waste-yellow';
+  if (types.some((type) => type.includes('papier') || type.includes('altpapier') || type.includes('blaue'))) return 'waste-paper';
+  if (types.some((type) => type.includes('rest'))) return 'waste-rest';
+  return 'neutral';
 }
 
 function shortWasteType(value: string) {
@@ -262,6 +302,33 @@ function WallDashboardContent() {
     }
   };
 
+  const toggleVacation = async () => {
+    if (!data) return;
+    const entityId = 'input_boolean.vacation_mode';
+    const nextOn = !vacationStatus(data);
+    setData((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        waste: current.waste ? {
+          ...current.waste,
+          context: { ...current.waste.context, vacation_mode: nextOn },
+        } : current.waste,
+      };
+    });
+    setBusyEntity(entityId);
+    setError('');
+    try {
+      await api.callHomeAssistantService({ domain: 'input_boolean', service: nextOn ? 'turn_on' : 'turn_off', entity_id: entityId });
+      scheduleRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Urlaubsmodus konnte nicht geschaltet werden.');
+      await load(true);
+    } finally {
+      setBusyEntity('');
+    }
+  };
+
   const goSection = (next: WallSection) => {
     setSection(next);
     if (next !== 'floor') setFloorView('');
@@ -339,9 +406,10 @@ function WallDashboardContent() {
         {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
         {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
 
-        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates} onClearPost={clearPost} />}
+        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates} onClearPost={clearPost} onToggleVacation={toggleVacation} />}
         {data && section === 'lights' && (
           <LightsSection
+            data={data}
             groups={data.light_groups}
             visibleGroups={visibleGroups}
             selectedFloor={selectedFloor}
@@ -388,6 +456,7 @@ function HomeSection({
   onAgents,
   onClimate,
   onClearPost,
+  onToggleVacation,
 }: {
   data: WallDashboardData;
   onLights: () => void;
@@ -396,12 +465,15 @@ function HomeSection({
   onAgents: () => void;
   onClimate: () => void;
   onClearPost: () => void;
+  onToggleVacation: () => void;
 }) {
   const hasPost = postStatus(data);
+  const vacation = vacationStatus(data);
   const climate = houseClimateSummary(data);
   const activeLights = data.lights.filter((light) => light.on).length;
   const open = data.security.openings_open;
   const issues = data.security.problems.length + data.health.unavailable.length;
+  const batterySummary = homeBatterySummary(data);
   return (
     <div className="wall-home-grid">
       <MetricCard
@@ -409,6 +481,15 @@ function HomeSection({
         label="Wetter"
         value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'}
         detail={`${formatNumber(data.weather?.temperature)}°C · ${formatNumber(data.weather?.humidity)}%`}
+        tone={weatherTone(data)}
+      />
+      <MetricCard
+        icon={<Thermometer size={24} />}
+        label="Haus ohne Keller"
+        value={`Ø ${formatNumber(climate.houseTemp)}°C · ${formatNumber(climate.houseHumidity)}%`}
+        detail={`Keller Ø ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
+        tone="climate"
+        onClick={onClimate}
       />
       <MetricCard
         icon={<Trash2 size={24} />}
@@ -418,26 +499,26 @@ function HomeSection({
         tone={wasteTone(data)}
       />
       <MetricCard
-        icon={<Thermometer size={24} />}
-        label="Haus ohne Keller"
-        value={`Ø ${formatNumber(climate.houseTemp)}°C · ${formatNumber(climate.houseHumidity)}%`}
-        detail={`Keller Ø ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
-        tone="ok"
-        onClick={onClimate}
+        icon={<Plane size={24} />}
+        label="Vacation Mode"
+        value={vacation ? 'Aktiv' : 'Aus'}
+        detail={vacation ? 'Antippen zum Deaktivieren' : 'Antippen zum Aktivieren'}
+        tone={vacation ? 'warn' : 'neutral'}
+        onClick={onToggleVacation}
       />
-      <MetricCard icon={<Lightbulb size={24} />} label="Lampen" value={`${activeLights}/${data.lights.length}`} detail="aktiv" tone="light" onClick={onLights} />
-      <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'warn' : 'ok'} />
-      <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={data.health.low_batteries.length ? 'warn' : 'ok'} onClick={onBatteries} />
-      <MetricCard icon={<ShieldAlert size={24} />} label="System" value={`${issues}`} detail="auffällig" tone={issues ? 'warn' : 'ok'} />
+      <MetricCard icon={<Lightbulb size={24} />} label="Lampen" value={`${activeLights}/${data.lights.length}`} detail="aktiv" tone={activeLights ? 'light' : 'neutral'} onClick={onLights} />
+      <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'critical' : 'ok'} />
       <MetricCard
         icon={<Mailbox size={24} />}
         label="Posteingang"
         value={hasPost ? 'Post da' : 'Leer'}
         detail={hasPost ? 'Antippen zum Zurücksetzen' : 'Briefkasten'}
-        tone={hasPost ? 'warn' : 'ok'}
+        tone={hasPost && vacation ? 'critical' : hasPost ? 'warn' : 'neutral'}
         onClick={hasPost ? onClearPost : undefined}
       />
-      <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} onClick={onAgents}/>
+      <MetricCard icon={batterySummary.icon} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={batterySummary.tone} onClick={onBatteries} />
+
+      <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} tone={homeAgentTone(data)} onClick={onAgents}/>
       <section className="wall-panel wall-span-2">
         <div className="wall-section-title">
           <span>Etagen</span>
@@ -481,13 +562,15 @@ function FloorSection({
     <div className="wall-page-stack">
       <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> Dashboard</button>
       <div className="wall-room-grid">
-        {rooms.map((room) => (
-          <button className="wall-room-card wall-click-card" type="button" key={`${floor}-${room.area}`} onClick={() => onRoom(floor, room.area)}>
+        {rooms.map((room) => {
+          const climateLine = roomClimateLine(data, room.area);
+          return (
+          <button className={`wall-room-card wall-click-card ${room.on ? 'room-active' : ''}`} type="button" key={`${floor}-${room.area}`} onClick={() => onRoom(floor, room.area)}>
             <div className="wall-room-head">
               <span><Lightbulb size={24} /></span>
               <div>
                 <h2>{room.area}</h2>
-                <p>{floor} · {room.on}/{room.total} Lampen an</p>
+                <p>{floor} · {room.on}/{room.total} Lampen an{climateLine ? ` · ${climateLine}` : ''}</p>
               </div>
               <ChevronRight size={20} />
             </div>
@@ -496,7 +579,8 @@ function FloorSection({
               <span>Lampen und Geräte anzeigen</span>
             </div>
           </button>
-        ))}
+          );
+        })}
         {rooms.length === 0 && <section className="wall-panel">Keine Räume für diese Etage gefunden.</section>}
       </div>
     </div>
@@ -522,6 +606,8 @@ function RoomSection({
 }) {
   const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
   const otherDevices = roomDevices(data, room, new Set(lights.map((light) => light.entity_id)));
+  const coverCount = (data.covers ?? []).filter((cover) => sameArea(cover.area, room)).length;
+  const roomTemp = roomTemperature(data, room);
 
   return (
     <div className="wall-page-stack">
@@ -531,7 +617,12 @@ function RoomSection({
           <span><Lightbulb size={24} /></span>
           <div>
             <h2>{room}</h2>
-            <p>{floor} · {lights.filter((light) => light.on).length}/{lights.length} Lampen an · {otherDevices.length} weitere Geräte</p>
+            <p>
+              {floor} · {lights.filter((light) => light.on).length}/{lights.length} Lampen an
+              {coverCount ? ` · ${coverCount} Jalousien` : ''}
+              {roomTemp !== null ? ` · ${formatNumber(roomTemp)}°C` : ''}
+              {otherDevices.length ? ` · ${otherDevices.length} weitere Geräte` : ''}
+            </p>
           </div>
         </div>
         <div className="wall-light-list">
@@ -553,6 +644,7 @@ function RoomSection({
 }
 
 function LightsSection({
+  data,
   groups,
   visibleGroups,
   selectedFloor,
@@ -562,6 +654,7 @@ function LightsSection({
   onBrightness,
   onBulk,
 }: {
+  data: WallDashboardData;
   groups: WallLightGroup[];
   visibleGroups: WallLightGroup[];
   selectedFloor: string;
@@ -595,13 +688,15 @@ function LightsSection({
         <button className="primary" onClick={() => onBulk(true)} disabled={busyEntity === 'bulk'}>Alle an</button>
       </div>
       <div className="wall-room-grid">
-        {visibleRooms.map((room) => (
-          <section className="wall-room-card" key={`${room.floor}-${room.area}`}>
+        {visibleRooms.map((room) => {
+          const climateLine = roomClimateLine(data, room.area);
+          return (
+          <section className={`wall-room-card ${room.on ? 'room-active' : ''}`} key={`${room.floor}-${room.area}`}>
             <div className="wall-room-head">
               <span><Lightbulb size={24} /></span>
               <div>
                 <h2>{room.area}</h2>
-                <p>{room.floor} · {room.on}/{room.total} an</p>
+                <p>{room.floor} · {room.on}/{room.total} an{climateLine ? ` · ${climateLine}` : ''}</p>
               </div>
             </div>
             <div className="wall-light-list">
@@ -616,7 +711,8 @@ function LightsSection({
               ))}
             </div>
           </section>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -676,10 +772,10 @@ function SecuritySection({ data }: { data: WallDashboardData }) {
   const openItems = data.security.openings.filter((item) => item.state === 'on');
   return (
     <div className="wall-card-grid">
-      <MetricCard icon={<DoorOpen size={24} />} label="Offene Kontakte" value={`${openItems.length}`} detail={`${data.security.openings_total} gesamt`} tone={openItems.length ? 'warn' : 'ok'} />
-      <MetricCard icon={<ShieldAlert size={24} />} label="Probleme" value={`${data.security.problems.length}`} detail="gemeldet" tone={data.security.problems.length ? 'warn' : 'ok'} />
-      <MetricCard icon={<Zap size={24} />} label="Offline" value={`${data.health.unavailable.length}`} detail="unknown/unavailable" tone={data.health.unavailable.length ? 'warn' : 'ok'} />
-      <MetricCard icon={<BatteryWarning size={24} />} label="Batterie" value={`${data.health.low_batteries.length}`} detail="niedrig" tone={data.health.low_batteries.length ? 'warn' : 'ok'} />
+      <MetricCard icon={<DoorOpen size={24} />} label="Offene Kontakte" value={`${openItems.length}`} detail={`${data.security.openings_total} gesamt`} tone={openItems.length ? 'critical' : 'ok'} />
+      <MetricCard icon={<ShieldAlert size={24} />} label="Probleme" value={`${data.security.problems.length}`} detail="gemeldet" tone={data.security.problems.length ? 'critical' : 'ok'} />
+      <MetricCard icon={<Zap size={24} />} label="Offline" value={`${data.health.unavailable.length}`} detail="unknown/unavailable" tone={data.health.unavailable.length ? 'neutral' : 'ok'} />
+      <MetricCard icon={<BatteryWarning size={24} />} label="Batterie" value={`${data.health.low_batteries.length}`} detail="niedrig" tone={data.health.low_batteries.length ? 'critical' : 'ok'} />
       <ListPanel title="Offene Fenster & Türen" items={openItems} />
       <ListPanel title="Niedrige Batterien" items={data.health.low_batteries} />
       <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)} />
@@ -748,6 +844,17 @@ function homeAgentState(data: WallDashboardData) {
   return 'Bereit';
 }
 
+function homeAgentTone(data: WallDashboardData): MetricTone {
+  const invoices = data.agents.invoices;
+  const wellness = data.agents.mywellness;
+  const market = data.agents.market;
+  if (invoices.status === 'error' || wellness.status === 'error' || market.status === 'error') return 'critical';
+  if (invoices.is_running || wellness.is_running) return 'active';
+  if (invoices.enabled === false || wellness.enabled === false) return 'warn';
+  if (invoices.last_status === 'ok' || wellness.last_status === 'ok' || market.status === 'ok') return 'ok';
+  return 'neutral';
+}
+
 function homeAgentDetail(data: WallDashboardData) {
   const invoiceNext = formatAgentNextRun(data.agents.invoices.next_scheduled_run, data.agents.invoices.schedule);
   return data.agents.invoices.enabled === false ? 'Invoice pausiert' : `Invoice ${invoiceNext}`;
@@ -798,17 +905,17 @@ function LightRow({
 function DeviceRow({ device }: { device: WallEntity }) {
   return (
     <article className="wall-device-row">
-      <div className={`wall-dot ${device.state === 'on' ? 'on' : ''}`} />
+      <div className={`wall-dot ${deviceActive(device) ? 'on' : ''}`} />
       <div>
         <strong>{device.name}</strong>
         <span>{device.entity_id}</span>
       </div>
-      <b>{device.unit ? `${device.state} ${device.unit}` : labelState(device.state)}</b>
+      <b>{deviceValue(device)}</b>
     </article>
   );
 }
 
-function MetricCard({ icon, label, value, detail, tone = 'info', onClick }: { icon: ReactNode; label: string; value: string; detail: string; tone?: 'info' | 'ok' | 'warn' | 'light'; onClick?: () => void }) {
+function MetricCard({ icon, label, value, detail, tone = 'info', onClick }: { icon: ReactNode; label: string; value: string; detail: string; tone?: MetricTone; onClick?: () => void }) {
   const content = (
     <>
       <span>{icon}</span>
@@ -893,6 +1000,28 @@ function formatBatteryLevel(battery: WallEntity & { level?: number | null }) {
   return labelState(battery.state);
 }
 
+function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: ReactNode } {
+  const batteries = data.health.batteries ?? [];
+  const hasUnknown = batteries.some((battery) => battery.level === null || battery.level === undefined || ['unknown', 'unavailable'].includes(String(battery.state).toLowerCase()));
+  const levels = batteries
+    .map((battery) => battery.level)
+    .filter((level): level is number => level !== null && level !== undefined && Number.isFinite(Number(level)));
+  const minLevel = levels.length ? Math.min(...levels) : null;
+  if (batteries.some((battery) => String(battery.state).toLowerCase() === 'low') || (minLevel !== null && minLevel <= 15)) {
+    return { tone: 'critical', icon: <BatteryWarning size={24} /> };
+  }
+  if (minLevel !== null && minLevel <= 30) {
+    return { tone: 'warn', icon: <BatteryLow size={24} /> };
+  }
+  if (minLevel !== null && minLevel <= 60) {
+    return { tone: 'warn', icon: <BatteryMedium size={24} /> };
+  }
+  if (hasUnknown) {
+    return { tone: 'neutral', icon: <Battery size={24} /> };
+  }
+  return { tone: 'ok', icon: <BatteryFull size={24} /> };
+}
+
 function batteryBarWidth(battery: WallEntity & { level?: number | null }) {
   if (battery.level === null || battery.level === undefined || !Number.isFinite(Number(battery.level))) {
     return battery.state?.toLowerCase() === 'low' ? 12 : 100;
@@ -916,12 +1045,8 @@ function findRoom(data: WallDashboardData, floor: string, room: string): WallLig
 
 function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
   const devices: WallEntity[] = [
-    ...data.switches,
-    ...data.climate,
-    ...data.security.openings,
-    ...data.security.problems,
-    ...(data.health.batteries ?? data.health.low_batteries),
-    ...data.health.unavailable,
+    ...(data.covers ?? []),
+    ...(data.sensors ?? data.temperature_sensors ?? []),
   ];
   const unique = new Map<string, WallEntity>();
   for (const device of devices) {
@@ -931,12 +1056,79 @@ function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>
   return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function roomTemperature(data: WallDashboardData, room: string) {
+  const values = [
+    ...(data.temperature_sensors ?? [])
+      .filter((sensor) => sameArea(sensor.area, room))
+      .map((sensor) => sensor.temperature)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+    ...data.climate
+      .filter((item) => sameArea(item.area, room))
+      .map((item) => item.current_temperature)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+  ];
+  return avg(values.map(Number));
+}
+
+function roomHumidity(data: WallDashboardData, room: string) {
+  const values = [
+    ...(data.temperature_sensors ?? [])
+      .filter((sensor) => sameArea(sensor.area, room))
+      .map((sensor) => sensor.humidity)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+    ...data.climate
+      .filter((item) => sameArea(item.area, room))
+      .map((item) => item.humidity)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+  ];
+  return avg(values.map(Number));
+}
+
+function roomClimateLine(data: WallDashboardData, room: string) {
+  const temp = roomTemperature(data, room);
+  const humidity = roomHumidity(data, room);
+  if (temp === null && humidity === null) return '';
+  if (temp !== null && humidity !== null) return `${formatNumber(temp)}°C · ${formatNumber(humidity)}%`;
+  if (temp !== null) return `${formatNumber(temp)}°C`;
+  return `${formatNumber(humidity)}%`;
+}
+
+function deviceActive(device: WallEntity) {
+  const state = String(device.state || '').toLowerCase();
+  if (state === 'on' || state === 'open' || state === 'opening') return true;
+  return false;
+}
+
+function deviceValue(device: WallEntity) {
+  const item = device as WallEntity & {
+    position?: number | null;
+    current_temperature?: number | null;
+    target_temperature?: number | null;
+    humidity?: number | null;
+    temperature?: number | null;
+  };
+  if (item.current_temperature !== undefined && item.current_temperature !== null) {
+    const target = item.target_temperature !== undefined && item.target_temperature !== null
+      ? ` · Ziel ${formatNumber(item.target_temperature)}°C`
+      : '';
+    return `${formatNumber(item.current_temperature)}°C${target}`;
+  }
+  if (item.temperature !== undefined && item.temperature !== null) {
+    return `${formatNumber(item.temperature)}°C`;
+  }
+  if (item.position !== undefined && item.position !== null) {
+    return `${labelState(device.state)} · ${formatNumber(item.position)}%`;
+  }
+  if (device.unit) return `${device.state} ${device.unit}`;
+  return labelState(device.state);
+}
+
 function sameArea(left?: string, right?: string) {
   return normalizeArea(left) === normalizeArea(right);
 }
 
 function normalizeArea(value?: string) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
 }
 
 function labelState(state: string) {
