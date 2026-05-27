@@ -29,11 +29,6 @@ frontend:
 automation: !include_dir_merge_list automations
 script: !include scripts.yaml
 scene: !include scenes.yaml
-climate:
-  - platform: intesishome
-    username: !secret intesishome_username
-    password: !secret intesishome_password
-    device: airconwithme
 lovelace:
     mode: storage
     dashboards:
