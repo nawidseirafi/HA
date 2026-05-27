@@ -1,5 +1,6 @@
 import requests
 from datetime import datetime, timedelta
+import json
 import time
 import os
 import sys
@@ -181,7 +182,14 @@ def try_booking_course(course_name, course_id, target_date):
                 timeout=REQUEST_TIMEOUT
             )
             elapsed_ms = round((time.perf_counter() - start) * 1000)
-            text = response.text
+            try:
+                response_json = response.json()
+            except Exception:
+                response_json = {}
+            log_payload = dict(response_json) if isinstance(response_json, dict) else {}
+            if "token" in log_payload:
+                log_payload["token"] = "[redacted]"
+            text = json.dumps(log_payload, ensure_ascii=False) if log_payload else response.text
             result = (
                 f"{course_name}: Versuch {attempt}, "
                 f"Status {response.status_code}, "
@@ -197,15 +205,12 @@ def try_booking_course(course_name, course_id, target_date):
                     "success": False,
                     "message": f"{course_name}: Buchung nicht geöffnet nach {MAX_RETRIES} Versuchen."
                 }
-            try:
-                response_json = response.json()
-
-            except Exception:
-                response_json = {}
             has_errors = bool(response_json.get("errors"))
+            booking_state = response_json.get("data")
             success = (
                 response.status_code in (200, 201)
                 and not has_errors
+                and booking_state == "Booked"
             )
             return {
                 "course_name": course_name,

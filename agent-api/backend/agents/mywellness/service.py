@@ -973,7 +973,12 @@ class MyWellnessService:
         }
 
     def _output_has_error(self, output: str) -> bool:
-        return bool(re.search(r"\b(Fehler|Traceback|Exception|Error)\b", output or "", re.IGNORECASE))
+        relevant_lines = [
+            line
+            for line in (output or "").splitlines()
+            if "Home Assistant Notification" not in line
+        ]
+        return bool(re.search(r"\b(Fehler|Traceback|Exception|Error)\b", "\n".join(relevant_lines), re.IGNORECASE))
 
     def _extract_error(self, output: str) -> Optional[str]:
         for line in reversed((output or "").splitlines()):

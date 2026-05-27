@@ -20,6 +20,7 @@ function toTimeInput(value?: string) {
 }
 
 export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }: Props) {
+  const [agentEnabled, setAgentEnabled] = useState(true);
   const [prepareEnabled, setPrepareEnabled] = useState(true);
   const [bookingEnabled, setBookingEnabled] = useState(true);
   const [prepareTime, setPrepareTime] = useState('17:00:00');
@@ -34,6 +35,7 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
 
   useEffect(() => {
     if (!status) return;
+    setAgentEnabled(status.enabled !== false);
     setPrepareEnabled(status.prepare_enabled !== false);
     setBookingEnabled(status.booking_enabled !== false);
     setPrepareTime(toTimeInput(status.prepare_time) || '17:00:00');
@@ -118,6 +120,7 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
         onSubmit={(event) => {
           event.preventDefault();
           onSave({
+            enabled: agentEnabled,
             prepare_enabled: prepareEnabled,
             booking_enabled: bookingEnabled,
             prepare_time: prepareTime,
@@ -134,6 +137,14 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
             <h3>Automationen</h3>
             <p>Steuere, wann die Kursliste vorbereitet und Buchungen ausgeführt werden.</p>
           </div>
+        </div>
+        <div className="wellness-setting-row">
+          <label className="wellness-toggle-line">
+            <input type="checkbox" checked={agentEnabled} onChange={(event) => setAgentEnabled(event.target.checked)} />
+            <span />
+            <strong>Automationen aktiv</strong>
+          </label>
+          <span className={`agent-state-pill ${agentEnabled ? 'ok' : 'waiting'}`}>{agentEnabled ? 'Aktiv' : 'Pausiert'}</span>
         </div>
         <div className="wellness-setting-row">
           <label className="wellness-toggle-line">
