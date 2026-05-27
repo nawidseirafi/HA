@@ -15,6 +15,7 @@ import {
   Home,
   Lightbulb,
   Mailbox,
+  Layers3,
   Plane,
   Trash2,
   RefreshCw,
@@ -347,6 +348,15 @@ function WallDashboardContent() {
     setSection('floor');
   };
 
+  const openFloors = () => {
+    const firstFloor = data?.light_groups[0]?.area || '';
+    const floor = selectedFloor !== 'Alle Etagen' ? selectedFloor : firstFloor;
+    setFloorView(floor);
+    setSelectedFloor(floor || 'Alle Etagen');
+    setRoomView('');
+    setSection('floor');
+  };
+
   const openBatteries = () => {
     setFloorView('');
     setRoomView('');
@@ -375,13 +385,14 @@ function WallDashboardContent() {
   const activeLights = data?.lights.filter((light) => light.on).length ?? 0;
   const totalLights = data?.lights.length ?? 0;
   const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
-  const headerTitle = section === 'floor' ? floorView || 'Etage' : section === 'room' ? roomView || 'Raum' : titleFor(section);
+  const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
 
   return (
     <div className="wall-shell">
       <aside className="wall-nav">
         <button className={section === 'home' ? 'active' : ''} onClick={() => goSection('home')} aria-label="Home"><Home size={24} /></button>
         <button className={section === 'lights' ? 'active' : ''} onClick={openLights} aria-label="Lampen"><Lightbulb size={24} /></button>
+        <button className={section === 'floor' || section === 'room' ? 'active' : ''} onClick={openFloors} aria-label="Etagen"><Layers3 size={24} /></button>
         <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')} aria-label="Klima"><Thermometer size={24} /></button>
         <button className={section === 'security' ? 'active' : ''} onClick={() => goSection('security')} aria-label="Sicherheit"><ShieldAlert size={24} /></button>
         <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')} aria-label="Agenten"><Bot size={24} /></button>
@@ -429,6 +440,7 @@ function WallDashboardContent() {
             data={data}
             floor={floorView}
             onBack={() => goSection('home')}
+            onFloor={openFloor}
             onRoom={openRoom}
           />
         )}
@@ -548,29 +560,39 @@ function FloorSection({
   data,
   floor,
   onBack,
+  onFloor,
   onRoom,
 }: {
   data: WallDashboardData;
   floor: string;
   onBack: () => void;
+  onFloor: (floor: string) => void;
   onRoom: (floor: string, room: string) => void;
 }) {
-  const group = data.light_groups.find((item) => item.area === floor);
+  const selectedFloor = floor || data.light_groups[0]?.area || '';
+  const group = data.light_groups.find((item) => item.area === selectedFloor);
   const rooms = group?.rooms?.length ? group.rooms : group ? [{ area: group.area, total: group.total, on: group.on, items: group.items }] : [];
 
   return (
     <div className="wall-page-stack">
       <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> Dashboard</button>
+      <div className="wall-tabs">
+        {data.light_groups.map((group) => (
+          <button key={group.area} className={group.area === selectedFloor ? 'active' : ''} onClick={() => onFloor(group.area)}>
+            {group.area} <span>{group.rooms?.length || 1}</span>
+          </button>
+        ))}
+      </div>
       <div className="wall-room-grid">
         {rooms.map((room) => {
           const climateLine = roomClimateLine(data, room.area);
           return (
-          <button className={`wall-room-card wall-click-card ${room.on ? 'room-active' : ''}`} type="button" key={`${floor}-${room.area}`} onClick={() => onRoom(floor, room.area)}>
+          <button className={`wall-room-card wall-click-card ${room.on ? 'room-active' : ''}`} type="button" key={`${selectedFloor}-${room.area}`} onClick={() => onRoom(selectedFloor, room.area)}>
             <div className="wall-room-head">
               <span><Lightbulb size={24} /></span>
               <div>
                 <h2>{room.area}</h2>
-                <p>{floor} · {room.on}/{room.total} Lampen an{climateLine ? ` · ${climateLine}` : ''}</p>
+                <p>{selectedFloor} · {room.on}/{room.total} Lampen an{climateLine ? ` · ${climateLine}` : ''}</p>
               </div>
               <ChevronRight size={20} />
             </div>
@@ -986,7 +1008,7 @@ function titleFor(section: WallSection) {
 
 function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number) {
   if (section === 'lights') return `${activeLights} von ${totalLights} aktiv`;
-  if (section === 'floor') return 'Räume dieser Etage';
+  if (section === 'floor') return 'Etage wählen und Räume öffnen';
   if (section === 'room') return 'Geräte in diesem Raum';
   if (section === 'batteries') return 'Batteriestände und Status aller Batterie-Geräte';
   if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
