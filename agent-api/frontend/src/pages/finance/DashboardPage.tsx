@@ -193,6 +193,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
               <span className="eyebrow">Neueste Rechnungen & Belege</span>
               <h2>Belegliste</h2>
             </div>
+            <button className="button ghost" onClick={() => navigate({ name: 'years' })}>Archiv</button>
           </div>
           <InvoiceTable
             invoices={invoices}
@@ -207,28 +208,6 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
         </div>
 
         <aside className="quick-stack">
-          <div className="panel latest-panel">
-            <div className="section-title">
-              <div>
-                <span className="eyebrow">Uploads</span>
-                <h2>Letzte Uploads</h2>
-              </div>
-              <button className="button ghost" onClick={() => navigate({ name: 'years' })}>Archiv</button>
-            </div>
-            <div className="upload-list">
-              {invoices.slice(0, 5).map((invoice) => (
-                <button key={invoice.id} onClick={() => navigate({ name: 'invoice', id: invoice.id })}>
-                  <span className={`status-dot ${invoice.review_status}`} />
-                  <div>
-                    <strong>{invoice.vendor || 'Unbekannter Beleg'}</strong>
-                    <small>{shortDate(invoice.invoice_date)} · {invoice.category || 'Ohne Kategorie'}</small>
-                  </div>
-                  <b>{currency(invoice.gross_amount ?? invoice.amount, invoice.currency)}</b>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="panel">
             <div className="section-title">
               <div>

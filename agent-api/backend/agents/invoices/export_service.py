@@ -110,22 +110,54 @@ def _write_xlsx(path: Path, rows: list[list[object]]) -> None:
 
 
 def _write_simple_pdf(path: Path, title: str, rows: list[dict]) -> None:
-    lines = [title, "", f"Anzahl Belege: {len(rows)}"]
-    total = sum(float(row.get("gross_amount") or row.get("amount") or 0) for row in rows)
-    lines.append(f"Summe Brutto: {total:.2f} EUR")
-    lines.append("")
-    for row in rows[:40]:
-        lines.append(f"{row.get('invoice_date')}  {row.get('vendor')}  {row.get('gross_amount') or row.get('amount') or ''} {row.get('currency') or 'EUR'}")
-    text = "\\n".join(lines)
-    stream = f"BT /F1 12 Tf 50 790 Td ({_pdf_escape(text[:3500])}) Tj ET"
-    content = stream.encode("latin-1", errors="replace")
+    page_width = 842
+    page_height = 595
+    margin = 36
+    row_height = 18
+    rows_per_page = 22
+    total = sum(_amount(row) for row in rows)
+    pages = [rows[index:index + rows_per_page] for index in range(0, len(rows), rows_per_page)] or [[]]
+    content_streams = [
+        _pdf_page_content(
+            title=title,
+            rows=page_rows,
+            page_number=page_index + 1,
+            page_count=len(pages),
+            total_rows=len(rows),
+            total=total,
+            page_width=page_width,
+            page_height=page_height,
+            margin=margin,
+            row_height=row_height,
+        )
+        for page_index, page_rows in enumerate(pages)
+    ]
+    page_object_start = 3
+    font_object_id = page_object_start + len(content_streams)
+    content_object_start = font_object_id + 1
+    kids = " ".join(f"{page_object_start + index} 0 R" for index in range(len(content_streams)))
     objects = [
         b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
-        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
-        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
-        b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
-        f"5 0 obj << /Length {len(content)} >> stream\n".encode() + content + b"\nendstream endobj\n",
+        f"2 0 obj << /Type /Pages /Kids [{kids}] /Count {len(content_streams)} >> endobj\n".encode(),
     ]
+    for index in range(len(content_streams)):
+        page_id = page_object_start + index
+        content_id = content_object_start + index
+        objects.append(
+            (
+                f"{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+                f"/Resources << /Font << /F1 {font_object_id} 0 R >> >> /Contents {content_id} 0 R >> endobj\n"
+            ).encode()
+        )
+    objects.append(f"{font_object_id} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".encode())
+    for index, stream in enumerate(content_streams):
+        content = stream.encode("latin-1", errors="replace")
+        content_id = content_object_start + index
+        objects.append(
+            f"{content_id} 0 obj << /Length {len(content)} >> stream\n".encode()
+            + content
+            + b"\nendstream endobj\n"
+        )
     buffer = io.BytesIO()
     buffer.write(b"%PDF-1.4\n")
     offsets = []
@@ -138,6 +170,90 @@ def _write_simple_pdf(path: Path, title: str, rows: list[dict]) -> None:
         buffer.write(f"{offset:010d} 00000 n \n".encode())
     buffer.write(f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode())
     path.write_bytes(buffer.getvalue())
+
+
+def _pdf_page_content(
+    *,
+    title: str,
+    rows: list[dict],
+    page_number: int,
+    page_count: int,
+    total_rows: int,
+    total: float,
+    page_width: int,
+    page_height: int,
+    margin: int,
+    row_height: int,
+) -> str:
+    commands = [
+        "1 1 1 rg 0 0 842 595 re f",
+        "0.08 0.12 0.2 rg 0 545 842 50 re f",
+        _pdf_text(margin, 566, title, 18, "1 1 1"),
+        _pdf_text(page_width - margin - 90, 566, f"Seite {page_number}/{page_count}", 9, "0.82 0.88 0.96"),
+        _pdf_text(margin, 523, f"Belege: {total_rows}", 11, "0.12 0.18 0.28"),
+        _pdf_text(margin + 130, 523, f"Summe brutto: {_format_money(total)}", 11, "0.12 0.18 0.28"),
+        "0.88 0.91 0.96 rg 36 496 770 24 re f",
+    ]
+    columns = [
+        ("Datum", 42, 64),
+        ("Anbieter", 106, 178),
+        ("Kategorie", 284, 106),
+        ("Brutto", 390, 92),
+        ("Art", 500, 64),
+        ("Status", 578, 78),
+        ("Rechnung", 670, 100),
+    ]
+    for label, x, _width in columns:
+        commands.append(_pdf_text(x, 505, label, 8.5, "0.22 0.29 0.4"))
+
+    y = 474
+    for index, row in enumerate(rows):
+        if index % 2 == 0:
+            commands.append(f"0.97 0.98 1 rg 36 {y - 5} 770 {row_height} re f")
+        commands.append("0.86 0.89 0.94 RG 36 %.1f m 806 %.1f l S" % (y - 7, y - 7))
+        values = [
+            _short(row.get("invoice_date"), 10),
+            _short(row.get("vendor"), 30),
+            _short(row.get("category"), 22),
+            _format_money(_amount(row), row.get("currency") or "EUR"),
+            "Einnahme" if row.get("transaction_type") == "income" else "Ausgabe",
+            _short(row.get("review_status") or row.get("status"), 14),
+            _short(row.get("invoice_number"), 22),
+        ]
+        for value, (_label, x, width) in zip(values, columns):
+            align_right = _label == "Brutto"
+            text_x = x + width - _text_width(value, 8.5) if align_right else x
+            commands.append(_pdf_text(text_x, y, value, 8.5, "0.08 0.12 0.2"))
+        y -= row_height
+
+    if not rows:
+        commands.append(_pdf_text(margin, 470, "Keine Belege fuer diesen Zeitraum.", 11, "0.35 0.42 0.52"))
+    commands.append(_pdf_text(margin, 24, "RoboterSteve Invoice Export", 8, "0.45 0.52 0.62"))
+    return "\n".join(commands)
+
+
+def _pdf_text(x: float, y: float, value: object, size: float = 10, color: str = "0 0 0") -> str:
+    return f"{color} rg BT /F1 {size} Tf {x:.1f} {y:.1f} Td ({_pdf_escape(str(value or ''))}) Tj ET"
+
+
+def _amount(row: dict) -> float:
+    try:
+        return float(row.get("gross_amount") or row.get("amount") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _format_money(value: float, currency: str = "EUR") -> str:
+    return f"{value:,.2f} {currency}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _short(value: object, max_length: int) -> str:
+    text = str(value or "").strip()
+    return text if len(text) <= max_length else f"{text[:max_length - 1]}."
+
+
+def _text_width(value: str, font_size: float) -> float:
+    return len(value) * font_size * 0.48
 
 
 def _pdf_escape(value: str) -> str:
