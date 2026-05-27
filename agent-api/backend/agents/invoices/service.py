@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import sqlite3
@@ -5,7 +6,8 @@ import subprocess
 import sys
 import time
 import logging
-from datetime import date, datetime, timezone
+import threading
+from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
@@ -24,6 +26,7 @@ DEFAULT_REVIEW_DIR = AI_AGENT_DIR / "data" / "invoices" / "review"
 DEFAULT_EXPORT_DIR = AI_AGENT_DIR / "data" / "invoices" / "exports"
 DEFAULT_ARCHIVE_CLEANUP_BACKUP_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive_cleanup_backup"
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
+DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
 
 
 EXTRA_COLUMNS: dict[str, str] = {
@@ -95,6 +98,9 @@ def secure_filename(filename: str) -> str:
 
 class InvoiceService:
     def __init__(self):
+        self.run_lock = threading.Lock()
+        self.scheduler_stop = threading.Event()
+        self.scheduler_thread: Optional[threading.Thread] = None
         self.paths = configured_paths()
         self.database_path = self.paths["database"]
         self.inbox_dir = self.paths["inbox"]
@@ -164,7 +170,231 @@ class InvoiceService:
                     created_at = coalesce(created_at, updated_at)
                 """
             )
+            connection.execute(
+                """
+                create table if not exists invoice_agent_settings (
+                    id integer primary key check (id = 1),
+                    enabled integer not null default 1,
+                    schedule_json text not null default '["08:00:00","18:00:00"]',
+                    last_status text not null default 'idle',
+                    last_successful_run text,
+                    last_started_at text,
+                    last_finished_at text,
+                    last_error text,
+                    last_output text,
+                    updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                insert or ignore into invoice_agent_settings
+                    (id, enabled, schedule_json, updated_at)
+                values (?, ?, ?, ?)
+                """,
+                (
+                    1,
+                    1 if self._invoice_api_config().get("enabled", True) else 0,
+                    yaml.safe_dump(self._configured_schedule(), default_flow_style=True).strip(),
+                    utc_now(),
+                ),
+            )
+            row = connection.execute("select schedule_json from invoice_agent_settings where id = 1").fetchone()
+            if row is not None:
+                try:
+                    current_schedule = yaml.safe_load(row["schedule_json"] or "[]") or []
+                except yaml.YAMLError:
+                    current_schedule = []
+                if isinstance(current_schedule, list):
+                    normalized = [self._normalize_time_string(value) for value in current_schedule if str(value).strip()]
+                    if normalized == ["08:00:00", "18:00:00"]:
+                        connection.execute(
+                            """
+                            update invoice_agent_settings
+                            set schedule_json = ?, updated_at = ?
+                            where id = 1
+                            """,
+                            (yaml.safe_dump(DEFAULT_INVOICE_SCHEDULE, default_flow_style=True).strip(), utc_now()),
+                        )
             connection.commit()
+
+    def status(self) -> dict[str, Any]:
+        settings = self._agent_settings()
+        running = self.run_lock.locked()
+        next_scheduled = self._next_scheduled(settings["schedule"]) if settings["enabled"] else None
+        current_status = "running" if running else settings["last_status"]
+        return {
+            "enabled": settings["enabled"],
+            "is_running": running,
+            "current_status": current_status,
+            "last_status": settings["last_status"],
+            "last_successful_run": settings["last_successful_run"],
+            "last_started_at": settings["last_started_at"],
+            "last_finished_at": settings["last_finished_at"],
+            "last_error": settings["last_error"],
+            "last_output": settings["last_output"],
+            "schedule": settings["schedule"],
+            "next_scheduled_run": next_scheduled,
+            "updated_at": settings["updated_at"],
+        }
+
+    def enable(self) -> dict[str, Any]:
+        self._write_agent_settings(enabled=True, last_status="enabled", last_error=None)
+        logger.info("InvoiceAgent aktiviert.")
+        return self.status()
+
+    def disable(self) -> dict[str, Any]:
+        self._write_agent_settings(enabled=False, last_status="disabled")
+        logger.info("InvoiceAgent deaktiviert.")
+        return self.status()
+
+    def toggle(self) -> dict[str, Any]:
+        return self.disable() if self._agent_settings()["enabled"] else self.enable()
+
+    def update_agent_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        if "enabled" in payload:
+            updates["enabled"] = bool(payload["enabled"])
+        if "schedule" in payload:
+            schedule = payload["schedule"]
+            if not isinstance(schedule, list):
+                raise HTTPException(status_code=422, detail="schedule muss eine Liste sein.")
+            updates["schedule"] = [self._normalize_time_string(value) for value in schedule if str(value).strip()]
+            if not updates["schedule"]:
+                raise HTTPException(status_code=422, detail="schedule darf nicht leer sein.")
+        if updates:
+            updates["last_status"] = "configured"
+            updates["last_error"] = None
+            self._write_agent_settings(**updates)
+        return self.status()
+
+    def start_scheduler(self) -> None:
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            return
+        self.scheduler_stop.clear()
+        self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
+        self.scheduler_thread.start()
+        logger.info("InvoiceAgent Scheduler gestartet.")
+
+    def stop_scheduler(self) -> None:
+        self.scheduler_stop.set()
+
+    def _scheduler_loop(self) -> None:
+        last_run: dict[str, str] = {}
+        while not self.scheduler_stop.is_set():
+            now = datetime.now().astimezone()
+            settings = self._agent_settings()
+            if settings["enabled"]:
+                for run_time in self._parse_schedule(settings["schedule"]):
+                    run_key = f"{run_time.isoformat()}:{now.date().isoformat()}"
+                    scheduled_at = datetime.combine(now.date(), run_time, tzinfo=now.tzinfo)
+                    seconds_from_schedule = (now - scheduled_at).total_seconds()
+                    if 0 <= seconds_from_schedule < 2 and run_key not in last_run:
+                        last_run[run_key] = utc_now()
+                        threading.Thread(target=self._run_scheduled_agent, daemon=True).start()
+            self.scheduler_stop.wait(1)
+
+    def _run_scheduled_agent(self) -> None:
+        try:
+            self.run_agent()
+        except HTTPException as exc:
+            logger.warning("Geplanter InvoiceAgent-Lauf fehlgeschlagen: %s", exc.detail)
+        except Exception:
+            logger.exception("Geplanter InvoiceAgent-Lauf fehlgeschlagen.")
+
+    def _invoice_api_config(self) -> dict[str, Any]:
+        return load_config().get("agents", {}).get("invoices", {}) or {}
+
+    def _configured_schedule(self) -> list[str]:
+        configured = self._invoice_api_config().get("schedule", DEFAULT_INVOICE_SCHEDULE)
+        if not isinstance(configured, list):
+            return DEFAULT_INVOICE_SCHEDULE
+        try:
+            return [self._normalize_time_string(value) for value in configured if str(value).strip()] or DEFAULT_INVOICE_SCHEDULE
+        except HTTPException:
+            return DEFAULT_INVOICE_SCHEDULE
+
+    def _agent_settings(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute("select * from invoice_agent_settings where id = 1").fetchone()
+        if row is None:
+            self._ensure_schema()
+            return self._agent_settings()
+        data = dict(row)
+        try:
+            schedule = yaml.safe_load(data.get("schedule_json") or "") or []
+        except yaml.YAMLError:
+            schedule = []
+        if not isinstance(schedule, list):
+            schedule = []
+        return {
+            "enabled": bool(data.get("enabled")),
+            "schedule": [self._normalize_time_string(value) for value in schedule if str(value).strip()] or DEFAULT_INVOICE_SCHEDULE,
+            "last_status": data.get("last_status") or "idle",
+            "last_successful_run": data.get("last_successful_run"),
+            "last_started_at": data.get("last_started_at"),
+            "last_finished_at": data.get("last_finished_at"),
+            "last_error": data.get("last_error"),
+            "last_output": data.get("last_output") or "",
+            "updated_at": data.get("updated_at"),
+        }
+
+    def _write_agent_settings(self, **values: Any) -> None:
+        if not values:
+            return
+        updates = dict(values)
+        if "enabled" in updates:
+            updates["enabled"] = 1 if updates["enabled"] else 0
+        if "schedule" in updates:
+            updates["schedule_json"] = yaml.safe_dump(updates.pop("schedule"), default_flow_style=True).strip()
+        allowed = {
+            "enabled",
+            "schedule_json",
+            "last_status",
+            "last_successful_run",
+            "last_started_at",
+            "last_finished_at",
+            "last_error",
+            "last_output",
+        }
+        updates = {key: value for key, value in updates.items() if key in allowed}
+        if not updates:
+            return
+        updates["updated_at"] = utc_now()
+        columns = ", ".join(f"{key} = ?" for key in updates)
+        with self.connect() as connection:
+            connection.execute(f"update invoice_agent_settings set {columns} where id = 1", list(updates.values()))
+            connection.commit()
+
+    def _parse_schedule(self, schedule: list[str]) -> list[datetime_time]:
+        return sorted(self._parse_time(value) for value in schedule)
+
+    def _parse_time(self, value: Any) -> datetime_time:
+        normalized = self._normalize_time_string(value)
+        return datetime_time.fromisoformat(normalized)
+
+    @staticmethod
+    def _normalize_time_string(value: Any) -> str:
+        text = str(value).strip()
+        if re.fullmatch(r"\d{1,2}:\d{2}", text):
+            text = f"{text}:00"
+        if not re.fullmatch(r"\d{1,2}:\d{2}:\d{2}", text):
+            raise HTTPException(status_code=422, detail=f"Ungueltige Uhrzeit: {value}")
+        hour, minute, second = (int(part) for part in text.split(":"))
+        text = f"{hour:02d}:{minute:02d}:{second:02d}"
+        parsed = datetime_time.fromisoformat(text)
+        return parsed.isoformat()
+
+    def _next_scheduled(self, schedule: list[str]) -> Optional[str]:
+        now = datetime.now().astimezone()
+        run_times = self._parse_schedule(schedule)
+        for day_offset in range(2):
+            target_date = now.date() + timedelta(days=day_offset)
+            for run_time in run_times:
+                candidate = datetime.combine(target_date, run_time, tzinfo=now.tzinfo)
+                if candidate > now:
+                    return candidate.isoformat(timespec="seconds")
+        return None
 
     def summary(self) -> dict[str, Any]:
         today = date.today()
@@ -396,37 +626,60 @@ class InvoiceService:
         }
 
     def run_agent(self) -> dict[str, Any]:
+        if not self.run_lock.acquire(blocking=False):
+            logger.info("InvoiceAgent uebersprungen, weil bereits ein Lauf aktiv ist.")
+            return {**self.status(), "status": "running", "message": "InvoiceAgent laeuft bereits."}
         python = PROJECT_DIR / "venv" / "bin" / "python"
         command = [str(python if python.exists() else sys.executable), "-m", "invoice.invoices", "--once"]
         invoice_config = load_config().get("agents", {}).get("invoices", {})
         timeout_seconds = int(invoice_config.get("run_timeout_seconds", DEFAULT_AGENT_TIMEOUT_SECONDS))
         logger.info("InvoiceAgent startet: command=%s cwd=%s timeout=%s", command, AI_AGENT_DIR, timeout_seconds)
+        started_at = utc_now()
+        self._write_agent_settings(last_status="running", last_started_at=started_at, last_error=None)
         try:
-            result = subprocess.run(command, cwd=AI_AGENT_DIR, capture_output=True, text=True, timeout=timeout_seconds)
+            env = os.environ.copy() | {"PYTHONPATH": str(AI_AGENT_DIR)}
+            result = subprocess.run(command, cwd=AI_AGENT_DIR, env=env, capture_output=True, text=True, timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
             logger.warning("InvoiceAgent Timeout nach %s Sekunden.", timeout_seconds)
+            self._write_agent_settings(last_status="error", last_finished_at=utc_now(), last_error=f"Timeout nach {timeout_seconds} Sekunden.")
             raise HTTPException(status_code=504, detail=f"InvoiceAgent Timeout nach {timeout_seconds} Sekunden.") from exc
         except OSError as exc:
             logger.exception("InvoiceAgent konnte nicht gestartet werden.")
+            self._write_agent_settings(last_status="error", last_finished_at=utc_now(), last_error=str(exc))
             raise HTTPException(status_code=500, detail=f"InvoiceAgent konnte nicht gestartet werden: {exc}") from exc
-        stdout = result.stdout.strip()
-        stderr = result.stderr.strip()
-        if stdout:
-            logger.info("InvoiceAgent stdout: %s", stdout[-3000:])
-        if stderr:
-            logger.warning("InvoiceAgent stderr: %s", stderr[-3000:])
-        if result.returncode != 0:
-            detail = (stderr or stdout or "InvoiceAgent failed")[-3000:]
-            logger.error("InvoiceAgent fehlgeschlagen: returncode=%s detail=%s", result.returncode, detail)
-            raise HTTPException(status_code=500, detail=detail)
-        self._ensure_schema()
-        return {
-            "status": "completed",
-            "command": " ".join(command),
-            "cwd": str(AI_AGENT_DIR),
-            "stdout": stdout,
-            "stderr": stderr,
-        }
+        finally:
+            if "result" not in locals():
+                self.run_lock.release()
+        try:
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+            output = "\n".join(part for part in (stdout, stderr) if part)
+            if stdout:
+                logger.info("InvoiceAgent stdout: %s", stdout[-3000:])
+            if stderr:
+                logger.warning("InvoiceAgent stderr: %s", stderr[-3000:])
+            if result.returncode != 0:
+                detail = (stderr or stdout or "InvoiceAgent failed")[-3000:]
+                logger.error("InvoiceAgent fehlgeschlagen: returncode=%s detail=%s", result.returncode, detail)
+                self._write_agent_settings(last_status="error", last_finished_at=utc_now(), last_error=detail, last_output=output[-8000:])
+                raise HTTPException(status_code=500, detail=detail)
+            self._ensure_schema()
+            self._write_agent_settings(
+                last_status="ok",
+                last_successful_run=utc_now(),
+                last_finished_at=utc_now(),
+                last_error=None,
+                last_output=output[-8000:],
+            )
+            return {
+                "status": "completed",
+                "command": " ".join(command),
+                "cwd": str(AI_AGENT_DIR),
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+        finally:
+            self.run_lock.release()
 
     def cleanup_archive(self, apply: bool = False) -> dict[str, Any]:
         referenced = self._referenced_archive_paths()

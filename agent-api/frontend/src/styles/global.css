@@ -722,6 +722,13 @@ p { color: var(--muted); line-height: 1.65; }
   gap: 10px;
 }
 
+.invoice-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
 .search-box {
   width: min(340px, 42vw);
   height: 44px;
@@ -2139,6 +2146,95 @@ p { color: var(--muted); line-height: 1.65; }
   background: rgba(251, 191, 36, 0.11);
 }
 
+.invoice-settings-panel {
+  gap: 14px;
+}
+
+.invoice-settings-form {
+  gap: 18px;
+}
+
+.invoice-settings-section {
+  gap: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.035)),
+    rgba(3, 12, 24, 0.3);
+}
+
+.invoice-settings-head {
+  align-items: center;
+}
+
+.invoice-settings-head > span {
+  color: #9af0c9;
+  background: rgba(52, 211, 153, 0.13);
+}
+
+.invoice-settings-card,
+.invoice-time-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(190, 208, 235, 0.12);
+  border-radius: 16px;
+  background: rgba(3, 12, 24, 0.34);
+}
+
+.invoice-settings-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.invoice-toggle-line {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.invoice-toggle-line div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.invoice-toggle-line small,
+.invoice-time-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.invoice-state-pill {
+  justify-self: end;
+}
+
+.invoice-time-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.invoice-time-field input {
+  height: 48px;
+  font-size: 1.08rem;
+}
+
+.invoice-time-card > div {
+  min-width: 118px;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  padding-bottom: 3px;
+}
+
+.invoice-time-card > div strong {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.invoice-settings-footer {
+  padding-top: 2px;
+}
+
 .filters {
   display: grid;
   grid-template-columns: 2fr repeat(4, 1fr);
@@ -3271,6 +3367,15 @@ label.check input[type="checkbox"]:disabled {
   .wellness-settings-grid,
   .wellness-setting-row {
     grid-template-columns: 1fr;
+  }
+  .invoice-settings-card,
+  .invoice-time-card {
+    grid-template-columns: 1fr;
+  }
+  .invoice-state-pill,
+  .invoice-time-card > div {
+    justify-self: start;
+    justify-items: start;
   }
   .wellness-hero-header {
     min-height: auto;

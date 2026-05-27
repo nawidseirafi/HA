@@ -112,6 +112,34 @@ def _mywellness_runtime_settings(db_path: Path) -> dict[str, Any]:
     }
 
 
+def _invoice_runtime_settings(db_path: Path) -> dict[str, Any]:
+    if not db_path.exists():
+        return {}
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                select enabled, schedule_json
+                from invoice_agent_settings
+                where id = 1
+                """
+            ).fetchone()
+    except sqlite3.Error:
+        return {}
+    if row is None:
+        return {}
+    try:
+        schedule = yaml.safe_load(row["schedule_json"] or "[]")
+    except yaml.YAMLError:
+        schedule = []
+    return {
+        "enabled": bool(row["enabled"]),
+        "schedule": schedule if isinstance(schedule, list) else [],
+        "source": "database",
+    }
+
+
 def get_settings() -> dict[str, Any]:
     api_config = _load_yaml(API_CONFIG_PATH)
     agent_config = _load_yaml(AGENT_CONFIG_PATH)
@@ -131,6 +159,7 @@ def get_settings() -> dict[str, Any]:
     mywellness_db = AGENT_DIR / "data" / "mywellness" / "mywellness.db"
     mywellness_runtime = _mywellness_runtime_settings(mywellness_db)
     invoice_db = _path_info(AGENT_DIR, invoice_config.get("database_path"))
+    invoice_runtime = _invoice_runtime_settings(_resolve_path(AGENT_DIR, invoice_config.get("database_path")) or AGENT_DIR / "data" / "invoices" / "invoices.db")
 
     return {
         "api": {
@@ -160,9 +189,10 @@ def get_settings() -> dict[str, Any]:
         },
         "agents": {
             "invoices": {
-                "enabled": bool(agents_config.get("invoices", {}).get("enabled", True)),
+                "enabled": bool(invoice_runtime.get("enabled", agents_config.get("invoices", {}).get("enabled", True))),
                 "upload_dir": _path_info(BASE_DIR, agents_config.get("invoices", {}).get("upload_dir")),
                 "database": invoice_db,
+                "schedule": invoice_runtime.get("schedule", agents_config.get("invoices", {}).get("schedule", [])),
                 "email_enabled": bool(invoice_config.get("email", {}).get("enabled", False)),
                 "portal_import_enabled": bool(invoice_config.get("portals", {}).get("enabled", False)),
                 "ai_extraction_enabled": bool(invoice_config.get("ai_extraction", {}).get("enabled", False)),

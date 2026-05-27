@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, AlertTriangle, Bell, BrainCircuit, CheckCircle2, Database, Euro, FileText, Moon, Play, Server, Upload, WalletCards } from 'lucide-react';
+import { Activity, AlertTriangle, BrainCircuit, CalendarClock, CheckCircle2, Database, Euro, FileText, Play, Power, Save, Server, Settings, Upload, WalletCards, X } from 'lucide-react';
 import { api } from '../../api/client';
+import type { AgentStatus } from '../../api/client';
 import type { Route } from '../../App';
 import type { Invoice, MonthSummary, Summary } from '../../types/invoice';
 import { currency, monthNames, shortDate } from '../../lib/format';
@@ -11,16 +12,18 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const [summary, setSummary] = useState<Summary | null>(null);
   const [months, setMonths] = useState<MonthSummary[]>([]);
   const [yearInvoices, setYearInvoices] = useState<Invoice[]>([]);
+  const [invoiceAgent, setInvoiceAgent] = useState<AgentStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [agentStatus, setAgentStatus] = useState('');
   const [agentError, setAgentError] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const greeting = getGreeting();
 
   const load = async () => {
-    const [summaryData, yearData, monthResults] = await Promise.all([
+    const [summaryData, yearData, monthResults, nextAgentStatus] = await Promise.all([
       api.summary(),
       api.year(currentYear).catch(() => ({ year: currentYear, months: [] })),
       Promise.all(
@@ -28,10 +31,12 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           api.month(currentYear, index + 1, new URLSearchParams()).catch(() => ({ year: currentYear, month: index + 1, invoices: [] })),
         ),
       ),
+      api.invoiceAgentStatus().catch(() => null),
     ]);
     setSummary(summaryData);
     setMonths(yearData.months);
     setYearInvoices(monthResults.flatMap((result) => result.invoices));
+    setInvoiceAgent(nextAgentStatus);
   };
   useEffect(() => { load(); }, []);
 
@@ -47,6 +52,38 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       setAgentStatus(`Invoice Agent fertig. ${lastAgentLine(result.stdout) || 'Neue Belege wurden einsortiert oder zur Prüfung markiert.'}`);
     } catch (err) {
       setAgentError(err instanceof Error ? err.message : 'Invoice Agent konnte nicht gestartet werden.');
+      setAgentStatus('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleAgent = async () => {
+    setBusy(true);
+    setAgentError('');
+    try {
+      const active = invoiceAgent?.enabled !== false;
+      const next = active ? await api.disableInvoiceAgent() : await api.enableInvoiceAgent();
+      setInvoiceAgent(next);
+      setAgentStatus(active ? 'Automatischer Invoice-Agent pausiert.' : 'Automatischer Invoice-Agent aktiviert.');
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'Invoice Agent konnte nicht umgeschaltet werden.');
+      setAgentStatus('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveInvoiceSettings = async (payload: { enabled: boolean; schedule: string[] }) => {
+    setBusy(true);
+    setAgentError('');
+    try {
+      const next = await api.updateInvoiceAgentSettings(payload);
+      setInvoiceAgent(next);
+      setSettingsOpen(false);
+      setAgentStatus('Invoice-Agent Einstellungen gespeichert.');
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'Invoice Einstellungen konnten nicht gespeichert werden.');
       setAgentStatus('');
     } finally {
       setBusy(false);
@@ -105,9 +142,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           <h1>{greeting}, Nawid</h1>
           <p>Hier ist die Übersicht deiner Finanzen und Belege.</p>
         </div>
-        <div className="top-tools">
-          <button className="icon-button" title="Dark Mode"><Moon size={18} /></button>
-          <button className="icon-button" title="Benachrichtigungen"><Bell size={18} /></button>
+        <div className="invoice-hero-actions">
+          <button className="icon-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen öffnen">
+            <Settings size={19} />
+          </button>
         </div>
       </header>
 
@@ -204,6 +242,9 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                 {busy ? <Activity size={16} /> : <Play size={16} />}
                 {busy ? 'Agent läuft...' : 'Invoice Agent starten'}
               </button>
+              <button className="button ghost" onClick={toggleAgent} disabled={busy}>
+                <Power size={16} /> {invoiceAgent?.enabled === false ? 'Automatik aktivieren' : 'Automatik pausieren'}
+              </button>
               <button className="button ghost" onClick={cleanup} disabled={busy}><Database size={16} /> Archiv-Cleanup</button>
               <ExportButtons year={currentYear} month={currentMonth} compact />
               <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
@@ -217,7 +258,8 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                 <h2>RoboterSteve</h2>
               </div>
             </div>
-            <StatusRow icon={Activity} label="Invoice Agent" value={busy ? 'scannt Belege' : 'bereit'} tone={busy ? 'yellow' : 'green'} />
+            <StatusRow icon={Activity} label="Invoice Agent" value={agentStatusLabel(invoiceAgent, busy)} tone={busy || invoiceAgent?.is_running ? 'yellow' : invoiceAgent?.enabled === false ? 'blue' : 'green'} />
+            <StatusRow icon={Power} label="Nächster Lauf" value={formatNextRun(invoiceAgent)} tone="blue" />
             <StatusRow icon={Database} label="Datenbank" value="verbunden" tone="green" />
             <StatusRow icon={Server} label="Speicherplatz" value="lokal" tone="blue" />
             <StatusRow icon={CheckCircle2} label="Letzter Lauf" value={invoices[0]?.updated_at ? shortDate(invoices[0].updated_at) : 'noch keiner'} tone="blue" />
@@ -225,6 +267,103 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
         </aside>
 
       </section>
+      <InvoiceSettingsDrawer
+        open={settingsOpen}
+        status={invoiceAgent}
+        loading={busy}
+        onClose={() => setSettingsOpen(false)}
+        onSave={saveInvoiceSettings}
+      />
+    </div>
+  );
+}
+
+function InvoiceSettingsDrawer({
+  open,
+  status,
+  loading,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  status: AgentStatus | null;
+  loading: boolean;
+  onClose: () => void;
+  onSave: (payload: { enabled: boolean; schedule: string[] }) => void;
+}) {
+  const [enabled, setEnabled] = useState(true);
+  const [dailyRun, setDailyRun] = useState('22:00');
+
+  useEffect(() => {
+    if (!open) return;
+    setEnabled(status?.enabled !== false);
+    setDailyRun(timeInputValue(status?.schedule?.[0] ?? '22:00:00'));
+  }, [open, status]);
+
+  if (!open) return null;
+
+  return (
+    <div className="wellness-drawer-layer">
+      <button className="wellness-drawer-backdrop" type="button" onClick={onClose} aria-label="Einstellungen schließen" />
+      <aside className="wellness-settings-drawer" role="dialog" aria-modal="true" aria-label="Invoice Agent Einstellungen">
+        <header>
+          <div>
+            <span className="eyebrow">Invoice Agent</span>
+            <h2>Einstellungen</h2>
+            <p>Automatische Mail- und Inbox-Scans planen.</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Schließen"><X size={18} /></button>
+        </header>
+        <div className="panel wellness-settings-panel invoice-settings-panel">
+          <form
+            className="wellness-settings-form invoice-settings-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSave({
+                enabled,
+                schedule: [dailyRun].filter(Boolean),
+              });
+            }}
+          >
+            <section className="wellness-settings-section invoice-settings-section">
+              <div className="wellness-settings-section-head invoice-settings-head">
+                <span><CalendarClock size={18} /></span>
+                <div>
+                  <h3>Automationen</h3>
+                  <p>Lege fest, wann der Agent einmal täglich neue E-Mails und Dateien verarbeitet.</p>
+                </div>
+              </div>
+              <div className="invoice-settings-card">
+                <label className="wellness-toggle-line invoice-toggle-line">
+                  <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+                  <span />
+                  <div>
+                    <strong>Automatischer Scan</strong>
+                    <small>{enabled ? 'E-Mails und Inbox werden täglich geprüft.' : 'Geplante Scans sind pausiert.'}</small>
+                  </div>
+                </label>
+                <span className={`agent-state-pill invoice-state-pill ${enabled ? 'ok' : 'waiting'}`}>{enabled ? 'Aktiv' : 'Pausiert'}</span>
+              </div>
+              <div className="invoice-time-card">
+                <label className="wellness-field invoice-time-field">
+                  <small>Nächster täglicher Scan</small>
+                  <input type="time" value={dailyRun} onChange={(event) => setDailyRun(event.target.value)} aria-label="Täglicher Scan" />
+                </label>
+                <div>
+                  <strong>{dailyRun}</strong>
+                  <span>einmal pro Tag</span>
+                </div>
+              </div>
+            </section>
+            <div className="wellness-settings-footer invoice-settings-footer">
+              <button className="button primary" type="submit" disabled={loading}>
+                <Save size={18} />
+                Einstellungen speichern
+              </button>
+            </div>
+          </form>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -242,6 +381,25 @@ function getGreeting() {
   if (hour < 12) return 'Guten Morgen';
   if (hour < 18) return 'Guten Tag';
   return 'Guten Abend';
+}
+
+function agentStatusLabel(status: AgentStatus | null, busy: boolean) {
+  if (busy || status?.is_running) return 'scannt Belege';
+  if (status?.enabled === false) return 'pausiert';
+  if (status?.last_status === 'error') return 'Fehler';
+  return 'automatisch aktiv';
+}
+
+function formatNextRun(status: AgentStatus | null) {
+  if (!status || status.enabled === false) return 'nicht geplant';
+  if (!status.next_scheduled_run) return (status.schedule ?? []).join(', ') || 'nicht geplant';
+  const date = new Date(status.next_scheduled_run);
+  if (!Number.isFinite(date.getTime())) return status.next_scheduled_run;
+  return date.toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function timeInputValue(value: string) {
+  return value.slice(0, 5) || '22:00';
 }
 
 function Kpi({ icon: Icon, label, value, note, tone }: { icon: typeof Euro; label: string; value: string | number; note: string; tone: 'blue' | 'violet' | 'green' | 'yellow' }) {

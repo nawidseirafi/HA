@@ -46,6 +46,8 @@ export type AgentStatus = {
   last_started_at?: string | null;
   last_finished_at?: string | null;
   last_mode?: 'prepare' | 'book';
+  schedule?: string[];
+  updated_at?: string | null;
 };
 
 export type MyWellnessSettingsPayload = {
@@ -220,6 +222,7 @@ export type SettingsInfo = {
       enabled: boolean;
       upload_dir: PathSetting;
       database: PathSetting;
+      schedule: string[];
       email_enabled: boolean;
       portal_import_enabled: boolean;
       ai_extraction_enabled: boolean;
@@ -389,7 +392,18 @@ export type WallDashboardData = {
     unavailable: WallEntity[];
   };
   agents: {
-    invoices: { status: string; total?: number; needs_review?: number; errors?: number; error?: string };
+    invoices: {
+      status: string;
+      total?: number;
+      needs_review?: number;
+      errors?: number;
+      enabled?: boolean;
+      is_running?: boolean;
+      next_scheduled_run?: string | null;
+      schedule?: string[];
+      last_status?: string;
+      error?: string;
+    };
     mywellness: Partial<AgentStatus> & { status?: string; error?: string };
     market: { status: string; watchlist_count?: number; enabled_count?: number; signals?: Record<string, number>; error?: string };
   };
@@ -490,6 +504,12 @@ export const api = {
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
   runAgent: () => request<{ status: string; command: string; cwd: string; stdout: string; stderr: string }>('/api/invoices/run', { method: 'POST' }),
+  invoiceAgentStatus: () => request<AgentStatus>('/api/invoices/agent/status'),
+  enableInvoiceAgent: () => request<AgentStatus>('/api/invoices/agent/enable', { method: 'POST' }),
+  disableInvoiceAgent: () => request<AgentStatus>('/api/invoices/agent/disable', { method: 'POST' }),
+  toggleInvoiceAgent: () => request<AgentStatus>('/api/invoices/agent/toggle', { method: 'POST' }),
+  updateInvoiceAgentSettings: (payload: { enabled?: boolean; schedule?: string[] }) =>
+    request<AgentStatus>('/api/invoices/agent/settings', { method: 'PUT', body: JSON.stringify(payload) }),
   cleanupArchive: (apply = false) =>
     request<{
       applied: boolean;

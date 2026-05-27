@@ -20,6 +20,8 @@ agents:
     enabled: true
     upload_dir: ../ai-agent/data/invoices/inbox
     run_timeout_seconds: 1800
+    schedule:
+      - "22:00:00"
   vacation:
     enabled: true
   mywellness:

@@ -143,6 +143,7 @@ export function SettingsPage() {
             </div>
             <PathRow label="Inbox" value={settings.agents.invoices.upload_dir} />
             <PathRow label="Datenbank" value={settings.agents.invoices.database} />
+            <SettingRow label="Planung" value={settings.agents.invoices.schedule.join(', ') || '-'} />
             <SettingRow label="KI-Auswertung" value={settings.agents.invoices.ai_extraction_enabled} />
             <SettingRow label="E-Mail Import" value={settings.agents.invoices.email_enabled} />
             <SettingRow label="Portal Import" value={settings.agents.invoices.portal_import_enabled} />

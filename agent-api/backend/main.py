@@ -107,15 +107,19 @@ app.openapi = custom_openapi
 
 @app.on_event("startup")
 def start_schedulers() -> None:
+    from backend.agents.invoices.routes import invoice_service
     from backend.agents.mywellness.routes import mywellness_service
 
+    invoice_service.start_scheduler()
     mywellness_service.start_scheduler()
 
 
 @app.on_event("shutdown")
 def stop_schedulers() -> None:
+    from backend.agents.invoices.routes import invoice_service
     from backend.agents.mywellness.routes import mywellness_service
 
+    invoice_service.stop_scheduler()
     mywellness_service.stop_scheduler()
 
 

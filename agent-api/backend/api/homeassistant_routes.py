@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.agents.invoices.service import InvoiceService
+from backend.agents.invoices.routes import invoice_service
 from backend.agents.market.report_service import MarketReportService
 from backend.agents.mywellness.routes import mywellness_service
 from backend.services.homeassistant_service import HomeAssistantService
@@ -102,12 +102,18 @@ def _agent_summary() -> dict[str, Any]:
     market: dict[str, Any]
     mywellness: dict[str, Any]
     try:
-        invoice_summary = InvoiceService().summary()
+        invoice_summary = invoice_service.summary()
+        invoice_status = invoice_service.status()
         invoices = {
             "status": "ok",
             "total": invoice_summary.get("total_invoices", 0),
             "needs_review": invoice_summary.get("needs_review_count", 0),
             "errors": invoice_summary.get("ai_error_count", 0),
+            "enabled": invoice_status.get("enabled", False),
+            "is_running": invoice_status.get("is_running", False),
+            "next_scheduled_run": invoice_status.get("next_scheduled_run"),
+            "schedule": invoice_status.get("schedule", []),
+            "last_status": invoice_status.get("last_status"),
         }
     except Exception as exc:
         invoices = {"status": "error", "error": str(exc)}

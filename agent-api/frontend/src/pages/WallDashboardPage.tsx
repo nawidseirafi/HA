@@ -261,7 +261,7 @@ function HomeSection({ data, onLights, onFloor, onBatteries }: { data: WallDashb
       <MetricCard icon={<DoorOpen size={24} />} label="Fenster & Türen" value={`${open}/${data.security.openings_total}`} detail="offen" tone={open ? 'warn' : 'ok'} />
       <MetricCard icon={<BatteryWarning size={24} />} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={data.health.low_batteries.length ? 'warn' : 'ok'} onClick={onBatteries} />
       <MetricCard icon={<ShieldAlert size={24} />} label="System" value={`${issues}`} detail="auffällig" tone={issues ? 'warn' : 'ok'} />
-      <MetricCard icon={<Bot size={24} />} label="Agenten" value={data.agents.mywellness.is_running ? 'Aktiv' : 'Bereit'} detail="MyWellness" />
+      <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} />
       <section className="wall-panel wall-span-2">
         <div className="wall-section-title">
           <span>Etagen</span>
@@ -517,7 +517,8 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
     <div className="wall-card-grid">
       <section className="wall-panel">
         <div className="wall-section-title"><span>Invoice Agent</span><Bot size={20} /></div>
-        <h2>{invoices.status === 'ok' ? 'Bereit' : 'Fehler'}</h2>
+        <h2>{invoiceState(invoices)}</h2>
+        <p>Nächster Scan: {formatAgentNextRun(invoices.next_scheduled_run, invoices.schedule)}</p>
         <p>{invoices.total ?? 0} Belege · {invoices.needs_review ?? 0} zu prüfen · {invoices.errors ?? 0} Fehler</p>
       </section>
       <section className="wall-panel">
@@ -532,6 +533,24 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
       </section>
     </div>
   );
+}
+
+function homeAgentState(data: WallDashboardData) {
+  if (data.agents.invoices.is_running || data.agents.mywellness.is_running) return 'Aktiv';
+  if (data.agents.invoices.enabled === false && data.agents.mywellness.enabled === false) return 'Pausiert';
+  return 'Bereit';
+}
+
+function homeAgentDetail(data: WallDashboardData) {
+  const invoiceNext = formatAgentNextRun(data.agents.invoices.next_scheduled_run, data.agents.invoices.schedule);
+  return data.agents.invoices.enabled === false ? 'Invoice pausiert' : `Invoice ${invoiceNext}`;
+}
+
+function invoiceState(invoices: WallDashboardData['agents']['invoices']) {
+  if (invoices.status !== 'ok') return 'Fehler';
+  if (invoices.is_running) return 'Läuft';
+  if (invoices.enabled === false) return 'Pausiert';
+  return 'Aktiv';
 }
 
 function LightRow({
@@ -734,6 +753,11 @@ function formatDateTime(value: string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'nicht geplant';
   return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${formatClock(date)}`;
+}
+
+function formatAgentNextRun(value?: string | null, schedule: string[] = []) {
+  if (value) return formatDateTime(value);
+  return schedule.length ? schedule.map((item) => item.slice(0, 5)).join(', ') : 'nicht geplant';
 }
 
 function formatWellnessNextRun(wellness: Partial<AgentStatus> & { status?: string; error?: string }) {

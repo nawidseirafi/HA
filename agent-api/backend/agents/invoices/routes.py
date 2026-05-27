@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from backend.agents.invoices.export_service import ExportService
 from backend.agents.invoices.file_service import FileService
@@ -14,9 +15,40 @@ file_service = FileService(invoice_service)
 export_service = ExportService(invoice_service)
 
 
+class InvoiceAgentSettingsPayload(BaseModel):
+    enabled: Optional[bool] = None
+    schedule: Optional[list[str]] = None
+
+
 @router.get("/summary")
 def invoice_summary():
     return invoice_service.summary()
+
+
+@router.get("/agent/status")
+def invoice_agent_status():
+    return invoice_service.status()
+
+
+@router.post("/agent/enable")
+def enable_invoice_agent():
+    return invoice_service.enable()
+
+
+@router.post("/agent/disable")
+def disable_invoice_agent():
+    return invoice_service.disable()
+
+
+@router.post("/agent/toggle")
+def toggle_invoice_agent():
+    return invoice_service.toggle()
+
+
+@router.put("/agent/settings")
+def update_invoice_agent_settings(payload: InvoiceAgentSettingsPayload):
+    data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    return invoice_service.update_agent_settings(data)
 
 
 @router.get("/years")
