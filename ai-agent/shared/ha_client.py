@@ -2,11 +2,25 @@ import requests
 import yaml
 import logging
 import os
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _resolve_config_value(value: str | None) -> str:
+    if not value:
+        return ""
+    text = str(value).strip()
+    resolved = os.getenv(text) or os.getenv(text.upper())
+    if resolved:
+        return resolved.strip()
+    if re.fullmatch(r"[A-Z0-9_-]+", text):
+        return ""
+    return text
 
 
 class HomeAssistantClient:
@@ -22,15 +36,26 @@ class HomeAssistantClient:
         if not config:
             raise ValueError("config.yaml ist leer oder ungültig")
 
-        self.base_url = config["home_assistant"]["url"].rstrip("/")
-        self.token = os.getenv(
-            config["home_assistant"].get("token", ""),
-        )
+        self.base_url = _resolve_config_value(config["home_assistant"].get("url", "")).rstrip("/")
+        self.token = _resolve_config_value(config["home_assistant"].get("token", ""))
+        self._validate_config()
 
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+
+    def _validate_config(self):
+        if not self.base_url:
+            raise ValueError("Home Assistant URL fehlt. Setze HA_URL in ai-agent/.env oder eine echte URL in config.yaml.")
+        parsed = urlparse(self.base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(
+                f"Home Assistant URL ist ungueltig: {self.base_url!r}. "
+                "Erwartet wird z.B. http://homeassistant.local:8123"
+            )
+        if not self.token:
+            raise ValueError("Home Assistant Token fehlt. Setze HA_TOKEN in ai-agent/.env oder eine echte Token-Referenz in config.yaml.")
 
     def get_states(self):
         url = f"{self.base_url}/api/states"

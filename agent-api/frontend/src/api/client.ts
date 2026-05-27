@@ -60,6 +60,24 @@ export type MyWellnessSettingsPayload = {
   desired_courses?: string[];
 };
 
+export type AgentManifest = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  enabled: boolean;
+  status: string;
+  dashboard_route?: string | null;
+  api_prefix: string;
+  settings: Record<string, unknown>;
+};
+
+export type AgentsResponse = {
+  agents: AgentManifest[];
+};
+
+export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard';
+
 export type MyWellnessHealthSettings = {
   id?: number;
   enabled: boolean;
@@ -473,6 +491,7 @@ export const api = {
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
   settings: () => request<SettingsInfo>('/api/settings'),
+  agents: async () => (await request<AgentsResponse>('/api/agents')).agents,
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
   callHomeAssistantService: (payload: { domain: string; service: string; entity_id?: string | string[]; data?: Record<string, unknown> }) =>
     request<{ ok: boolean; result: unknown }>('/api/homeassistant/service', { method: 'POST', body: JSON.stringify(payload) }),

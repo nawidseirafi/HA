@@ -1,0 +1,17 @@
+id: invoices
+name: Rechnungs-Agent
+description: Belege hochladen, mit KI analysieren, pruefen und exportieren.
+enabled: true
+status: active
+api:
+  prefix: /api/invoices
+  route_module: backend.agents.invoices.routes
+runtime:
+  service_object: invoice_service
+ui:
+  icon: FileText
+  dashboard_route: invoiceDashboard
+settings:
+  schedule:
+    default:
+      - "22:00:00"

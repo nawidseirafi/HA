@@ -7,9 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.agents.invoices.routes import router as invoice_router
-from backend.agents.market.routes import router as market_router
-from backend.agents.mywellness.routes import router as mywellness_router
+from backend.agents.registry import agent_runtime_services, include_agent_routers
+from backend.agents.routes import router as agents_router
 from backend.api.auth_routes import router as auth_router
 from backend.api.homeassistant_routes import router as homeassistant_router
 from backend.api.settings_routes import router as settings_router
@@ -66,10 +65,9 @@ async def require_api_auth(request, call_next):
 
 app.include_router(auth_router)
 app.include_router(homeassistant_router)
-app.include_router(invoice_router)
-app.include_router(mywellness_router)
+app.include_router(agents_router)
+include_agent_routers(app)
 app.include_router(settings_router)
-app.include_router(market_router)
 
 
 SECURITY_SCHEME_NAME = "BearerAuth"
@@ -107,20 +105,18 @@ app.openapi = custom_openapi
 
 @app.on_event("startup")
 def start_schedulers() -> None:
-    from backend.agents.invoices.routes import invoice_service
-    from backend.agents.mywellness.routes import mywellness_service
-
-    invoice_service.start_scheduler()
-    mywellness_service.start_scheduler()
+    for service in agent_runtime_services():
+        start_scheduler = getattr(service, "start_scheduler", None)
+        if callable(start_scheduler):
+            start_scheduler()
 
 
 @app.on_event("shutdown")
 def stop_schedulers() -> None:
-    from backend.agents.invoices.routes import invoice_service
-    from backend.agents.mywellness.routes import mywellness_service
-
-    invoice_service.stop_scheduler()
-    mywellness_service.stop_scheduler()
+    for service in agent_runtime_services():
+        stop_scheduler = getattr(service, "stop_scheduler", None)
+        if callable(stop_scheduler):
+            stop_scheduler()
 
 
 @app.get("/health")

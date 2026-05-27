@@ -1,0 +1,15 @@
+id: market
+name: MarketAgent
+description: Watchlist beobachten, Marktberichte erzeugen und Signale einschaetzen.
+enabled: true
+status: active
+api:
+  prefix: /api/market
+  route_module: backend.agents.market.routes
+runtime:
+  service_object: agent
+ui:
+  icon: LineChart
+  dashboard_route: marketDashboard
+settings:
+  disclaimer: Keine Finanzberatung.

@@ -1,0 +1,18 @@
+id: mywellness
+name: MyWellness-Agent
+description: Kurse finden, Buchungen pruefen und den Agenten manuell steuern.
+enabled: true
+status: active
+api:
+  prefix: /api/mywellness
+  route_module: backend.agents.mywellness.routes
+runtime:
+  service_object: mywellness_service
+ui:
+  icon: Dumbbell
+  dashboard_route: mywellnessDashboard
+settings:
+  schedule:
+    default:
+      - "17:00:00"
+      - "20:59:58"
