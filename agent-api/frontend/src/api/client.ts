@@ -399,11 +399,42 @@ export type WallWeather = WallEntity & {
   humidity?: number | null;
 };
 
+export type WasteItem = {
+  type: string;
+  date?: string | null;
+  date_de?: string | null;
+  days_until?: number | null;
+  label: string;
+  icon: string;
+  color: string;
+};
+
+export type WasteStatus = {
+  ok: boolean;
+  updated_at: string;
+  next: WasteItem | null;
+  items: WasteItem[];
+  context: {
+    vacation_mode?: boolean | null;
+    mailbox_has_mail?: boolean | null;
+  };
+  reminders: Array<{
+    priority: 'high' | 'medium' | 'low';
+    message: string;
+    reason: string;
+  }>;
+  source_entity: string;
+  stale?: boolean;
+  error?: string;
+  raw?: unknown;
+};
+
 export type WallDashboardData = {
   updated_at: string;
   home_assistant: { configured: boolean; entity_count: number };
   weather: WallWeather | null;
   post?: WallEntity | null;
+  waste?: WasteStatus | null;
   lights: WallLight[];
   light_groups: WallLightGroup[];
   switches: WallEntity[];
@@ -572,6 +603,9 @@ export const api = {
     request<{ result: unknown; status: AgentStatus }>('/api/mywellness/run/prepare', { method: 'POST', body: JSON.stringify({ dry_run: dryRun }) }),
   runMywellnessBook: (dryRun = false) =>
     request<{ result: unknown; status: AgentStatus }>('/api/mywellness/run/book', { method: 'POST', body: JSON.stringify({ dry_run: dryRun }) }),
+  wasteStatus: () => request<WasteStatus>('/api/waste/status'),
+  wasteNext: () => request<{ ok: boolean; updated_at: string; next: WasteItem | null; source_entity: string; error?: string }>('/api/waste/next'),
+  wasteReminders: () => request<Pick<WasteStatus, 'ok' | 'updated_at' | 'context' | 'reminders' | 'source_entity' | 'error'>>('/api/waste/reminders'),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
   mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
   mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,

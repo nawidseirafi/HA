@@ -11,6 +11,7 @@ import {
   DoorOpen,
   Home,
   Lightbulb,
+  Trash2,
   RefreshCw,
   ShieldAlert,
   Thermometer,
@@ -32,6 +33,39 @@ export function WallDashboardPage() {
 function postStatus(data: WallDashboardData) {
   return data.post?.state === 'on';
 }
+
+function wasteTitle(data: WallDashboardData) {
+  const waste = data.waste;
+  if (!waste?.ok) return 'Keine Daten';
+  if (!waste.next) return 'Kein Termin';
+  const sameDate = waste.items.filter((item) => item.date && item.date === waste.next?.date);
+  const types = sameDate.length ? sameDate.map((item) => shortWasteType(item.type)) : [shortWasteType(waste.next.type)];
+  return types.join(' + ');
+}
+
+function wasteDetail(data: WallDashboardData) {
+  const waste = data.waste;
+  if (!waste?.ok) return waste?.error || 'Abfall-Sensor nicht verfügbar';
+  if (!waste.next) return 'Sensor meldet keinen nächsten Termin';
+  return `${waste.next.date_de || waste.next.date || ''} · ${waste.next.label}`.trim();
+}
+
+function wasteTone(data: WallDashboardData): 'info' | 'ok' | 'warn' | 'light' {
+  const days = data.waste?.next?.days_until;
+  if (days === 0 || days === 1) return 'warn';
+  if (typeof days === 'number') return 'ok';
+  return 'info';
+}
+
+function shortWasteType(value: string) {
+  const text = value.toLowerCase();
+  if (text.includes('bio')) return 'Bio';
+  if (text.includes('papier') || text.includes('altpapier') || text.includes('blaue')) return 'Papier';
+  if (text.includes('gelb') || text.includes('leicht') || text.includes('verpackung')) return 'Gelb';
+  if (text.includes('rest')) return 'Rest';
+  return value;
+}
+
 function isBasementArea(area?: string) {
   const value = normalizeArea(area);
   return value.includes('basement') || value.includes('keller');
@@ -375,6 +409,13 @@ function HomeSection({
         label="Wetter"
         value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'}
         detail={`${formatNumber(data.weather?.temperature)}°C · ${formatNumber(data.weather?.humidity)}%`}
+      />
+      <MetricCard
+        icon={<Trash2 size={24} />}
+        label="Müllabfuhr"
+        value={wasteTitle(data)}
+        detail={wasteDetail(data)}
+        tone={wasteTone(data)}
       />
       <MetricCard
         icon={<Thermometer size={24} />}

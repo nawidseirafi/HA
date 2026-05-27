@@ -9,10 +9,12 @@ from backend.agents.invoices.routes import invoice_service
 from backend.agents.market.report_service import MarketReportService
 from backend.agents.mywellness.routes import mywellness_service
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.waste_service import WasteService
 
 
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
+waste_service = WasteService(ha_service)
 
 
 class ServicePayload(BaseModel):
@@ -66,6 +68,7 @@ def wall_dashboard():
 
     agents = _agent_summary()
     climate_summary = _climate_summary()
+    waste = waste_service.status()
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -91,6 +94,7 @@ def wall_dashboard():
         },
         "agents": agents,
         "post": post,
+        "waste": waste,
     }
 
 
