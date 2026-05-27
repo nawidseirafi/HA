@@ -21,8 +21,6 @@ function toTimeInput(value?: string) {
 
 export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }: Props) {
   const [agentEnabled, setAgentEnabled] = useState(true);
-  const [prepareEnabled, setPrepareEnabled] = useState(true);
-  const [bookingEnabled, setBookingEnabled] = useState(true);
   const [prepareTime, setPrepareTime] = useState('17:00:00');
   const [bookingTime, setBookingTime] = useState('20:59:58');
   const [days, setDays] = useState(2);
@@ -36,8 +34,6 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
   useEffect(() => {
     if (!status) return;
     setAgentEnabled(status.enabled !== false);
-    setPrepareEnabled(status.prepare_enabled !== false);
-    setBookingEnabled(status.booking_enabled !== false);
     setPrepareTime(toTimeInput(status.prepare_time) || '17:00:00');
     setBookingTime(toTimeInput(status.booking_time) || '20:59:58');
     setDays(status.days ?? 2);
@@ -121,8 +117,6 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           event.preventDefault();
           onSave({
             enabled: agentEnabled,
-            prepare_enabled: prepareEnabled,
-            booking_enabled: bookingEnabled,
             prepare_time: prepareTime,
             booking_time: bookingTime,
             days,
@@ -147,24 +141,14 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           <span className={`agent-state-pill ${agentEnabled ? 'ok' : 'waiting'}`}>{agentEnabled ? 'Aktiv' : 'Pausiert'}</span>
         </div>
         <div className="wellness-setting-row">
-          <label className="wellness-toggle-line">
-            <input type="checkbox" checked={prepareEnabled} onChange={(event) => setPrepareEnabled(event.target.checked)} />
-            <span />
-            <strong>Kursliste vorbereiten</strong>
-          </label>
           <label className="wellness-field">
-            <small>Uhrzeit</small>
+            <small>Kursliste vorbereiten</small>
             <input type="time" step="1" value={prepareTime} onChange={(event) => setPrepareTime(event.target.value)} />
           </label>
         </div>
         <div className="wellness-setting-row">
-          <label className="wellness-toggle-line">
-            <input type="checkbox" checked={bookingEnabled} onChange={(event) => setBookingEnabled(event.target.checked)} />
-            <span />
-            <strong>Automatisch buchen</strong>
-          </label>
           <label className="wellness-field">
-            <small>Uhrzeit</small>
+            <small>Automatisch buchen</small>
             <input type="time" step="1" value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} />
           </label>
         </div>

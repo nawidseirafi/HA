@@ -93,7 +93,7 @@ def replace_prepared_courses(target_date: str, event_items: Iterable[dict[str, A
         if desired and _matches_desired_course(str(item.get("name") or ""), desired)
     ]
     with connect() as connection:
-        connection.execute("delete from courses where source = 'prepare' and partition_date = ?", (target_date,))
+        connection.execute("delete from courses where source = 'prepare'")
         upsert_courses(connection, courses)
 
 

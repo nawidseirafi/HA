@@ -182,9 +182,11 @@ class MyWellnessService:
 
     def update_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         updates: dict[str, Any] = {}
-        for field in ("enabled", "prepare_enabled", "booking_enabled"):
-            if field in payload:
-                updates[field] = bool(payload[field])
+        if "enabled" in payload:
+            enabled = bool(payload["enabled"])
+            updates["enabled"] = enabled
+            updates["prepare_enabled"] = enabled
+            updates["booking_enabled"] = enabled
         if "prepare_time" in payload:
             updates["prepare_time"] = self._normalize_time_string(payload["prepare_time"], "prepare_time")
         if "booking_time" in payload:
