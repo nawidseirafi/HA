@@ -489,7 +489,7 @@ export const api = {
   markReviewed: (id: number) => request<Invoice>(`/api/invoices/${id}/mark-reviewed`, { method: 'POST' }),
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
-  runAgent: () => request('/api/invoices/run', { method: 'POST' }),
+  runAgent: () => request<{ status: string; command: string; cwd: string; stdout: string; stderr: string }>('/api/invoices/run', { method: 'POST' }),
   cleanupArchive: (apply = false) =>
     request<{
       applied: boolean;

@@ -4,6 +4,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -15,6 +16,7 @@ from fastapi import HTTPException, UploadFile
 from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, API_DIR, PROJECT_DIR
 
 CONFIG_PATH = API_CONFIG_PATH
+logger = logging.getLogger(__name__)
 DEFAULT_DB_PATH = AI_AGENT_DIR / "data" / "invoices" / "invoices.db"
 DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
 DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
@@ -398,17 +400,33 @@ class InvoiceService:
         command = [str(python if python.exists() else sys.executable), "-m", "invoice.invoices", "--once"]
         invoice_config = load_config().get("agents", {}).get("invoices", {})
         timeout_seconds = int(invoice_config.get("run_timeout_seconds", DEFAULT_AGENT_TIMEOUT_SECONDS))
+        logger.info("InvoiceAgent startet: command=%s cwd=%s timeout=%s", command, AI_AGENT_DIR, timeout_seconds)
         try:
             result = subprocess.run(command, cwd=AI_AGENT_DIR, capture_output=True, text=True, timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
+            logger.warning("InvoiceAgent Timeout nach %s Sekunden.", timeout_seconds)
             raise HTTPException(status_code=504, detail=f"InvoiceAgent Timeout nach {timeout_seconds} Sekunden.") from exc
         except OSError as exc:
+            logger.exception("InvoiceAgent konnte nicht gestartet werden.")
             raise HTTPException(status_code=500, detail=f"InvoiceAgent konnte nicht gestartet werden: {exc}") from exc
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        if stdout:
+            logger.info("InvoiceAgent stdout: %s", stdout[-3000:])
+        if stderr:
+            logger.warning("InvoiceAgent stderr: %s", stderr[-3000:])
         if result.returncode != 0:
-            detail = (result.stderr.strip() or result.stdout.strip() or "InvoiceAgent failed")[-3000:]
+            detail = (stderr or stdout or "InvoiceAgent failed")[-3000:]
+            logger.error("InvoiceAgent fehlgeschlagen: returncode=%s detail=%s", result.returncode, detail)
             raise HTTPException(status_code=500, detail=detail)
         self._ensure_schema()
-        return {"status": "completed", "stdout": result.stdout.strip(), "stderr": result.stderr.strip()}
+        return {
+            "status": "completed",
+            "command": " ".join(command),
+            "cwd": str(AI_AGENT_DIR),
+            "stdout": stdout,
+            "stderr": stderr,
+        }
 
     def cleanup_archive(self, apply: bool = False) -> dict[str, Any]:
         referenced = self._referenced_archive_paths()

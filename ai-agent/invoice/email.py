@@ -138,6 +138,71 @@ def fetch_imap_attachments(
     return result
 
 
+def inspect_recent_messages(config: EmailConfig, limit: int, is_processed=None) -> list[dict]:
+    if not config.host or not config.username or not config.password:
+        raise RuntimeError("E-Mail host/username/password fehlen.")
+
+    with imaplib.IMAP4_SSL(config.host, config.port) as mailbox:
+        mailbox.login(config.username, config.password)
+        mailbox.select(config.mailbox)
+
+        search_criteria = _search_criteria(config)
+        status, data = mailbox.uid("search", None, *search_criteria)
+        if status != "OK":
+            raise RuntimeError(f"IMAP search fehlgeschlagen: {status} {data}")
+
+        import_key = _import_key(config)
+        rows = []
+        for uid_bytes in data[0].split()[-limit:]:
+            uid = uid_bytes.decode("ascii", errors="ignore")
+            status, message_data = mailbox.uid("fetch", uid, "(RFC822)")
+            if status != "OK":
+                rows.append({"uid": uid, "error": f"fetch failed: {status}"})
+                continue
+
+            raw_message = _message_bytes(message_data)
+            if not raw_message:
+                rows.append({"uid": uid, "error": "empty message"})
+                continue
+
+            message = BytesParser(policy=policy.default).parsebytes(raw_message)
+            attachments = []
+            for index, part in enumerate(message.walk(), start=1):
+                if part.is_multipart():
+                    continue
+                filename = part.get_filename() or ""
+                content_type = part.get_content_type().lower()
+                disposition = (part.get_content_disposition() or "").lower()
+                suffix = Path(filename).suffix.lower()
+                inferred_suffix = CONTENT_TYPE_EXTENSIONS.get(content_type, "")
+                accepted = (
+                    bool(filename) or disposition in {"attachment", "inline"} or content_type in AUTO_ATTACHMENT_CONTENT_TYPES
+                ) and (suffix or inferred_suffix) in config.attachment_extensions
+                if filename or disposition in {"attachment", "inline"} or content_type in AUTO_ATTACHMENT_CONTENT_TYPES:
+                    attachments.append(
+                        {
+                            "part": index,
+                            "filename": filename or f"part-{index}",
+                            "content_type": content_type,
+                            "disposition": disposition or "-",
+                            "accepted": accepted,
+                        }
+                    )
+
+            message_key = f"{config.host}:{config.mailbox}:{uid}:{import_key}"
+            rows.append(
+                {
+                    "uid": uid,
+                    "date": str(message.get("date", "")).strip(),
+                    "from": str(message.get("from", "")).strip(),
+                    "subject": str(message.get("subject", "")).strip(),
+                    "processed": bool(is_processed and is_processed(message_key)),
+                    "attachments": attachments,
+                }
+            )
+        return rows
+
+
 def extract_attachments_from_eml(eml_path: Path, output_dir: Path) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     with eml_path.open("rb") as f:

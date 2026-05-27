@@ -15,3 +15,4 @@ ai-agent/data/
 !ai-agent/data/.gitkeep
 HA/secrets.yaml
 agent-api/backend/storage/
+agent-api.service

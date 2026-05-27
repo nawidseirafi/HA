@@ -17,7 +17,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from invoice.categories import refresh_database_categories
-from invoice.email import EmailConfig
+from invoice.email import EmailConfig, inspect_recent_messages
 from invoice.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
 from invoice.scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
 from invoice.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
@@ -93,12 +93,35 @@ def main():
     parser.add_argument("--portal-check", choices=portal_names or None, help="Nur ein Portal pruefen und Downloads speichern.")
     parser.add_argument("--tax-year", type=int, help="Steuer-Export fuer dieses Jahr erzeugen, z.B. 2025.")
     parser.add_argument("--refresh-categories", action="store_true", help="Bestehende Datenbank-Eintraege anhand der Kategorie-Regeln aktualisieren.")
+    parser.add_argument("--email-debug", type=int, metavar="N", help="Letzte N passende E-Mails mit Anhaengen und Verarbeitungsstatus anzeigen.")
     args = parser.parse_args()
 
     _setup_logging()
     config = load_config(raw_config)
     if args.reprocess:
         config.reprocess_existing = True
+
+    if args.email_debug:
+        from invoice.catalog import InvoiceCatalog
+        catalog = InvoiceCatalog(config.database_path)
+        try:
+            rows = inspect_recent_messages(config.email, args.email_debug, is_processed=catalog.has_email_message)
+        finally:
+            catalog.close()
+        for row in rows:
+            print(f"UID {row.get('uid')} processed={row.get('processed')} date={row.get('date')}")
+            print(f"  from={row.get('from')}")
+            print(f"  subject={row.get('subject')}")
+            attachments = row.get("attachments") or []
+            if not attachments:
+                print("  attachments=-")
+            for attachment in attachments:
+                marker = "OK" if attachment.get("accepted") else "SKIP"
+                print(
+                    f"  [{marker}] {attachment.get('filename')} "
+                    f"({attachment.get('content_type')}, {attachment.get('disposition')})"
+                )
+        return
 
     if args.portal_login:
         provider = _find_portal_provider(config.portals, args.portal_login)

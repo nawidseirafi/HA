@@ -41,10 +41,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     setAgentStatus('Invoice Agent startet. Inbox, E-Mail und vorhandene Belege werden geprüft...');
     try {
       setAgentStatus('Invoice Agent läuft. Dokumente werden gescannt und Metadaten ermittelt...');
-      await api.runAgent();
+      const result = await api.runAgent();
       setAgentStatus('Scan abgeschlossen. Dashboard wird aktualisiert...');
       await load();
-      setAgentStatus('Invoice Agent fertig. Neue Belege wurden einsortiert oder zur Prüfung markiert.');
+      setAgentStatus(`Invoice Agent fertig. ${lastAgentLine(result.stdout) || 'Neue Belege wurden einsortiert oder zur Prüfung markiert.'}`);
     } catch (err) {
       setAgentError(err instanceof Error ? err.message : 'Invoice Agent konnte nicht gestartet werden.');
       setAgentStatus('');
@@ -227,6 +227,14 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       </section>
     </div>
   );
+}
+
+function lastAgentLine(output: string) {
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-1)[0] ?? '';
 }
 
 function getGreeting() {
