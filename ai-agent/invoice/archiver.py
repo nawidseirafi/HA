@@ -26,16 +26,14 @@ def archive_invoice(source: Path, metadata: InvoiceMetadata, archive_dir: Path) 
     month_dir = archive_dir / str(metadata.invoice_date.year) / MONTH_NAMES[metadata.invoice_date.month - 1]
     month_dir.mkdir(parents=True, exist_ok=True)
     target = _unique_or_existing_same_file(source, month_dir / _archive_filename(source, metadata))
-    shutil.copy2(source, target)
-    return target
+    return _move_to_target(source, target)
 
 
 def copy_to_review(source: Path, metadata: InvoiceMetadata, review_dir: Path) -> Path:
     month_dir = review_dir / str(metadata.invoice_date.year) / MONTH_NAMES[metadata.invoice_date.month - 1]
     month_dir.mkdir(parents=True, exist_ok=True)
     target = _unique_or_existing_same_file(source, month_dir / source.name)
-    shutil.copy2(source, target)
-    return target
+    return _move_to_target(source, target)
 
 
 def month_dir_for(archive_dir: Path, year: int, month: int) -> Path:
@@ -82,6 +80,19 @@ def _unique_or_existing_same_file(source: Path, path: Path) -> Path:
         if _same_file(source, candidate):
             return candidate
     raise RuntimeError(f"Kein freier Dateiname gefunden fuer {path}")
+
+
+def _move_to_target(source: Path, target: Path) -> Path:
+    try:
+        if source.resolve() == target.resolve():
+            return target
+    except OSError:
+        pass
+    if target.exists() and _same_file(source, target):
+        source.unlink()
+        return target
+    shutil.move(str(source), str(target))
+    return target
 
 
 def _same_file(left: Path, right: Path) -> bool:

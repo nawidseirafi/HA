@@ -1,8 +1,10 @@
 import logging
 import imaplib
 import re
+import shlex
 from email import policy
 from email.parser import BytesParser
+from datetime import datetime, timedelta
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -12,6 +14,7 @@ CONTENT_TYPE_EXTENSIONS = {
     "application/pdf": ".pdf"
 }
 AUTO_ATTACHMENT_CONTENT_TYPES = {"application/pdf"}
+IMAP_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
 @dataclass
@@ -25,6 +28,7 @@ class EmailConfig:
     search: str = "UNSEEN"
     mark_seen: bool = False
     max_messages: int = 25
+    lookback_days: int = 7
     attachment_extensions: tuple[str, ...] = DEFAULT_ATTACHMENT_EXTENSIONS
 
 
@@ -34,10 +38,13 @@ class EmailFetchResult:
     messages_new: int = 0
     attachments_saved: int = 0
     files: list[Path] = None
+    message_keys_by_file: dict[str, str] = None
 
     def __post_init__(self):
         if self.files is None:
             self.files = []
+        if self.message_keys_by_file is None:
+            self.message_keys_by_file = {}
 
 
 def fetch_imap_attachments(
@@ -58,7 +65,8 @@ def fetch_imap_attachments(
         mailbox.login(config.username, config.password)
         mailbox.select(config.mailbox)
 
-        status, data = mailbox.uid("search", None, config.search)
+        search_criteria = _search_criteria(config)
+        status, data = mailbox.uid("search", None, *search_criteria)
         if status != "OK":
             logging.warning("IMAP search fehlgeschlagen: %s %s", status, data)
             return result
@@ -70,8 +78,9 @@ def fetch_imap_attachments(
         first_uid = selected_uids[0].decode("ascii", errors="ignore") if selected_uids else "-"
         last_uid = selected_uids[-1].decode("ascii", errors="ignore") if selected_uids else "-"
         logging.info(
-            "E-Mail Suche: %s Treffer, pruefe letzte %s UIDs (%s bis %s).",
+            "E-Mail Suche: %s Treffer fuer %s, pruefe letzte %s UIDs (%s bis %s).",
             len(uids),
+            " ".join(search_criteria),
             len(selected_uids),
             first_uid,
             last_uid,
@@ -103,7 +112,11 @@ def fetch_imap_attachments(
             result.messages_new += 1
             result.attachments_saved += len(saved)
             result.files.extend(saved)
-            mark_processed(message_key)
+            if not saved:
+                mark_processed(message_key)
+            else:
+                for path in saved:
+                    result.message_keys_by_file[str(path.resolve())] = message_key
 
             if config.mark_seen:
                 mailbox.uid("store", uid, "+FLAGS", "(\\Seen)")
@@ -179,6 +192,20 @@ def _extract_attachments_from_message(message, output_dir: Path, attachment_exte
 def _import_key(config: EmailConfig) -> str:
     extensions = ",".join(sorted(ext.lower() for ext in config.attachment_extensions))
     return f"v3:{extensions}"
+
+
+def _search_criteria(config: EmailConfig) -> list[str]:
+    criteria = shlex.split(config.search or "UNSEEN")
+    if not criteria:
+        criteria = ["UNSEEN"]
+    if config.lookback_days > 0 and not any(item.upper() in {"SINCE", "SENTSINCE"} for item in criteria):
+        since = datetime.now() - timedelta(days=config.lookback_days)
+        criteria.extend(["SINCE", _imap_date(since)])
+    return criteria
+
+
+def _imap_date(value: datetime) -> str:
+    return f"{value.day:02d}-{IMAP_MONTHS[value.month - 1]}-{value.year}"
 
 
 def _safe_attachment_filename(filename: str, suffix: str) -> str:

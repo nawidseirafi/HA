@@ -18,6 +18,7 @@ CONFIG_PATH = API_CONFIG_PATH
 DEFAULT_DB_PATH = AI_AGENT_DIR / "data" / "invoices" / "invoices.db"
 DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
 DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
+DEFAULT_REVIEW_DIR = AI_AGENT_DIR / "data" / "invoices" / "review"
 DEFAULT_EXPORT_DIR = AI_AGENT_DIR / "data" / "invoices" / "exports"
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 
@@ -73,6 +74,7 @@ def configured_paths() -> dict[str, Path]:
         "database": DEFAULT_DB_PATH,
         "inbox": inbox_dir,
         "archive": DEFAULT_ARCHIVE_DIR,
+        "review": DEFAULT_REVIEW_DIR,
         "exports": DEFAULT_EXPORT_DIR,
     }
 
@@ -93,6 +95,7 @@ class InvoiceService:
         self.database_path = self.paths["database"]
         self.inbox_dir = self.paths["inbox"]
         self.archive_dir = self.paths["archive"]
+        self.review_dir = self.paths["review"]
         self.export_dir = self.paths["exports"]
         self.export_dir.mkdir(parents=True, exist_ok=True)
         self._ensure_schema()
@@ -327,10 +330,11 @@ class InvoiceService:
 
     def delete(self, invoice_id: int) -> dict[str, Any]:
         invoice = self.get(invoice_id)
+        deleted_files = self._delete_invoice_files(invoice, invoice_id)
         with self.connect() as connection:
             connection.execute("delete from invoices where id = ?", (invoice_id,))
             connection.commit()
-        return {"deleted": True, "invoice": invoice}
+        return {"deleted": True, "deleted_files": [str(path) for path in deleted_files], "invoice": invoice}
 
     def reanalyze(self, invoice_id: int) -> dict[str, Any]:
         invoice = self.get(invoice_id)
@@ -426,7 +430,7 @@ class InvoiceService:
                 break
 
         if path.name:
-            for root in (self.archive_dir, self.inbox_dir, AI_AGENT_DIR / "data" / "invoices" / "review"):
+            for root in (self.archive_dir, self.inbox_dir, self.review_dir):
                 if root.exists():
                     candidates.extend(root.rglob(path.name))
 
@@ -436,29 +440,124 @@ class InvoiceService:
 
         raise HTTPException(status_code=404, detail=f"Document file not found: {path.name or raw_path}")
 
+    def _delete_invoice_files(self, invoice: dict[str, Any], invoice_id: int) -> list[Path]:
+        paths = []
+        for key in ("stored_path", "archive_path", "source_path"):
+            raw_path = invoice.get(key)
+            if raw_path:
+                paths.append(Path(str(raw_path)).expanduser())
+
+        deleted = []
+        for path in self._existing_managed_paths(paths):
+            if self._is_path_referenced_by_other_invoice(path, invoice_id):
+                continue
+            try:
+                path.unlink()
+                deleted.append(path)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise HTTPException(status_code=500, detail=f"Datei konnte nicht geloescht werden: {path.name}") from exc
+        return deleted
+
+    def _existing_managed_paths(self, paths: list[Path]) -> list[Path]:
+        managed_roots = [self.archive_dir, self.inbox_dir, self.review_dir]
+        candidates = []
+        for path in paths:
+            candidates.append(path)
+            if not path.is_absolute():
+                candidates.append((AI_AGENT_DIR / path).resolve())
+                candidates.append((API_DIR / path).resolve())
+
+        resolved_paths = []
+        seen = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if resolved in seen or not resolved.exists() or not resolved.is_file():
+                continue
+            if not self._is_inside_any(resolved, managed_roots):
+                continue
+            seen.add(resolved)
+            resolved_paths.append(resolved)
+        return resolved_paths
+
+    def _is_path_referenced_by_other_invoice(self, path: Path, invoice_id: int) -> bool:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                select stored_path, archive_path, source_path
+                from invoices
+                where id != ?
+                """,
+                (invoice_id,),
+            ).fetchall()
+        try:
+            resolved = path.resolve()
+        except OSError:
+            return False
+        for row in rows:
+            for key in ("stored_path", "archive_path", "source_path"):
+                raw_path = row[key]
+                if not raw_path:
+                    continue
+                try:
+                    if Path(str(raw_path)).expanduser().resolve() == resolved:
+                        return True
+                except OSError:
+                    continue
+        return False
+
+    @staticmethod
+    def _is_inside_any(path: Path, roots: list[Path]) -> bool:
+        for root in roots:
+            try:
+                path.relative_to(root.resolve())
+                return True
+            except (OSError, ValueError):
+                continue
+        return False
+
     def _reanalyze_with_ai(self, path: Path):
         if str(AI_AGENT_DIR) not in sys.path:
             sys.path.insert(0, str(AI_AGENT_DIR))
         from invoice.invoices import load_raw_config  # type: ignore
         from invoice.ai_extractor import refine_metadata_with_ai  # type: ignore
+        from invoice.categories import apply_category_rules  # type: ignore
         from invoice.extractor import extract_metadata  # type: ignore
+        from invoice.tax_export import DEFAULT_CATEGORY_RULES  # type: ignore
         from llm import create_llm_client  # type: ignore
 
         raw_config = load_raw_config()
         llm_config = raw_config.get("llm", {})
         invoice_config = raw_config.get("invoice_agent", {})
+        tax_config = raw_config.get("tax_export", {})
+        category_rules = dict(DEFAULT_CATEGORY_RULES)
+        category_rules.update(tax_config.get("categories", {}))
         if not llm_config:
             raise RuntimeError("keine llm-Konfiguration vorhanden")
         metadata = extract_metadata(path, default_category=invoice_config.get("default_category", "Unsortiert"))
+        metadata = apply_category_rules(
+            metadata,
+            category_rules,
+            invoice_config.get("default_category", "Unsortiert"),
+        )
         llm_client = create_llm_client({"llm": llm_config})
         last_error = None
         for attempt in range(3):
             try:
-                return refine_metadata_with_ai(
+                metadata = refine_metadata_with_ai(
                     path=path,
                     metadata=metadata,
                     llm_client=llm_client,
                     default_category=invoice_config.get("default_category", "Unsortiert"),
+                )
+                return apply_category_rules(
+                    metadata,
+                    category_rules,
+                    invoice_config.get("default_category", "Unsortiert"),
                 )
             except Exception as exc:
                 last_error = exc

@@ -116,8 +116,10 @@ invoice_agent:
   archive_dir: "./data/invoices/archive"
   review_dir: "./data/invoices/review"
   database_path: "./data/invoices/invoices.db"
-  email_attachment_dir: "./data/invoices/extracted_email_attachments"
+  email_attachment_dir: "./data/invoices/inbox"
 ```
+
+Der E-Mail-Import nutzt `invoice_agent.email.lookback_days`, damit nachtraeglich eingegangene oder uebersprungene Mails innerhalb des Fensters erneut gefunden werden. `max_messages` begrenzt nur noch die Anzahl innerhalb dieses Zeitfensters.
 
 Auf Debian kannst du spaeter absolute Pfade verwenden, zum Beispiel:
 
@@ -127,7 +129,7 @@ invoice_agent:
   archive_dir: "/srv/agents/invoices/archive"
   review_dir: "/srv/agents/invoices/review"
   database_path: "/srv/agents/invoices/invoices.db"
-  email_attachment_dir: "/srv/agents/invoices/extracted_email_attachments"
+  email_attachment_dir: "/srv/agents/invoices/inbox"
 ```
 
 Secrets wie API-Keys gehoeren in `.env`, nicht ins Git-Repository.
@@ -233,7 +235,7 @@ invoice_agent:
         enabled: true
         url: "https://www.huk24.de/meine-huk24/postfach/"
         session_path: "./data/invoices/portal_sessions/huk24.json"
-        download_dir: "./data/invoices/portal_downloads/huk24"
+        download_dir: "./data/invoices/inbox"
         headless: true
         wait_seconds: 20
 ```
@@ -352,7 +354,13 @@ Ist es nicht installiert, faellt der Export auf einen einfachen XLSX-Writer ohne
 
 Die CSV-Datei nutzt UTF-8 mit BOM und deutsche Formatierung (Datum `TT.MM.JJJJ`, Komma als Dezimaltrenner, Semikolon als Trennzeichen) - damit oeffnet Excel sie direkt korrekt.
 
-Die Regeln stehen in `config.yaml` unter `tax_export.categories`. Nicht sicher zuordenbare oder auffaellige Belege landen in `Review`.
+Die Regeln stehen in `config.yaml` unter `tax_export.categories`. Sie werden beim Scannen, bei KI-Reanalyse und beim Steuer-Export genutzt. Nicht sicher zuordenbare oder auffaellige Belege landen im Export in `Review`.
+
+Bestehende Datenbank-Eintraege ohne erneute OCR/KI neu kategorisieren:
+
+```bash
+../venv/bin/python invoice/invoices.py --refresh-categories
+```
 
 ## Systemd-Service auf Debian
 

@@ -8,6 +8,7 @@ from shared.ha_client import HomeAssistantClient
 from invoice.ai_extractor import refine_metadata_with_ai
 from invoice.archiver import archive_invoice, copy_to_review
 from invoice.catalog import InvoiceCatalog
+from invoice.categories import apply_category_rules
 from invoice.email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
 from invoice.extractor import extract_metadata, file_sha256
 from invoice.portals import PortalConfig, fetch_portal_documents
@@ -26,6 +27,7 @@ class InvoiceAgentConfig:
     email_attachment_dir: Path
     poll_interval_seconds: int
     default_category: str = "Unsortiert"
+    category_rules: dict[str, str] = None
     confidence_threshold: float = 0.5
     require_amount_for_archive: bool = True
     reprocess_existing: bool = False
@@ -73,6 +75,7 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
     catalog = InvoiceCatalog(config.database_path)
     result = ScanResult()
     llm_client = None
+    email_message_keys_by_file = {}
 
     try:
         if config.portals and config.portals.enabled:
@@ -90,6 +93,7 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
                     is_processed=catalog.has_email_message,
                     mark_processed=catalog.record_email_message,
                 )
+                email_message_keys_by_file.update(email_result.message_keys_by_file)
                 logging.info("E-Mail Scan: %s", email_result)
             except Exception as exc:
                 logging.warning("E-Mail Scan fehlgeschlagen, lokaler Scan laeuft weiter: %s", exc)
@@ -100,6 +104,8 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
             if catalog.has_hash(file_hash) and not config.reprocess_existing:
                 result.duplicates += 1
                 logging.info("Duplikat uebersprungen: %s", path)
+                _mark_email_file_processed(path, email_message_keys_by_file, catalog)
+                _discard_input_file(path, config)
                 continue
 
             metadata = extract_metadata(path, default_category=config.default_category)
@@ -116,6 +122,7 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
                         )
                     except Exception as exc:
                         logging.warning("KI-Belegextraktion fehlgeschlagen, lokale Metadaten werden genutzt: %s", exc)
+            metadata = apply_category_rules(metadata, config.category_rules, config.default_category)
             if catalog.has_metadata_duplicate(metadata) and not config.reprocess_existing:
                 result.duplicates += 1
                 logging.info(
@@ -125,15 +132,19 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
                     metadata.invoice_date,
                     metadata.amount,
                 )
+                _mark_email_file_processed(path, email_message_keys_by_file, catalog)
+                _discard_input_file(path, config)
                 continue
             if _should_archive(config, metadata):
                 archive_path = archive_invoice(path, metadata, config.archive_dir)
                 catalog.upsert(metadata, archive_path, "archived")
+                _mark_email_file_processed(path, email_message_keys_by_file, catalog)
                 result.archived += 1
                 logging.info("Rechnung archiviert: %s -> %s", path, archive_path)
             else:
                 review_path = copy_to_review(path, metadata, config.review_dir)
                 catalog.upsert(metadata, review_path, "review")
+                _mark_email_file_processed(path, email_message_keys_by_file, catalog)
                 result.review += 1
                 logging.info("Zur Pruefung abgelegt: %s -> %s", path, review_path)
 
@@ -209,15 +220,19 @@ def _ensure_dirs(config: InvoiceAgentConfig) -> None:
 
 
 def _iter_input_files(config: InvoiceAgentConfig):
+    roots = []
     for root in (config.inbox_dir, config.email_attachment_dir):
-        yield from _iter_files(root)
+        if root not in roots:
+            roots.append(root)
     if config.portals:
         for provider in config.portals.providers:
-            if provider.download_dir:
-                yield from _iter_files(provider.download_dir)
+            if provider.download_dir and provider.download_dir not in roots:
+                roots.append(provider.download_dir)
+    for root in roots:
+        yield from _iter_files(root, config.email_attachment_dir)
 
 
-def _iter_files(root: Path):
+def _iter_files(root: Path, attachment_dir: Path):
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.name.startswith("."):
             continue
@@ -225,9 +240,53 @@ def _iter_files(root: Path):
             logging.info("Nicht unterstuetzte Datei uebersprungen: %s", path)
             continue
         if path.suffix.lower() == ".eml":
-            yield from extract_attachments_from_eml(path, config.email_attachment_dir)
+            extracted = extract_attachments_from_eml(path, attachment_dir)
+            if extracted:
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    logging.warning("Verarbeitete EML konnte nicht entfernt werden: %s (%s)", path, exc)
+            yield from extracted
             continue
         yield path
+
+
+def _discard_input_file(path: Path, config: InvoiceAgentConfig) -> None:
+    roots = [config.inbox_dir, config.email_attachment_dir]
+    if config.portals:
+        roots.extend(provider.download_dir for provider in config.portals.providers if provider.download_dir)
+    if not _is_inside_any(path, roots):
+        return
+    try:
+        path.unlink()
+        logging.info("Eingangsduplikat entfernt: %s", path)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        logging.warning("Eingangsduplikat konnte nicht entfernt werden: %s (%s)", path, exc)
+
+
+def _mark_email_file_processed(path: Path, message_keys_by_file: dict[str, str], catalog: InvoiceCatalog) -> None:
+    try:
+        message_key = message_keys_by_file.get(str(path.resolve()))
+    except OSError:
+        message_key = None
+    if message_key:
+        catalog.record_email_message(message_key)
+
+
+def _is_inside_any(path: Path, roots: list[Path]) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    for root in roots:
+        try:
+            resolved.relative_to(root.resolve())
+            return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 def _notify_home_assistant(config: InvoiceAgentConfig, result: ScanResult) -> None:

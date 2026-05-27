@@ -16,6 +16,7 @@ if str(SCRIPT_DIR) in sys.path:
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from invoice.categories import refresh_database_categories
 from invoice.email import EmailConfig
 from invoice.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
 from invoice.scanner import AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
@@ -39,20 +40,24 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
     ai_extraction_config = invoice_config.get("ai_extraction", {})
     data_dir = BASE_DIR / "data" / "invoices"
+    category_rules = _category_rules(raw_config)
+
+    inbox_dir = _path(invoice_config.get("inbox_dir", data_dir / "inbox"))
 
     return InvoiceAgentConfig(
-        inbox_dir=_path(invoice_config.get("inbox_dir", data_dir / "inbox")),
+        inbox_dir=inbox_dir,
         archive_dir=_path(invoice_config.get("archive_dir", data_dir / "archive")),
         review_dir=_path(invoice_config.get("review_dir", data_dir / "review")),
         database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
-        email_attachment_dir=_path(invoice_config.get("email_attachment_dir", data_dir / "extracted_email_attachments")),
+        email_attachment_dir=_path(invoice_config.get("email_attachment_dir", inbox_dir)),
         poll_interval_seconds=int(invoice_config.get("poll_interval_seconds", 600)),
         default_category=invoice_config.get("default_category", "Unsortiert"),
+        category_rules=category_rules,
         confidence_threshold=float(invoice_config.get("confidence_threshold", 0.5)),
         require_amount_for_archive=bool(invoice_config.get("require_amount_for_archive", True)),
         reprocess_existing=bool(invoice_config.get("reprocess_existing", False)),
         email=_load_email_config(email_config),
-        portals=_load_portal_config(portals_config, data_dir),
+        portals=_load_portal_config(portals_config, data_dir, inbox_dir),
         home_assistant_notifications=_load_ha_notification_config(ha_notification_config),
         ai_extraction=_load_ai_extraction_config(ai_extraction_config),
         llm_config=raw_config.get("llm", {}),
@@ -66,13 +71,10 @@ def load_tax_config(raw_config: Optional[dict] = None) -> TaxExportConfig:
     tax_config = raw_config.get("tax_export", {})
     data_dir = BASE_DIR / "data" / "invoices"
 
-    rules = dict(DEFAULT_CATEGORY_RULES)
-    rules.update(tax_config.get("categories", {}))
-
     return TaxExportConfig(
         database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
         output_dir=_path(tax_config.get("output_dir", data_dir / "tax")),
-        category_rules=rules,
+        category_rules=_category_rules(raw_config),
     )
 
 
@@ -87,6 +89,7 @@ def main():
     parser.add_argument("--portal-login", choices=portal_names or None, help="Interaktiven Portal-Login starten und Session speichern.")
     parser.add_argument("--portal-check", choices=portal_names or None, help="Nur ein Portal pruefen und Downloads speichern.")
     parser.add_argument("--tax-year", type=int, help="Steuer-Export fuer dieses Jahr erzeugen, z.B. 2025.")
+    parser.add_argument("--refresh-categories", action="store_true", help="Bestehende Datenbank-Eintraege anhand der Kategorie-Regeln aktualisieren.")
     args = parser.parse_args()
 
     _setup_logging()
@@ -110,6 +113,13 @@ def main():
         logging.info("Portal-Check fertig: %s", result)
         print(result)
         return
+
+    if args.refresh_categories:
+        changed = refresh_database_categories(config.database_path, config.category_rules)
+        logging.info("Kategorien aktualisiert: %s", changed)
+        print(f"Kategorien aktualisiert: {changed}")
+        if not args.once and not args.tax_year:
+            return
 
     if args.watch:
         watch(config)
@@ -153,13 +163,20 @@ def _load_email_config(email_config: dict) -> EmailConfig:
         search=email_config.get("search", "UNSEEN"),
         mark_seen=bool(email_config.get("mark_seen", False)),
         max_messages=int(email_config.get("max_messages", 25)),
+        lookback_days=int(email_config.get("lookback_days", 7)),
         attachment_extensions=attachment_extensions,
     )
 
 
-def _load_portal_config(config: dict, data_dir: Path) -> PortalConfig:
+def _category_rules(raw_config: dict) -> dict[str, str]:
+    tax_config = raw_config.get("tax_export", {})
+    rules = dict(DEFAULT_CATEGORY_RULES)
+    rules.update(tax_config.get("categories", {}))
+    return rules
+
+
+def _load_portal_config(config: dict, data_dir: Path, inbox_dir: Path) -> PortalConfig:
     providers = []
-    portal_dir = data_dir / "portal_downloads"
     session_dir = data_dir / "portal_sessions"
     for raw_provider in config.get("providers", []):
         name = raw_provider.get("name", "")
@@ -169,7 +186,7 @@ def _load_portal_config(config: dict, data_dir: Path) -> PortalConfig:
                 enabled=bool(raw_provider.get("enabled", False)),
                 url=raw_provider.get("url", ""),
                 session_path=_path(raw_provider.get("session_path", session_dir / f"{name}.json")),
-                download_dir=_path(raw_provider.get("download_dir", portal_dir / name)),
+                download_dir=_path(raw_provider.get("download_dir", inbox_dir)),
                 headless=bool(raw_provider.get("headless", True)),
                 wait_seconds=int(raw_provider.get("wait_seconds", 20)),
                 debug_dir=_path(raw_provider.get("debug_dir", data_dir / "portal_debug" / name)),

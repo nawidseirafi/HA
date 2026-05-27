@@ -27,7 +27,7 @@ invoice_agent:
   archive_dir: "./data/invoices/archive"
   review_dir: "./data/invoices/review"
   database_path: "./data/invoices/invoices.db"
-  email_attachment_dir: "./data/invoices/extracted_email_attachments"
+  email_attachment_dir: "./data/invoices/inbox"
   poll_interval_seconds: 600
   default_category: "Unsortiert"
   confidence_threshold: 0.5
@@ -47,7 +47,8 @@ invoice_agent:
     mailbox: "INBOX"
     search: "ALL"
     mark_seen: false
-    max_messages: 50
+    max_messages: 500
+    lookback_days: 7
     attachment_extensions:
       - ".pdf"
   portals:
@@ -57,7 +58,7 @@ invoice_agent:
         enabled: true
         url: "https://www.huk24.de/meine-huk24/postfach/"
         session_path: "./data/invoices/portal_sessions/huk24.json"
-        download_dir: "./data/invoices/portal_downloads/huk24"
+        download_dir: "./data/invoices/inbox"
         debug_dir: "./data/invoices/portal_debug/huk24"
         headless: true
         wait_seconds: 45
