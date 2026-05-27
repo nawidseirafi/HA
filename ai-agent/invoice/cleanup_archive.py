@@ -1,6 +1,7 @@
 import argparse
 import shutil
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +10,59 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATABASE = BASE_DIR / "data" / "invoices" / "invoices.db"
 DEFAULT_ARCHIVE = BASE_DIR / "data" / "invoices" / "archive"
 DEFAULT_BACKUP = BASE_DIR / "data" / "invoices" / "archive_cleanup_backup"
+
+
+@dataclass
+class ArchiveCleanupResult:
+    archive_files: int
+    db_references: int
+    unreferenced: int
+    missing: int
+    moved: int = 0
+    backup_dir: Path = None
+    unreferenced_examples: list[Path] = None
+    missing_examples: list[Path] = None
+
+    def __post_init__(self):
+        if self.unreferenced_examples is None:
+            self.unreferenced_examples = []
+        if self.missing_examples is None:
+            self.missing_examples = []
+
+
+def cleanup_archive(
+    database_path: Path,
+    archive_dir: Path,
+    backup_dir: Path,
+    apply: bool = False,
+) -> ArchiveCleanupResult:
+    referenced = _referenced_archive_paths(database_path, archive_dir)
+    archive_files = _archive_files(archive_dir)
+    unreferenced = sorted(archive_files - referenced)
+    missing = sorted(referenced - archive_files)
+
+    run_backup_dir = None
+    moved = 0
+    if apply and unreferenced:
+        run_backup_dir = backup_dir / datetime.now().strftime("%Y%m%dT%H%M%S")
+        for source in unreferenced:
+            relative = source.relative_to(archive_dir)
+            target = run_backup_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(target))
+            moved += 1
+        _remove_empty_dirs(archive_dir)
+
+    return ArchiveCleanupResult(
+        archive_files=len(archive_files),
+        db_references=len(referenced),
+        unreferenced=len(unreferenced),
+        missing=len(missing),
+        moved=moved,
+        backup_dir=run_backup_dir,
+        unreferenced_examples=unreferenced[:20],
+        missing_examples=missing[:20],
+    )
 
 
 def main():
@@ -25,42 +79,29 @@ def main():
     archive_dir = _resolve(args.archive_dir)
     backup_dir = _resolve(args.backup_dir)
 
-    referenced = _referenced_archive_paths(database_path)
-    archive_files = _archive_files(archive_dir)
-    unreferenced = sorted(archive_files - referenced)
-    missing = sorted(referenced - archive_files)
+    result = cleanup_archive(database_path, archive_dir, backup_dir, apply=args.apply)
 
-    print(f"Archivdateien: {len(archive_files)}")
-    print(f"DB-Referenzen: {len(referenced)}")
-    print(f"Unreferenziert: {len(unreferenced)}")
-    print(f"DB-Referenzen ohne Datei: {len(missing)}")
+    print(f"Archivdateien: {result.archive_files}")
+    print(f"DB-Referenzen: {result.db_references}")
+    print(f"Unreferenziert: {result.unreferenced}")
+    print(f"DB-Referenzen ohne Datei: {result.missing}")
 
-    if unreferenced:
+    if result.unreferenced_examples:
         print("\nBeispiele unreferenzierter Dateien:")
-        for path in unreferenced[:20]:
+        for path in result.unreferenced_examples:
             print(f"- {path.relative_to(BASE_DIR)}")
 
-    if missing:
+    if result.missing_examples:
         print("\nBeispiele fehlender referenzierter Dateien:")
-        for path in missing[:20]:
+        for path in result.missing_examples:
             print(f"- {path}")
 
     if not args.apply:
         print("\nDry run. Mit --apply werden unreferenzierte Dateien in den Backup-Ordner verschoben.")
         return
 
-    run_backup_dir = backup_dir / datetime.now().strftime("%Y%m%dT%H%M%S")
-    moved = 0
-    for source in unreferenced:
-        relative = source.relative_to(archive_dir)
-        target = run_backup_dir / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(source), str(target))
-        moved += 1
-
-    _remove_empty_dirs(archive_dir)
-    print(f"\nVerschoben: {moved}")
-    print(f"Backup: {run_backup_dir}")
+    print(f"\nVerschoben: {result.moved}")
+    print(f"Backup: {result.backup_dir}")
 
 
 def _resolve(path: Path) -> Path:
@@ -70,7 +111,7 @@ def _resolve(path: Path) -> Path:
     return (BASE_DIR / path).resolve()
 
 
-def _referenced_archive_paths(database_path: Path) -> set[Path]:
+def _referenced_archive_paths(database_path: Path, archive_dir: Path) -> set[Path]:
     if not database_path.exists():
         raise FileNotFoundError(f"Datenbank nicht gefunden: {database_path}")
 
@@ -80,13 +121,23 @@ def _referenced_archive_paths(database_path: Path) -> set[Path]:
             """
             select archive_path
             from invoices
-            where status = 'archived' and archive_path is not null and archive_path != ''
+            where status = 'archived'
+              and archive_path is not null and archive_path != ''
             """
         ).fetchall()
     finally:
         con.close()
 
-    return {Path(row[0]).expanduser().resolve() for row in rows}
+    referenced = set()
+    archive_root = archive_dir.resolve()
+    for row in rows:
+        path = Path(row[0]).expanduser().resolve()
+        try:
+            path.relative_to(archive_root)
+        except ValueError:
+            continue
+        referenced.add(path)
+    return referenced
 
 
 def _archive_files(archive_dir: Path) -> set[Path]:

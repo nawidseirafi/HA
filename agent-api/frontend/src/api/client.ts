@@ -490,6 +490,18 @@ export const api = {
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
   runAgent: () => request('/api/invoices/run', { method: 'POST' }),
+  cleanupArchive: (apply = false) =>
+    request<{
+      applied: boolean;
+      archive_files: number;
+      db_references: number;
+      unreferenced: number;
+      missing: number;
+      moved: number;
+      backup_dir: string | null;
+      unreferenced_examples: string[];
+      missing_examples: string[];
+    }>(`/api/invoices/cleanup-archive?apply=${apply ? 'true' : 'false'}`, { method: 'POST' }),
   mywellnessStatus: () => request<AgentStatus>('/api/mywellness/status'),
   startMywellnessAgent: (mode: 'prepare' | 'book' = 'prepare') =>
     request<AgentStatus>('/api/agent/start', { method: 'POST', body: JSON.stringify({ mode }) }),

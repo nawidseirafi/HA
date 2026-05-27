@@ -128,3 +128,8 @@ def upload_invoice(file: UploadFile = File(...)):
 @router.post("/run")
 def run_invoice_agent():
     return invoice_service.run_agent()
+
+
+@router.post("/cleanup-archive")
+def cleanup_invoice_archive(apply: bool = Query(False)):
+    return invoice_service.cleanup_archive(apply=apply)

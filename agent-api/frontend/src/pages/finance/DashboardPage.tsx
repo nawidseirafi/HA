@@ -56,9 +56,41 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const upload = async (file?: File) => {
     if (!file) return;
     setBusy(true);
-    await api.upload(file);
-    await load();
-    setBusy(false);
+    setAgentError('');
+    try {
+      await api.upload(file);
+      await load();
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'Upload fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cleanup = async () => {
+    setBusy(true);
+    setAgentError('');
+    setAgentStatus('Archiv-Cleanup prüft unreferenzierte Dateien...');
+    try {
+      const preview = await api.cleanupArchive(false);
+      if (preview.unreferenced === 0) {
+        setAgentStatus(`Archiv sauber. ${preview.archive_files} Dateien geprüft, keine unreferenzierten Dateien gefunden.`);
+        return;
+      }
+      const apply = confirm(`${preview.unreferenced} unreferenzierte Archivdateien gefunden. In Backup verschieben?`);
+      if (!apply) {
+        setAgentStatus(`Cleanup abgebrochen. ${preview.unreferenced} unreferenzierte Dateien gefunden.`);
+        return;
+      }
+      const result = await api.cleanupArchive(true);
+      setAgentStatus(`Cleanup fertig. ${result.moved} Dateien nach ${result.backup_dir ?? 'Backup'} verschoben.`);
+      await load();
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'Archiv-Cleanup fehlgeschlagen.');
+      setAgentStatus('');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const invoices = summary?.latest_uploads ?? [];
@@ -172,6 +204,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                 {busy ? <Activity size={16} /> : <Play size={16} />}
                 {busy ? 'Agent läuft...' : 'Invoice Agent starten'}
               </button>
+              <button className="button ghost" onClick={cleanup} disabled={busy}><Database size={16} /> Archiv-Cleanup</button>
               <ExportButtons year={currentYear} month={currentMonth} compact />
               <input ref={fileRef} type="file" hidden onChange={(event) => upload(event.target.files?.[0])} />
             </div>

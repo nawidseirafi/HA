@@ -121,6 +121,18 @@ invoice_agent:
 
 Der E-Mail-Import nutzt `invoice_agent.email.lookback_days`, damit nachtraeglich eingegangene oder uebersprungene Mails innerhalb des Fensters erneut gefunden werden. `max_messages` begrenzt nur noch die Anzahl innerhalb dieses Zeitfensters.
 
+Archiv-Cleanup kann serverseitig beim normalen Agent-Lauf aktiviert werden:
+
+```yaml
+invoice_agent:
+  archive_cleanup:
+    enabled: true
+    apply: true
+    backup_dir: "./data/invoices/archive_cleanup_backup"
+```
+
+Der Agent verschiebt dabei nur unreferenzierte Dateien aus `archive` in das Backup-Verzeichnis. Es werden keine Dateien endgueltig geloescht.
+
 Auf Debian kannst du spaeter absolute Pfade verwenden, zum Beispiel:
 
 ```yaml

@@ -19,7 +19,7 @@ if str(BASE_DIR) not in sys.path:
 from invoice.categories import refresh_database_categories
 from invoice.email import EmailConfig
 from invoice.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
-from invoice.scanner import AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+from invoice.scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
 from invoice.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
 
 
@@ -39,6 +39,7 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
     portals_config = invoice_config.get("portals", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
     ai_extraction_config = invoice_config.get("ai_extraction", {})
+    archive_cleanup_config = invoice_config.get("archive_cleanup", {})
     data_dir = BASE_DIR / "data" / "invoices"
     category_rules = _category_rules(raw_config)
 
@@ -50,6 +51,7 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
         review_dir=_path(invoice_config.get("review_dir", data_dir / "review")),
         database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
         email_attachment_dir=_path(invoice_config.get("email_attachment_dir", inbox_dir)),
+        archive_cleanup_backup_dir=_path(archive_cleanup_config.get("backup_dir", data_dir / "archive_cleanup_backup")),
         poll_interval_seconds=int(invoice_config.get("poll_interval_seconds", 600)),
         default_category=invoice_config.get("default_category", "Unsortiert"),
         category_rules=category_rules,
@@ -60,6 +62,7 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
         portals=_load_portal_config(portals_config, data_dir, inbox_dir),
         home_assistant_notifications=_load_ha_notification_config(ha_notification_config),
         ai_extraction=_load_ai_extraction_config(ai_extraction_config),
+        archive_cleanup=_load_archive_cleanup_config(archive_cleanup_config),
         llm_config=raw_config.get("llm", {}),
     )
 
@@ -229,6 +232,13 @@ def _load_ai_extraction_config(config: dict) -> AIExtractionConfig:
         min_confidence=float(config.get("min_confidence", 0.8)),
         max_file_bytes=int(config.get("max_file_bytes", 10 * 1024 * 1024)),
         always_for_documents=bool(config.get("always_for_documents", True)),
+    )
+
+
+def _load_archive_cleanup_config(config: dict) -> ArchiveCleanupConfig:
+    return ArchiveCleanupConfig(
+        enabled=bool(config.get("enabled", False)),
+        apply=bool(config.get("apply", False)),
     )
 
 

@@ -9,6 +9,7 @@ from invoice.ai_extractor import refine_metadata_with_ai
 from invoice.archiver import archive_invoice, copy_to_review
 from invoice.catalog import InvoiceCatalog
 from invoice.categories import apply_category_rules
+from invoice.cleanup_archive import cleanup_archive
 from invoice.email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
 from invoice.extractor import extract_metadata, file_sha256
 from invoice.portals import PortalConfig, fetch_portal_documents
@@ -25,6 +26,7 @@ class InvoiceAgentConfig:
     review_dir: Path
     database_path: Path
     email_attachment_dir: Path
+    archive_cleanup_backup_dir: Path
     poll_interval_seconds: int
     default_category: str = "Unsortiert"
     category_rules: dict[str, str] = None
@@ -35,6 +37,7 @@ class InvoiceAgentConfig:
     portals: PortalConfig = None
     home_assistant_notifications: "HomeAssistantNotificationConfig" = None
     ai_extraction: "AIExtractionConfig" = None
+    archive_cleanup: "ArchiveCleanupConfig" = None
     llm_config: Optional[dict] = None
 
 
@@ -57,12 +60,21 @@ class AIExtractionConfig:
 
 
 @dataclass
+class ArchiveCleanupConfig:
+    enabled: bool = False
+    apply: bool = False
+
+
+@dataclass
 class ScanResult:
     scanned: int = 0
     archived: int = 0
     review: int = 0
     duplicates: int = 0
     skipped: int = 0
+    cleanup_unreferenced: int = 0
+    cleanup_missing: int = 0
+    cleanup_moved: int = 0
     portal_login_required: list[str] = None
 
     def __post_init__(self):
@@ -151,6 +163,12 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
         written_indexes = catalog.export_monthly_indexes(config.archive_dir)
         for index_path in written_indexes:
             logging.info("Monatsindex geschrieben: %s", index_path)
+
+        cleanup_result = _cleanup_archive(config)
+        if cleanup_result:
+            result.cleanup_unreferenced = cleanup_result.unreferenced
+            result.cleanup_missing = cleanup_result.missing
+            result.cleanup_moved = cleanup_result.moved
     finally:
         catalog.close()
 
@@ -215,8 +233,35 @@ def _ensure_dirs(config: InvoiceAgentConfig) -> None:
         config.review_dir,
         config.database_path.parent,
         config.email_attachment_dir,
+        config.archive_cleanup_backup_dir,
     ):
         path.mkdir(parents=True, exist_ok=True)
+
+
+def _cleanup_archive(config: InvoiceAgentConfig):
+    cleanup_config = config.archive_cleanup
+    if not cleanup_config or not cleanup_config.enabled:
+        return None
+    try:
+        result = cleanup_archive(
+            database_path=config.database_path,
+            archive_dir=config.archive_dir,
+            backup_dir=config.archive_cleanup_backup_dir,
+            apply=cleanup_config.apply,
+        )
+    except Exception as exc:
+        logging.warning("Archiv-Cleanup fehlgeschlagen: %s", exc)
+        return None
+    logging.info(
+        "Archiv-Cleanup: archive_files=%s db_references=%s unreferenced=%s missing=%s moved=%s backup=%s",
+        result.archive_files,
+        result.db_references,
+        result.unreferenced,
+        result.missing,
+        result.moved,
+        result.backup_dir or "-",
+    )
+    return result
 
 
 def _iter_input_files(config: InvoiceAgentConfig):

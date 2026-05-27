@@ -33,6 +33,10 @@ invoice_agent:
   confidence_threshold: 0.5
   require_amount_for_archive: true
   reprocess_existing: false
+  archive_cleanup:
+    enabled: true
+    apply: true
+    backup_dir: "./data/invoices/archive_cleanup_backup"
   ai_extraction:
     enabled: true
     always_for_documents: true

@@ -20,6 +20,7 @@ DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
 DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
 DEFAULT_REVIEW_DIR = AI_AGENT_DIR / "data" / "invoices" / "review"
 DEFAULT_EXPORT_DIR = AI_AGENT_DIR / "data" / "invoices" / "exports"
+DEFAULT_ARCHIVE_CLEANUP_BACKUP_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive_cleanup_backup"
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 
 
@@ -76,6 +77,7 @@ def configured_paths() -> dict[str, Path]:
         "archive": DEFAULT_ARCHIVE_DIR,
         "review": DEFAULT_REVIEW_DIR,
         "exports": DEFAULT_EXPORT_DIR,
+        "archive_cleanup_backup": DEFAULT_ARCHIVE_CLEANUP_BACKUP_DIR,
     }
 
 
@@ -97,6 +99,7 @@ class InvoiceService:
         self.archive_dir = self.paths["archive"]
         self.review_dir = self.paths["review"]
         self.export_dir = self.paths["exports"]
+        self.archive_cleanup_backup_dir = self.paths["archive_cleanup_backup"]
         self.export_dir.mkdir(parents=True, exist_ok=True)
         self._ensure_schema()
 
@@ -407,6 +410,36 @@ class InvoiceService:
         self._ensure_schema()
         return {"status": "completed", "stdout": result.stdout.strip(), "stderr": result.stderr.strip()}
 
+    def cleanup_archive(self, apply: bool = False) -> dict[str, Any]:
+        referenced = self._referenced_archive_paths()
+        archive_files = self._archive_files()
+        unreferenced = sorted(archive_files - referenced)
+        missing = sorted(referenced - archive_files)
+
+        backup_dir = None
+        moved = []
+        if apply and unreferenced:
+            backup_dir = self.archive_cleanup_backup_dir / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            for source in unreferenced:
+                relative = source.relative_to(self.archive_dir)
+                target = backup_dir / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source), str(target))
+                moved.append(target)
+            self._remove_empty_dirs(self.archive_dir)
+
+        return {
+            "applied": apply,
+            "archive_files": len(archive_files),
+            "db_references": len(referenced),
+            "unreferenced": len(unreferenced),
+            "missing": len(missing),
+            "moved": len(moved),
+            "backup_dir": str(backup_dir) if backup_dir else None,
+            "unreferenced_examples": [str(path) for path in unreferenced[:20]],
+            "missing_examples": [str(path) for path in missing[:20]],
+        }
+
     def document_path(self, invoice_id: int) -> Path:
         invoice = self.get(invoice_id)
         raw_path = invoice.get("stored_path") or invoice.get("archive_path") or invoice.get("source_path")
@@ -439,6 +472,44 @@ class InvoiceService:
                 return candidate
 
         raise HTTPException(status_code=404, detail=f"Document file not found: {path.name or raw_path}")
+
+    def _referenced_archive_paths(self) -> set[Path]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                select archive_path
+                from invoices
+                where status = 'archived'
+                  and archive_path is not null and archive_path != ''
+                """
+            ).fetchall()
+        referenced = set()
+        for row in rows:
+            path = Path(str(row["archive_path"])).expanduser()
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if self._is_inside_any(resolved, [self.archive_dir]):
+                referenced.add(resolved)
+        return referenced
+
+    def _archive_files(self) -> set[Path]:
+        if not self.archive_dir.exists():
+            return set()
+        return {
+            path.resolve()
+            for path in self.archive_dir.rglob("*")
+            if path.is_file() and path.name != "index.xlsx"
+        }
+
+    @staticmethod
+    def _remove_empty_dirs(root: Path) -> None:
+        for path in sorted((item for item in root.rglob("*") if item.is_dir()), reverse=True):
+            try:
+                path.rmdir()
+            except OSError:
+                pass
 
     def _delete_invoice_files(self, invoice: dict[str, Any], invoice_id: int) -> list[Path]:
         paths = []
