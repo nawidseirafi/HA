@@ -21,9 +21,6 @@ command_line:
         - lastchanged
         - timestamp
         - last_run
-shell_command:
-  mywellness_prepare: "/usr/local/bin/python3 /config/scripts/mywellness.py prepare"
-  mywellness_book: "/usr/local/bin/python3 /config/scripts/mywellness.py book"
 frontend:
   themes: !include_dir_merge_named themes
 automation: !include_dir_merge_list automations
