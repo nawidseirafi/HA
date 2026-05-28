@@ -7,7 +7,6 @@ import {
   ArrowUp,
   Battery,
   BatteryFull,
-  BatteryLow,
   BatteryMedium,
   BatteryWarning,
   Bot,
@@ -34,6 +33,7 @@ import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
 type BatteryBadge = { label: string; tone: string };
+const LOW_BATTERY_THRESHOLD = 40;
 type MetricTone =
   | 'info'
   | 'ok'
@@ -1370,11 +1370,8 @@ function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: 
     .map((battery) => battery.level)
     .filter((level): level is number => level !== null && level !== undefined && Number.isFinite(Number(level)));
   const minLevel = levels.length ? Math.min(...levels) : null;
-  if (batteries.some((battery) => String(battery.state).toLowerCase() === 'low') || (minLevel !== null && minLevel <= 15)) {
+  if (batteries.some((battery) => String(battery.state).toLowerCase() === 'low') || (minLevel !== null && minLevel < LOW_BATTERY_THRESHOLD)) {
     return { tone: 'critical', icon: <BatteryWarning size={24} /> };
-  }
-  if (minLevel !== null && minLevel <= 30) {
-    return { tone: 'warn', icon: <BatteryLow size={24} /> };
   }
   if (minLevel !== null && minLevel <= 60) {
     return { tone: 'warn', icon: <BatteryMedium size={24} /> };
@@ -1432,7 +1429,7 @@ function batteryTone(battery: WallEntity & { level?: number | null }) {
   if (battery.state?.toLowerCase() === 'low') return 'warn';
   if (level === null || level === undefined) return 'unknown';
   if (level <= 15) return 'danger';
-  if (level <= 25) return 'warn';
+  if (level < LOW_BATTERY_THRESHOLD) return 'warn';
   return 'ok';
 }
 

@@ -15,6 +15,7 @@ from backend.services.waste_service import WasteService
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
 waste_service = WasteService(ha_service)
+LOW_BATTERY_THRESHOLD = 40
 
 
 class ServicePayload(BaseModel):
@@ -52,7 +53,7 @@ def wall_dashboard():
     ]
     low_batteries = [
         item for item in battery_items
-        if (item["level"] is not None and item["level"] <= 25) or str(item["state"]).lower() == "low"
+        if (item["level"] is not None and item["level"] < LOW_BATTERY_THRESHOLD) or str(item["state"]).lower() == "low"
     ]
     unavailable = [
         _simple_item(state)
