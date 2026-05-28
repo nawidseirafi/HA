@@ -3,9 +3,9 @@ import sqlite3
 from datetime import date, datetime, timezone
 from typing import Any
 
+from backend.agents.mywellness.ai_service import MyWellnessAIService
 from backend.agents.mywellness.service import DB_PATH
 from backend.services.homeassistant_service import HomeAssistantService
-from backend.services.mywellness_ai_service import MyWellnessAIService
 
 
 def utc_now() -> str:

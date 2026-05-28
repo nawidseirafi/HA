@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from backend.agents.mywellness.service import MyWellnessService
-from backend.services.mywellness_health_service import MyWellnessHealthService
+from backend.agents.mywellness.health_service import MyWellnessHealthService
 
 
 router = APIRouter(tags=["mywellness"])
