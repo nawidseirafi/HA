@@ -2,7 +2,9 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState } from 're
 import type { ErrorInfo, ReactNode } from 'react';
 import {
   Activity,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Battery,
   BatteryFull,
   BatteryLow,
@@ -22,8 +24,9 @@ import {
   ShieldAlert,
   Thermometer,
   Zap,
+  Warehouse,
 } from 'lucide-react';
-import { api, type AgentStatus, type WallDashboardData, type WallEntity, type WallLight, type WallLightGroup, type WallLightRoom, type WallTemperatureSensor } from '../api/client';
+import { api, type AgentStatus, type WallCover, type WallDashboardData, type WallEntity, type WallLight, type WallLightGroup, type WallLightRoom, type WallTemperatureSensor } from '../api/client';
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
@@ -330,6 +333,22 @@ function WallDashboardContent() {
     }
   };
 
+  const callCover = async (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => {
+    const nextState = service === 'open_cover' ? 'opening' : service === 'close_cover' ? 'closing' : cover.state;
+    setData((current) => patchWallCover(current, cover.entity_id, { state: nextState }));
+    setBusyEntity(cover.entity_id);
+    setError('');
+    try {
+      await api.callHomeAssistantService({ domain: 'cover', service, entity_id: cover.entity_id });
+      scheduleRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Garagentor konnte nicht geschaltet werden.');
+      await load(true);
+    } finally {
+      setBusyEntity('');
+    }
+  };
+
   const goSection = (next: WallSection) => {
     setSection(next);
     if (next !== 'floor') setFloorView('');
@@ -403,7 +422,7 @@ function WallDashboardContent() {
           <div>
             <span>{formatWallDate(now)}</span>
             <h1>{headerTitle}</h1>
-            <p>{subtitleFor(section, activeLights, totalLights, problemCount)}</p>
+            <p>{subtitleFor(section, activeLights, totalLights, problemCount, data)}</p>
           </div>
           <div className="wall-header-side">
             <strong>{formatClock(now)}</strong>
@@ -417,7 +436,7 @@ function WallDashboardContent() {
         {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
         {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
 
-        {data && section === 'home' && <HomeSection data={data} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates} onClearPost={clearPost} onToggleVacation={toggleVacation} />}
+        {data && section === 'home' && <HomeSection data={data} busyEntity={busyEntity} onLights={openLights} onFloor={openFloor} onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates} onClearPost={clearPost} onToggleVacation={toggleVacation} onGarageCommand={callCover} />}
         {data && section === 'lights' && (
           <LightsSection
             data={data}
@@ -431,7 +450,7 @@ function WallDashboardContent() {
             onBulk={turnSelected}
           />
         )}
-        {data && section === 'climate' && <ClimateSection data={data} />}
+        {data && section === 'climate' && <ClimateSection data={data} selectedFloor={selectedFloor} onFloor={setSelectedFloor} />}
         {data && section === 'security' && <SecuritySection data={data} />}
         {data && section === 'agents' && <AgentsSection data={data} />}
         {data && section === 'batteries' && <BatteriesSection data={data} onBack={() => goSection('home')} />}
@@ -469,8 +488,11 @@ function HomeSection({
   onClimate,
   onClearPost,
   onToggleVacation,
+  onGarageCommand,
+  busyEntity,
 }: {
   data: WallDashboardData;
+  busyEntity: string;
   onLights: () => void;
   onFloor: (floor: string) => void;
   onBatteries: () => void;
@@ -478,6 +500,7 @@ function HomeSection({
   onClimate: () => void;
   onClearPost: () => void;
   onToggleVacation: () => void;
+  onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
 }) {
   const hasPost = postStatus(data);
   const vacation = vacationStatus(data);
@@ -486,6 +509,7 @@ function HomeSection({
   const open = data.security.openings_open;
   const issues = data.security.problems.length + data.health.unavailable.length;
   const batterySummary = homeBatterySummary(data);
+  const garage = garageCover(data);
   return (
     <div className="wall-home-grid">
       <MetricCard
@@ -528,8 +552,12 @@ function HomeSection({
         tone={hasPost && vacation ? 'critical' : hasPost ? 'warn' : 'neutral'}
         onClick={hasPost ? onClearPost : undefined}
       />
+      <GarageDoorCard
+        cover={garage}
+        busy={garage ? busyEntity === garage.entity_id : false}
+        onCommand={onGarageCommand}
+      />
       <MetricCard icon={batterySummary.icon} label="Batterien" value={`${data.health.low_batteries.length}`} detail={`${data.health.battery_total} gesamt`} tone={batterySummary.tone} onClick={onBatteries} />
-
       <MetricCard icon={<Bot size={24} />} label="Agenten" value={homeAgentState(data)} detail={homeAgentDetail(data)} tone={homeAgentTone(data)} onClick={onAgents}/>
       <section className="wall-panel wall-span-2">
         <div className="wall-section-title">
@@ -544,13 +572,6 @@ function HomeSection({
             </button>
           ))}
         </div>
-      </section>
-      <section className="wall-panel">
-        <div className="wall-section-title">
-          <span>Letztes Update</span>
-          <strong>{formatTime(data.updated_at)}</strong>
-        </div>
-        <p>{data.home_assistant.entity_count} Home-Assistant-Entities verbunden.</p>
       </section>
     </div>
   );
@@ -579,7 +600,7 @@ function FloorSection({
       <div className="wall-tabs">
         {data.light_groups.map((group) => (
           <button key={group.area} className={group.area === selectedFloor ? 'active' : ''} onClick={() => onFloor(group.area)}>
-            {group.area} <span>{group.rooms?.length || 1}</span>
+            {group.area} <span>{group.rooms?.length || 1} · Ø {formatNumber(floorTemperature(data, group.area))}°C</span>
           </button>
         ))}
       </div>
@@ -752,40 +773,59 @@ function averageHouseTemperature(data: WallDashboardData) {
   if (!values.length) return null;
   return values.reduce((sum, value) => sum + Number(value), 0) / values.length;
 }
-function ClimateSection({ data }: { data: WallDashboardData }) {
-  const rooms = temperatureRooms(data.temperature_sensors ?? []);
+function ClimateSection({
+  data,
+  selectedFloor,
+  onFloor,
+}: {
+  data: WallDashboardData;
+  selectedFloor: string;
+  onFloor: (floor: string) => void;
+}) {
+  const floor = selectedFloor === 'Alle Etagen' ? 'Alle Etagen' : selectedFloor || data.light_groups[0]?.area || 'Alle Etagen';
+  const rooms = temperatureRooms(data, floor);
+  const hasClimateData = data.climate.length > 0 || (data.temperature_sensors ?? []).length > 0;
   return (
-    <div className="wall-card-grid">
-      {data.climate.map((item) => (
-        <section className="wall-panel" key={item.entity_id}>
-          <div className="wall-section-title">
-            <span>{item.area}</span>
-            <Thermometer size={20} />
-          </div>
-          <h2>{item.name}</h2>
-          <div className="wall-climate-value">{formatNumber(item.current_temperature)}°C</div>
-          <p>Ziel {formatNumber(item.target_temperature)}°C · {item.humidity ?? '--'}% · {labelState(item.state)}</p>
-        </section>
-      ))}
-      {rooms.map((room) => (
-        <section className="wall-panel wall-temperature-room" key={room.area}>
-          <div className="wall-section-title">
-            <span>{room.area}</span>
-            <Thermometer size={20} />
-          </div>
-          <h2>{room.area}</h2>
-          <div className="wall-climate-value">{formatNumber(room.average)}°C</div>
-          <div className="wall-temperature-list">
-            {room.items.map((item) => (
-              <article key={item.entity_id}>
-                <span>{item.name}</span>
-                <strong>{formatNumber(item.temperature)}°C</strong>
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
-      {data.climate.length === 0 && rooms.length === 0 && <section className="wall-panel">Keine Temperaturdaten gefunden.</section>}
+    <div className="wall-page-stack">
+      <div className="wall-tabs">
+        <button className={floor === 'Alle Etagen' ? 'active' : ''} onClick={() => onFloor('Alle Etagen')}>
+          Alle Etagen <span>Ø {formatNumber(averageHouseTemperature(data))}°C</span>
+        </button>
+        {data.light_groups.map((group) => (
+          <button key={group.area} className={floor === group.area ? 'active' : ''} onClick={() => onFloor(group.area)}>
+            {group.area} <span>Ø {formatNumber(floorTemperature(data, group.area))}°C</span>
+          </button>
+        ))}
+      </div>
+      <div className="wall-card-grid">
+        {rooms.map((room) => (
+          <section className="wall-panel wall-temperature-room" key={`${room.floor}-${room.area}`}>
+            <div className="wall-section-title">
+              <span>{room.floor}</span>
+              <Thermometer size={20} />
+            </div>
+            <h2>{room.area}</h2>
+            <div className="wall-climate-value">{formatNumber(room.temperature)}°C</div>
+            <p>{room.humidity !== null ? `${formatNumber(room.humidity)}% Luftfeuchtigkeit` : 'Luftfeuchtigkeit --'}</p>
+            <div className="wall-temperature-list">
+              {room.climate.map((item) => (
+                <article key={item.entity_id}>
+                  <span>{item.name}</span>
+                  <strong>{formatNumber(item.current_temperature)}°C</strong>
+                </article>
+              ))}
+              {room.items.map((item) => (
+                <article key={item.entity_id}>
+                  <span>{item.name}</span>
+                  <strong>{formatNumber(item.temperature)}°C</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+        {hasClimateData && rooms.length === 0 && <section className="wall-panel">Keine Temperaturdaten für diese Etage gefunden.</section>}
+        {!hasClimateData && <section className="wall-panel">Keine Temperaturdaten gefunden.</section>}
+      </div>
     </div>
   );
 }
@@ -954,6 +994,41 @@ function MetricCard({ icon, label, value, detail, tone = 'info', onClick }: { ic
   return <section className={`wall-metric ${tone}`}>{content}</section>;
 }
 
+function GarageDoorCard({
+  cover,
+  busy,
+  onCommand,
+}: {
+  cover: WallCover | null;
+  busy: boolean;
+  onCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+}) {
+  const state = String(cover?.state || '').toLowerCase();
+  const offline = !cover || state === 'unavailable' || state === 'unknown';
+  const open = state === 'open';
+  const moving = ['opening', 'closing'].includes(state);
+  const status = offline ? 'Offline' : moving ? 'Bewegt sich' : open ? 'Geöffnet' : state === 'closed' ? 'Geschlossen' : garageDoorState(cover);
+  const detail = offline ? 'Verbindung nicht verfügbar' : coverPositionDetail(cover);
+  return (
+    <section className={`wall-metric wall-garage-card ${garageDoorClass(state, offline)}`}>
+      <span><Warehouse size={24} /></span>
+      <div className="wall-garage-copy">
+        <small>Garage</small>
+        <strong>{status}</strong>
+        <p>{detail}</p>
+      </div>
+      <div className="wall-garage-actions">
+        <button type="button" className="open" disabled={offline || busy || state === 'open'} onClick={() => cover && onCommand(cover, 'open_cover')} aria-label="Garagentor öffnen" title="Öffnen">
+          <ArrowUp size={22} />
+        </button>
+        <button type="button" className="close" disabled={offline || busy || state === 'closed'} onClick={() => cover && onCommand(cover, 'close_cover')} aria-label="Garagentor schließen" title="Schließen">
+          <ArrowDown size={22} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
 class WallErrorBoundary extends Component<{ children: ReactNode }, { message: string; stack: string }> {
   state = { message: '', stack: '' };
 
@@ -1006,7 +1081,7 @@ function titleFor(section: WallSection) {
   return 'Zuhause';
 }
 
-function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number) {
+function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number, data?: WallDashboardData | null) {
   if (section === 'lights') return `${activeLights} von ${totalLights} aktiv`;
   if (section === 'floor') return 'Etage wählen und Räume öffnen';
   if (section === 'room') return 'Geräte in diesem Raum';
@@ -1014,6 +1089,7 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
   if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
   if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
   if (section === 'climate') return 'Temperaturen, Luftfeuchte und Thermostate';
+  if (section === 'home' && data) return `Aktualisiert ${formatTime(data.updated_at)} · ${data.home_assistant.entity_count} Home-Assistant-Entities`;
   return 'Hausstatus, Geräte und Agenten auf einen Blick';
 }
 
@@ -1044,6 +1120,41 @@ function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: 
   return { tone: 'ok', icon: <BatteryFull size={24} /> };
 }
 
+function garageCover(data: WallDashboardData): WallCover | null {
+  const covers = data.covers ?? [];
+  return covers.find((cover) => {
+    const haystack = `${cover.entity_id} ${cover.name} ${cover.area} ${cover.device_class || ''}`.toLowerCase();
+    return haystack.includes('garage') || haystack.includes('garagen') || haystack.includes('garagentor');
+  }) ?? covers.find((cover) => {
+    const haystack = `${cover.entity_id} ${cover.name} ${cover.area}`.toLowerCase();
+    return haystack.includes('tor');
+  }) ?? null;
+}
+
+function garageDoorState(cover: WallCover) {
+  const state = String(cover.state || '').toLowerCase();
+  if (state === 'open') return 'Offen';
+  if (state === 'closed') return 'Geschlossen';
+  if (state === 'opening') return 'Öffnet';
+  if (state === 'closing') return 'Schließt';
+  if (state === 'unavailable' || state === 'unknown') return 'Nicht verfügbar';
+  return labelState(cover.state);
+}
+
+function garageDoorClass(state: string, offline: boolean) {
+  if (offline) return 'offline';
+  if (state === 'open') return 'open';
+  if (state === 'opening' || state === 'closing') return 'moving';
+  return 'closed';
+}
+
+function coverPositionDetail(cover: WallCover) {
+  if (cover.position !== null && cover.position !== undefined && Number.isFinite(Number(cover.position))) {
+    return `${formatNumber(cover.position)}% offen`;
+  }
+  return labelState(cover.state);
+}
+
 function batteryBarWidth(battery: WallEntity & { level?: number | null }) {
   if (battery.level === null || battery.level === undefined || !Number.isFinite(Number(battery.level))) {
     return battery.state?.toLowerCase() === 'low' ? 12 : 100;
@@ -1063,6 +1174,27 @@ function batteryTone(battery: WallEntity & { level?: number | null }) {
 function findRoom(data: WallDashboardData, floor: string, room: string): WallLightRoom | undefined {
   const group = data.light_groups.find((item) => item.area === floor);
   return group?.rooms?.find((item) => sameArea(item.area, room));
+}
+
+function floorRooms(data: WallDashboardData, floor: string) {
+  const group = data.light_groups.find((item) => item.area === floor);
+  if (!group) return [];
+  return group.rooms?.length ? group.rooms : [{ area: group.area, total: group.total, on: group.on, items: group.items }];
+}
+
+function floorTemperature(data: WallDashboardData, floor: string) {
+  const roomNames = new Set(floorRooms(data, floor).map((room) => normalizeArea(room.area)));
+  if (!roomNames.size) return null;
+  const values = [
+    ...(data.temperature_sensors ?? [])
+      .filter((sensor) => roomNames.has(normalizeArea(sensor.area)))
+      .map((sensor) => sensor.temperature),
+    ...data.climate
+      .filter((item) => roomNames.has(normalizeArea(item.area)))
+      .map((item) => item.current_temperature),
+  ].filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value)));
+
+  return avg(values.map(Number));
 }
 
 function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
@@ -1164,19 +1296,50 @@ function formatNumber(value?: number | null) {
   return `${Math.round(number * 10) / 10}`.replace('.', ',');
 }
 
-function temperatureRooms(sensors: WallTemperatureSensor[]) {
-  const groups = new Map<string, WallTemperatureSensor[]>();
-  for (const sensor of sensors) {
-    if (sensor.temperature === null || sensor.temperature === undefined) continue;
-    groups.set(sensor.area || 'Haus', [...(groups.get(sensor.area || 'Haus') ?? []), sensor]);
+function temperatureRooms(data: WallDashboardData, selectedFloor: string) {
+  const roomToFloor = new Map<string, string>();
+  for (const group of data.light_groups) {
+    for (const room of floorRooms(data, group.area)) {
+      roomToFloor.set(normalizeArea(room.area), group.area);
+    }
   }
-  return [...groups.entries()]
-    .map(([area, items]) => ({
-      area,
-      items: items.sort((left, right) => left.name.localeCompare(right.name)),
-      average: items.reduce((sum, item) => sum + Number(item.temperature ?? 0), 0) / items.length,
-    }))
-    .sort((left, right) => left.area.localeCompare(right.area));
+
+  const areas = new Set<string>();
+  for (const sensor of data.temperature_sensors ?? []) {
+    if (sensor.temperature !== null && sensor.temperature !== undefined) areas.add(sensor.area || 'Haus');
+  }
+  for (const item of data.climate) {
+    if (item.current_temperature !== null && item.current_temperature !== undefined) areas.add(item.area || 'Haus');
+  }
+
+  return [...areas]
+    .map((area) => {
+      const floor = roomToFloor.get(normalizeArea(area)) || 'Haus';
+      const items = (data.temperature_sensors ?? [])
+        .filter((sensor) => sameArea(sensor.area, area) && sensor.temperature !== null && sensor.temperature !== undefined)
+        .sort((left, right) => left.name.localeCompare(right.name));
+      const climate = data.climate
+        .filter((item) => sameArea(item.area, area) && item.current_temperature !== null && item.current_temperature !== undefined)
+        .sort((left, right) => left.name.localeCompare(right.name));
+      const temperatures = [
+        ...items.map((item) => item.temperature),
+        ...climate.map((item) => item.current_temperature),
+      ].filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value)));
+      const humidityValues = [
+        ...items.map((item) => item.humidity),
+        ...climate.map((item) => item.humidity),
+      ].filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value)));
+      return {
+        area,
+        floor,
+        items,
+        climate,
+        temperature: avg(temperatures.map(Number)),
+        humidity: avg(humidityValues.map(Number)),
+      };
+    })
+    .filter((room) => selectedFloor === 'Alle Etagen' || room.floor === selectedFloor)
+    .sort((left, right) => left.floor.localeCompare(right.floor) || left.area.localeCompare(right.area));
 }
 
 function formatTime(value: string) {
@@ -1192,8 +1355,8 @@ function formatDateTime(value: string) {
 }
 
 function formatAgentNextRun(value?: string | null, schedule: string[] = []) {
-  if (value) return formatDateTime(value);
-  return schedule.length ? schedule.map((item) => item.slice(0, 5)).join(', ') : 'nicht geplant';
+  if (schedule.length) return schedule.map((item) => item.slice(0, 5)).join(', ');
+  return value ? formatDateTime(value) : 'nicht geplant';
 }
 
 function formatWellnessNextRun(wellness: Partial<AgentStatus> & { status?: string; error?: string }) {
@@ -1265,4 +1428,18 @@ function patchWallLights(
     };
   });
   return { ...current, lights, light_groups };
+}
+
+function patchWallCover(
+  current: WallDashboardData | null,
+  entityId: string,
+  patch: Partial<WallCover>,
+): WallDashboardData | null {
+  if (!current) return current;
+  return {
+    ...current,
+    covers: (current.covers ?? []).map((cover) => (
+      cover.entity_id === entityId ? { ...cover, ...patch } : cover
+    )),
+  };
 }
