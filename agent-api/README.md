@@ -16,7 +16,7 @@ agent-api/
 │   └── agents/
 │       ├── invoices/         # InvoiceAgent API, Service, Exporte, Dateien
 │       ├── market/           # MarketAgent API, Agent, Analyse-/Datenservices
-│       └── mywellness/       # MyWellness API, Agent, Scheduler-Service
+│       └── mywellness/       # MyWellness API, Agent, Scheduler-, Health- und AI-Services
 ├── frontend/
 │   └── src/
 ├── logs/
@@ -121,12 +121,30 @@ MyWellness-Endpunkte:
 GET  /api/agent/status
 POST /api/agent/start
 POST /api/agent/stop
+GET  /api/mywellness/status
+POST /api/mywellness/run/prepare
+POST /api/mywellness/run/book
+POST /api/mywellness/enable
+POST /api/mywellness/disable
+POST /api/mywellness/toggle
+PUT  /api/mywellness/settings
 GET  /api/mywellness/courses
 GET  /api/mywellness/courses/upcoming
 POST /api/mywellness/book
 POST /api/mywellness/cancel
 GET  /api/mywellness/bookings
 GET  /api/mywellness/logs
+GET  /api/mywellness/health/status
+GET  /api/mywellness/health/metrics
+POST /api/mywellness/health/import-from-ha
+POST /api/mywellness/health/analyze
+GET  /api/mywellness/health/latest-report
+GET  /api/mywellness/health/reports
+PUT  /api/mywellness/health/settings
+GET  /api/mywellness/health/withings/entities
+POST /api/mywellness/health/withings/import
+GET  /api/mywellness/health/withings/latest
+POST /api/mywellness/health/withings/discover
 ```
 
 `POST /api/agent/start` startet den bestehenden `../ai-agent/mywellness/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Persistenter Zustand, History und vorbereitete Kursdaten liegen in der SQLite-DB `../ai-agent/data/mywellness/mywellness.db`; der Lauf-Status (`is_running`, letzter Output) wird im Arbeitsspeicher gehalten. Agent-Logs bleiben bei `../ai-agent/logs/mywellness.log`.
@@ -148,7 +166,7 @@ Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/i
 
 ## MyWellness Agent
 
-Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse aus dem Prepare-Cache, verfuegbare Kurse der naechsten 48 Stunden und die letzten Logs. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal, laden API-Daten neu oder buchen/stornieren Kurse. Verfuegbare Kurse, Buchungen und Status werden automatisch alle 30 Sekunden aktualisiert.
+Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse aus dem Prepare-Cache, verfuegbare Kurse der naechsten 48 Stunden und die letzten Logs. Zusaetzlich gibt es Health-/Recovery-Auswertungen aus Home-Assistant- und Withings-Daten. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal, laden API-Daten neu oder buchen/stornieren Kurse. Verfuegbare Kurse, Buchungen und Status werden automatisch alle 30 Sekunden aktualisiert.
 
 Erforderliche ENV-Werte werden aus der Umgebung oder aus `../ai-agent/.env` gelesen:
 
@@ -158,7 +176,17 @@ MY_WELLNESS_USER_ID
 MY_WELLNESS_FACILITY_ID
 ```
 
-Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. Vorbereitete Kurse und Live-Kurse liegen in `../ai-agent/data/mywellness/mywellness.db`.
+Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. Vorbereitete Kurse, Live-Kurse, Health-Metriken, Recovery-Reports und Health-Einstellungen liegen in `../ai-agent/data/mywellness/mywellness.db`.
+
+Der MyWellness-spezifische Backend-Code ist im Agent-Paket gebuendelt:
+
+```text
+backend/agents/mywellness/
+  routes.py
+  service.py
+  health_service.py
+  ai_service.py
+```
 
 Fehler pruefen:
 
@@ -171,7 +199,48 @@ Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detail
 
 ## Hinweise
 
-- Kein Login-System in V1.
-- API-Key/Auth ist als naechster Backend-Middleware-Schritt vorbereitet.
+- JWT-Login ist aktiv; nur `/health` und `/api/auth/login` sind oeffentlich.
 - ELSTER-Direktversand ist nicht implementiert und wird nur als deaktivierter Platzhalter angezeigt.
 - Steuerkategorien sind nur Datenfelder, keine Steuerberatung.
+
+## Agent Plugin Contract
+
+Ein Agent wird als Ordner unter `agent-api/backend/agents/<id>/` angelegt.
+
+Minimaler Aufbau:
+
+```text
+backend/agents/example/
+  manifest.yaml
+  routes.py
+  service.py
+```
+
+`manifest.yaml`:
+
+```yaml
+id: example
+name: Example Agent
+description: Kurzbeschreibung fuer die Agenten-Uebersicht.
+enabled: true
+status: active
+api:
+  prefix: /api/example
+  route_module: backend.agents.example.routes
+runtime:
+  service_object: example_service
+ui:
+  icon: Bot
+  dashboard_route:
+settings: {}
+```
+
+`routes.py` muss einen FastAPI-`router` exportieren. Wenn `runtime.service_object`
+gesetzt ist und dieses Objekt `start_scheduler()` / `stop_scheduler()` besitzt,
+ruft die API diese Methoden beim Starten und Stoppen automatisch auf.
+
+Bekannte UI-Icons im Frontend: `Bot`, `FileText`, `Dumbbell`, `LineChart`,
+`Mail`, `CalendarCheck`, `Home`, `Settings2`.
+
+Ein `dashboard_route` ist optional. Ohne eigene Frontend-Route erscheint der
+Agent in der Uebersicht als installiert, aber ohne oeffnende Detailseite.

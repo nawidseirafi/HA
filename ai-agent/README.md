@@ -21,12 +21,12 @@ ai-agent/
 │   ├── analysis.py / data.py / news.py / report.py / symbol_resolver.py
 ├── mailbox/   presence/   vacation/   # weitere Einzelagenten
 ├── shared/                # Querschnitt (ha_client.py)
-├── llm/                   # LLM-Client-Factory (Gemini, OpenAI, Llama)
+├── llm/                   # LLM-Client-Factory (Gemini, OpenAI, Claude, Llama)
 ├── config.yaml
 └── requirements.txt
 ```
 
-Jeder Agent besitzt einen eigenen Ordner mit CLI-Entry und Domaenenmodulen. Die FastAPI-Schicht unter `../agent-api/backend/` importiert Read-Module direkt via `sys.path` (`from invoice.…`, `from mywellness.store`, `from market.report`) und startet schwere Laeufe per `subprocess` ueber die jeweiligen `<domain>/<domain>.py`-CLIs.
+Jeder Agent besitzt einen eigenen Ordner mit CLI-Entry und Domaenenmodulen. Die FastAPI-Schicht unter `../agent-api/backend/agents/` kapselt die API-Services je Agent, importiert einzelne Read-Module direkt via `sys.path` (`from invoice.…`, `from mywellness.store`, `from market.report`) und startet schwere Laeufe per `subprocess` ueber die jeweiligen `<domain>/<domain>.py`-CLIs.
 
 ## Debian-Pakete
 
@@ -74,19 +74,23 @@ Lokale Entwicklung in diesem Projekt nutzt das gemeinsame `venv` auf Repo-Ebene.
 Die Python-Pakete stehen in `requirements.txt`:
 
 ```text
+fastapi
+uvicorn[standard]
+python-multipart
 google-genai
 openai
-playwright
 python-dotenv
 PyYAML
-pypdf
 requests
+pypdf
 openpyxl
+pillow
 ```
 
-Fuer Portal-Downloads wird zusaetzlich ein Playwright-Browser benoetigt:
+Fuer Portal-Downloads wird zusaetzlich Playwright benoetigt:
 
 ```bash
+../venv/bin/pip install playwright
 ../venv/bin/playwright install chromium
 ```
 
@@ -97,15 +101,16 @@ Die zentrale Konfiguration liegt in `config.yaml`.
 Fuer Home Assistant gehoert der Long-Lived Access Token in `.env`:
 
 ```bash
-HA-TOKEN="dein-home-assistant-token"
+HA_URL="http://homeassistant.local:8123"
+HA_TOKEN="dein-home-assistant-token"
 ```
 
-In `config.yaml` verweist `token_env` darauf:
+In `config.yaml` verweist die Home-Assistant-Konfiguration auf diese ENV-Namen:
 
 ```yaml
 home_assistant:
-  url: "http://homeassistant.local:8123"
-  token: "TOKEN"
+  url: HA_URL
+  token: HA_TOKEN
 ```
 
 Wichtige Pfade fuer den Rechnungs-Agenten:
@@ -145,6 +150,50 @@ invoice_agent:
 ```
 
 Secrets wie API-Keys gehoeren in `.env`, nicht ins Git-Repository.
+
+## MyWellness-Agent
+
+Der CLI-Agent liegt unter `mywellness/` und kann direkt gestartet werden:
+
+```bash
+../venv/bin/python mywellness/mywellness.py prepare
+../venv/bin/python mywellness/mywellness.py book
+```
+
+`prepare` sucht Zielkurse und speichert die Kurs-IDs. `book` liest diese vorbereiteten Kurs-IDs und versucht die Buchung. Die Agent-API nutzt dieselbe CLI fuer geplante Laeufe und stellt zusaetzlich Live-Kurse, Buchungen, Settings und Health-/Recovery-Funktionen bereit.
+
+Erforderliche ENV-Werte werden aus der Umgebung oder aus `ai-agent/.env` gelesen:
+
+```text
+MY_WELLNESS_TOKEN
+MY_WELLNESS_USER_ID
+MY_WELLNESS_FACILITY_ID
+```
+
+Der lokale CLI-Fallback in `ai-agent/config.yaml` heisst aktuell `myWelness_agent`. `MY_WELLNESS_TOKEN` aus der Umgebung hat Vorrang; der Config-Wert kann noch auf den aelteren ENV-Namen `MY_WELLNESS_KEY` zeigen:
+
+```yaml
+myWelness_agent:
+  token: MY_WELLNESS_KEY
+  user_id: MY_WELLNESS_USER_ID
+  facility_id: MY_WELLNESS_FACILITY_ID
+```
+
+Die Agent-API liest ihre MyWellness-Laufzeitkonfiguration aus `../agent-api/config.yaml` unter `agents.mywellness` und aus der SQLite-Datenbank.
+
+Der MyWellness-Agent speichert vorbereitete und live geladene Kursdaten in:
+
+```text
+ai-agent/data/mywellness/mywellness.db
+```
+
+`mywellness/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `mywellness/mywellness.py book` liest diese Kurs-IDs aus der Datenbank. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank und verwaltet dort auch `mywellness_settings`, `mywellness_logs`, `mywellness_health_metrics`, `mywellness_recovery_reports` und `mywellness_health_settings`.
+
+Der API-seitige MyWellness-Code liegt in:
+
+```text
+../agent-api/backend/agents/mywellness/
+```
 
 ## E-Mail-Anbindung ALL-INKL
 
@@ -199,8 +248,6 @@ mailbox: "Rechnungen"
 search: "ALL"
 ```
 
-## Rechnungs-Agent starten
-
 ## Home-Assistant-Benachrichtigung
 
 Der Agent kann nach einem Scan eine Home-Assistant-Mobile-Benachrichtigung schicken und optional weiter eine `persistent_notification` in Home Assistant erstellen.
@@ -225,16 +272,6 @@ Mit `only_on_changes: true` meldet der Agent nur, wenn neue Rechnungen archivier
 ## Portal-Downloads HUK24
 
 Fuer Anbieter wie HUK24, bei denen Rechnungen nur im Kundenportal liegen, nutzt der Agent Playwright mit einer gespeicherten Browser-Session.
-
-## MyWellness-Datenbank
-
-Der MyWellness-Agent speichert vorbereitete und live geladene Kursdaten in:
-
-```text
-ai-agent/data/mywellness/mywellness.db
-```
-
-`mywellness/mywellness.py prepare` schreibt die gefundenen Zielkurse in die Tabelle `courses` mit `source = 'prepare'`. `mywellness/mywellness.py book` liest diese Kurs-IDs aus der Datenbank. Die Agent-API schreibt live geladene Kurse mit `source = 'live'` ebenfalls in dieselbe Datenbank.
 
 In `config.yaml`:
 
