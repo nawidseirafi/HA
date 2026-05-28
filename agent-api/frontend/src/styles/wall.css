@@ -490,6 +490,7 @@
   display: flex;
   gap: 8px;
   margin-left: auto;
+  transform: translateY(12px);
 }
 
 .wall-garage-actions button {
