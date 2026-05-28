@@ -16,3 +16,4 @@ ai-agent/data/
 HA/secrets.yaml
 agent-api/backend/storage/
 agent-api.service
+.idea/
