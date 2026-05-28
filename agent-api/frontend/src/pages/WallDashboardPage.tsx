@@ -18,10 +18,13 @@ import {
   Lightbulb,
   Mailbox,
   Layers3,
+  Minus,
   Plane,
+  Plus,
   Trash2,
   RefreshCw,
   ShieldAlert,
+  Square,
   Thermometer,
   Zap,
   Warehouse,
@@ -30,6 +33,7 @@ import { api, type AgentStatus, type WallCover, type WallDashboardData, type Wal
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
+type BatteryBadge = { label: string; tone: string };
 type MetricTone =
   | 'info'
   | 'ok'
@@ -349,6 +353,37 @@ function WallDashboardContent() {
     }
   };
 
+  const setCoverPosition = async (cover: WallCover, position: number) => {
+    const nextPosition = clampPercent(position);
+    setData((current) => patchWallCover(current, cover.entity_id, { position: nextPosition }));
+    setBusyEntity(cover.entity_id);
+    setError('');
+    try {
+      await api.callHomeAssistantService({ domain: 'cover', service: 'set_cover_position', entity_id: cover.entity_id, data: { position: nextPosition } });
+      scheduleRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Jalousieposition konnte nicht gesetzt werden.');
+      await load(true);
+    } finally {
+      setBusyEntity('');
+    }
+  };
+
+  const callClimate = async (item: WallDashboardData['climate'][number], service: 'set_hvac_mode' | 'set_temperature', payload: Record<string, unknown>) => {
+    setData((current) => patchWallClimate(current, item.entity_id, payload));
+    setBusyEntity(item.entity_id);
+    setError('');
+    try {
+      await api.callHomeAssistantService({ domain: 'climate', service, entity_id: item.entity_id, data: payload });
+      scheduleRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Klima konnte nicht geschaltet werden.');
+      await load(true);
+    } finally {
+      setBusyEntity('');
+    }
+  };
+
   const goSection = (next: WallSection) => {
     setSection(next);
     if (next !== 'floor') setFloorView('');
@@ -410,8 +445,8 @@ function WallDashboardContent() {
     <div className="wall-shell">
       <aside className="wall-nav">
         <button className={section === 'home' ? 'active' : ''} onClick={() => goSection('home')} aria-label="Home"><Home size={24} /></button>
-        <button className={section === 'lights' ? 'active' : ''} onClick={openLights} aria-label="Lampen"><Lightbulb size={24} /></button>
         <button className={section === 'floor' || section === 'room' ? 'active' : ''} onClick={openFloors} aria-label="Etagen"><Layers3 size={24} /></button>
+        <button className={section === 'lights' ? 'active' : ''} onClick={openLights} aria-label="Lampen"><Lightbulb size={24} /></button>
         <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')} aria-label="Klima"><Thermometer size={24} /></button>
         <button className={section === 'security' ? 'active' : ''} onClick={() => goSection('security')} aria-label="Sicherheit"><ShieldAlert size={24} /></button>
         <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')} aria-label="Agenten"><Bot size={24} /></button>
@@ -472,6 +507,10 @@ function WallDashboardContent() {
             onBack={() => setSection('floor')}
             onToggle={(light) => callLight(light.on ? 'turn_off' : 'turn_on', light.entity_id)}
             onBrightness={setBrightness}
+            onCoverCommand={callCover}
+            onCoverPosition={setCoverPosition}
+            onClimateMode={(item, mode) => callClimate(item, 'set_hvac_mode', { hvac_mode: mode })}
+            onClimateTemperature={(item, temperature) => callClimate(item, 'set_temperature', { temperature })}
           />
         )}
       </main>
@@ -638,6 +677,10 @@ function RoomSection({
   onBack,
   onToggle,
   onBrightness,
+  onCoverCommand,
+  onCoverPosition,
+  onClimateMode,
+  onClimateTemperature,
 }: {
   data: WallDashboardData;
   floor: string;
@@ -646,44 +689,266 @@ function RoomSection({
   onBack: () => void;
   onToggle: (light: WallLight) => void;
   onBrightness: (light: WallLight, value: number) => void;
+  onCoverCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+  onCoverPosition: (cover: WallCover, position: number) => void;
+  onClimateMode: (item: WallDashboardData['climate'][number], mode: string) => void;
+  onClimateTemperature: (item: WallDashboardData['climate'][number], temperature: number) => void;
 }) {
   const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
-  const otherDevices = roomDevices(data, room, new Set(lights.map((light) => light.entity_id)));
-  const coverCount = (data.covers ?? []).filter((cover) => sameArea(cover.area, room)).length;
+  const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
+  const climates = data.climate.filter((item) => sameArea(item.area, room));
+  const sensorChips = roomSensorChips(data, room);
+  const excluded = new Set([
+    ...lights.map((light) => light.entity_id),
+    ...covers.map((cover) => cover.entity_id),
+    ...climates.map((item) => item.entity_id),
+    ...sensorChips.map((chip) => chip.entity_id),
+  ]);
+  const otherDevices = roomDevices(data, room, excluded);
   const roomTemp = roomTemperature(data, room);
+  const roomHumidityValue = roomHumidity(data, room);
+  const activeLights = lights.filter((light) => light.on).length;
+  const deviceCount = lights.length + covers.length + climates.length + sensorChips.length + otherDevices.length;
+  const mood = roomMood(data, room, climates);
+  const temperatureClass = roomTemperatureClass(roomTemp);
 
   return (
-    <div className="wall-page-stack">
+    <div className="wall-page-stack wall-room-detail-page">
       <button className="wall-back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> {floor}</button>
-      <section className="wall-room-card wall-room-detail-card">
-        <div className="wall-room-head">
-          <span><Lightbulb size={24} /></span>
-          <div>
-            <h2>{room}</h2>
-            <p>
-              {floor} · {lights.filter((light) => light.on).length}/{lights.length} Lampen an
-              {coverCount ? ` · ${coverCount} Jalousien` : ''}
-              {roomTemp !== null ? ` · ${formatNumber(roomTemp)}°C` : ''}
-              {otherDevices.length ? ` · ${otherDevices.length} weitere Geräte` : ''}
-            </p>
-          </div>
-        </div>
-        <div className="wall-light-list">
-          {lights.map((light) => (
-            <LightRow
-              key={light.entity_id}
-              light={light}
-              busy={busyEntity === light.entity_id}
-              onToggle={onToggle}
-              onBrightness={onBrightness}
-            />
-          ))}
-          {otherDevices.map((device) => <DeviceRow key={device.entity_id} device={device} />)}
-          {lights.length === 0 && otherDevices.length === 0 && <p>Keine Geräte für diesen Raum gefunden.</p>}
+      <section className={`wall-room-hero ${temperatureClass} ${activeLights ? 'active' : ''} ${mood.classes.join(' ')}`}>
+        <span><Home size={30} /></span>
+        <div>
+          <small>{floor}</small>
+          <h2>{room}</h2>
+          <p>
+            {roomTemp !== null ? `${formatNumber(roomTemp)}°C` : '--°C'}
+            {roomHumidityValue !== null ? ` · ${formatNumber(roomHumidityValue)}% Luftfeuchte` : ''}
+          </p>
+          <p>{activeLights ? `${activeLights} Licht an` : 'Licht aus'} · {deviceCount} Geräte</p>
+          {mood.chips.length > 0 && (
+            <div className="wall-room-mood-chips">
+              {mood.chips.map((chip) => <span key={chip.label} className={chip.tone}>{chip.label}</span>)}
+            </div>
+          )}
         </div>
       </section>
+      <div className="wall-room-control-grid">
+        {lights.length > 0 && (
+          <RoomLightControl
+            lights={lights}
+            busyEntity={busyEntity}
+            onToggle={onToggle}
+            onBrightness={onBrightness}
+          />
+        )}
+        {climates.map((item) => (
+          <RoomClimateControl
+            key={item.entity_id}
+            item={item}
+            battery={batteryForDeviceName(data, room, item.name)}
+            busy={busyEntity === item.entity_id}
+            onMode={onClimateMode}
+            onTemperature={onClimateTemperature}
+          />
+        ))}
+        {covers.map((cover) => (
+          <RoomCoverControl
+            key={cover.entity_id}
+            cover={cover}
+            battery={batteryForDeviceName(data, room, cover.name)}
+            busy={busyEntity === cover.entity_id}
+            onCommand={onCoverCommand}
+            onPosition={onCoverPosition}
+          />
+        ))}
+        {sensorChips.length > 0 && (
+          <section className="wall-room-panel wall-room-sensors">
+            <div className="wall-room-panel-title">
+              <span>Sensoren</span>
+              <strong>{sensorChips.length}</strong>
+            </div>
+            <div className="wall-sensor-chip-grid">
+              {sensorChips.map((chip) => (
+                <article key={chip.entity_id} className={`wall-sensor-chip ${chip.tone}`}>
+                  <small>{chip.label}</small>
+                  <strong>{chip.value}{chip.battery && <BatteryPill battery={chip.battery} />}</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+        {otherDevices.length > 0 && (
+          <section className="wall-room-panel wall-room-devices">
+            <div className="wall-room-panel-title">
+              <span>Geräte</span>
+              <strong>{otherDevices.length}</strong>
+            </div>
+            <div className="wall-device-card-grid">
+              {otherDevices.map((device) => <RoomDeviceCard key={device.entity_id} device={device} battery={batteryForDeviceName(data, room, device.name)} />)}
+            </div>
+          </section>
+        )}
+        {lights.length === 0 && climates.length === 0 && covers.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+          <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
+        )}
+      </div>
     </div>
   );
+}
+
+function RoomLightControl({
+  lights,
+  busyEntity,
+  onToggle,
+  onBrightness,
+}: {
+  lights: WallLight[];
+  busyEntity: string;
+  onToggle: (light: WallLight) => void;
+  onBrightness: (light: WallLight, value: number) => void;
+}) {
+  const active = lights.filter((light) => light.on);
+  const dimmable = lights.filter((light) => light.brightness_pct !== null && light.brightness_pct !== undefined);
+  const brightness = active.length ? Math.round(avg(active.map((light) => light.brightness_pct ?? 100)) ?? 100) : 0;
+  const busy = lights.some((light) => busyEntity === light.entity_id);
+  const setAll = (on: boolean) => lights.forEach((light) => {
+    if (light.on !== on) onToggle(light);
+  });
+  const setScene = (value: number) => {
+    dimmable.forEach((light) => onBrightness(light, value));
+    lights.filter((light) => !light.on).forEach((light) => onToggle(light));
+  };
+
+  return (
+    <section className={`wall-room-panel wall-light-control ${active.length ? 'on' : ''}`}>
+      <div className="wall-room-panel-title">
+        <span>Licht</span>
+        <strong>{active.length}/{lights.length}</strong>
+      </div>
+      <div className="wall-light-control-main">
+        <span><Lightbulb size={32} /></span>
+        <div>
+          <h3>{active.length ? 'Licht an' : 'Licht aus'}</h3>
+          <p>{active.length ? `${brightness}% Helligkeit` : 'Ruhiger Modus'}</p>
+        </div>
+        <button type="button" className={`wall-room-power ${active.length ? 'on' : ''}`} disabled={busy} onClick={() => setAll(!active.length)}>
+          {active.length ? 'Ausschalten' : 'Einschalten'}
+        </button>
+      </div>
+      {active.length > 0 && dimmable.length > 0 && (
+        <label className="wall-room-slider">
+          <span>Helligkeit</span>
+          <strong>{brightness}%</strong>
+          <input type="range" min="1" max="100" value={brightness} onChange={(event) => setScene(Number(event.target.value))} />
+        </label>
+      )}
+      <div className="wall-scene-buttons">
+        <button type="button" onClick={() => setScene(100)}>Hell</button>
+        <button type="button" onClick={() => setScene(35)}>Relax</button>
+        <button type="button" onClick={() => setScene(75)}>Sport</button>
+        <button type="button" onClick={() => setScene(15)}>Kino</button>
+        <button type="button" onClick={() => setAll(false)}>Alles aus</button>
+      </div>
+    </section>
+  );
+}
+
+function RoomClimateControl({
+  item,
+  battery,
+  busy,
+  onMode,
+  onTemperature,
+}: {
+  item: WallDashboardData['climate'][number];
+  battery?: BatteryBadge | null;
+  busy: boolean;
+  onMode: (item: WallDashboardData['climate'][number], mode: string) => void;
+  onTemperature: (item: WallDashboardData['climate'][number], temperature: number) => void;
+}) {
+  const mode = String(item.state || 'off').toLowerCase();
+  const target = Number(item.target_temperature ?? item.current_temperature ?? 20);
+  return (
+    <section className={`wall-room-panel wall-climate-control ${climateToneClass(mode)}`}>
+      <div className="wall-room-panel-title">
+        <span>Klima</span>
+        <strong><b className={`wall-climate-status ${climateToneClass(mode)}`}>{labelClimateMode(mode)}</b>{battery && <BatteryPill battery={battery} />}</strong>
+      </div>
+      <div className="wall-climate-dial">
+        <button type="button" disabled={busy} onClick={() => onTemperature(item, Math.round((target - 0.5) * 10) / 10)} aria-label="Zieltemperatur senken"><Minus size={20} /></button>
+        <div className="wall-thermostat-circle">
+          <strong>{formatNumber(target)}°C</strong>
+          <span>Zieltemperatur</span>
+          <small>Aktuell {formatNumber(item.current_temperature)}°C</small>
+        </div>
+        <button type="button" disabled={busy} onClick={() => onTemperature(item, Math.round((target + 0.5) * 10) / 10)} aria-label="Zieltemperatur erhöhen"><Plus size={20} /></button>
+      </div>
+      <div className="wall-mode-buttons">
+        {['off', 'heat', 'cool', 'auto', 'dry'].map((nextMode) => (
+          <button key={nextMode} type="button" className={mode === nextMode ? 'active' : ''} disabled={busy} onClick={() => onMode(item, nextMode)}>
+            {labelClimateMode(nextMode)}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RoomCoverControl({
+  cover,
+  battery,
+  busy,
+  onCommand,
+  onPosition,
+}: {
+  cover: WallCover;
+  battery?: BatteryBadge | null;
+  busy: boolean;
+  onCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+  onPosition: (cover: WallCover, position: number) => void;
+}) {
+  const position = clampPercent(cover.position ?? (cover.state === 'open' ? 100 : 0));
+  return (
+    <section className="wall-room-panel wall-cover-control">
+      <div className="wall-room-panel-title">
+        <span>Jalousien</span>
+        <strong>{coverStatus(cover)}{battery && <BatteryPill battery={battery} />}</strong>
+      </div>
+      <div className="wall-cover-body">
+        <div className="wall-cover-visual" aria-hidden="true">
+          <i style={{ height: `${100 - position}%` }} />
+        </div>
+          <div>
+          <h3>{cover.name}</h3>
+          <p>{formatNumber(position)}% offen</p>
+          <label className="wall-room-slider compact">
+            <input type="range" min="0" max="100" value={position} disabled={busy} onChange={(event) => onPosition(cover, Number(event.target.value))} />
+          </label>
+          <div className="wall-cover-actions">
+            <button type="button" disabled={busy || cover.state === 'open'} onClick={() => onCommand(cover, 'open_cover')}><ArrowUp size={18} /> Hoch</button>
+            <button type="button" disabled={busy} onClick={() => onCommand(cover, 'stop_cover')}><Square size={14} /> Stop</button>
+            <button type="button" disabled={busy || cover.state === 'closed'} onClick={() => onCommand(cover, 'close_cover')}><ArrowDown size={18} /> Runter</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RoomDeviceCard({ device, battery }: { device: WallEntity; battery?: BatteryBadge | null }) {
+  return (
+    <article className="wall-room-device-card">
+      <div className={`wall-dot ${deviceActive(device) ? 'on' : ''}`} />
+      <div>
+        <strong>{device.name}</strong>
+        <span>{deviceValue(device)}{battery && <BatteryPill battery={battery} />}</span>
+      </div>
+    </article>
+  );
+}
+
+function BatteryPill({ battery }: { battery: BatteryBadge }) {
+  return <em className={`wall-battery-pill ${battery.tone}`}>{battery.label}</em>;
 }
 
 function LightsSection({
@@ -879,19 +1144,19 @@ function AgentsSection({ data }: { data: WallDashboardData }) {
   const invoices = data.agents.invoices;
   const market = data.agents.market;
   return (
-    <div className="wall-card-grid">
-      <section className="wall-panel">
+    <div className="wall-card-grid wall-agents-grid">
+      <section className="wall-panel wall-agent-card">
         <div className="wall-section-title"><span>Invoice Agent</span><Bot size={20} /></div>
         <h2>{invoiceState(invoices)}</h2>
         <p>Nächster Scan: {formatAgentNextRun(invoices.next_scheduled_run, invoices.schedule)}</p>
         <p>{invoices.total ?? 0} Belege · {invoices.needs_review ?? 0} zu prüfen · {invoices.errors ?? 0} Fehler</p>
       </section>
-      <section className="wall-panel">
+      <section className="wall-panel wall-agent-card">
         <div className="wall-section-title"><span>MyWellness</span><Activity size={20} /></div>
         <h2>{wellness.is_running ? 'Läuft' : wellness.enabled === false ? 'Pausiert' : 'Bereit'}</h2>
         <p>Nächster Lauf: {formatWellnessNextRun(wellness)}</p>
       </section>
-      <section className="wall-panel">
+      <section className="wall-panel wall-agent-card">
         <div className="wall-section-title"><span>Market Agent</span><Zap size={20} /></div>
         <h2>{market.status === 'ok' ? 'Bereit' : 'Fehler'}</h2>
         <p>{market.enabled_count ?? 0}/{market.watchlist_count ?? 0} Watchlist aktiv</p>
@@ -1199,8 +1464,8 @@ function floorTemperature(data: WallDashboardData, floor: string) {
 
 function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
   const devices: WallEntity[] = [
-    ...(data.covers ?? []),
-    ...(data.sensors ?? data.temperature_sensors ?? []),
+    ...(data.switches ?? []),
+    ...(data.media_players ?? []),
   ];
   const unique = new Map<string, WallEntity>();
   for (const device of devices) {
@@ -1208,6 +1473,183 @@ function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>
     unique.set(device.entity_id, device);
   }
   return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
+  const classes: string[] = [];
+  const chips: Array<{ label: string; tone: string }> = [];
+  const hasOpenContact = data.security.openings.some((item) => sameArea(item.area, room) && item.state === 'on');
+  const playing = (data.media_players ?? []).some((item) => sameArea(item.area, room) && String(item.state).toLowerCase() === 'playing');
+  const vacation = vacationStatus(data);
+  const climateMode = climates.map((item) => String(item.state || '').toLowerCase()).find((mode) => mode && mode !== 'off');
+
+  if (climateMode === 'cool') {
+    classes.push('mood-cool');
+    chips.push({ label: 'Klima kühlt', tone: 'cool' });
+  } else if (climateMode === 'heat') {
+    classes.push('mood-heat');
+    chips.push({ label: 'Klima heizt', tone: 'heat' });
+  } else if (climateMode === 'auto' || climateMode === 'dry') {
+    classes.push('mood-auto');
+    chips.push({ label: climateMode === 'dry' ? 'Entfeuchtet' : 'Klima Auto', tone: 'auto' });
+  }
+
+  if (hasOpenContact) {
+    classes.push('mood-open');
+    chips.push({ label: 'Fenster offen', tone: 'open' });
+  }
+
+  if (playing) {
+    classes.push('mood-music');
+    chips.push({ label: 'Musik läuft', tone: 'music' });
+  }
+
+  if (vacation) {
+    classes.push('mood-vacation');
+    chips.push({ label: 'Urlaub aktiv', tone: 'vacation' });
+  }
+
+  return { classes, chips };
+}
+
+function roomTemperatureClass(value: number | null) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'temp-neutral';
+  if (value < 18) return 'temp-cold';
+  if (value < 21) return 'temp-cool';
+  if (value < 24) return 'temp-comfort';
+  if (value < 26) return 'temp-warm';
+  return 'temp-hot';
+}
+
+function roomSensorChips(data: WallDashboardData, room: string) {
+  const chips = new Map<string, { entity_id: string; label: string; value: string; tone: string; battery?: BatteryBadge | null }>();
+  const add = (entity_id: string, label: string, value: string, tone = 'neutral', battery?: BatteryBadge | null) => {
+    chips.set(entity_id, { entity_id, label, value, tone, battery });
+  };
+
+  for (const sensor of data.temperature_sensors ?? []) {
+    if (!sameArea(sensor.area, room)) continue;
+    if (sensor.temperature !== null && sensor.temperature !== undefined) {
+      add(`${sensor.entity_id}:temperature`, 'Temperatur', `${formatNumber(sensor.temperature)}°C`, 'climate');
+    }
+    if (sensor.humidity !== null && sensor.humidity !== undefined) {
+      add(`${sensor.entity_id}:humidity`, 'Luftfeuchte', `${formatNumber(sensor.humidity)}%`, 'climate');
+    }
+  }
+
+  for (const sensor of data.sensors ?? []) {
+    if (!sameArea(sensor.area, room)) continue;
+    const deviceClass = String(sensor.device_class || '').toLowerCase();
+    if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery') continue;
+    const label = sensorLabel(sensor);
+    add(sensor.entity_id, label, sensorValue(sensor), sensorTone(sensor), batteryForDeviceName(data, room, sensor.name));
+  }
+
+  for (const opening of data.security.openings ?? []) {
+    if (!sameArea(opening.area, room)) continue;
+    add(
+      opening.entity_id,
+      opening.device_class === 'door' ? 'Tür' : 'Fenster',
+      opening.state === 'on' ? 'Offen' : 'Geschlossen',
+      opening.state === 'on' ? 'warn' : 'ok',
+      batteryForDeviceName(data, room, opening.name),
+    );
+  }
+
+  return [...chips.values()].sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function batteryForDeviceName(data: WallDashboardData, room: string, deviceName: string): BatteryBadge | null {
+  const deviceTokens = batteryMatchTokens(deviceName, room);
+  if (!deviceTokens.length) return null;
+  const candidates = (data.health.batteries ?? []).map((battery) => {
+    const sameRoom = sameArea(battery.area, room);
+    const batteryTokens = batteryMatchTokens(battery.name, room);
+    const overlap = batteryTokens.filter((token) => deviceTokens.includes(token));
+    const contains = normalizeBatteryName(battery.name, room).includes(normalizeBatteryName(deviceName, room))
+      || normalizeBatteryName(deviceName, room).includes(normalizeBatteryName(battery.name, room));
+    return {
+      battery,
+      score: overlap.length * 10 + (contains ? 8 : 0) + (sameRoom ? 5 : 0),
+    };
+  }).filter(({ score }) => score >= 15);
+  const match = candidates.sort((left, right) => right.score - left.score)[0]?.battery;
+  if (!match) return null;
+  const tone = batteryTone(match);
+  return {
+    label: `Batterie ${formatBatteryLevel(match)}`,
+    tone: tone === 'danger' ? 'critical' : tone,
+  };
+}
+
+function normalizeBatteryName(value: string, room = '') {
+  return normalizeArea(value)
+    .replace(normalizeArea(room), '')
+    .replace(/\b(battery|batterie|batteriestand|akku|level|status|sensor|power|battery level|batterie level)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function batteryMatchTokens(value: string, room: string) {
+  return normalizeBatteryName(value, room)
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !['the', 'and', 'mit', 'von', 'der', 'die', 'das'].includes(token));
+}
+
+function sensorLabel(sensor: WallEntity) {
+  const deviceClass = String(sensor.device_class || '').toLowerCase();
+  if (deviceClass === 'battery') return 'Batterie';
+  if (deviceClass === 'motion') return 'Bewegung';
+  if (deviceClass === 'illuminance') return 'Helligkeit';
+  if (deviceClass === 'power') return 'Leistung';
+  if (deviceClass === 'energy') return 'Energie';
+  return sensor.name;
+}
+
+function sensorValue(sensor: WallEntity) {
+  const deviceClass = String(sensor.device_class || '').toLowerCase();
+  const state = String(sensor.state || '').toLowerCase();
+  if (deviceClass === 'motion') return state === 'on' ? 'Bewegung' : 'Keine Bewegung';
+  if (sensor.unit) return `${sensor.state} ${sensor.unit}`;
+  return labelState(sensor.state);
+}
+
+function sensorTone(sensor: WallEntity) {
+  const state = String(sensor.state || '').toLowerCase();
+  if (state === 'unavailable' || state === 'unknown') return 'neutral';
+  if (state === 'on' || state === 'open') return 'warn';
+  return 'ok';
+}
+
+function coverStatus(cover: WallCover) {
+  const position = cover.position;
+  if (cover.state === 'opening' || cover.state === 'closing') return 'Bewegt sich';
+  if (position !== null && position !== undefined) {
+    if (position <= 5) return 'Geschlossen';
+    if (position >= 95) return 'Offen';
+    return 'Teilweise';
+  }
+  if (cover.state === 'open') return 'Offen';
+  if (cover.state === 'closed') return 'Geschlossen';
+  return labelState(cover.state);
+}
+
+function labelClimateMode(mode: string) {
+  if (mode === 'off') return 'Aus';
+  if (mode === 'heat') return 'Heizen';
+  if (mode === 'cool') return 'Kühlen';
+  if (mode === 'auto') return 'Auto';
+  if (mode === 'dry') return 'Entfeuchten';
+  return labelState(mode);
+}
+
+function climateToneClass(mode: string) {
+  if (mode === 'heat') return 'heat';
+  if (mode === 'cool') return 'cool';
+  if (mode === 'auto') return 'auto';
+  if (mode === 'dry') return 'dry';
+  return 'off';
 }
 
 function roomTemperature(data: WallDashboardData, room: string) {
@@ -1441,5 +1883,24 @@ function patchWallCover(
     covers: (current.covers ?? []).map((cover) => (
       cover.entity_id === entityId ? { ...cover, ...patch } : cover
     )),
+  };
+}
+
+function patchWallClimate(
+  current: WallDashboardData | null,
+  entityId: string,
+  patch: Record<string, unknown>,
+): WallDashboardData | null {
+  if (!current) return current;
+  return {
+    ...current,
+    climate: current.climate.map((item) => {
+      if (item.entity_id !== entityId) return item;
+      return {
+        ...item,
+        state: typeof patch.hvac_mode === 'string' ? patch.hvac_mode : item.state,
+        target_temperature: typeof patch.temperature === 'number' ? patch.temperature : item.target_temperature,
+      };
+    }),
   };
 }

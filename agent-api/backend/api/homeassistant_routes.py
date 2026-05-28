@@ -37,6 +37,7 @@ def wall_dashboard():
     covers = [_with_area_lookup(_cover_item(state), area_lookup) for state in states if _domain(state) == "cover"]
     sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "sensor"]
     switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "switch"]
+    media_players = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "media_player"]
     climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _domain(state) == "climate"]
     temperature_sensors = [_with_area_lookup(item, area_lookup) for item in _temperature_items(states)]
     weather = next((_weather_item(state) for state in states if _domain(state) == "weather"), None)
@@ -83,6 +84,7 @@ def wall_dashboard():
         "covers": covers,
         "sensors": sorted(sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "switches": switches,
+        "media_players": media_players,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "climate_summary": climate_summary,

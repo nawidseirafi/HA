@@ -132,6 +132,7 @@
 }
 
 .wall-header {
+  min-height: 118px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -343,6 +344,27 @@
 
 .wall-panel {
   padding: 20px;
+}
+
+.wall-agents-grid {
+  align-items: start;
+}
+
+.wall-agent-card {
+  min-height: 168px;
+  display: grid;
+  align-content: start;
+}
+
+.wall-agent-card h2 {
+  margin: 2px 0 10px;
+  color: var(--foreground);
+  font-size: 1.65rem;
+  line-height: 1.08;
+}
+
+.wall-agent-card p + p {
+  margin-top: 6px;
 }
 
 .wall-span-2 {
@@ -621,6 +643,646 @@ button.wall-room-card {
   max-width: 920px;
 }
 
+.wall-room-detail-page {
+  padding-bottom: 28px;
+}
+
+.wall-room-hero,
+.wall-room-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.wall-room-hero {
+  min-height: 156px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 8%, #fff));
+}
+
+.wall-room-hero.temp-cold {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.16), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, #60a5fa 12%, #fff));
+}
+
+.wall-room-hero.temp-cool {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-climate) 14%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 10%, #fff));
+}
+
+.wall-room-hero.temp-comfort,
+.wall-room-hero.temp-neutral {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-ok) 10%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 6%, #fff));
+}
+
+.wall-room-hero.temp-warm {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-warn) 16%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-warn) 10%, #fff));
+}
+
+.wall-room-hero.temp-hot {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-critical) 12%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-warn) 16%, #fff));
+  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
+}
+
+.wall-room-hero.active > span {
+  color: #1f2937;
+  background: var(--state-warn);
+}
+
+.wall-room-hero.mood-cool {
+  border-color: color-mix(in srgb, var(--state-climate) 28%, var(--border));
+}
+
+.wall-room-hero.mood-heat {
+  border-color: color-mix(in srgb, var(--state-warn) 28%, var(--border));
+}
+
+.wall-room-hero.mood-auto {
+  border-color: color-mix(in srgb, var(--state-ok) 24%, var(--border));
+}
+
+.wall-room-hero.mood-open {
+  box-shadow: var(--shadow-card), inset 4px 0 0 color-mix(in srgb, var(--state-warn) 86%, #fff);
+}
+
+.wall-room-hero.mood-vacation {
+  filter: saturate(0.88);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 35%, #fff), #fff);
+}
+
+.wall-room-hero > span {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 24px;
+  color: var(--primary-foreground);
+  background: var(--state-neutral);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.wall-room-hero small,
+.wall-room-panel-title span,
+.wall-sensor-chip small {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.wall-room-hero h2 {
+  margin: 4px 0 6px;
+  color: var(--foreground);
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.wall-room-hero p {
+  color: var(--muted-foreground);
+  font-size: 1rem;
+}
+
+.wall-room-mood-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wall-room-mood-chips span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: rgba(255,255,255,0.64);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.78);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.wall-room-mood-chips .cool {
+  color: #0f766e;
+  background: color-mix(in srgb, var(--state-climate) 14%, #fff);
+}
+
+.wall-room-mood-chips .heat,
+.wall-room-mood-chips .open {
+  color: #92400e;
+  background: color-mix(in srgb, var(--state-warn) 16%, #fff);
+}
+
+.wall-room-mood-chips .auto {
+  color: #047857;
+  background: color-mix(in srgb, var(--state-ok) 14%, #fff);
+}
+
+.wall-room-mood-chips .vacation {
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--state-neutral) 10%, #fff);
+}
+
+.wall-room-mood-chips .music::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ec4899;
+  box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.34);
+  animation: wall-music-pulse 1.35s ease-in-out infinite;
+}
+
+@keyframes wall-music-pulse {
+  0%, 100% { transform: scale(0.85); box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.28); }
+  50% { transform: scale(1.12); box-shadow: 0 0 0 7px rgba(236, 72, 153, 0); }
+}
+
+.wall-room-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.wall-room-panel {
+  padding: 20px;
+}
+
+.wall-room-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.wall-room-panel-title strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 0.92rem;
+}
+
+.wall-light-control {
+  grid-column: span 2;
+}
+
+.wall-light-control.on {
+  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
+}
+
+.wall-light-control-main {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.wall-light-control-main > span {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: var(--muted-foreground);
+  background: var(--surface);
+}
+
+.wall-light-control.on .wall-light-control-main > span {
+  color: #1f2937;
+  background: var(--state-warn);
+}
+
+.wall-light-control-main h3,
+.wall-cover-body h3 {
+  color: var(--foreground);
+  font-size: 1.3rem;
+}
+
+.wall-light-control-main p,
+.wall-cover-body p {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+}
+
+.wall-room-power,
+.wall-scene-buttons button,
+.wall-mode-buttons button,
+.wall-cover-actions button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  font-weight: 850;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, opacity 140ms ease;
+}
+
+.wall-room-power {
+  padding: 0 18px;
+}
+
+.wall-room-power.on {
+  color: #1f2937;
+  border-color: var(--state-warn);
+  background: color-mix(in srgb, var(--state-warn) 22%, #fff);
+}
+
+.wall-room-power:not(:disabled):active,
+.wall-scene-buttons button:not(:disabled):active,
+.wall-mode-buttons button:not(:disabled):active,
+.wall-cover-actions button:not(:disabled):active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+.wall-room-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--muted-foreground);
+  font-weight: 800;
+}
+
+.wall-room-slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--state-warn);
+}
+
+.wall-room-slider.compact {
+  margin-top: 12px;
+}
+
+.wall-scene-buttons,
+.wall-mode-buttons,
+.wall-cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wall-scene-buttons button,
+.wall-mode-buttons button,
+.wall-cover-actions button {
+  padding: 0 15px;
+}
+
+.wall-climate-control.heat {
+  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
+  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-warn) 16%, transparent);
+}
+
+.wall-climate-control.cool {
+  border-color: color-mix(in srgb, var(--state-climate) 34%, var(--border));
+  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-climate) 16%, transparent);
+}
+
+.wall-climate-control.auto {
+  border-color: color-mix(in srgb, var(--state-ok) 28%, var(--border));
+  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-ok) 14%, transparent);
+}
+
+.wall-climate-control.dry {
+  border-color: color-mix(in srgb, #6366f1 28%, var(--border));
+  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, #6366f1 14%, transparent);
+}
+
+.wall-climate-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: var(--surface);
+  font-size: 0.78rem;
+}
+
+.wall-climate-status.heat {
+  color: #92400e;
+  background: color-mix(in srgb, var(--state-warn) 18%, #fff);
+}
+
+.wall-climate-status.cool {
+  color: #0f766e;
+  background: color-mix(in srgb, var(--state-climate) 18%, #fff);
+}
+
+.wall-climate-status.auto {
+  color: #047857;
+  background: color-mix(in srgb, var(--state-ok) 16%, #fff);
+}
+
+.wall-climate-status.dry {
+  color: #4338ca;
+  background: color-mix(in srgb, #6366f1 14%, #fff);
+}
+
+.wall-climate-dial {
+  min-height: 194px;
+  display: grid;
+  grid-template-columns: 64px auto 64px;
+  justify-content: center;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+
+.wall-climate-dial button {
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--foreground) 72%, transparent);
+  background: rgba(255,255,255,0.62);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.75);
+  backdrop-filter: blur(10px);
+  justify-self: center;
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease, background 140ms ease;
+}
+
+.wall-climate-dial button:not(:disabled):hover {
+  background: rgba(255,255,255,0.82);
+}
+
+.wall-climate-dial button:not(:disabled):active {
+  transform: scale(0.95);
+  box-shadow: none;
+}
+
+.wall-climate-control.off .wall-climate-dial button {
+  color: var(--muted-foreground);
+  background: rgba(248,250,252,0.7);
+}
+
+.wall-thermostat-circle {
+  width: 172px;
+  height: 172px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.96), rgba(255,255,255,0.62) 42%, rgba(255,255,255,0.28) 70%),
+    linear-gradient(145deg, #fff, var(--surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -16px 28px rgba(15, 23, 42, 0.035),
+    0 18px 38px rgba(15, 23, 42, 0.1);
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.wall-climate-control.heat .wall-thermostat-circle {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.98), color-mix(in srgb, var(--state-warn) 15%, #fff) 50%, color-mix(in srgb, var(--state-warn) 30%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 0 0 8px color-mix(in srgb, var(--state-warn) 9%, transparent),
+    0 18px 46px color-mix(in srgb, var(--state-warn) 34%, transparent);
+}
+
+.wall-climate-control.cool .wall-thermostat-circle {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,0.98), color-mix(in srgb, var(--state-climate) 14%, #fff) 46%, color-mix(in srgb, #38bdf8 24%, #fff) 72%),
+    linear-gradient(145deg, rgba(255,255,255,0.9), color-mix(in srgb, var(--state-climate) 18%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 0 0 8px color-mix(in srgb, var(--state-climate) 8%, transparent),
+    0 18px 46px color-mix(in srgb, var(--state-climate) 34%, transparent);
+}
+
+.wall-climate-control.auto .wall-thermostat-circle {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.98), color-mix(in srgb, var(--state-ok) 14%, #fff) 50%, color-mix(in srgb, var(--state-climate) 22%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 0 0 8px color-mix(in srgb, var(--state-ok) 7%, transparent),
+    0 18px 46px color-mix(in srgb, var(--state-ok) 26%, transparent);
+}
+
+.wall-climate-control.dry .wall-thermostat-circle {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.98), color-mix(in srgb, #6366f1 12%, #fff) 50%, color-mix(in srgb, #38bdf8 16%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 0 0 8px color-mix(in srgb, #6366f1 7%, transparent),
+    0 18px 46px color-mix(in srgb, #6366f1 24%, transparent);
+}
+
+.wall-thermostat-circle strong {
+  color: var(--foreground);
+  font-size: 2.9rem;
+  line-height: 1;
+}
+
+.wall-thermostat-circle span,
+.wall-thermostat-circle small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.wall-thermostat-circle small {
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+.wall-mode-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(255,255,255,0.68);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.82), 0 8px 22px rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.wall-mode-buttons button {
+  min-height: 38px;
+  padding: 0 10px;
+  color: color-mix(in srgb, var(--foreground) 68%, transparent);
+  border-color: transparent;
+  box-shadow: none;
+  background: rgba(255,255,255,0.45);
+}
+
+.wall-mode-buttons button.active {
+  color: var(--primary-foreground);
+  border-color: var(--state-climate);
+  background: var(--state-climate);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-climate) 28%, transparent);
+}
+
+.wall-climate-control.heat .wall-mode-buttons button.active {
+  color: #1f2937;
+  border-color: var(--state-warn);
+  background: var(--state-warn);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-warn) 30%, transparent);
+}
+
+.wall-climate-control.auto .wall-mode-buttons button.active {
+  border-color: var(--state-ok);
+  background: var(--state-ok);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-ok) 24%, transparent);
+}
+
+.wall-climate-control.dry .wall-mode-buttons button.active {
+  border-color: #6366f1;
+  background: #6366f1;
+  box-shadow: 0 8px 18px color-mix(in srgb, #6366f1 26%, transparent);
+}
+
+.wall-cover-body {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.wall-cover-visual {
+  width: 72px;
+  height: 118px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #fff, var(--surface));
+}
+
+.wall-cover-visual i {
+  width: 100%;
+  display: block;
+  background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--state-neutral) 55%, #fff), color-mix(in srgb, var(--state-neutral) 55%, #fff) 8px, #fff 9px, #fff 14px);
+  transition: height 160ms ease;
+}
+
+.wall-cover-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wall-sensor-chip-grid,
+.wall-device-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wall-sensor-chip,
+.wall-room-device-card {
+  min-height: 76px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgb(207, 204, 204);
+}
+
+.wall-sensor-chip strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--foreground);
+  font-size: 1.1rem;
+}
+
+.wall-sensor-chip.climate {
+  background: color-mix(in srgb, var(--state-climate) 11%, #fff);
+}
+
+.wall-sensor-chip.ok {
+  background: color-mix(in srgb, var(--state-ok) 10%, #fff);
+}
+
+.wall-sensor-chip.warn {
+  background: color-mix(in srgb, var(--state-warn) 13%, #fff);
+}
+
+.wall-sensor-chip.critical {
+  background: color-mix(in srgb, var(--state-critical) 10%, #fff);
+}
+
+.wall-room-device-card {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.wall-room-device-card strong,
+.wall-room-device-card span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-room-device-card strong {
+  color: var(--foreground);
+}
+
+.wall-room-device-card span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 0.88rem;
+}
+
+.wall-battery-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--state-neutral) 10%, #fff);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.wall-battery-pill.ok {
+  color: var(--state-ok);
+  background: color-mix(in srgb, var(--state-ok) 10%, #fff);
+}
+
+.wall-battery-pill.warn {
+  color: var(--state-warn);
+  background: color-mix(in srgb, var(--state-warn) 12%, #fff);
+}
+
+.wall-battery-pill.critical {
+  color: var(--state-critical);
+  background: color-mix(in srgb, var(--state-critical) 10%, #fff);
+}
+
 .wall-device-row {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;
@@ -832,6 +1494,8 @@ button.wall-room-card {
   .wall-main { padding: 32px; }
   .wall-home-grid,
   .wall-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wall-room-control-grid { grid-template-columns: 1fr; }
+  .wall-light-control { grid-column: auto; }
   .wall-room-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
 }
 
@@ -841,17 +1505,39 @@ button.wall-room-card {
     position: sticky;
     top: 0;
     z-index: 2;
+    min-height: 68px;
+    height: 68px;
+    box-sizing: border-box;
     flex-direction: row;
+    flex-wrap: nowrap;
     justify-content: center;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 10px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
-  .wall-header { display: grid; }
+  .wall-nav button {
+    flex: 0 0 48px;
+  }
+  .wall-nav button svg {
+    display: block;
+  }
+  .wall-header {
+    min-height: 164px;
+    display: grid;
+    align-content: start;
+  }
   .wall-home-grid,
   .wall-card-grid,
+  .wall-room-control-grid,
   .wall-room-grid,
   .wall-area-strip { grid-template-columns: 1fr; }
   .wall-span-2,
   .wall-list-panel { grid-column: auto; }
+  .wall-light-control-main,
+  .wall-cover-body { grid-template-columns: 1fr; }
+  .wall-room-power { width: 100%; }
+  .wall-cover-visual { width: 100%; height: 92px; }
 }

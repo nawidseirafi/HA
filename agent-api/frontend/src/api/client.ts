@@ -445,6 +445,7 @@ export type WallDashboardData = {
   covers?: WallCover[];
   sensors?: WallEntity[];
   switches: WallEntity[];
+  media_players?: WallEntity[];
   climate: WallClimate[];
   temperature_sensors: WallTemperatureSensor[];
   climate_summary?: {
