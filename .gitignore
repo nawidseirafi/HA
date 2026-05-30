@@ -17,3 +17,4 @@ HA/secrets.yaml
 agent-api/backend/storage/
 .idea/
 /build/
+/old/
