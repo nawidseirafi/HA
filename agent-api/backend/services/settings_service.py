@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from backend.config import load_agent_section
 from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH
 
 
@@ -138,10 +139,10 @@ def get_settings() -> dict[str, Any]:
 
     server_config = config.get("server", {})
     auth_config = config.get("auth", {})
-    agents_config = config.get("agents", {})
-    invoice_config = agents_config.get("invoices", {})
-    mywellness_config = agents_config.get("my_wellness", {})
-    market_config = agents_config.get("market", {})
+    invoice_config = load_agent_section("invoices")
+    mywellness_config = load_agent_section("mywellness")
+    market_config = load_agent_section("market")
+    vacation_config = load_agent_section("vacation")
     ha_config = config.get("home_assistant", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
 
@@ -177,7 +178,7 @@ def get_settings() -> dict[str, Any]:
             "production_dist_exists": (API_DIR / "frontend" / "dist").exists(),
         },
         "storage": {
-            "uploads": _path_info(API_DIR, invoice_config.get("uploads_dir")),
+            "uploads": _path_info(API_DIR, invoice_config.get("upload_dir") or invoice_config.get("uploads_dir")),
             "log_file": _path_info(API_DIR, config.get("logging", {}).get("file")),
         },
         "agents": {
@@ -202,7 +203,7 @@ def get_settings() -> dict[str, Any]:
                 "facility_id_configured": _env_present(mywellness_config.get("facility_id"), env_values),
             },
             "vacation": {
-                "enabled": bool(agents_config.get("vacation", {}).get("enabled", False)),
+                "enabled": bool(vacation_config.get("enabled", False)),
             },
             "market": {
                 "enabled": bool(market_config.get("enabled", False)),

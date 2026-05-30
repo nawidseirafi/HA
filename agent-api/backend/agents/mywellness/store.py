@@ -4,8 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
-import yaml
-from backend.paths import API_DIR
+from backend.config import load_agent_section, resolve_api_path
 
 
 
@@ -14,11 +13,8 @@ def utc_now() -> str:
 
 
 def get_db_path() -> Path:
-    config_path = API_DIR / "config.yaml"
-    with config_path.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
-    db_path = config.get("agents", {}).get("my_wellness", {}).get("database_path", "data/mywellness/mywellness.db")
-    return (API_DIR / db_path).resolve()
+    config = load_agent_section("mywellness")
+    return resolve_api_path(config.get("database_path"), "data/mywellness/mywellness.db")
 
 
 def connect() -> sqlite3.Connection:

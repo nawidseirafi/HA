@@ -12,10 +12,10 @@ from typing import Any, Optional
 import httpx
 import yaml
 from fastapi import HTTPException
-from backend.paths import PROJECT_DIR, API_CONFIG_PATH, API_DIR, AGENTS_DIR
+from backend.config import load_agent_section, resolve_api_path
+from backend.paths import PROJECT_DIR, API_DIR, AGENTS_DIR
 
 AGENT_SCRIPT = AGENTS_DIR / "mywellness" / "mywellness.py"
-CONFIG_PATH = API_CONFIG_PATH
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
@@ -23,13 +23,6 @@ from .store import delete_prepared_courses, list_prepared_courses, replace_live_
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def read_yaml(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    with path.open("r", encoding="utf-8") as config_file:
-        return yaml.safe_load(config_file) or {}
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -756,7 +749,7 @@ class MyWellnessService:
 
     def _mywellness_config(self) -> dict[str, Any]:
         env_values = read_env_file(API_DIR / ".env")
-        api_config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
+        api_config = load_agent_section("mywellness")
         settings = self._settings()
         token = resolve_secret(api_config.get("token"), env_values)
         user_id = resolve_secret(api_config.get("user_id"), env_values)
@@ -797,23 +790,13 @@ class MyWellnessService:
 
     @staticmethod
     def get_db_path() -> Path:
-        config_dir = CONFIG_PATH.parent
-        api_config = (
-            read_yaml(CONFIG_PATH)
-            .get("agents", {})
-            .get("my_wellness", {})
-        )
-        return (config_dir / api_config["database_path"]).resolve()
+        api_config = load_agent_section("mywellness")
+        return resolve_api_path(api_config.get("database_path"), "data/mywellness/mywellness.db")
 
     @staticmethod
     def get_log_path() -> Path:
-        config_dir = CONFIG_PATH.parent
-        api_config = (
-            read_yaml(CONFIG_PATH)
-            .get("agents", {})
-            .get("my_wellness", {})
-        )
-        return (config_dir / api_config["log_path"]).resolve()
+        api_config = load_agent_section("mywellness")
+        return resolve_api_path(api_config.get("log_path"), "logs/my_wellness.log")
 
     def _ensure_schema(self) -> None:
         with self._connect() as connection:
@@ -1028,7 +1011,7 @@ class MyWellnessService:
         return parsed.isoformat()
 
     def _config_schedule(self) -> list[str]:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
+        config = load_agent_section("mywellness")
         schedule = config.get("schedule") or ["17:00:00", "20:59:58"]
         return [
             self._normalize_time_string(schedule[0] if len(schedule) > 0 else "17:00:00", "prepare_time"),
@@ -1036,11 +1019,11 @@ class MyWellnessService:
         ]
 
     def _config_days(self) -> int:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
+        config = load_agent_section("mywellness")
         return int(config.get("days", 2) or 2)
 
     def _config_desired_courses(self) -> list[str]:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
+        config = load_agent_section("mywellness")
         courses = config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"]
         return [str(course).strip() for course in courses if str(course).strip()]
 

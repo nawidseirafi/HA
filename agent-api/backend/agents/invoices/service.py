@@ -15,9 +15,9 @@ from uuid import uuid4
 import yaml
 from fastapi import HTTPException, UploadFile
 
-from backend.paths import API_CONFIG_PATH, API_DIR, PROJECT_DIR
+from backend.config import load_agent_runtime_config
+from backend.paths import API_DIR, PROJECT_DIR
 
-CONFIG_PATH = API_CONFIG_PATH
 logger = logging.getLogger(__name__)
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
@@ -52,10 +52,7 @@ def utc_now() -> str:
 
 
 def load_config() -> dict[str, Any]:
-    if not CONFIG_PATH.exists():
-        return {}
-    with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
-        return yaml.safe_load(config_file) or {}
+    return load_agent_runtime_config("invoices")
 
 
 def resolve_path(value: Any, default_base: Path = API_DIR) -> Path:
@@ -67,7 +64,7 @@ def resolve_path(value: Any, default_base: Path = API_DIR) -> Path:
 
 def configured_paths() -> dict[str, Path]:
     config = load_config()
-    invoice_config = config.get("agents", {}).get("invoices", {})
+    invoice_config = config.get("invoices", {})
     data_dir = API_DIR / "data" / "invoices"
     return {
         "database": resolve_path(invoice_config.get("database_path", data_dir / "invoices.db")),
@@ -296,7 +293,7 @@ class InvoiceService:
             logger.exception("Geplanter InvoiceAgent-Lauf fehlgeschlagen.")
 
     def _invoice_api_config(self) -> dict[str, Any]:
-        return load_config().get("agents", {}).get("invoices", {}) or {}
+        return load_config().get("invoices", {}) or {}
 
     def _configured_schedule(self) -> list[str]:
         configured = self._invoice_api_config().get("schedule", DEFAULT_INVOICE_SCHEDULE)
@@ -623,8 +620,8 @@ class InvoiceService:
             logger.info("InvoiceAgent uebersprungen, weil bereits ein Lauf aktiv ist.")
             return {**self.status(), "status": "running", "message": "InvoiceAgent laeuft bereits."}
         python = PROJECT_DIR / "venv" / "bin" / "python"
-        command = [str(python if python.exists() else sys.executable), "-m", "invoice.invoices", "--once"]
-        invoice_config = load_config().get("agents", {}).get("invoices", {})
+        command = [str(python if python.exists() else sys.executable), "-m", "backend.agents.invoices.invoices", "--once"]
+        invoice_config = load_config().get("invoices", {})
         timeout_seconds = int(invoice_config.get("run_timeout_seconds", DEFAULT_AGENT_TIMEOUT_SECONDS))
         logger.info("InvoiceAgent startet: command=%s cwd=%s timeout=%s", command, API_DIR, timeout_seconds)
         started_at = utc_now()
@@ -864,8 +861,7 @@ class InvoiceService:
 
         raw_config = load_raw_config()
         llm_config = raw_config.get("llm", {})
-        agents_config = raw_config.get("agents", {})
-        invoice_config = agents_config.get("invoices", {})
+        invoice_config = raw_config.get("invoices", {})
         tax_config = invoice_config.get("tax_export", {})
         category_rules = dict(DEFAULT_CATEGORY_RULES)
         category_rules.update(tax_config.get("categories", {}))

@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Bot, CalendarCheck, Dumbbell, FileText, Home, LineChart, Mail, Settings2 } from 'lucide-react';
+import { Bot, CalendarCheck, Dumbbell, FileText, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
 import { api, type AgentManifest, type KnownDashboardRoute } from '../api/client';
 import type { Route } from '../App';
 
 interface Props {
   navigate: (route: Route) => void;
 }
-
-const plannedAgents = [
-  { name: 'Vacation Agent', text: 'Abwesenheiten und Kalender-Automation.', icon: CalendarCheck },
-];
 
 const iconMap = {
   Bot,
@@ -20,6 +16,7 @@ const iconMap = {
   LineChart,
   Mail,
   Settings2,
+  ShieldCheck,
 };
 
 const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
@@ -66,20 +63,6 @@ export function AgentsPage({ navigate }: Props) {
                 <span className="eyebrow">{agent.enabled ? 'Aktiv' : 'Installiert'}</span>
                 <h2>{agent.name}</h2>
                 <p>{agent.description || 'Agent per Manifest eingebunden.'}</p>
-              </div>
-            </button>
-          );
-        })}
-
-        {plannedAgents.map((agent) => {
-          const Icon = agent.icon;
-          return (
-            <button className="agent-card planned-agent" key={agent.name} disabled>
-              <div className="agent-icon"><Icon size={24} /></div>
-              <div>
-                <span className="eyebrow">Vorbereitet</span>
-                <h2>{agent.name}</h2>
-                <p>{agent.text}</p>
               </div>
             </button>
           );

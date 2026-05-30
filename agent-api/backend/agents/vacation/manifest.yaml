@@ -1,0 +1,16 @@
+id: vacation
+name: Vacation-Agent
+description: Anwesenheit simulieren und Home-Assistant-Regeln fuer Abwesenheit vorbereiten.
+enabled: false
+status: draft
+api:
+  prefix: /api/vacation
+  route_module: backend.agents.vacation.routes
+runtime:
+  service_object: vacation_service
+ui:
+  icon: ShieldCheck
+  dashboard_route: vacationDashboard
+settings:
+  mode_entity: input_boolean.vacation_mode
+  dry_run_default: true

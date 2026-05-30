@@ -3,8 +3,7 @@ import re
 import sys
 from typing import Any
 
-import yaml
-
+from backend.config import load_global_config
 from backend.paths import API_DIR
 
 
@@ -42,14 +41,14 @@ class MarketSymbolResolver:
         if str(API_DIR) not in sys.path:
             sys.path.insert(0, str(API_DIR))
 
-        from llm import create_llm_client  # type: ignore
+        from backend.services.llm.factory import create_llm_client
 
-        config = yaml.safe_load(API_DIR.read_text(encoding="utf-8")) or {}
+        config = load_global_config()
         llm_config = config.get("llm", {})
         if not llm_config:
             return None
 
-        client = create_llm_client({"llm": llm_config})
+        client = create_llm_client()
         response = client.generate(
             prompt=self._prompt(requested_symbol, watchlist_item),
             system=SYSTEM_PROMPT,

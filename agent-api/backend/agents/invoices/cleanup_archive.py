@@ -1,13 +1,13 @@
 import argparse
 import shutil
 import sqlite3
-import yaml
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 
-from backend.paths import API_DIR, API_CONFIG_PATH
+from backend.config import load_agent_runtime_config
+from backend.paths import API_DIR
 
 
 @dataclass
@@ -64,13 +64,12 @@ def cleanup_archive(
 
 
 def _load_config() -> dict:
-    with API_CONFIG_PATH.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+    return load_agent_runtime_config("invoices")
 
 
 def main():
     config = _load_config()
-    invoice_config = config.get("agents", {}).get("invoices", {})
+    invoice_config = config.get("invoices", {})
     data_dir = API_DIR / "data" / "invoices"
 
     parser = argparse.ArgumentParser(

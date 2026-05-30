@@ -4,9 +4,9 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional
-import yaml
 from dotenv import load_dotenv
-from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, AI_AGENT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
+from backend.config import load_agent_runtime_config
+from backend.paths import API_DIR
 
 
 from backend.agents.invoices.categories import refresh_database_categories
@@ -18,9 +18,7 @@ from backend.agents.invoices.tax_export import DEFAULT_CATEGORY_RULES, TaxExport
 
 def load_raw_config() -> dict:
     load_dotenv(API_DIR / ".env")
-
-    with (API_DIR / "config.yaml").open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+    return load_agent_runtime_config("invoices")
 
 
 def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:

@@ -1,34 +1,32 @@
-import yaml
 import logging
-from backend.paths import API_DIR
+from backend.config import load_agent_runtime_config
 from backend.services.llm.factory import create_llm_client
 from backend.services.core.ha_client import HomeAssistantClient
+from backend.agents.vacation.service import VacationService
 
 import warnings
 
 warnings.filterwarnings("ignore")
 
-LOG_DIR = API_DIR / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+vacation_service = VacationService()
+log_path = vacation_service.log_path()
+log_path.parent.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
-    filename=LOG_DIR / "vaction.log",
+    filename=log_path,
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
 def load_config():
-    with (API_DIR / "config.yaml").open("r") as f:
-        return yaml.safe_load(f)
+    return load_agent_runtime_config("vacation")
 
 def main():
     config = load_config()
     llm = create_llm_client(config)
     ha = HomeAssistantClient()
 
-    vacation_mode = ha.get_state(
-        "input_boolean.vacation_mode"
-    )["state"] == "on"
+    vacation_mode = vacation_service.get_vacation_mode()
 
     logging.info(f"vacation_mode: {vacation_mode}")
 

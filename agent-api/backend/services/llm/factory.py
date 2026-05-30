@@ -3,15 +3,16 @@ from .openai_client import OpenAILLMClient
 from .LlamaLLMClient import LlamaLLMClient
 from dotenv import load_dotenv
 import os
-import yaml
+from typing import Any
+
+from backend.config import load_global_config
 from backend.paths import API_DIR
 
 load_dotenv(API_DIR / ".env")
 
-def create_llm_client():
-    config_path = API_DIR / "config.yaml"
-    with config_path.open("r", encoding="utf-8") as handle:
-        config = yaml.safe_load(handle) or {}
+def create_llm_client(config: dict[str, Any] | None = None):
+    if config is None:
+        config = load_global_config()
     llm_config = config.get("llm", {})
     provider = llm_config.get("provider", "")
     provider_config = llm_config.get(provider, {})

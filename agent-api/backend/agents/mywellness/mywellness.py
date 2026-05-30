@@ -8,7 +8,7 @@ from pathlib import Path
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
-import yaml
+from backend.config import load_agent_runtime_config
 from backend.paths import API_DIR
 # =====================
 # KONFIGURATION
@@ -37,14 +37,12 @@ days = int(agent_settings["days"] or 2)
 
 def load_raw_config() -> dict:
     load_dotenv(API_DIR / ".env")
-
-    with (API_DIR / "config.yaml").open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+    return load_agent_runtime_config("mywellness")
 
 
 def get_log_path() -> Path:
     config = load_raw_config()
-    log_path = config.get("agents", {}).get("my_wellness", {}).get("log_path", "logs/my_wellness.log")
+    log_path = config.get("my_wellness", {}).get("log_path", "logs/my_wellness.log")
     return (API_DIR / log_path).resolve()
 
 def resolve_config_value(value):

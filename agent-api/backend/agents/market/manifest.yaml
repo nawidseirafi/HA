@@ -1,5 +1,5 @@
 id: market
-name: MarketAgent
+name: Market-Agent
 description: Watchlist beobachten, Marktberichte erzeugen und Signale einschaetzen.
 enabled: true
 status: active
