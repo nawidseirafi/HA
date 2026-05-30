@@ -1198,7 +1198,7 @@ button.wall-room-card {
   min-height: 76px;
   padding: 14px;
   border-radius: 16px;
-  background: rgb(207, 204, 204);
+  background: rgba(195, 205, 224, 0.82);
 }
 
 .wall-sensor-chip strong {
@@ -1458,7 +1458,7 @@ button.wall-room-card {
   align-items: center;
   padding: 8px 10px;
   border-radius: 12px;
-  background: var(--surface);
+  background: rgba(65, 90, 138, 0.82)
 }
 
 .wall-temperature-list span {

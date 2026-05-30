@@ -3,7 +3,7 @@ server:
   port: 8080
 
 logging:
-  file: ../logs/agent-api.log
+  file: ../logs/orchstrator.log
   level: INFO
 
 auth:
