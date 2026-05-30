@@ -3,7 +3,7 @@ import shutil
 import filecmp
 from pathlib import Path
 
-from invoices.extractor import InvoiceMetadata
+from .extractor import InvoiceMetadata
 
 
 MONTH_NAMES = (

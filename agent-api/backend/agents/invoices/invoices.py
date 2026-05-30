@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
@@ -9,11 +8,11 @@ from backend.config import load_agent_runtime_config
 from backend.paths import API_DIR
 
 
-from backend.agents.invoices.categories import refresh_database_categories
-from backend.agents.invoices.email import EmailConfig, inspect_recent_messages
-from backend.agents.invoices.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
-from backend.agents.invoices.scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
-from backend.agents.invoices.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
+from .categories import refresh_database_categories
+from .email import EmailConfig, inspect_recent_messages
+from .portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
+from .scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+from .tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
 
 
 def load_raw_config() -> dict:

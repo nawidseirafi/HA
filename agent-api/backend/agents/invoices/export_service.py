@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 from xml.sax.saxutils import escape
 
-from backend.agents.invoices.service import InvoiceService
+from .service import InvoiceService
 
 
 EXPORT_HEADERS = [

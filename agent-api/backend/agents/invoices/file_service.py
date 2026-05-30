@@ -2,7 +2,7 @@ import mimetypes
 from fastapi.responses import FileResponse
 from typing import Optional
 
-from backend.agents.invoices.service import InvoiceService
+from .service import InvoiceService
 
 
 class FileService:

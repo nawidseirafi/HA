@@ -4,9 +4,9 @@ from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from backend.agents.invoices.export_service import ExportService
-from backend.agents.invoices.file_service import FileService
-from backend.agents.invoices.service import InvoiceService
+from .export_service import ExportService
+from .file_service import FileService
+from .service import InvoiceService
 
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
