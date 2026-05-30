@@ -1,0 +1,3 @@
+vacation:
+  enabled: true
+  log_path: logs/vacation.log

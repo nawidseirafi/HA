@@ -1,0 +1,15 @@
+my_wellness:
+    enabled: true
+    token: MY_WELLNESS_TOKEN
+    user_id: MY_WELLNESS_USER_ID
+    facility_id: MY_WELLNESS_FACILITY_ID
+    database_path: data/mywellness/mywellness.db
+    log_path: logs/my_wellness.log
+    desired_courses:
+      - Cross-Power
+      - Body Workout
+      - Functional Training
+    days: 2
+    schedule:
+      - "17:00:00"
+      - "20:59:58"
