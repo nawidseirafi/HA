@@ -60,7 +60,7 @@ class MyWellnessService:
         self._ensure_schema()
         self._courses_cache: Optional[list[dict[str, Any]]] = None
         self._courses_cache_time: Optional[float] = None
-        self._cache_ttl = 300  # 5 Minuten Cache
+        self._cache_ttl = 0  # Cache deaktiviert
 
     def status(self) -> dict[str, Any]:
         settings = self._settings()
