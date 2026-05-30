@@ -1145,7 +1145,7 @@ function ClimateSection({
             </div>
             <div className="wall-card-grid">
                 {rooms.map((room) => (
-                    <section className="wall-panel wall-temperature-room" key={`${room.floor}-${room.area}`}>
+                    <section className={`wall-panel wall-temperature-room ${roomTemperatureClass(room.temperature)}`} key={`${room.floor}-${room.area}`}>
                         <div className="wall-section-title">
                             <span>{room.floor}</span>
                             <Thermometer size={20}/>
@@ -1153,19 +1153,25 @@ function ClimateSection({
                         <h2>{room.area}</h2>
                         <div className="wall-climate-value">{formatNumber(room.temperature)}°C</div>
                         <p>{room.humidity !== null ? `${formatNumber(room.humidity)}% Luftfeuchtigkeit` : 'Luftfeuchtigkeit --'}</p>
-                        <div className="wall-temperature-list">
-                            {room.climate.map((item) => (
-                                <article key={item.entity_id}>
-                                    <span>{item.name}</span>
-                                    <strong>{formatNumber(item.current_temperature)}°C</strong>
-                                </article>
-                            ))}
-                            {room.items.map((item) => (
-                                <article key={item.entity_id}>
-                                    <span>{item.name}</span>
-                                    <strong>{formatNumber(item.temperature)}°C</strong>
-                                </article>
-                            ))}
+                        <div className="wall-climate-sensor-chips">
+                          {[
+                            ...room.climate.map((item) => ({
+                              name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
+                              value: item.current_temperature,
+                            })),
+                            ...room.items.map((item) => ({
+                              name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
+                              value: item.temperature,
+                            })),
+                          ].slice(0, 2).map((item) => (
+                            <span key={item.name}>
+                              {item.name} {formatNumber(item.value)}°C
+                            </span>
+                          ))}
+
+                          {room.climate.length + room.items.length > 2 && (
+                            <span>+{room.climate.length + room.items.length - 2}</span>
+                          )}
                         </div>
                     </section>
                 ))}

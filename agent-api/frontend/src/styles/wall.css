@@ -1541,3 +1541,106 @@ button.wall-room-card {
   .wall-room-power { width: 100%; }
   .wall-cover-visual { width: 100%; height: 92px; }
 }
+
+.wall-temperature-room {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 8%, #fff));
+}
+
+.wall-temperature-room.temp-cold {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.16), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, #60a5fa 12%, #fff));
+}
+
+.wall-temperature-room.temp-cool {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-climate) 14%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 10%, #fff));
+}
+
+.wall-temperature-room.temp-comfort,
+.wall-temperature-room.temp-neutral {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-ok) 10%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-climate) 6%, #fff));
+}
+
+.wall-temperature-room.temp-warm {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-warn) 16%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-warn) 10%, #fff));
+}
+
+.wall-temperature-room.temp-hot {
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-critical) 12%, transparent), transparent 34%),
+    linear-gradient(135deg, #fff, color-mix(in srgb, var(--state-warn) 16%, #fff));
+  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
+}
+
+.wall-temperature-room .wall-section-title {
+  margin: -20px -20px 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255,255,255,0.34);
+  backdrop-filter: blur(10px);
+}
+
+.wall-temperature-room .wall-section-title svg {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  border-radius: var(--radius-xl);
+  color: var(--primary-foreground);
+  background: var(--state-neutral);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.wall-temperature-room.temp-cold .wall-section-title svg {
+  background: #60a5fa;
+}
+
+.wall-temperature-room.temp-cool .wall-section-title svg,
+.wall-temperature-room.temp-comfort .wall-section-title svg,
+.wall-temperature-room.temp-neutral .wall-section-title svg {
+  background: var(--state-climate);
+}
+
+.wall-temperature-room.temp-warm .wall-section-title svg,
+.wall-temperature-room.temp-hot .wall-section-title svg {
+  color: #1f2937;
+  background: var(--state-warn);
+}
+.wall-climate-sensor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.wall-climate-sensor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.wall-climate-sensor-chips span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+
+  color: var(--muted-foreground);
+  background: rgba(255,255,255,0.65);
+
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 1px 2px rgba(0,0,0,0.04);
+}
