@@ -1,6 +1,6 @@
 from google import genai
 from google.genai import types
-from llm.base import BaseLLMClient, LLMResponse
+from .base import BaseLLMClient, LLMResponse
 from typing import Optional
 import mimetypes
 

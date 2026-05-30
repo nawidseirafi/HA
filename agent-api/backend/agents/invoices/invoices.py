@@ -4,29 +4,22 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional
-
 import yaml
 from dotenv import load_dotenv
+from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, AI_AGENT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) in sys.path:
-    sys.path.remove(str(SCRIPT_DIR))
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from invoice.categories import refresh_database_categories
-from invoice.email import EmailConfig, inspect_recent_messages
-from invoice.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
-from invoice.scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
-from invoice.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
+from backend.agents.invoices.categories import refresh_database_categories
+from backend.agents.invoices.email import EmailConfig, inspect_recent_messages
+from backend.agents.invoices.portals import PortalConfig, PortalProviderConfig, fetch_huk24_documents, login_portal
+from backend.agents.invoices.scanner import ArchiveCleanupConfig, AIExtractionConfig, HomeAssistantNotificationConfig, InvoiceAgentConfig, scan_once, watch
+from backend.agents.invoices.tax_export import DEFAULT_CATEGORY_RULES, TaxExportConfig, export_tax_year
 
 
 def load_raw_config() -> dict:
-    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(API_DIR / ".env")
 
-    with (BASE_DIR / "config.yaml").open("r", encoding="utf-8") as f:
+    with (API_DIR / "config.yaml").open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
@@ -34,13 +27,13 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
     if raw_config is None:
         raw_config = load_raw_config()
 
-    invoice_config = raw_config.get("invoice_agent", {})
+    invoice_config = raw_config.get("invoices", {})
     email_config = invoice_config.get("email", {})
     portals_config = invoice_config.get("portals", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
     ai_extraction_config = invoice_config.get("ai_extraction", {})
     archive_cleanup_config = invoice_config.get("archive_cleanup", {})
-    data_dir = BASE_DIR / "data" / "invoices"
+    data_dir = API_DIR / "data" / "invoices"
     category_rules = _category_rules(raw_config)
 
     inbox_dir = _path(invoice_config.get("inbox_dir", data_dir / "inbox"))
@@ -70,9 +63,9 @@ def load_config(raw_config: Optional[dict] = None) -> InvoiceAgentConfig:
 def load_tax_config(raw_config: Optional[dict] = None) -> TaxExportConfig:
     if raw_config is None:
         raw_config = load_raw_config()
-    invoice_config = raw_config.get("invoice_agent", {})
-    tax_config = raw_config.get("tax_export", {})
-    data_dir = BASE_DIR / "data" / "invoices"
+    invoice_config = raw_config.get("invoices", {})
+    tax_config = invoice_config.get("tax_export", {})
+    data_dir = API_DIR / "data" / "invoices"
 
     return TaxExportConfig(
         database_path=_path(invoice_config.get("database_path", data_dir / "invoices.db")),
@@ -102,7 +95,7 @@ def main():
         config.reprocess_existing = True
 
     if args.email_debug:
-        from invoice.catalog import InvoiceCatalog
+        from backend.agents.invoices.catalog import InvoiceCatalog
         catalog = InvoiceCatalog(config.database_path)
         try:
             rows = inspect_recent_messages(config.email, args.email_debug, is_processed=catalog.has_email_message)
@@ -167,7 +160,7 @@ def _path(value) -> Path:
     path = Path(value).expanduser()
     if path.is_absolute():
         return path
-    return (BASE_DIR / path).resolve()
+    return (API_DIR / path).resolve()
 
 
 def _load_email_config(email_config: dict) -> EmailConfig:
@@ -234,7 +227,7 @@ def _find_portal_provider(config: PortalConfig, name: str) -> PortalProviderConf
 
 
 def _portal_provider_names(raw_config: dict) -> list[str]:
-    portals = (raw_config.get("invoice_agent", {}) or {}).get("portals", {}) or {}
+    portals = (raw_config.get("invoices", {}) or {}).get("portals", {}) or {}
     return [p.get("name", "") for p in portals.get("providers", []) if p.get("name")]
 
 
@@ -266,7 +259,7 @@ def _load_archive_cleanup_config(config: dict) -> ArchiveCleanupConfig:
 
 
 def _setup_logging():
-    log_dir = BASE_DIR / "logs"
+    log_dir = API_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 

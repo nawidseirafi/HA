@@ -9,24 +9,17 @@ import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
-
 import httpx
 import yaml
 from fastapi import HTTPException
+from backend.paths import PROJECT_DIR, API_CONFIG_PATH, API_DIR, AGENTS_DIR
 
-from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, PROJECT_DIR
-
-AGENT_SCRIPT = AI_AGENT_DIR / "mywellness" / "mywellness.py"
-AGENT_LOG_FILE = AI_AGENT_DIR / "logs" / "mywellness.log"
+AGENT_SCRIPT = AGENTS_DIR / "mywellness" / "mywellness.py"
 CONFIG_PATH = API_CONFIG_PATH
-AI_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
-if str(AI_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(AI_AGENT_DIR))
+if str(API_DIR) not in sys.path:
+    sys.path.insert(0, str(API_DIR))
 
-from mywellness.store import delete_prepared_courses, list_prepared_courses, replace_live_courses
-
-DB_PATH = AI_AGENT_DIR / "data" / "mywellness" / "mywellness.db"
-
+from .store import delete_prepared_courses, list_prepared_courses, replace_live_courses
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -73,6 +66,9 @@ class MyWellnessService:
         self.scheduler_thread: Optional[threading.Thread] = None
         self._state: dict[str, Any] = self._default_status()
         self._ensure_schema()
+        self._courses_cache: Optional[list[dict[str, Any]]] = None
+        self._courses_cache_time: Optional[float] = None
+        self._cache_ttl = 300  # 5 Minuten Cache
 
     def status(self) -> dict[str, Any]:
         settings = self._settings()
@@ -139,11 +135,11 @@ class MyWellnessService:
             self._write_status(state)
 
             env = os.environ.copy()
-            env["PYTHONPATH"] = str(AI_AGENT_DIR)
+            env["PYTHONPATH"] = str(API_DIR)
             command = self._command(mode, dry_run=dry_run)
             self.process = subprocess.Popen(
                 command,
-                cwd=AI_AGENT_DIR,
+                cwd=API_DIR,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -211,8 +207,9 @@ class MyWellnessService:
         limit = min(max(limit, 1), 1000)
         db_logs = self._logs(limit=limit)
         lines: list[str] = []
-        if AGENT_LOG_FILE.exists():
-            lines = AGENT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
+        log_file = self.get_log_path()
+        if log_file.exists():
+            lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
         state = self._read_status()
         if state.get("last_output"):
             lines.extend(str(state["last_output"]).splitlines()[-40:])
@@ -244,6 +241,18 @@ class MyWellnessService:
     def upcoming_courses(self) -> dict[str, Any]:
         state = self._read_status()
         try:
+            # Zuerst aus Datenbank-Cache lesen
+            cached_courses = self._courses_from_db_cache()
+            if cached_courses:
+                courses = self._filter_upcoming(cached_courses)
+                state["upcoming_courses"] = courses
+                state["current_bookings"] = self._bookings_from_courses(courses)
+                state["last_upcoming_refresh"] = utc_now()
+                state["last_error"] = None
+                self._write_status(state)
+                return {"courses": courses}
+
+            # Fallback: API laden
             courses = self._upcoming_courses()
             state["upcoming_courses"] = courses
             state["current_bookings"] = self._bookings_from_courses(courses)
@@ -317,10 +326,10 @@ class MyWellnessService:
             if not AGENT_SCRIPT.exists():
                 raise FileNotFoundError("MyWellness-Agent wurde nicht gefunden.")
             env = os.environ.copy()
-            env["PYTHONPATH"] = str(AI_AGENT_DIR)
+            env["PYTHONPATH"] = str(API_DIR)
             result = subprocess.run(
                 self._command(action_type, dry_run=dry_run),
-                cwd=AI_AGENT_DIR,
+                cwd=API_DIR,
                 env=env,
                 capture_output=True,
                 text=True,
@@ -332,8 +341,8 @@ class MyWellnessService:
             message = self._extract_error(output) if has_error else f"{action_type} abgeschlossen."
             duration = time_module.monotonic() - start_time
             self._record_action_result(action_type, status, message or "", duration, started_at)
-            if output:
-                self._agent_log(output[-2000:])
+            if has_error and output:
+                self._agent_log(f"{action_type} Fehler: {self._extract_error(output)}")
             return {
                 "action_type": action_type,
                 "status": status,
@@ -359,6 +368,9 @@ class MyWellnessService:
 
     def start_scheduler(self) -> None:
         if self.scheduler_thread and self.scheduler_thread.is_alive():
+            return
+        settings = self._settings()
+        if not settings["enabled"]:
             return
         self.scheduler_stop.clear()
         self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
@@ -478,7 +490,13 @@ class MyWellnessService:
         self._write_status(state)
         return {"ok": True, "message": message, "course": next((item for item in refreshed if item.get("id") == course_id), course)}
 
-    def _fetch_courses(self) -> list[dict[str, Any]]:
+    def _fetch_courses(self, force_refresh: bool = False) -> list[dict[str, Any]]:
+        # Cache-Check
+        now = time_module.time()
+        if not force_refresh and self._courses_cache is not None and self._courses_cache_time is not None:
+            if now - self._courses_cache_time < self._cache_ttl:
+                return self._courses_cache
+
         config = self._mywellness_config()
         if not config["token"] or not config["facility_id"]:
             raise RuntimeError("MY_WELLNESS_TOKEN und MY_WELLNESS_FACILITY_ID sind erforderlich.")
@@ -508,6 +526,11 @@ class MyWellnessService:
         deduped = self._dedupe_courses(courses)
         replace_live_courses(deduped)
         self._delete_booked_prepared_courses(deduped)
+
+        # Cache aktualisieren
+        self._courses_cache = deduped
+        self._courses_cache_time = now
+
         return deduped
 
     def _delete_booked_prepared_courses(self, courses: list[dict[str, Any]]) -> int:
@@ -633,6 +656,59 @@ class MyWellnessService:
         _, target_date = self._dates()
         return list_prepared_courses(target_date)
 
+    def _courses_from_db_cache(self) -> list[dict[str, Any]]:
+        """Lädt Kurse aus der Datenbank (live source)"""
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    select * from courses
+                    where source = 'live'
+                    order by start_time, title
+                    """
+                ).fetchall()
+            return [self._course_row_to_api(row) for row in rows]
+        except Exception:
+            return []
+
+    def _course_row_to_api(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "studio": row["studio"] or "",
+            "trainer": row["trainer"],
+            "startTime": row["start_time"],
+            "endTime": row["end_time"],
+            "availableSlots": row["available_slots"],
+            "waitingList": bool(row["waiting_list"]),
+            "booked": bool(row["booked"]),
+            "bookable": bool(row["bookable"]),
+            "cancellable": bool(row["cancellable"]),
+            "status": row["status"],
+            "category": row["category"],
+            "partitionDate": row["partition_date"],
+            "bookingUserStatus": row["booking_user_status"],
+            "room": row["room"],
+            "name": row["title"],
+            "starts_at": row["start_time"],
+            "ends_at": row["end_time"],
+            "location": row["studio"],
+            "booking_status": row["status"],
+            "is_desired": bool(row["is_desired"]),
+            "is_participant": bool(row["booked"]),
+        }
+
+    def _filter_upcoming(self, courses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Filtert Kurse für die nächsten 48 Stunden"""
+        now = datetime.now()
+        limit_day = now + timedelta(days=2)
+        limit = datetime(limit_day.year, limit_day.month, limit_day.day, 23, 59, 59)
+        return [
+            course
+            for course in courses
+            if self._course_datetime(course.get("startTime") or course.get("starts_at"), fallback_min=True) <= limit
+        ]
+
     def _bookings_from_output(self, output: str) -> list[dict[str, Any]]:
         names = re.findall(r"Erfolgreich gebucht:\s*(.+)", output or "")
         booked = []
@@ -645,9 +721,10 @@ class MyWellnessService:
         return self._bookings_from_logs()
 
     def _bookings_from_logs(self) -> list[dict[str, Any]]:
-        if not AGENT_LOG_FILE.exists():
+        log_file = self.get_log_path()
+        if not log_file.exists():
             return []
-        lines = AGENT_LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
+        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
         bookings: list[dict[str, Any]] = []
         for line in lines[-500:]:
             match = re.search(r"Erfolgreich gebucht:\s*(.+)$", line)
@@ -678,13 +755,12 @@ class MyWellnessService:
         }
 
     def _mywellness_config(self) -> dict[str, Any]:
-        env_values = read_env_file(AI_AGENT_DIR / ".env")
-        api_config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
-        ai_config = read_yaml(AI_CONFIG_PATH).get("myWelness_agent", {})
+        env_values = read_env_file(API_DIR / ".env")
+        api_config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
         settings = self._settings()
-        token = resolve_secret(api_config.get("token_env"), env_values) or resolve_secret(ai_config.get("token"), env_values)
-        user_id = resolve_secret(api_config.get("user_id_env"), env_values) or resolve_secret(ai_config.get("user_id"), env_values)
-        facility_id = resolve_secret(api_config.get("facility_id_env"), env_values) or resolve_secret(ai_config.get("facility_id"), env_values)
+        token = resolve_secret(api_config.get("token"), env_values)
+        user_id = resolve_secret(api_config.get("user_id"), env_values)
+        facility_id = resolve_secret(api_config.get("facility_id"), env_values)
         return {
             "token": token,
             "user_id": user_id,
@@ -705,16 +781,39 @@ class MyWellnessService:
     def _agent_log(self, message: str) -> None:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         try:
-            with AGENT_LOG_FILE.open("a", encoding="utf-8") as log_file:
-                log_file.write(f"[{timestamp}] {message}\n")
+            log_file = self.get_log_path()
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] {message}\n")
         except OSError:
             pass
 
     def _connect(self) -> sqlite3.Connection:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(DB_PATH)
+        db_path = self.get_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(db_path)
         connection.row_factory = sqlite3.Row
         return connection
+
+    @staticmethod
+    def get_db_path() -> Path:
+        config_dir = CONFIG_PATH.parent
+        api_config = (
+            read_yaml(CONFIG_PATH)
+            .get("agents", {})
+            .get("my_wellness", {})
+        )
+        return (config_dir / api_config["database_path"]).resolve()
+
+    @staticmethod
+    def get_log_path() -> Path:
+        config_dir = CONFIG_PATH.parent
+        api_config = (
+            read_yaml(CONFIG_PATH)
+            .get("agents", {})
+            .get("my_wellness", {})
+        )
+        return (config_dir / api_config["log_path"]).resolve()
 
     def _ensure_schema(self) -> None:
         with self._connect() as connection:
@@ -929,7 +1028,7 @@ class MyWellnessService:
         return parsed.isoformat()
 
     def _config_schedule(self) -> list[str]:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
         schedule = config.get("schedule") or ["17:00:00", "20:59:58"]
         return [
             self._normalize_time_string(schedule[0] if len(schedule) > 0 else "17:00:00", "prepare_time"),
@@ -937,11 +1036,11 @@ class MyWellnessService:
         ]
 
     def _config_days(self) -> int:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
         return int(config.get("days", 2) or 2)
 
     def _config_desired_courses(self) -> list[str]:
-        config = read_yaml(CONFIG_PATH).get("agents", {}).get("mywellness", {})
+        config = read_yaml(CONFIG_PATH).get("agents", {}).get("my_wellness", {})
         courses = config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"]
         return [str(course).strip() for course in courses if str(course).strip()]
 

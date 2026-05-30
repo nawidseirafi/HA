@@ -5,14 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-PROJECT_DIR = BASE_DIR.parent
-AGENT_DIR = PROJECT_DIR / "ai-agent"
-API_CONFIG_PATH = BASE_DIR / "config.yaml"
-AGENT_CONFIG_PATH = AGENT_DIR / "config.yaml"
-ENV_PATHS = (BASE_DIR / ".env", AGENT_DIR / ".env")
+from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -24,15 +17,14 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 def _load_env_files() -> dict[str, str]:
     values: dict[str, str] = {}
-    for path in ENV_PATHS:
-        if not path.exists():
+    if not ENV_PATH.exists():
+        return values
+    for raw_line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, raw_value = line.split("=", 1)
-            values[key.strip()] = raw_value.strip().strip("\"'")
+        key, raw_value = line.split("=", 1)
+        values[key.strip()] = raw_value.strip().strip("\"'")
     return values
 
 
@@ -68,8 +60,8 @@ def _setting_present(value: str | None, env_values: dict[str, str]) -> bool:
     return value not in placeholders and not value.endswith("_KEY") and not value.endswith("_TOKEN")
 
 
-def _llm_info(agent_config: dict[str, Any], env_values: dict[str, str]) -> dict[str, Any]:
-    llm_config = agent_config.get("llm", {})
+def _llm_info(config: dict[str, Any], env_values: dict[str, str]) -> dict[str, Any]:
+    llm_config = config.get("llm", {})
     provider = llm_config.get("provider", "")
     provider_config = llm_config.get(provider, {}) if provider else {}
     api_key_setting = provider_config.get("api_key")
@@ -141,25 +133,26 @@ def _invoice_runtime_settings(db_path: Path) -> dict[str, Any]:
 
 
 def get_settings() -> dict[str, Any]:
-    api_config = _load_yaml(API_CONFIG_PATH)
-    agent_config = _load_yaml(AGENT_CONFIG_PATH)
+    config = _load_yaml(API_CONFIG_PATH)
     env_values = _load_env_files()
 
-    server_config = api_config.get("server", {})
-    auth_config = api_config.get("auth", {})
-    storage_config = api_config.get("storage", {})
-    agents_config = api_config.get("agents", {})
-    invoice_config = agent_config.get("invoice_agent", {})
-    mywellness_config = agents_config.get("mywellness", {})
+    server_config = config.get("server", {})
+    auth_config = config.get("auth", {})
+    agents_config = config.get("agents", {})
+    invoice_config = agents_config.get("invoices", {})
+    mywellness_config = agents_config.get("my_wellness", {})
     market_config = agents_config.get("market", {})
-    ha_config = agent_config.get("home_assistant", {})
+    ha_config = config.get("home_assistant", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
 
     token_ttl_seconds = int(auth_config.get("token_ttl_seconds", 0) or 0)
-    mywellness_db = AGENT_DIR / "data" / "mywellness" / "mywellness.db"
-    mywellness_runtime = _mywellness_runtime_settings(mywellness_db)
-    invoice_db = _path_info(AGENT_DIR, invoice_config.get("database_path"))
-    invoice_runtime = _invoice_runtime_settings(_resolve_path(AGENT_DIR, invoice_config.get("database_path")) or AGENT_DIR / "data" / "invoices" / "invoices.db")
+    data_dir = API_DIR / "data"
+
+    mywellness_db = _resolve_path(API_DIR, mywellness_config.get("database_path", data_dir / "mywellness" / "mywellness.db"))
+    mywellness_runtime = _mywellness_runtime_settings(mywellness_db) if mywellness_db else {}
+    invoice_db_path = _resolve_path(API_DIR, invoice_config.get("database_path", data_dir / "invoices" / "invoices.db"))
+    invoice_db = {"path": str(invoice_db_path), "exists": invoice_db_path.exists() if invoice_db_path else False}
+    invoice_runtime = _invoice_runtime_settings(invoice_db_path) if invoice_db_path else {}
 
     return {
         "api": {
@@ -180,19 +173,19 @@ def get_settings() -> dict[str, Any]:
         },
         "frontend": {
             "dev_server": "Vite 5173",
-            "production_dist": str(BASE_DIR / "frontend" / "dist"),
-            "production_dist_exists": (BASE_DIR / "frontend" / "dist").exists(),
+            "production_dist": str(API_DIR / "frontend" / "dist"),
+            "production_dist_exists": (API_DIR / "frontend" / "dist").exists(),
         },
         "storage": {
-            "uploads": _path_info(BASE_DIR, storage_config.get("uploads_dir")),
-            "log_file": _path_info(BASE_DIR, api_config.get("logging", {}).get("file")),
+            "uploads": _path_info(API_DIR, invoice_config.get("uploads_dir")),
+            "log_file": _path_info(API_DIR, config.get("logging", {}).get("file")),
         },
         "agents": {
             "invoices": {
-                "enabled": bool(invoice_runtime.get("enabled", agents_config.get("invoices", {}).get("enabled", True))),
-                "upload_dir": _path_info(BASE_DIR, agents_config.get("invoices", {}).get("upload_dir")),
+                "enabled": bool(invoice_runtime.get("enabled", invoice_config.get("enabled", True))),
+                "upload_dir": _path_info(API_DIR, invoice_config.get("upload_dir")),
                 "database": invoice_db,
-                "schedule": invoice_runtime.get("schedule", agents_config.get("invoices", {}).get("schedule", [])),
+                "schedule": invoice_runtime.get("schedule", invoice_config.get("schedule", [])),
                 "email_enabled": bool(invoice_config.get("email", {}).get("enabled", False)),
                 "portal_import_enabled": bool(invoice_config.get("portals", {}).get("enabled", False)),
                 "ai_extraction_enabled": bool(invoice_config.get("ai_extraction", {}).get("enabled", False)),
@@ -200,20 +193,20 @@ def get_settings() -> dict[str, Any]:
             },
             "mywellness": {
                 "enabled": bool(mywellness_runtime.get("enabled", mywellness_config.get("enabled", False))),
-                "database": {"path": str(mywellness_db), "exists": mywellness_db.exists()},
+                "database": {"path": str(mywellness_db), "exists": mywellness_db.exists() if mywellness_db else False},
                 "days": mywellness_runtime.get("days", mywellness_config.get("days", 2)),
                 "schedule": mywellness_runtime.get("schedule", mywellness_config.get("schedule", [])),
                 "desired_courses": mywellness_runtime.get("desired_courses", mywellness_config.get("desired_courses", [])),
-                "token_configured": _env_present(mywellness_config.get("token_env"), env_values),
-                "user_id_configured": _env_present(mywellness_config.get("user_id_env"), env_values),
-                "facility_id_configured": _env_present(mywellness_config.get("facility_id_env"), env_values),
+                "token_configured": _env_present(mywellness_config.get("token"), env_values),
+                "user_id_configured": _env_present(mywellness_config.get("user_id"), env_values),
+                "facility_id_configured": _env_present(mywellness_config.get("facility_id"), env_values),
             },
             "vacation": {
                 "enabled": bool(agents_config.get("vacation", {}).get("enabled", False)),
             },
             "market": {
                 "enabled": bool(market_config.get("enabled", False)),
-                "database": _path_info(BASE_DIR, market_config.get("database_path", "../ai-agent/data/market/market.db")),
+                "database": _path_info(API_DIR, market_config.get("database_path", data_dir / "market" / "market.db")),
                 "price_provider": market_config.get("price_provider", "yahoo"),
                 "news_provider": market_config.get("news_provider", "fallback"),
                 "trading_enabled": False,
@@ -221,7 +214,7 @@ def get_settings() -> dict[str, Any]:
             },
         },
         "integrations": {
-            "llm": _llm_info(agent_config, env_values),
+            "llm": _llm_info(config, env_values),
             "home_assistant": {
                 "configured": _setting_present(ha_config.get("token"), env_values),
                 "notifications_enabled": bool(ha_notification_config.get("enabled", False)),

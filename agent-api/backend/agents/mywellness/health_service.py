@@ -3,8 +3,8 @@ import sqlite3
 from datetime import date, datetime, timezone
 from typing import Any
 
+from backend.agents.mywellness.service import MyWellnessService
 from backend.agents.mywellness.ai_service import MyWellnessAIService
-from backend.agents.mywellness.service import DB_PATH
 from backend.services.homeassistant_service import HomeAssistantService
 
 
@@ -291,8 +291,9 @@ class MyWellnessHealthService:
         return self._decode_metric(dict(row)) if row else None
 
     def _connect(self) -> sqlite3.Connection:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(DB_PATH)
+        db_path = MyWellnessService.get_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(db_path)
         connection.row_factory = sqlite3.Row
         return connection
 

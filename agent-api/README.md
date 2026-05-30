@@ -1,40 +1,38 @@
-# RoboterSteve Agent API und Agent Console
+# RoboterSteve - AI Agent System
 
-Lokale FastAPI-Schnittstelle und React-Weboberflaeche fuer lokale Agenten. Der Rechnungs-Agent ist der erste aktive Bereich; weitere Agenten koennen als eigene Bereiche ergaenzt werden.
+Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness und Boersenanalyse.
+
+## Projektstruktur
+
+```text
+roboterSteve/
+├── agent-api/                    # FastAPI-Backend + React-Frontend
+│   ├── backend/
+│   │   ├── main.py
+│   │   ├── paths.py
+│   │   ├── api/                  # Querschnitts-APIs: Auth, Settings
+│   │   ├── services/             # Querschnitts-Services (LLM, Home Assistant)
+│   │   └── agents/
+│   │       ├── invoices/         # InvoiceAgent API, Service, Exporte, CLI
+│   │       ├── market/           # MarketAgent API, Analyse-/Datenservices, CLI
+│   │       └── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
+│   ├── frontend/
+│   │   └── src/                 # React-App
+│   ├── config.yaml
+│   └── requirements.txt
+└── venv/                        # Gemeinsame Python-Umgebung
+```
 
 ## Entwicklung
 
-## Struktur
-
-```text
-agent-api/
-├── backend/
-│   ├── main.py
-│   ├── paths.py
-│   ├── api/                  # Querschnitts-APIs: Auth, Settings
-│   ├── services/             # Querschnitts-Services
-│   └── agents/
-│       ├── invoices/         # InvoiceAgent API, Service, Exporte, Dateien
-│       ├── market/           # MarketAgent API, Agent, Analyse-/Datenservices
-│       └── mywellness/       # MyWellness API, Agent, Scheduler-, Health- und AI-Services
-├── frontend/
-│   └── src/
-├── logs/
-├── config.yaml
-├── main.py
-└── requirements.txt
-```
-
-`main.py` im Root bleibt als kleiner Kompatibilitaets-Einstieg fuer `uvicorn main:app`. Der eigentliche Backend-Code liegt unter `backend/`. Agent-spezifische Routen und Services liegen jeweils zusammen unter `backend/agents/<agent>/`; neue KI-Agenten sollten dort als eigenes Package ergaenzt werden.
-
-Backend:
+### Backend (FastAPI)
 
 ```bash
 cd agent-api
 ../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-Frontend:
+### Frontend (React)
 
 ```bash
 cd agent-api/frontend
@@ -42,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Danach:
+### Zugriff
 
 ```text
 Frontend: http://localhost:5173
@@ -52,41 +50,70 @@ Swagger:  http://localhost:8080/docs
 
 Im lokalen Netzwerk ist Vite je nach Host-IP z.B. unter `http://192.168.178.143:5173` erreichbar.
 
-## Produktion
+## Python-Umgebung
+
+Gemeinsame Python-Umgebung auf Repo-Ebene:
 
 ```bash
-cd agent-api/frontend
-npm run build
+cd roboterSteve
+python3 -m venv venv
+source venv/bin/activate  # macOS/Linux
+# oder venv\Scripts\activate  # Windows
 
-cd ..
-../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080
+pip install --upgrade pip
+pip install -r agent-api/requirements.txt
 ```
 
-Wenn `frontend/dist` existiert, liefert FastAPI die gebaute React-App direkt aus.
+Für Portal-Downloads wird zusätzlich Playwright benötigt:
 
-## Auth
-
-Alle `/api/*`-Endpunkte ausser `/api/auth/login` sind per JWT geschuetzt. Zugangsdaten werden ueber ENV gesetzt:
-
-```text
-AGENT_API_USERNAME
-AGENT_API_PASSWORD
-AGENT_API_JWT_SECRET
+```bash
+pip install playwright
+playwright install chromium
 ```
 
-Lokaler Fallback fuer Entwicklung ist `admin` / `admin`. `AGENT_API_JWT_SECRET` sollte fuer echte Nutzung gesetzt werden.
+## Konfiguration
 
-## API
+Die zentrale Konfiguration liegt in `config.yaml`.
 
-Auth-Endpunkte:
+### Home Assistant
 
+```bash
+# .env
+HA_URL="http://homeassistant.local:8123"
+HA_TOKEN="dein-home-assistant-token"
+```
+
+```yaml
+# config.yaml
+home_assistant:
+  url: HA_URL
+  token: HA_TOKEN
+```
+
+### Auth (Agent API)
+
+Alle `/api/*`-Endpunkte außer `/api/auth/login` sind per JWT geschützt:
+
+```bash
+# .env
+AGENT_API_USERNAME=admin
+AGENT_API_PASSWORD=admin
+AGENT_API_JWT_SECRET=dein-geheimer-schluessel
+```
+
+Lokaler Fallback für Entwicklung ist `admin` / `admin`. `AGENT_API_JWT_SECRET` sollte für echte Nutzung gesetzt werden.
+
+## Agent API (Web-Interface)
+
+### API-Endpunkte
+
+**Auth:**
 ```text
 POST /api/auth/login
 GET  /api/auth/me
 ```
 
-Invoice-Endpunkte:
-
+**Invoice:**
 ```text
 GET    /api/invoices/summary
 GET    /api/invoices/years
@@ -102,8 +129,7 @@ POST   /api/invoices/upload
 POST   /api/invoices/run
 ```
 
-Export-Endpunkte:
-
+**Export:**
 ```text
 GET /api/invoices/exports/year/{year}/excel
 GET /api/invoices/exports/year/{year}/pdf
@@ -113,10 +139,7 @@ GET /api/invoices/exports/month/{year}/{month}/pdf
 GET /api/invoices/exports/month/{year}/{month}/zip
 ```
 
-Die Export-Endpunkte gehoeren bewusst zur Invoice-API. Es gibt keinen separaten `/api/exports`-Bereich mehr.
-
-MyWellness-Endpunkte:
-
+**MyWellness:**
 ```text
 GET  /api/agent/status
 POST /api/agent/start
@@ -147,12 +170,7 @@ GET  /api/mywellness/health/withings/latest
 POST /api/mywellness/health/withings/discover
 ```
 
-`POST /api/agent/start` startet den bestehenden `../ai-agent/mywellness/mywellness.py` standardmaessig im `prepare`-Modus, damit Kursdaten aktualisiert werden. Fuer einen Buchungslauf kann optional `{"mode":"book"}` gesendet werden. Persistenter Zustand, History und vorbereitete Kursdaten liegen in der SQLite-DB `../ai-agent/data/mywellness/mywellness.db`; der Lauf-Status (`is_running`, letzter Output) wird im Arbeitsspeicher gehalten. Agent-Logs bleiben bei `../ai-agent/logs/mywellness.log`.
-
-`GET /api/mywellness/courses/upcoming` liefert das einheitliche Course-Modell fuer die naechsten 48 Stunden. `POST /api/mywellness/book` und `POST /api/mywellness/cancel` erwarten `{"courseId":"..."}` und fuehren Buchung oder Stornierung ausschliesslich ueber das Backend aus.
-
-Kompatible alte Endpunkte bleiben aktiv:
-
+**Kompatible alte Endpunkte:**
 ```text
 GET  /health
 GET  /agents
@@ -162,53 +180,219 @@ POST /agents/invoices/upload
 POST /agents/vacation/run
 ```
 
-Uploads fuer Rechnungen werden in der Invoice-Inbox `../ai-agent/data/invoices/inbox` gespeichert. Persistente Agent-Daten liegen in den jeweiligen SQLite-Datenbanken unter `../ai-agent/data`. Die React-App startet nach dem Login auf einer neutralen Agenten-Uebersicht; der Rechnungs-Agent liegt unter `/invoices`. Die React-App greift nicht direkt auf SQLite oder Dateien zu, sondern nur ueber FastAPI.
+## CLI-Agenten
 
-## MyWellness Agent
+Die CLI-Agenten sind in `backend/agents/` integriert und können direkt gestartet werden:
 
-Der MyWellness-Bereich liegt im Frontend unter `/mywellness`. Angezeigt werden Laufstatus, letzter erfolgreicher Lauf, naechster geplanter Lauf, Fehler, aktuelle Buchungen aus Agent-Daten, gefundene Kurse aus dem Prepare-Cache, verfuegbare Kurse der naechsten 48 Stunden und die letzten Logs. Zusaetzlich gibt es Health-/Recovery-Auswertungen aus Home-Assistant- und Withings-Daten. Die Buttons starten den Agenten, deaktivieren/stoppen ihn lokal, laden API-Daten neu oder buchen/stornieren Kurse. Verfuegbare Kurse, Buchungen und Status werden automatisch alle 30 Sekunden aktualisiert.
+### Rechnungs-Agent
 
-Erforderliche ENV-Werte werden aus der Umgebung oder aus `../ai-agent/.env` gelesen:
+**Einmaliger Lauf:**
+```bash
+cd agent-api
+../venv/bin/python -m backend.agents.invoices.invoices --once
+```
 
-```text
+**Dauerbetrieb:**
+```bash
+../venv/bin/python -m backend.agents.invoices.invoices --watch
+```
+
+**Bereits bekannte Dateien erneut auswerten:**
+```bash
+../venv/bin/python -m backend.agents.invoices.invoices --once --reprocess
+```
+
+**Steuer-Export:**
+```bash
+../venv/bin/python -m backend.agents.invoices.invoices --tax-year 2026
+```
+
+**Archiv aufräumen:**
+```bash
+# Nur prüfen
+../venv/bin/python -m backend.agents.invoices.cleanup_archive
+
+# Unreferenzierte Dateien in Backup verschieben
+../venv/bin/python -m backend.agents.invoices.cleanup_archive --apply
+```
+
+### MyWellness-Agent
+
+```bash
+cd agent-api
+../venv/bin/python -m backend.agents.mywellness.mywellness prepare  # Zielkurse suchen
+../venv/bin/python -m backend.agents.mywellness.mywellness book     # Buchung versuchen
+```
+
+Erforderliche ENV-Werte:
+```bash
 MY_WELLNESS_TOKEN
 MY_WELLNESS_USER_ID
 MY_WELLNESS_FACILITY_ID
 ```
 
-Die Kursnamen, der Suchhorizont und die geplanten Laufzeiten stehen in `agent-api/config.yaml` unter `agents.mywellness`. Zugangsdaten werden nicht ans Frontend geliefert. Vorbereitete Kurse, Live-Kurse, Health-Metriken, Recovery-Reports und Health-Einstellungen liegen in `../ai-agent/data/mywellness/mywellness.db`.
-
-Der MyWellness-spezifische Backend-Code ist im Agent-Paket gebuendelt:
-
-```text
-backend/agents/mywellness/
-  routes.py
-  service.py
-  health_service.py
-  ai_service.py
-```
-
-Fehler pruefen:
+### Market-Agent
 
 ```bash
 cd agent-api
-../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
+../venv/bin/python -m backend.agents.market.market run
+../venv/bin/python -m backend.agents.market.market analyze --symbol AAPL
 ```
 
-Dann `http://localhost:8080/docs` oder `/mywellness` im Frontend oeffnen. Detailfehler stehen in der DB-Tabelle `mywellness_logs` (`../ai-agent/data/mywellness/mywellness.db`), in `../ai-agent/logs/mywellness.log` und im UI-Panel "Agent Logs".
+## Konfiguration - Rechnungs-Agent
 
-## Hinweise
+```yaml
+invoice_agent:
+  inbox_dir: "./data/invoices/inbox"
+  archive_dir: "./data/invoices/archive"
+  review_dir: "./data/invoices/review"
+  database_path: "./data/invoices/invoices.db"
+  email_attachment_dir: "./data/invoices/inbox"
+  ai_extraction:
+    enabled: true
+    always_for_documents: true
+    min_confidence: 0.8
+    max_file_bytes: 10485760
+  archive_cleanup:
+    enabled: true
+    apply: true
+    backup_dir: "./data/invoices/archive_cleanup_backup"
+```
 
-- JWT-Login ist aktiv; nur `/health` und `/api/auth/login` sind oeffentlich.
-- ELSTER-Direktversand ist nicht implementiert und wird nur als deaktivierter Platzhalter angezeigt.
-- Steuerkategorien sind nur Datenfelder, keine Steuerberatung.
+### E-Mail-Anbindung (ALL-INKL)
+
+```yaml
+invoice_agent:
+  email:
+    enabled: true
+    host_env: "INVOICE_EMAIL_HOST"
+    port: 993
+    username_env: "INVOICE_EMAIL_USERNAME"
+    password_env: "INVOICE_EMAIL_PASSWORD"
+    mailbox: "INBOX"
+    search: "ALL"
+    mark_seen: false
+    max_messages: 500
+```
+
+```bash
+# .env
+INVOICE_EMAIL_HOST="wXXXXXXX.kasserver.com"
+INVOICE_EMAIL_USERNAME="name@deinedomain.de"
+INVOICE_EMAIL_PASSWORD="mailbox-passwort"
+```
+
+### Home-Assistant-Benachrichtigung
+
+```yaml
+invoice_agent:
+  home_assistant_notifications:
+    enabled: true
+    only_on_changes: true
+    title: "Rechnungs-Agent"
+    notification_id: "invoice_agent"
+    notify_service: "notify.mobile_app_system_error_404"
+    persistent: true
+```
+
+### Portal-Downloads (HUK24)
+
+```yaml
+invoice_agent:
+  portals:
+    enabled: true
+    providers:
+      - name: "huk24"
+        enabled: true
+        url: "https://www.huk24.de/meine-huk24/postfach/"
+        session_path: "./data/invoices/portal_sessions/huk24.json"
+        download_dir: "./data/invoices/inbox"
+        headless: true
+        wait_seconds: 20
+```
+
+**Einmalig einloggen:**
+```bash
+../venv/bin/python -m backend.agents.invoices.invoices --portal-login huk24
+```
+
+**Portal prüfen:**
+```bash
+../venv/bin/python -m backend.agents.invoices.invoices --portal-check huk24
+```
+
+## Konfiguration - MyWellness-Agent
+
+```yaml
+agents:
+  mywellness:
+    token: MY_WELLNESS_TOKEN
+    user_id: MY_WELLNESS_USER_ID
+    facility_id: MY_WELLNESS_FACILITY_ID
+    desired_courses:
+      - "Cross-Power"
+      - "Body Workout"
+      - "Functional Training"
+    days: 2
+    prepare_time: "17:00"
+    booking_time: "20:59:58"
+    database_path: "./data/mywellness/mywellness.db"
+    log_path: "./logs/mywellness.log"
+```
+
+## Produktion
+
+### Frontend builden
+
+```bash
+cd agent-api/frontend
+npm run build
+```
+
+### Backend starten
+
+```bash
+cd agent-api
+../venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8080
+```
+
+Wenn `frontend/dist` existiert, liefert FastAPI die gebaute React-App direkt aus.
+
+### Systemd-Service (Debian)
+
+Beispiel für `/etc/systemd/system/invoice-agent.service`:
+
+```ini
+[Unit]
+Description=Invoice AI Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/agents/agent-api
+ExecStart=/srv/agents/agent-api/venv/bin/python -m backend.agents.invoices.invoices --watch
+Restart=always
+RestartSec=10
+User=agent
+Group=agent
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now invoice-agent
+sudo systemctl status invoice-agent
+journalctl -u invoice-agent -f
+```
 
 ## Agent Plugin Contract
 
-Ein Agent wird als Ordner unter `agent-api/backend/agents/<id>/` angelegt.
+Ein neuer Agent wird als Ordner unter `agent-api/backend/agents/<id>/` angelegt.
 
-Minimaler Aufbau:
-
+**Minimaler Aufbau:**
 ```text
 backend/agents/example/
   manifest.yaml
@@ -216,8 +400,7 @@ backend/agents/example/
   service.py
 ```
 
-`manifest.yaml`:
-
+**manifest.yaml:**
 ```yaml
 id: example
 name: Example Agent
@@ -235,12 +418,14 @@ ui:
 settings: {}
 ```
 
-`routes.py` muss einen FastAPI-`router` exportieren. Wenn `runtime.service_object`
-gesetzt ist und dieses Objekt `start_scheduler()` / `stop_scheduler()` besitzt,
-ruft die API diese Methoden beim Starten und Stoppen automatisch auf.
+`routes.py` muss einen FastAPI-`router` exportieren. Wenn `runtime.service_object` gesetzt ist und dieses Objekt `start_scheduler()` / `stop_scheduler()` besitzt, ruft die API diese Methoden beim Starten und Stoppen automatisch auf.
 
-Bekannte UI-Icons im Frontend: `Bot`, `FileText`, `Dumbbell`, `LineChart`,
-`Mail`, `CalendarCheck`, `Home`, `Settings2`.
+**Bekannte UI-Icons:** `Bot`, `FileText`, `Dumbbell`, `LineChart`, `Mail`, `CalendarCheck`, `Home`, `Settings2`.
 
-Ein `dashboard_route` ist optional. Ohne eigene Frontend-Route erscheint der
-Agent in der Uebersicht als installiert, aber ohne oeffnende Detailseite.
+## Hinweise
+
+- JWT-Login ist aktiv; nur `/health` und `/api/auth/login` sind öffentlich.
+- ELSTER-Direktversand ist nicht implementiert und wird nur als deaktivierter Platzhalter angezeigt.
+- Steuerkategorien sind nur Datenfelder, keine Steuerberatung.
+- Secrets wie API-Keys gehören in `.env`, nicht ins Git-Repository.
+- Die KI-Extraktion für Belege nutzt die zentrale `llm`-Konfiguration und die API-Keys aus `.env`.

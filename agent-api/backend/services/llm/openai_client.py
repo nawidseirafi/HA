@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from openai import OpenAI
-from llm.base import BaseLLMClient, LLMResponse
+from .base import BaseLLMClient, LLMResponse
 
 class OpenAILLMClient(BaseLLMClient):
     def __init__(self, api_key: str, model: str):

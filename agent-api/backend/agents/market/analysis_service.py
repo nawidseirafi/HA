@@ -2,12 +2,10 @@ import json
 import re
 import sys
 from typing import Any
-
+from backend.services.llm.factory import create_llm_client
 import yaml
+from backend.paths import API_CONFIG_PATH
 
-from backend.paths import AI_AGENT_DIR
-
-AGENT_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
 ALLOWED_SIGNALS = {"bullish", "neutral", "bearish", "watch"}
 
 
@@ -20,17 +18,16 @@ class MarketAnalysisService:
         return validated
 
     def _llm_analysis(self, watchlist_item: dict[str, Any], quote: dict[str, Any], news: list[dict[str, Any]]) -> dict[str, Any]:
-        if not AGENT_CONFIG_PATH.exists():
-            raise RuntimeError("ai-agent/config.yaml nicht gefunden")
-        if str(AI_AGENT_DIR) not in sys.path:
-            sys.path.insert(0, str(AI_AGENT_DIR))
-        from llm import create_llm_client  # type: ignore
+        if not API_CONFIG_PATH.exists():
+            raise RuntimeError("config.yaml nicht gefunden")
+        if str(API_CONFIG_PATH) not in sys.path:
+            sys.path.insert(0, str(API_CONFIG_PATH))
 
-        config = yaml.safe_load(AGENT_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+        config = yaml.safe_load(API_CONFIG_PATH.read_text(encoding="utf-8")) or {}
         llm_config = config.get("llm", {})
         if not llm_config:
             raise RuntimeError("keine LLM-Konfiguration vorhanden")
-        client = create_llm_client({"llm": llm_config})
+        client = create_llm_client()
         response = client.generate(prompt=self._prompt(watchlist_item, quote, news), system=SYSTEM_PROMPT)
         return self._extract_json(response.text)
 

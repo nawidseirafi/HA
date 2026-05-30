@@ -7,7 +7,8 @@ from urllib.parse import urlparse
 import httpx
 import yaml
 
-from backend.paths import AI_AGENT_DIR
+from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
+
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -53,8 +54,8 @@ def _resolve_secret(value: Any, env_values: dict[str, str]) -> str:
 
 class HomeAssistantService:
     def __init__(self) -> None:
-        env_values = _read_env_file(AI_AGENT_DIR / ".env")
-        config = _read_yaml(AI_AGENT_DIR / "config.yaml").get("home_assistant", {})
+        env_values = _read_env_file(API_DIR / ".env")
+        config = _read_yaml(API_DIR / "config.yaml").get("home_assistant", {})
         self.base_url = (
             os.getenv("HA_URL")
             or env_values.get("HA_URL")

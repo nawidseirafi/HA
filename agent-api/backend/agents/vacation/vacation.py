@@ -1,30 +1,24 @@
 import yaml
 import logging
-import sys
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from llm import create_llm_client
-from shared.ha_client import HomeAssistantClient
+from backend.paths import API_DIR
+from backend.services.llm.factory import create_llm_client
+from backend.services.core.ha_client import HomeAssistantClient
 
 import warnings
 
 warnings.filterwarnings("ignore")
 
-LOG_DIR = BASE_DIR / "logs"
+LOG_DIR = API_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
-    filename=LOG_DIR / "agent.log",
+    filename=LOG_DIR / "vaction.log",
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
 def load_config():
-    with (BASE_DIR / "config.yaml").open("r") as f:
+    with (API_DIR / "config.yaml").open("r") as f:
         return yaml.safe_load(f)
 
 def main():

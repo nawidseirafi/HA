@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from shared.ha_client import HomeAssistantClient
-from invoice.ai_extractor import refine_metadata_with_ai
-from invoice.archiver import archive_invoice, copy_to_review
-from invoice.catalog import InvoiceCatalog
-from invoice.categories import apply_category_rules
-from invoice.cleanup_archive import cleanup_archive
-from invoice.email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
-from invoice.extractor import extract_metadata, file_sha256
-from invoice.portals import PortalConfig, fetch_portal_documents
+from backend.services.core.ha_client import HomeAssistantClient
+from .ai_extractor import refine_metadata_with_ai
+from .archiver import archive_invoice, copy_to_review
+from .catalog import InvoiceCatalog
+from .categories import apply_category_rules
+from .cleanup_archive import cleanup_archive
+from .email import EmailConfig, extract_attachments_from_eml, fetch_imap_attachments
+from .extractor import extract_metadata, file_sha256
+from .portals import PortalConfig, fetch_portal_documents
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv", ".eml"}
@@ -211,7 +211,7 @@ def _create_llm_client(config: InvoiceAgentConfig):
         logging.info("KI-Belegextraktion deaktiviert: keine llm-Konfiguration vorhanden.")
         return None
     try:
-        from llm import create_llm_client
+        from backend.services.llm.factory import create_llm_client
         return create_llm_client({"llm": config.llm_config})
     except Exception as exc:
         logging.warning("LLM-Client konnte nicht erstellt werden: %s", exc)

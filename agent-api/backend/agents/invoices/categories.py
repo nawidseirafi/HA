@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional
 
-from invoice.extractor import InvoiceMetadata
+from invoices.extractor import InvoiceMetadata
 
 
 def apply_category_rules(

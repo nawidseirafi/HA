@@ -1,17 +1,10 @@
-import sys
-from pathlib import Path
 from typing import Any
 
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = BASE_DIR.parent
-if str(PROJECT_DIR) not in sys.path:
-    sys.path.insert(0, str(PROJECT_DIR))
-
-from market.analysis import MarketAnalysisService
-from market.data import MarketDataService
-from market.news import MarketNewsService
-from market.report import MarketReportService, utc_now
-from market.symbol_resolver import MarketSymbolResolver
+from analysis_service import MarketAnalysisService
+from data_service import MarketDataService
+from news_service import MarketNewsService
+from report_service import MarketReportService, utc_now
+from symbol_resolver import MarketSymbolResolver
 
 
 class MarketAgent:

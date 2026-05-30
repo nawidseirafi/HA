@@ -1,6 +1,6 @@
 import requests
 
-from llm.base import BaseLLMClient, LLMResponse
+from .base import BaseLLMClient, LLMResponse
 
 
 class LlamaLLMClient(BaseLLMClient):

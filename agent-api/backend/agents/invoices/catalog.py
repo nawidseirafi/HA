@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Iterable
 from xml.sax.saxutils import escape
 
-from invoice.archiver import month_dir_for
-from invoice.extractor import InvoiceMetadata
+from invoices.archiver import month_dir_for
+from invoices.extractor import InvoiceMetadata
 
 
 HEADERS = (

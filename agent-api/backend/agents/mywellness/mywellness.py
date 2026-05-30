@@ -5,10 +5,11 @@ import time
 import os
 import sys
 from pathlib import Path
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 import yaml
-
+from backend.paths import API_DIR
 # =====================
 # KONFIGURATION
 # =====================
@@ -26,28 +27,25 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else "book"
 MAX_RETRIES = 30  # Reduziert: meist reichen 2-3 Versuche
 RETRY_DELAY = 0.1  # Schneller Retry
 REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = BASE_DIR.parent
-if str(BASE_DIR) in sys.path:
-    sys.path.remove(str(BASE_DIR))
-if str(PROJECT_DIR) in sys.path:
-    sys.path.remove(str(PROJECT_DIR))
-sys.path.insert(0, str(PROJECT_DIR))
 
-from shared.ha_client import HomeAssistantClient
-from mywellness.store import delete_prepared_courses, load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
+from backend.services.core.ha_client import HomeAssistantClient
+from backend.agents.mywellness.store import delete_prepared_courses, load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
 
 agent_settings = load_agent_settings()
 desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES
 days = int(agent_settings["days"] or 2)
 
-LOG_FILE = PROJECT_DIR / "logs" / "mywellness.log"
-
 def load_raw_config() -> dict:
-    load_dotenv(PROJECT_DIR / ".env")
+    load_dotenv(API_DIR / ".env")
 
-    with (PROJECT_DIR / "config.yaml").open("r", encoding="utf-8") as f:
+    with (API_DIR / "config.yaml").open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def get_log_path() -> Path:
+    config = load_raw_config()
+    log_path = config.get("agents", {}).get("my_wellness", {}).get("log_path", "logs/my_wellness.log")
+    return (API_DIR / log_path).resolve()
 
 def resolve_config_value(value):
     text = str(value or "")
@@ -59,11 +57,11 @@ def resolve_config_value(value):
     return text
 
 def mywellness_config() -> dict:
-    config = load_raw_config().get("myWelness_agent", {})
+    config = load_raw_config().get("my_wellness", {})
     return {
-        "token": os.getenv("MY_WELLNESS_TOKEN") or resolve_config_value(config.get("token", "")),
-        "user_id": os.getenv("MY_WELLNESS_USER_ID") or resolve_config_value(config.get("user_id", "")),
-        "facility_id": os.getenv("MY_WELLNESS_FACILITY_ID") or resolve_config_value(config.get("facility_id", "")),
+        "token":resolve_config_value(config.get("token", "")),
+        "user_id": resolve_config_value(config.get("user_id", "")),
+        "facility_id": resolve_config_value(config.get("facility_id", "")),
     }
     
 headers = {
@@ -82,8 +80,10 @@ def log(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     line = f"[{timestamp}] {message}"
     print(line)
+    log_file = get_log_path()
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception as e:
         print(f"Fehler beim Schreiben der Log-Datei: {e}")

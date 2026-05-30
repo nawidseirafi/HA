@@ -5,9 +5,7 @@ from typing import Any
 
 import yaml
 
-from backend.paths import AI_AGENT_DIR
-
-AGENT_CONFIG_PATH = AI_AGENT_DIR / "config.yaml"
+from backend.paths import API_DIR
 
 
 class MarketSymbolResolver:
@@ -39,14 +37,14 @@ class MarketSymbolResolver:
         ]
 
     def _llm_candidate(self, requested_symbol: str, watchlist_item: dict[str, Any]) -> dict[str, Any] | None:
-        if not AGENT_CONFIG_PATH.exists():
+        if not API_DIR.exists():
             return None
-        if str(AI_AGENT_DIR) not in sys.path:
-            sys.path.insert(0, str(AI_AGENT_DIR))
+        if str(API_DIR) not in sys.path:
+            sys.path.insert(0, str(API_DIR))
 
         from llm import create_llm_client  # type: ignore
 
-        config = yaml.safe_load(AGENT_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+        config = yaml.safe_load(API_DIR.read_text(encoding="utf-8")) or {}
         llm_config = config.get("llm", {})
         if not llm_config:
             return None

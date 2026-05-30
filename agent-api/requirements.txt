@@ -1,5 +1,11 @@
 fastapi
 uvicorn[standard]
 python-multipart
+google-genai
+openai
+python-dotenv
 PyYAML
-httpx
+requests
+pypdf
+openpyxl
+pillow

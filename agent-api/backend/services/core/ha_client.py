@@ -7,8 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
+from backend.paths import API_DIR
 
 
 def _resolve_config_value(value: str | None) -> str:
@@ -25,10 +24,10 @@ def _resolve_config_value(value: str | None) -> str:
 
 class HomeAssistantClient:
     def __init__(self, config_path="config.yaml"):
-        load_dotenv(BASE_DIR / ".env")
+        load_dotenv(API_DIR / ".env")
         config_file = Path(config_path)
         if not config_file.is_absolute():
-            config_file = BASE_DIR / config_file
+            config_file = API_DIR / config_file
 
         with config_file.open("r") as f:
             config = yaml.safe_load(f)

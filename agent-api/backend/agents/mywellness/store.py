@@ -4,17 +4,25 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
+import yaml
+from backend.paths import API_DIR
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "data" / "mywellness" / "mywellness.db"
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def connect(database_path: Path = DB_PATH) -> sqlite3.Connection:
+def get_db_path() -> Path:
+    config_path = API_DIR / "config.yaml"
+    with config_path.open("r", encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+    db_path = config.get("agents", {}).get("my_wellness", {}).get("database_path", "data/mywellness/mywellness.db")
+    return (API_DIR / db_path).resolve()
+
+
+def connect() -> sqlite3.Connection:
+    database_path = get_db_path()
     database_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(database_path)
     connection.row_factory = sqlite3.Row

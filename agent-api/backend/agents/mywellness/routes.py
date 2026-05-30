@@ -7,7 +7,7 @@ from backend.agents.mywellness.service import MyWellnessService
 from backend.agents.mywellness.health_service import MyWellnessHealthService
 
 
-router = APIRouter(tags=["mywellness"])
+router = APIRouter(tags=["my_wellness"])
 mywellness_service = MyWellnessService()
 mywellness_health_service = MyWellnessHealthService()
 

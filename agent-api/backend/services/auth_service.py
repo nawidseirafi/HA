@@ -4,23 +4,16 @@ import hmac
 import json
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 import yaml
 from fastapi import HTTPException, Request
-
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-PROJECT_DIR = BASE_DIR.parent
-CONFIG_PATH = BASE_DIR / "config.yaml"
-ENV_PATHS = (BASE_DIR / ".env", PROJECT_DIR / "ai-agent" / ".env")
-
+from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
 
 def _load_config() -> dict[str, Any]:
-    if not CONFIG_PATH.exists():
+    if not API_CONFIG_PATH.exists():
         return {}
-    with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+    with API_CONFIG_PATH.open("r", encoding="utf-8") as config_file:
         return yaml.safe_load(config_file) or {}
 
 
@@ -41,15 +34,14 @@ def _secret_value(value: str, default: str = "") -> str:
 
 def _load_env_files() -> dict[str, str]:
     values: dict[str, str] = {}
-    for path in ENV_PATHS:
-        if not path.exists():
+    if not ENV_PATH.exists():
+        return values
+    for raw_line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, raw_value = line.split("=", 1)
-            values[key.strip()] = raw_value.strip().strip("\"'")
+        key, raw_value = line.split("=", 1)
+        values[key.strip()] = raw_value.strip().strip("\"'")
     return values
 
 
@@ -68,7 +60,7 @@ def jwt_secret() -> str:
     secret = _secret_value(config.get("jwt_secret_env", "AGENT_API_JWT_SECRET"), config.get("jwt_secret", ""))
     if secret:
         return secret
-    return hashlib.sha256(str(CONFIG_PATH.resolve()).encode("utf-8")).hexdigest()
+    return hashlib.sha256(str(API_CONFIG_PATH.resolve()).encode("utf-8")).hexdigest()
 
 
 def token_ttl_seconds() -> int:

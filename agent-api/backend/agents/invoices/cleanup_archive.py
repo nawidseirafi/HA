@@ -1,15 +1,13 @@
 import argparse
 import shutil
 import sqlite3
+import yaml
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_DATABASE = BASE_DIR / "data" / "invoices" / "invoices.db"
-DEFAULT_ARCHIVE = BASE_DIR / "data" / "invoices" / "archive"
-DEFAULT_BACKUP = BASE_DIR / "data" / "invoices" / "archive_cleanup_backup"
+from backend.paths import API_DIR, API_CONFIG_PATH
 
 
 @dataclass
@@ -65,19 +63,28 @@ def cleanup_archive(
     )
 
 
+def _load_config() -> dict:
+    with API_CONFIG_PATH.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
 def main():
+    config = _load_config()
+    invoice_config = config.get("agents", {}).get("invoices", {})
+    data_dir = API_DIR / "data" / "invoices"
+
     parser = argparse.ArgumentParser(
         description="Unreferenzierte Archivdateien finden oder in ein Backup verschieben."
     )
     parser.add_argument("--apply", action="store_true", help="Dateien wirklich in den Backup-Ordner verschieben.")
-    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE, help="Pfad zur invoices.db.")
-    parser.add_argument("--archive-dir", type=Path, default=DEFAULT_ARCHIVE, help="Archiv-Ordner.")
-    parser.add_argument("--backup-dir", type=Path, default=DEFAULT_BACKUP, help="Backup-Ziel fuer verschobene Dateien.")
+    parser.add_argument("--database", type=Path, help="Pfad zur invoices.db.")
+    parser.add_argument("--archive-dir", type=Path, help="Archiv-Ordner.")
+    parser.add_argument("--backup-dir", type=Path, help="Backup-Ziel fuer verschobene Dateien.")
     args = parser.parse_args()
 
-    database_path = _resolve(args.database)
-    archive_dir = _resolve(args.archive_dir)
-    backup_dir = _resolve(args.backup_dir)
+    database_path = _resolve(args.database or invoice_config.get("database_path", data_dir / "invoices.db"))
+    archive_dir = _resolve(args.archive_dir or invoice_config.get("archive_dir", data_dir / "archive"))
+    backup_dir = _resolve(args.backup_dir or invoice_config.get("archive_cleanup", {}).get("backup_dir", data_dir / "archive_cleanup_backup"))
 
     result = cleanup_archive(database_path, archive_dir, backup_dir, apply=args.apply)
 
@@ -89,7 +96,7 @@ def main():
     if result.unreferenced_examples:
         print("\nBeispiele unreferenzierter Dateien:")
         for path in result.unreferenced_examples:
-            print(f"- {path.relative_to(BASE_DIR)}")
+            print(f"- {path.relative_to(API_DIR)}")
 
     if result.missing_examples:
         print("\nBeispiele fehlender referenzierter Dateien:")
@@ -108,7 +115,7 @@ def _resolve(path: Path) -> Path:
     path = path.expanduser()
     if path.is_absolute():
         return path.resolve()
-    return (BASE_DIR / path).resolve()
+    return (API_DIR / path).resolve()
 
 
 def _referenced_archive_paths(database_path: Path, archive_dir: Path) -> set[Path]:

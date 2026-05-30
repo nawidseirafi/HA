@@ -8,10 +8,7 @@ interface Props {
 }
 
 const plannedAgents = [
-  { name: 'Mailbox Agent', text: 'Postfachregeln, Anhänge und Benachrichtigungen.', icon: Mail },
   { name: 'Vacation Agent', text: 'Abwesenheiten und Kalender-Automation.', icon: CalendarCheck },
-  { name: 'Home Agent', text: 'Home-Assistant-Aktionen und Routinen.', icon: Home },
-  { name: 'System Agent', text: 'Jobs, Logs und Wartung.', icon: Settings2 },
 ];
 
 const iconMap = {

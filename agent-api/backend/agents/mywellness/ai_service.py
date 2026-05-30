@@ -1,11 +1,9 @@
 import json
 import os
-import sys
 from typing import Any
-
 import yaml
-
-from backend.paths import AI_AGENT_DIR
+from backend.services.llm.factory import create_llm_client
+from backend.paths import API_DIR
 
 SYSTEM_PROMPT = """You are an AI wellness and recovery assistant.
 Analyze structured fitness and wellness data.
@@ -23,8 +21,7 @@ Output valid JSON only."""
 
 class MyWellnessAIService:
     def __init__(self) -> None:
-        if str(AI_AGENT_DIR) not in sys.path:
-            sys.path.insert(0, str(AI_AGENT_DIR))
+        pass
 
     def analyze(self, payload: dict[str, Any]) -> dict[str, Any]:
         client = self._client()
@@ -91,9 +88,7 @@ class MyWellnessAIService:
         }
 
     def _client(self) -> Any:
-        from llm.factory import create_llm_client
-
-        config_path = AI_AGENT_DIR / "config.yaml"
+        config_path = API_DIR / "config.yaml"
         with config_path.open("r", encoding="utf-8") as handle:
             config = yaml.safe_load(handle) or {}
         provider = config.get("llm", {}).get("provider", "")
@@ -101,7 +96,7 @@ class MyWellnessAIService:
         api_key_name = provider_config.get("api_key")
         if api_key_name and not os.getenv(api_key_name):
             raise RuntimeError(f"{api_key_name} ist nicht konfiguriert.")
-        return create_llm_client(config)
+        return create_llm_client()
 
     def _parse_json(self, raw: str) -> dict[str, Any]:
         text = (raw or "").strip()

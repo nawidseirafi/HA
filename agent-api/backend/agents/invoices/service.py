@@ -15,16 +15,10 @@ from uuid import uuid4
 import yaml
 from fastapi import HTTPException, UploadFile
 
-from backend.paths import AI_AGENT_DIR, API_CONFIG_PATH, API_DIR, PROJECT_DIR
+from backend.paths import API_CONFIG_PATH, API_DIR, PROJECT_DIR
 
 CONFIG_PATH = API_CONFIG_PATH
 logger = logging.getLogger(__name__)
-DEFAULT_DB_PATH = AI_AGENT_DIR / "data" / "invoices" / "invoices.db"
-DEFAULT_INBOX_DIR = AI_AGENT_DIR / "data" / "invoices" / "inbox"
-DEFAULT_ARCHIVE_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive"
-DEFAULT_REVIEW_DIR = AI_AGENT_DIR / "data" / "invoices" / "review"
-DEFAULT_EXPORT_DIR = AI_AGENT_DIR / "data" / "invoices" / "exports"
-DEFAULT_ARCHIVE_CLEANUP_BACKUP_DIR = AI_AGENT_DIR / "data" / "invoices" / "archive_cleanup_backup"
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
 
@@ -73,16 +67,15 @@ def resolve_path(value: Any, default_base: Path = API_DIR) -> Path:
 
 def configured_paths() -> dict[str, Path]:
     config = load_config()
-    storage = config.get("storage", {})
     invoice_config = config.get("agents", {}).get("invoices", {})
-    inbox_dir = resolve_path(invoice_config.get("upload_dir", storage.get("uploads_dir", DEFAULT_INBOX_DIR)))
+    data_dir = API_DIR / "data" / "invoices"
     return {
-        "database": DEFAULT_DB_PATH,
-        "inbox": inbox_dir,
-        "archive": DEFAULT_ARCHIVE_DIR,
-        "review": DEFAULT_REVIEW_DIR,
-        "exports": DEFAULT_EXPORT_DIR,
-        "archive_cleanup_backup": DEFAULT_ARCHIVE_CLEANUP_BACKUP_DIR,
+        "database": resolve_path(invoice_config.get("database_path", data_dir / "invoices.db")),
+        "inbox": resolve_path(invoice_config.get("inbox_dir", invoice_config.get("upload_dir", data_dir / "inbox"))),
+        "archive": resolve_path(invoice_config.get("archive_dir", data_dir / "archive")),
+        "review": resolve_path(invoice_config.get("review_dir", data_dir / "review")),
+        "exports": resolve_path(invoice_config.get("export_dir", data_dir / "exports")),
+        "archive_cleanup_backup": resolve_path(invoice_config.get("archive_cleanup", {}).get("backup_dir", data_dir / "archive_cleanup_backup")),
     }
 
 
@@ -633,12 +626,12 @@ class InvoiceService:
         command = [str(python if python.exists() else sys.executable), "-m", "invoice.invoices", "--once"]
         invoice_config = load_config().get("agents", {}).get("invoices", {})
         timeout_seconds = int(invoice_config.get("run_timeout_seconds", DEFAULT_AGENT_TIMEOUT_SECONDS))
-        logger.info("InvoiceAgent startet: command=%s cwd=%s timeout=%s", command, AI_AGENT_DIR, timeout_seconds)
+        logger.info("InvoiceAgent startet: command=%s cwd=%s timeout=%s", command, API_DIR, timeout_seconds)
         started_at = utc_now()
         self._write_agent_settings(last_status="running", last_started_at=started_at, last_error=None)
         try:
-            env = os.environ.copy() | {"PYTHONPATH": str(AI_AGENT_DIR)}
-            result = subprocess.run(command, cwd=AI_AGENT_DIR, env=env, capture_output=True, text=True, timeout=timeout_seconds)
+            env = os.environ.copy() | {"PYTHONPATH": str(API_DIR)}
+            result = subprocess.run(command, cwd=API_DIR, env=env, capture_output=True, text=True, timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
             logger.warning("InvoiceAgent Timeout nach %s Sekunden.", timeout_seconds)
             self._write_agent_settings(last_status="error", last_finished_at=utc_now(), last_error=f"Timeout nach {timeout_seconds} Sekunden.")
@@ -674,7 +667,7 @@ class InvoiceService:
             return {
                 "status": "completed",
                 "command": " ".join(command),
-                "cwd": str(AI_AGENT_DIR),
+                "cwd": str(API_DIR),
                 "stdout": stdout,
                 "stderr": stderr,
             }
@@ -724,13 +717,13 @@ class InvoiceService:
         candidates = [path]
 
         if not path.is_absolute():
-            candidates.append((AI_AGENT_DIR / path).resolve())
+            candidates.append((API_DIR / path).resolve())
             candidates.append((API_DIR / path).resolve())
 
         parts = path.parts
         for index in range(len(parts) - 1):
             if parts[index] == "data" and parts[index + 1] == "invoices":
-                candidates.append((AI_AGENT_DIR / Path(*parts[index:])).resolve())
+                candidates.append((API_DIR / Path(*parts[index:])).resolve())
                 break
 
         if path.name:
@@ -808,7 +801,6 @@ class InvoiceService:
         for path in paths:
             candidates.append(path)
             if not path.is_absolute():
-                candidates.append((AI_AGENT_DIR / path).resolve())
                 candidates.append((API_DIR / path).resolve())
 
         resolved_paths = []
@@ -863,19 +855,18 @@ class InvoiceService:
         return False
 
     def _reanalyze_with_ai(self, path: Path):
-        if str(AI_AGENT_DIR) not in sys.path:
-            sys.path.insert(0, str(AI_AGENT_DIR))
-        from invoice.invoices import load_raw_config  # type: ignore
-        from invoice.ai_extractor import refine_metadata_with_ai  # type: ignore
-        from invoice.categories import apply_category_rules  # type: ignore
-        from invoice.extractor import extract_metadata  # type: ignore
-        from invoice.tax_export import DEFAULT_CATEGORY_RULES  # type: ignore
-        from llm import create_llm_client  # type: ignore
+        from backend.agents.invoices.invoices import load_raw_config
+        from backend.agents.invoices.ai_extractor import refine_metadata_with_ai
+        from backend.agents.invoices.categories import apply_category_rules
+        from backend.agents.invoices.extractor import extract_metadata
+        from backend.agents.invoices.tax_export import DEFAULT_CATEGORY_RULES
+        from backend.services.llm.factory import create_llm_client
 
         raw_config = load_raw_config()
         llm_config = raw_config.get("llm", {})
-        invoice_config = raw_config.get("invoice_agent", {})
-        tax_config = raw_config.get("tax_export", {})
+        agents_config = raw_config.get("agents", {})
+        invoice_config = agents_config.get("invoices", {})
+        tax_config = invoice_config.get("tax_export", {})
         category_rules = dict(DEFAULT_CATEGORY_RULES)
         category_rules.update(tax_config.get("categories", {}))
         if not llm_config:
@@ -886,7 +877,7 @@ class InvoiceService:
             category_rules,
             invoice_config.get("default_category", "Unsortiert"),
         )
-        llm_client = create_llm_client({"llm": llm_config})
+        llm_client = create_llm_client()
         last_error = None
         for attempt in range(3):
             try:

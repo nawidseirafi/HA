@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
-from invoice.extractor import InvoiceMetadata
+from invoices.extractor import InvoiceMetadata
 
 
 SYSTEM_PROMPT = (

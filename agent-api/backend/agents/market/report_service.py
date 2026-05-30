@@ -3,10 +3,9 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import yaml
 
-from backend.paths import AI_AGENT_DIR
-
-DB_PATH = AI_AGENT_DIR / "data" / "market" / "market.db"
+from backend.paths import API_DIR, API_CONFIG_PATH
 
 REPORT_EXTRA_COLUMNS: dict[str, str] = {
     "quote_provider": "text not null default ''",
@@ -19,15 +18,29 @@ REPORT_EXTRA_COLUMNS: dict[str, str] = {
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+def read_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as config_file:
+        return yaml.safe_load(config_file) or {}
 
 class MarketReportService:
-    def __init__(self, database_path: Path = DB_PATH):
-        self.database_path = database_path
+    def __init__(self):
         self._ensure_schema()
 
+    def get_db_path(self) -> Path:
+        config_dir = API_CONFIG_PATH.parent
+        api_config = (
+            read_yaml(API_CONFIG_PATH)
+            .get("agents", {})
+            .get("market", {})
+        )
+        return (config_dir / api_config["database_path"]).resolve()
+
     def connect(self) -> sqlite3.Connection:
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.database_path)
+        database_path = self.get_db_path()
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(database_path)
         connection.row_factory = sqlite3.Row
         return connection
 
