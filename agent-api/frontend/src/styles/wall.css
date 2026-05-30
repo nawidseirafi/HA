@@ -861,7 +861,7 @@ button.wall-room-card {
   place-items: center;
   border-radius: 22px;
   color: var(--muted-foreground);
-  background: var(--surface);
+  background: rgba(171, 181, 200, 0.82);
 }
 
 .wall-light-control.on .wall-light-control-main > span {

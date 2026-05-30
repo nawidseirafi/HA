@@ -3,7 +3,6 @@ import type {ErrorInfo, ReactNode} from 'react';
 import {
     Activity,
     ArrowDown,
-    ArrowLeft,
     ArrowUp,
     Battery,
     BatteryFull,
@@ -1159,10 +1158,12 @@ function ClimateSection({
                               name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
                               value: item.current_temperature,
                             })),
-                            ...room.items.map((item) => ({
-                              name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
-                              value: item.temperature,
-                            })),
+                            ...room.items
+                                .filter(isRoomTemperatureSensor)
+                                .map((item) => ({
+                                  name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
+                                  value: item.temperature,
+                                })),
                           ].slice(0, 2).map((item) => (
                             <span key={item.name}>
                               {item.name} {formatNumber(item.value)}°C
@@ -1769,18 +1770,24 @@ function climateToneClass(mode: string) {
     if (mode === 'dry') return 'dry';
     return 'off';
 }
+function isRoomTemperatureSensor(item: { name?: string; entity_id?: string }) {
+    const text = `${item.name || ''} ${item.entity_id || ''}`.toLowerCase();
+    return !/cpu|prozessor|processor|soc|chip|fritz/.test(text);
+}
+function isRealRoomTemperatureSensorName(name?: string) {
+    return !/cpu|prozessor|processor|device temperature|gerätetemperatur|geraetetemperatur|soc|chip|fritz/i.test(String(name || ''));
+}
 
 function roomTemperature(data: WallDashboardData, room: string) {
     const values = [
         ...(data.temperature_sensors ?? [])
             .filter((sensor) => sameArea(sensor.area, room))
-            .map((sensor) => sensor.temperature)
-            .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
+            .filter((sensor) => isRealRoomTemperatureSensorName(sensor.name))
+            .map((sensor) => sensor.temperature),
         ...data.climate
             .filter((item) => sameArea(item.area, room))
-            .map((item) => item.current_temperature)
-            .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
-    ];
+            .map((item) => item.current_temperature),
+    ].filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value)));
     return avg(values.map(Number));
 }
 
@@ -1876,7 +1883,12 @@ function temperatureRooms(data: WallDashboardData, selectedFloor: string) {
         .map((area) => {
             const floor = roomToFloor.get(normalizeArea(area)) || 'Haus';
             const items = (data.temperature_sensors ?? [])
-                .filter((sensor) => sameArea(sensor.area, area) && sensor.temperature !== null && sensor.temperature !== undefined)
+                .filter((sensor) =>
+    sameArea(sensor.area, area) &&
+    sensor.temperature !== null &&
+    sensor.temperature !== undefined &&
+    isRoomTemperatureSensor(sensor)
+)
                 .sort((left, right) => left.name.localeCompare(right.name));
             const climate = data.climate
                 .filter((item) => sameArea(item.area, area) && item.current_temperature !== null && item.current_temperature !== undefined)
