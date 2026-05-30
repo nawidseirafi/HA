@@ -3,8 +3,8 @@ from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.agents.market.agent import MarketAgent
-from backend.agents.market.report_service import MarketReportService
+from .agent import MarketAgent
+from .report_service import MarketReportService
 
 
 router = APIRouter(prefix="/api/market", tags=["market"])

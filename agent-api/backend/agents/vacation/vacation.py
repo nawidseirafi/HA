@@ -2,7 +2,7 @@ import logging
 from backend.config import load_agent_runtime_config
 from backend.services.llm.factory import create_llm_client
 from backend.services.core.ha_client import HomeAssistantClient
-from backend.agents.vacation.service import VacationService
+from .service import VacationService
 
 import warnings
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from backend.agents.vacation.service import VacationService
+from .service import VacationService
 
 router = APIRouter(prefix="/api/vacation", tags=["vacation"])
 vacation_service = VacationService()

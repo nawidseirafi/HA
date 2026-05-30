@@ -3,8 +3,8 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from backend.agents.mywellness.service import MyWellnessService
-from backend.agents.mywellness.health_service import MyWellnessHealthService
+from .service import MyWellnessService
+from .health_service import MyWellnessHealthService
 
 
 router = APIRouter(tags=["my_wellness"])

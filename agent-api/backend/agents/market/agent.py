@@ -1,10 +1,10 @@
 from typing import Any
 
-from backend.agents.market.analysis_service import MarketAnalysisService
-from backend.agents.market.data_service import MarketDataService
-from backend.agents.market.news_service import MarketNewsService
-from backend.agents.market.report_service import MarketReportService, utc_now
-from backend.agents.market.symbol_resolver import MarketSymbolResolver
+from .analysis_service import MarketAnalysisService
+from .data_service import MarketDataService
+from .news_service import MarketNewsService
+from .report_service import MarketReportService, utc_now
+from .symbol_resolver import MarketSymbolResolver
 
 
 class MarketAgent:

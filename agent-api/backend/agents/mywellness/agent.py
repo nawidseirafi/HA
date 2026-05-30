@@ -1,6 +1,6 @@
 from typing import Any
 
-from backend.agents.mywellness.service import MyWellnessService
+from .service import MyWellnessService
 
 
 class MyWellnessAgent:

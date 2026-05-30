@@ -10,7 +10,6 @@ from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 import httpx
-import yaml
 from fastapi import HTTPException
 from backend.config import load_agent_section, resolve_api_path
 from backend.paths import PROJECT_DIR, API_DIR, AGENTS_DIR

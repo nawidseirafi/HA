@@ -3,8 +3,8 @@ import sqlite3
 from datetime import date, datetime, timezone
 from typing import Any
 
-from backend.agents.mywellness.service import MyWellnessService
-from backend.agents.mywellness.ai_service import MyWellnessAIService
+from .service import MyWellnessService
+from .ai_service import MyWellnessAIService
 from backend.services.homeassistant_service import HomeAssistantService
 
 
