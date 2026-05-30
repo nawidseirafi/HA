@@ -16,3 +16,4 @@ agent-api/data/
 HA/secrets.yaml
 agent-api/backend/storage/
 .idea/
+/build/
