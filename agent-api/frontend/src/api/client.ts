@@ -434,6 +434,47 @@ export type WasteStatus = {
   raw?: unknown;
 };
 
+export type HouseholdReminder = {
+  priority: 'critical' | 'high' | 'medium' | 'low' | string;
+  message: string;
+  reason: string;
+  source?: string;
+};
+
+export type HouseholdStatus = {
+  ok: boolean;
+  updated_at: string;
+  home_assistant?: { configured: boolean };
+  waste: WasteStatus;
+  post: {
+    ok: boolean;
+    entity_id: string;
+    has_mail: boolean | null;
+    entity: WallEntity | null;
+    error?: string;
+  };
+  vacation: Record<string, unknown> & {
+    ok?: boolean;
+    available?: boolean;
+    vacation_mode?: boolean | null;
+    error?: string;
+  };
+  reminders: HouseholdReminder[];
+};
+
+export type HouseholdSummary = Pick<HouseholdStatus, 'ok' | 'updated_at' | 'waste' | 'post' | 'vacation' | 'reminders'> & {
+  counts: {
+    reminders: number;
+    high_priority: number;
+    waste_items: number;
+  };
+  state: {
+    mailbox_has_mail?: boolean | null;
+    vacation_mode?: boolean | null;
+    next_waste?: WasteItem | null;
+  };
+};
+
 export type WallDashboardData = {
   updated_at: string;
   home_assistant: { configured: boolean; entity_count: number };
@@ -482,6 +523,7 @@ export type WallDashboardData = {
     mywellness: Partial<AgentStatus> & { status?: string; error?: string };
     market: { status: string; watchlist_count?: number; enabled_count?: number; signals?: Record<string, number>; error?: string };
   };
+  household?: HouseholdSummary;
 };
 
 export type OrchestratorMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
@@ -650,6 +692,9 @@ export const api = {
   wasteStatus: () => request<WasteStatus>('/api/waste/status'),
   wasteNext: () => request<{ ok: boolean; updated_at: string; next: WasteItem | null; source_entity: string; error?: string }>('/api/waste/next'),
   wasteReminders: () => request<Pick<WasteStatus, 'ok' | 'updated_at' | 'context' | 'reminders' | 'source_entity' | 'error'>>('/api/waste/reminders'),
+  householdStatus: () => request<HouseholdStatus>('/api/household/status'),
+  householdSummary: () => request<HouseholdSummary>('/api/household/summary'),
+  householdReminders: () => request<Pick<HouseholdStatus, 'ok' | 'updated_at' | 'reminders'> & { context: Record<string, unknown> }>('/api/household/reminders'),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
   mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
   mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,

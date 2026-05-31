@@ -10,12 +10,14 @@ from backend.agents.market.report_service import MarketReportService
 from backend.agents.mywellness.routes import mywellness_service
 from backend.agents.vacation.routes import vacation_service
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.household_service import HouseholdService
 from backend.services.waste_service import WasteService
 
 
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
 waste_service = WasteService(ha_service)
+household_service = HouseholdService(ha_service=ha_service, waste_service=waste_service, vacation_status_provider=vacation_service.status)
 LOW_BATTERY_THRESHOLD = 40
 
 
@@ -75,7 +77,9 @@ def wall_dashboard():
 
     agents = _agent_summary()
     climate_summary = _climate_summary()
-    waste = waste_service.status()
+    household = household_service.summary()
+    waste = household.get("waste") or waste_service.status()
+    post = (household.get("post") or {}).get("entity") or post
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -105,6 +109,7 @@ def wall_dashboard():
         "agents": agents,
         "post": post,
         "waste": waste,
+        "household": household,
     }
 
 
