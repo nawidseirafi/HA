@@ -492,6 +492,9 @@ export type OrchestratorMapNode = {
   kind: 'orchestrator' | 'agent' | 'service';
   status: OrchestratorMapStatus;
   icon: string;
+  enabled?: boolean;
+  dashboard_route?: string | null;
+  api_prefix?: string | null;
   last_run?: string;
   next_action?: string;
 };

@@ -100,6 +100,9 @@ def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
         "kind": "agent",
         "status": status,
         "icon": _agent_icon(agent_id, manifest),
+        "enabled": bool(manifest.get("enabled", True)),
+        "dashboard_route": manifest.get("dashboard_route"),
+        "api_prefix": manifest.get("api_prefix"),
         "last_run": _first_string(status_data, "last_successful_run", "last_finished_at", "last_started_at"),
         "next_action": _first_string(status_data, "next_scheduled_run") or _next_action(agent_id),
     }
@@ -140,9 +143,13 @@ def _status_tone(agent_id: str, manifest: dict[str, Any], status_data: dict[str,
     if status_data.get("is_running") is True or "running" in raw:
         return "running"
     if status_data.get("enabled") is False or manifest.get("enabled") is False:
-        return "disabled" if agent_id == "vacation" else "paused"
-    if "pause" in raw or "idle" in raw:
+        return "disabled"
+    if "disabled" in raw or raw == "aus":
+        return "disabled"
+    if "pause" in raw:
         return "paused"
+    if "idle" in raw or raw in {"ok", "active", "ready"}:
+        return "active"
     if agent_id == "market":
         return "paused"
     return "active"

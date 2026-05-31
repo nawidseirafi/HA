@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import type { LucideProps } from 'lucide-react';
 import type { Route } from '../App';
 
-export type AgentMapStatus = 'active' | 'ok' | 'running' | 'paused' | 'error' | 'disabled';
+export type AgentMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
 
 export type AgentMapNodeKind = 'orchestrator' | 'agent' | 'service' | 'external' | 'database';
 

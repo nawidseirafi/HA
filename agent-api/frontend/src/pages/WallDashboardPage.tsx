@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import {
     api,
-    type AgentManifest,
     type AgentStatus,
     type WallCover,
     type WallDashboardData,
@@ -40,7 +39,7 @@ import {
     type WallLightRoom,
     type WallTemperatureSensor
 } from '../api/client';
-import {AgentMap, statusesFromOrchestratorMap} from '../components/AgentMap';
+import {AgentMap} from '../components/AgentMap';
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
@@ -1255,71 +1254,11 @@ function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () 
 }
 
 function AgentsSection({data: _data}: { data: WallDashboardData }) {
-    const [agents, setAgents] = useState<AgentManifest[]>([]);
-    const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & {
-        status?: string;
-        current_status?: string;
-        error?: string | null;
-        last_run?: string;
-        next_action?: string;
-    }>>>({});
-    const mergedAgentStatuses = useMemo(() => ({
-        ...wallAgentStatuses(_data),
-        ...agentStatuses,
-    }), [_data, agentStatuses]);
-
-    useEffect(() => {
-        let mounted = true;
-        let refresh: number | null = null;
-
-        api.agents()
-            .then((nextAgents) => mounted && setAgents(nextAgents))
-            .catch(() => undefined);
-
-        const loadStatuses = () => {
-            api.orchestratorMap()
-                .then((map) => mounted && setAgentStatuses((current) => ({...current, ...statusesFromOrchestratorMap(map)})))
-                .catch(() => undefined);
-
-            api.mywellnessStatus()
-                .then((status) => mounted && setAgentStatuses((current) => ({...current, mywellness: status})))
-                .catch(() => undefined);
-
-            api.invoiceAgentStatus()
-                .then((status) => mounted && setAgentStatuses((current) => ({...current, invoices: status})))
-                .catch(() => undefined);
-        };
-
-        loadStatuses();
-        refresh = window.setInterval(loadStatuses, 15000);
-
-        return () => {
-            mounted = false;
-            if (refresh) window.clearInterval(refresh);
-        };
-    }, []);
-
     return (
         <div className="wall-agent-map-surface">
-            <AgentMap agents={agents} statuses={mergedAgentStatuses} navigate={() => undefined} chrome={false} interactive={false}/>
+            <AgentMap navigate={() => undefined} chrome={false} interactive={false}/>
         </div>
     );
-}
-
-function wallAgentStatuses(data: WallDashboardData): Partial<Record<string, Partial<AgentStatus> & { status?: string; error?: string | null }>> {
-    const agents = data.agents as Record<string, Record<string, unknown> | undefined>;
-    return Object.fromEntries(Object.entries(agents).map(([id, raw]) => [id, {
-        enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : undefined,
-        is_running: raw?.is_running === true,
-        status: stringValue(raw?.status, raw?.current_status, raw?.last_status),
-        current_status: stringValue(raw?.current_status, raw?.status, raw?.last_status),
-        last_error: stringValue(raw?.last_error, raw?.error) || null,
-        error: stringValue(raw?.error, raw?.last_error) || null,
-        last_successful_run: stringValue(raw?.last_successful_run) || null,
-        last_finished_at: stringValue(raw?.last_finished_at) || null,
-        last_started_at: stringValue(raw?.last_started_at) || null,
-        next_scheduled_run: stringValue(raw?.next_scheduled_run) || null,
-    }]));
 }
 
 function homeAgentState(data: WallDashboardData) {

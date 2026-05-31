@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Bot, CalendarCheck, Dumbbell, FileText, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
-import { api, type AgentManifest, type AgentStatus, type KnownDashboardRoute } from '../api/client';
+import { Bot, CalendarCheck, Dumbbell, FileText, Heart, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
+import { api, type AgentManifest, type KnownDashboardRoute } from '../api/client';
 import type { Route } from '../App';
 import { AgentMap, agentStatusLabel, statusForAgentDisplay, statusesFromOrchestratorMap } from '../components/AgentMap';
 
@@ -13,6 +13,8 @@ const iconMap = {
   CalendarCheck,
   Dumbbell,
   FileText,
+  Heart,
+  Hearth: Heart,
   Home,
   LineChart,
   Mail,
@@ -29,36 +31,28 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
 export function AgentsPage({ navigate }: Props) {
   const greeting = getGreeting();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
-  const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & {
-    status?: string;
-    current_status?: string;
-    error?: string | null;
-    last_run?: string;
-    next_action?: string;
-  }>>>({});
+  const [agentStatuses, setAgentStatuses] = useState<ReturnType<typeof statusesFromOrchestratorMap>>({});
   const [error, setError] = useState('');
 
   useEffect(() => {
     let mounted = true;
+    let refresh: number | null = null;
 
     api.agents()
       .then((nextAgents) => mounted && setAgents(nextAgents))
       .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Agenten konnten nicht geladen werden.'));
 
-    api.orchestratorMap()
-      .then((map) => mounted && setAgentStatuses((current) => ({ ...current, ...statusesFromOrchestratorMap(map) })))
-      .catch(() => undefined);
-
-    api.mywellnessStatus()
-      .then((status) => mounted && setAgentStatuses((current) => ({ ...current, mywellness: status })))
-      .catch(() => undefined);
-
-    api.invoiceAgentStatus()
-      .then((status) => mounted && setAgentStatuses((current) => ({ ...current, invoices: status })))
-      .catch(() => undefined);
+    const loadStatuses = () => {
+      api.orchestratorMap()
+        .then((map) => mounted && setAgentStatuses(statusesFromOrchestratorMap(map)))
+        .catch(() => undefined);
+    };
+    loadStatuses();
+    refresh = window.setInterval(loadStatuses, 15000);
 
     return () => {
       mounted = false;
+      if (refresh) window.clearInterval(refresh);
     };
   }, []);
 
@@ -73,16 +67,17 @@ export function AgentsPage({ navigate }: Props) {
       </header>
       {error && <section className="panel error-panel">{error}</section>}
 
-      <AgentMap agents={agents} statuses={agentStatuses} navigate={navigate} />
+      <AgentMap navigate={navigate} />
 
       <section className="agent-grid">
         {agents.map((agent) => {
           const Icon = iconMap[agent.icon as keyof typeof iconMap] ?? Bot;
           const route = routeForAgent(agent);
           const status = statusForAgentDisplay(agent, agentStatuses[agent.id]);
+          const cardState = status === 'disabled' ? 'planned-agent' : 'active-agent';
           return (
             <button
-              className={`agent-card ${agent.enabled ? 'active-agent' : 'planned-agent'}`}
+              className={`agent-card ${cardState}`}
               key={agent.id}
               disabled={!route}
               onClick={() => route && navigate(route)}
