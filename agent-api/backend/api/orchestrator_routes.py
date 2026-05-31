@@ -81,6 +81,16 @@ def orchestrator_map() -> dict[str, Any]:
             "active": _is_active(vacation["status"]),
             "status": vacation["status"],
         })
+    if "mywellness" in agent_ids:
+        mywellness = next(agent for agent in agents if agent["id"] == "mywellness")
+        edges.append({
+            "id": "mywellness-homeassistant",
+            "from": "mywellness",
+            "to": "homeassistant",
+            "kind": "secondary",
+            "active": _is_active(mywellness["status"]),
+            "status": mywellness["status"],
+        })
     return {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "summary": _summary(agents),

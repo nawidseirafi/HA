@@ -234,10 +234,13 @@ export type SettingsInfo = {
   storage: {
     uploads: PathSetting;
     log_file: PathSetting;
+    configured_log_file?: PathSetting;
   };
   agents: {
     invoices: {
       enabled: boolean;
+      manifest_enabled?: boolean | null;
+      api_prefix?: string;
       upload_dir: PathSetting;
       database: PathSetting;
       schedule: string[];
@@ -248,6 +251,8 @@ export type SettingsInfo = {
     };
     mywellness: {
       enabled: boolean;
+      manifest_enabled?: boolean | null;
+      api_prefix?: string;
       database: PathSetting;
       days: number;
       schedule: string[];
@@ -258,9 +263,15 @@ export type SettingsInfo = {
     };
     vacation: {
       enabled: boolean;
+      manifest_enabled?: boolean | null;
+      api_prefix?: string;
+      mode_entity?: string;
+      dry_run_default?: boolean;
     };
     market?: {
       enabled: boolean;
+      manifest_enabled?: boolean | null;
+      api_prefix?: string;
       database: PathSetting;
       price_provider: string;
       news_provider: string;
@@ -276,9 +287,22 @@ export type SettingsInfo = {
     };
     home_assistant: {
       configured: boolean;
+      url_configured?: boolean;
       notifications_enabled: boolean;
       notify_service: string;
       persistent_notifications: boolean;
+    };
+    household?: {
+      post_entity: string;
+      waste_source: string;
+      vacation_source: string;
+      infrastructure_source: string;
+    };
+    infrastructure?: {
+      source: string;
+      direct_fritzbox_api: boolean;
+      auto_discovery: boolean;
+      entities: Record<string, string>;
     };
   };
   security: {
@@ -459,10 +483,12 @@ export type HouseholdStatus = {
     vacation_mode?: boolean | null;
     error?: string;
   };
+  infrastructure: InfrastructureSummary;
   reminders: HouseholdReminder[];
 };
 
 export type HouseholdSummary = Pick<HouseholdStatus, 'ok' | 'updated_at' | 'waste' | 'post' | 'vacation' | 'reminders'> & {
+  infrastructure: InfrastructureSummary;
   counts: {
     reminders: number;
     high_priority: number;
@@ -472,7 +498,44 @@ export type HouseholdSummary = Pick<HouseholdStatus, 'ok' | 'updated_at' | 'wast
     mailbox_has_mail?: boolean | null;
     vacation_mode?: boolean | null;
     next_waste?: WasteItem | null;
+    infrastructure_status?: InfrastructureStatus;
   };
+};
+
+export type InfrastructureStatus = 'ok' | 'down' | 'unstable' | 'unknown';
+
+export type InfrastructureCheck = {
+  key: 'internet_status' | 'fritzbox_status' | 'connected_devices' | 'wifi_status' | string;
+  configured: boolean;
+  discovered?: boolean;
+  entity_id: string;
+  status: InfrastructureStatus;
+  value: string | number | boolean | null;
+  label: string;
+  unit?: string | null;
+  attributes?: Record<string, unknown>;
+  error?: string;
+};
+
+export type InfrastructureSummary = {
+  ok: boolean;
+  updated_at: string;
+  status: InfrastructureStatus;
+  label: string;
+  detail: string;
+  router: string;
+  connected_devices: number | null;
+  wifi: InfrastructureStatus;
+  checks: Record<string, InfrastructureCheck>;
+};
+
+export type InfrastructureFullStatus = {
+  ok: boolean;
+  updated_at: string;
+  home_assistant: { configured: boolean };
+  configured_entities: Record<string, string>;
+  checks: Record<string, InfrastructureCheck>;
+  summary: Omit<InfrastructureSummary, 'ok' | 'updated_at' | 'checks'>;
 };
 
 export type WallDashboardData = {
@@ -695,6 +758,8 @@ export const api = {
   householdStatus: () => request<HouseholdStatus>('/api/household/status'),
   householdSummary: () => request<HouseholdSummary>('/api/household/summary'),
   householdReminders: () => request<Pick<HouseholdStatus, 'ok' | 'updated_at' | 'reminders'> & { context: Record<string, unknown> }>('/api/household/reminders'),
+  infrastructureStatus: () => request<InfrastructureFullStatus>('/api/infrastructure/status'),
+  infrastructureSummary: () => request<InfrastructureSummary>('/api/infrastructure/summary'),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
   mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
   mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,

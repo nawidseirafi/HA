@@ -403,7 +403,34 @@ def _with_area_lookup(item: dict[str, Any], area_lookup: dict[str, str]) -> dict
     area = area_lookup.get(entity_id)
     if area:
         return {**item, "area": area}
+    inferred_area = _infer_area_from_known_rooms(item, area_lookup.values())
+    if inferred_area:
+        return {**item, "area": inferred_area}
     return item
+
+
+def _infer_area_from_known_rooms(item: dict[str, Any], known_areas: Any) -> str:
+    entity_id = str(item.get("entity_id") or "")
+    name = str(item.get("name") or "")
+    text = f" {_normalize_area_text(entity_id)} {_normalize_area_text(name)} "
+    for area in sorted({str(value) for value in known_areas if value}, key=len, reverse=True):
+        normalized_area = _normalize_area_text(area)
+        if len(normalized_area) < 3:
+            continue
+        if f" {normalized_area} " in text:
+            return area
+    return ""
+
+
+def _normalize_area_text(value: str) -> str:
+    return " ".join(
+        str(value or "")
+        .lower()
+        .replace(".", " ")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split()
+    )
 
 
 def _light_group(label: str, lights: list[dict[str, Any]], rooms: list[dict[str, Any]] | None = None) -> dict[str, Any]:

@@ -1472,6 +1472,25 @@ function fritzboxInfo(data: WallDashboardData): FritzboxInfo {
         const text = `${entity.entity_id} ${entity.name} ${entity.area || ''}`.toLowerCase();
         return text.includes('fritz') || text.includes('wan') || text.includes('internet') || text.includes('dsl');
     });
+    const connectionDetail = fritzboxConnectionDetail(explicit, fritzEntities);
+    const infrastructure = firstRecord(data.household?.infrastructure);
+    if (infrastructure && hasInfrastructureSignal(infrastructure)) {
+        const status = internetStatusFromText(stringValue(infrastructure.status), []);
+        const connectedDevices = stringValue(infrastructure.connected_devices);
+        const wifi = stringValue(infrastructure.wifi);
+        const detail = stringValue(
+            infrastructure.detail,
+            connectedDevices ? `${connectedDevices} Geräte` : '',
+            wifi ? `WLAN ${wifi}` : '',
+        );
+        return {
+            status,
+            pillLabel: internetStatusLabel(status),
+            cardValue: status === 'ok' ? 'Internet OK' : status === 'down' ? 'Gestört' : status === 'unstable' ? 'Instabil' : 'Unbekannt',
+            cardDetail: connectionDetail || detail || stringValue(infrastructure.router, 'Fritzbox'),
+            routerName: stringValue(infrastructure.router, 'Fritzbox'),
+        };
+    }
 
     const explicitStatus = explicit ? stringValue(explicit.status, explicit.internet_status, explicit.connection, explicit.state) : '';
     const relevantState = stringValue(
@@ -1482,6 +1501,16 @@ function fritzboxInfo(data: WallDashboardData): FritzboxInfo {
     );
     const status = internetStatusFromText(relevantState, fritzEntities);
     const routerName = stringValue(explicit?.name, explicit?.model, findEntityName(fritzEntities, ['fritz']), 'Fritzbox');
+    return {
+        status,
+        pillLabel: internetStatusLabel(status),
+        cardValue: status === 'ok' ? 'Internet OK' : status === 'down' ? 'Gestört' : status === 'unstable' ? 'Instabil' : 'Unbekannt',
+        cardDetail: connectionDetail || routerName,
+        routerName,
+    };
+}
+
+function fritzboxConnectionDetail(explicit: Record<string, unknown> | null, fritzEntities: WallEntity[]) {
     const down = stringValue(
         explicit?.downstream,
         explicit?.download,
@@ -1503,14 +1532,19 @@ function fritzboxInfo(data: WallDashboardData): FritzboxInfo {
         ip ? `IP ${ip}` : '',
         uptime ? `Uptime ${uptime}` : '',
     ].filter(Boolean);
+    return detailParts[0] || '';
+}
 
-    return {
-        status,
-        pillLabel: internetStatusLabel(status),
-        cardValue: status === 'ok' ? 'Internet OK' : status === 'down' ? 'Gestört' : status === 'unstable' ? 'Instabil' : 'Unbekannt',
-        cardDetail: detailParts[0] || routerName,
-        routerName,
-    };
+function hasInfrastructureSignal(infrastructure: Record<string, unknown>) {
+    const status = stringValue(infrastructure.status).toLowerCase();
+    if (status && status !== 'unknown') return true;
+    const checks = firstRecord(infrastructure.checks);
+    if (!checks) return false;
+    return Object.values(checks).some((value) => {
+        const check = firstRecord(value);
+        if (!check) return false;
+        return check.configured === true || check.discovered === true;
+    });
 }
 
 function internetStatusFromText(value: string, entities: WallEntity[]): InternetStatus {

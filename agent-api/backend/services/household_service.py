@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.infrastructure_service import InfrastructureService
 from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
 
 
@@ -10,17 +11,20 @@ class HouseholdService:
         self,
         ha_service: HomeAssistantService | None = None,
         waste_service: WasteService | None = None,
+        infrastructure_service: InfrastructureService | None = None,
         vacation_status_provider: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self.ha_service = ha_service or HomeAssistantService()
         self.waste_service = waste_service or WasteService(self.ha_service)
+        self.infrastructure_service = infrastructure_service or InfrastructureService(self.ha_service)
         self.vacation_status_provider = vacation_status_provider
 
     def status(self) -> dict[str, Any]:
         waste = self._waste_status()
         post = self._post_status()
         vacation = self._vacation_status()
-        reminders = self._reminders(waste, post, vacation)
+        infrastructure = self._infrastructure_status()
+        reminders = self._reminders(waste, post, vacation, infrastructure)
         return {
             "ok": not any(item.get("priority") == "critical" for item in reminders),
             "updated_at": self._now(),
@@ -30,6 +34,7 @@ class HouseholdService:
             "waste": waste,
             "post": post,
             "vacation": vacation,
+            "infrastructure": infrastructure,
             "reminders": reminders,
         }
 
@@ -38,12 +43,14 @@ class HouseholdService:
         waste = status["waste"]
         post = status["post"]
         vacation = status["vacation"]
+        infrastructure = status["infrastructure"]
         return {
             "ok": status["ok"],
             "updated_at": status["updated_at"],
             "waste": waste,
             "post": post,
             "vacation": vacation,
+            "infrastructure": infrastructure,
             "reminders": status["reminders"],
             "counts": {
                 "reminders": len(status["reminders"]),
@@ -54,6 +61,7 @@ class HouseholdService:
                 "mailbox_has_mail": post.get("has_mail"),
                 "vacation_mode": vacation.get("vacation_mode"),
                 "next_waste": waste.get("next") if isinstance(waste, dict) else None,
+                "infrastructure_status": infrastructure.get("status") if isinstance(infrastructure, dict) else "unknown",
             },
         }
 
@@ -66,6 +74,7 @@ class HouseholdService:
             "context": {
                 "mailbox_has_mail": status["post"].get("has_mail"),
                 "vacation_mode": status["vacation"].get("vacation_mode"),
+                "infrastructure_status": status["infrastructure"].get("status"),
             },
         }
 
@@ -122,7 +131,24 @@ class HouseholdService:
             **status,
         }
 
-    def _reminders(self, waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any]) -> list[dict[str, str]]:
+    def _infrastructure_status(self) -> dict[str, Any]:
+        try:
+            return self.infrastructure_service.summary()
+        except Exception as exc:
+            return {
+                "ok": False,
+                "updated_at": self._now(),
+                "status": "unknown",
+                "label": "Unbekannt",
+                "detail": "Infrastructure Status nicht verfügbar",
+                "router": "Fritzbox",
+                "connected_devices": None,
+                "wifi": "unknown",
+                "checks": {},
+                "error": str(exc),
+            }
+
+    def _reminders(self, waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any], infrastructure: dict[str, Any]) -> list[dict[str, str]]:
         reminders: list[dict[str, str]] = []
         for item in waste.get("reminders", []) if isinstance(waste, dict) else []:
             if isinstance(item, dict):
@@ -149,7 +175,22 @@ class HouseholdService:
                 "source": "household",
             })
 
-        for section, source in ((waste, "waste"), (post, "post"), (vacation, "vacation")):
+        if infrastructure.get("status") == "down":
+            reminders.append({
+                "priority": "high",
+                "message": "Internet oder Netzwerk gestört",
+                "reason": str(infrastructure.get("detail") or "Infrastructure Status meldet Störung."),
+                "source": "infrastructure",
+            })
+        elif infrastructure.get("status") == "unstable":
+            reminders.append({
+                "priority": "medium",
+                "message": "Internet oder Netzwerk instabil",
+                "reason": str(infrastructure.get("detail") or "Infrastructure Status meldet Instabilität."),
+                "source": "infrastructure",
+            })
+
+        for section, source in ((waste, "waste"), (post, "post"), (vacation, "vacation"), (infrastructure, "infrastructure")):
             error = section.get("error") if isinstance(section, dict) else None
             if error:
                 reminders.append({

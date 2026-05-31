@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from backend.agents.registry import discover_agent_manifests
 from backend.config import load_agent_section
-from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH
+from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH, FRONTEND_DIST, LOG_DIR
+from backend.services.waste_service import MAILBOX_ENTITY_ID
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -70,6 +72,16 @@ def _llm_info(config: dict[str, Any], env_values: dict[str, str]) -> dict[str, A
         "provider": provider,
         "model": provider_config.get("model", ""),
         "api_key_configured": _setting_present(api_key_setting, env_values),
+    }
+
+
+def _configured_entities(config: dict[str, Any]) -> dict[str, str]:
+    household_entities = ((config.get("household") or {}).get("entities") or {})
+    infrastructure_entities = ((config.get("infrastructure") or {}).get("entities") or {})
+    merged = {**household_entities, **infrastructure_entities}
+    return {
+        key: str(merged.get(key) or "").strip()
+        for key in ("internet_status", "fritzbox_status", "connected_devices", "wifi_status")
     }
 
 
@@ -145,6 +157,7 @@ def get_settings() -> dict[str, Any]:
     vacation_config = load_agent_section("vacation")
     ha_config = config.get("home_assistant", {})
     ha_notification_config = invoice_config.get("home_assistant_notifications", {})
+    manifests = {manifest.id: manifest for manifest in discover_agent_manifests()}
 
     token_ttl_seconds = int(auth_config.get("token_ttl_seconds", 0) or 0)
     data_dir = API_DIR / "data"
@@ -174,16 +187,19 @@ def get_settings() -> dict[str, Any]:
         },
         "frontend": {
             "dev_server": "Vite 5173",
-            "production_dist": str(API_DIR / "frontend" / "dist"),
-            "production_dist_exists": (API_DIR / "frontend" / "dist").exists(),
+            "production_dist": str(FRONTEND_DIST),
+            "production_dist_exists": FRONTEND_DIST.exists(),
         },
         "storage": {
             "uploads": _path_info(API_DIR, invoice_config.get("upload_dir") or invoice_config.get("uploads_dir")),
-            "log_file": _path_info(API_DIR, config.get("logging", {}).get("file")),
+            "log_file": {"path": str(LOG_DIR / "agent-api.log"), "exists": (LOG_DIR / "agent-api.log").exists()},
+            "configured_log_file": _path_info(API_DIR, config.get("logging", {}).get("file")),
         },
         "agents": {
             "invoices": {
                 "enabled": bool(invoice_runtime.get("enabled", invoice_config.get("enabled", True))),
+                "manifest_enabled": manifests.get("invoices").enabled if manifests.get("invoices") else None,
+                "api_prefix": manifests.get("invoices").api_prefix if manifests.get("invoices") else "",
                 "upload_dir": _path_info(API_DIR, invoice_config.get("upload_dir")),
                 "database": invoice_db,
                 "schedule": invoice_runtime.get("schedule", invoice_config.get("schedule", [])),
@@ -194,6 +210,8 @@ def get_settings() -> dict[str, Any]:
             },
             "mywellness": {
                 "enabled": bool(mywellness_runtime.get("enabled", mywellness_config.get("enabled", False))),
+                "manifest_enabled": manifests.get("mywellness").enabled if manifests.get("mywellness") else None,
+                "api_prefix": manifests.get("mywellness").api_prefix if manifests.get("mywellness") else "",
                 "database": {"path": str(mywellness_db), "exists": mywellness_db.exists() if mywellness_db else False},
                 "days": mywellness_runtime.get("days", mywellness_config.get("days", 2)),
                 "schedule": mywellness_runtime.get("schedule", mywellness_config.get("schedule", [])),
@@ -204,9 +222,15 @@ def get_settings() -> dict[str, Any]:
             },
             "vacation": {
                 "enabled": bool(vacation_config.get("enabled", False)),
+                "manifest_enabled": manifests.get("vacation").enabled if manifests.get("vacation") else None,
+                "api_prefix": manifests.get("vacation").api_prefix if manifests.get("vacation") else "",
+                "mode_entity": vacation_config.get("mode_entity", ""),
+                "dry_run_default": True,
             },
             "market": {
                 "enabled": bool(market_config.get("enabled", False)),
+                "manifest_enabled": manifests.get("market").enabled if manifests.get("market") else None,
+                "api_prefix": manifests.get("market").api_prefix if manifests.get("market") else "",
                 "database": _path_info(API_DIR, market_config.get("database_path", data_dir / "market" / "market.db")),
                 "price_provider": market_config.get("price_provider", "yahoo"),
                 "news_provider": market_config.get("news_provider", "fallback"),
@@ -218,9 +242,22 @@ def get_settings() -> dict[str, Any]:
             "llm": _llm_info(config, env_values),
             "home_assistant": {
                 "configured": _setting_present(ha_config.get("token"), env_values),
+                "url_configured": _setting_present(ha_config.get("url"), env_values),
                 "notifications_enabled": bool(ha_notification_config.get("enabled", False)),
                 "notify_service": ha_notification_config.get("notify_service", ""),
                 "persistent_notifications": bool(ha_notification_config.get("persistent", False)),
+            },
+            "household": {
+                "post_entity": MAILBOX_ENTITY_ID,
+                "waste_source": "WasteService",
+                "vacation_source": "VacationService",
+                "infrastructure_source": "InfrastructureService",
+            },
+            "infrastructure": {
+                "source": "Home Assistant",
+                "direct_fritzbox_api": False,
+                "auto_discovery": True,
+                "entities": _configured_entities(config),
             },
         },
         "security": {

@@ -15,6 +15,13 @@ home_assistant:
   url: HA_URL
   token: HA_TOKEN
 
+infrastructure:
+  entities:
+    internet_status: ""
+    fritzbox_status: ""
+    connected_devices: ""
+    wifi_status: ""
+
 llm:
   provider: "openai"  # Options: gemini, openai, claude, llama
   gemini:
