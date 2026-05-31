@@ -11,6 +11,7 @@ from backend.agents.registry import agent_runtime_services, include_agent_router
 from backend.agents.routes import router as agents_router
 from backend.api.auth_routes import router as auth_router
 from backend.api.homeassistant_routes import router as homeassistant_router
+from backend.api.orchestrator_routes import router as orchestrator_router
 from backend.api.settings_routes import router as settings_router
 from backend.api.waste_routes import router as waste_router
 from backend.paths import FRONTEND_DIST, LOG_DIR
@@ -66,6 +67,7 @@ async def require_api_auth(request, call_next):
 
 app.include_router(auth_router)
 app.include_router(homeassistant_router)
+app.include_router(orchestrator_router)
 app.include_router(waste_router)
 app.include_router(agents_router)
 include_agent_routers(app)

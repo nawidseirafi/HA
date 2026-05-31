@@ -1057,6 +1057,228 @@ p { color: var(--muted); line-height: 1.65; }
 .planned-agent .agent-icon { color: var(--muted); background: var(--surface-soft); }
 .agent-note { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 
+.agent-map-panel {
+  min-height: 560px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.025)),
+    rgba(9, 19, 36, 0.88);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.36);
+  overflow: hidden;
+}
+
+.agent-map-panel-map-only {
+  padding: 0;
+}
+
+.agent-map-panel-map-only .agent-map-shell {
+  min-height: 560px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent-map-panel-map-only .react-flow {
+  min-height: 560px;
+}
+
+.agent-map-title { margin-bottom: 10px; }
+.agent-map-title h2 { font-size: 1.18rem; }
+.agent-map-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.agent-map-shell {
+  min-height: 486px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 14px;
+}
+
+.agent-map-shell .react-flow {
+  min-height: 486px;
+  border: 1px solid rgba(190, 208, 235, 0.1);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(77, 141, 255, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+  overflow: hidden;
+}
+
+.agent-map-shell .react-flow__controls,
+.agent-map-shell .react-flow__minimap {
+  border: 1px solid rgba(190, 208, 235, 0.14);
+  border-radius: 14px;
+  background: rgba(13, 25, 45, 0.76);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.agent-map-shell .react-flow__controls-button {
+  color: var(--ink);
+  background: transparent;
+  border-bottom-color: rgba(190, 208, 235, 0.1);
+}
+
+.agent-map-shell .react-flow__controls-button:hover { background: rgba(77, 141, 255, 0.16); }
+.agent-map-shell .react-flow__controls-button svg { fill: currentColor; }
+.agent-map-shell .react-flow__minimap { background: rgba(9, 19, 36, 0.7); }
+
+.agent-map-node {
+  width: 218px;
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 14px;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid rgba(190, 208, 235, 0.17);
+  border-radius: 20px;
+  color: var(--ink);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.035)),
+    rgba(15, 29, 53, 0.9);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(16px);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.agent-map-node:hover,
+.agent-map-node.selected {
+  transform: translateY(-2px);
+  border-color: rgba(77, 141, 255, 0.52);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.42);
+}
+
+.agent-map-node-orchestrator {
+  border-color: rgba(52, 211, 153, 0.34);
+  animation: agent-orchestrator-glow 4.8s ease-in-out infinite;
+}
+
+.agent-map-node.status-running {
+  border-color: rgba(77, 141, 255, 0.48);
+  animation: agent-running-border 3.4s ease-in-out infinite;
+}
+
+.agent-map-node-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(77, 141, 255, 0.92), rgba(139, 92, 246, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+.agent-map-node-database .agent-map-node-icon { background: linear-gradient(135deg, rgba(52, 211, 153, 0.88), rgba(20, 184, 166, 0.74)); }
+.agent-map-node-external .agent-map-node-icon { background: linear-gradient(135deg, rgba(251, 191, 36, 0.8), rgba(77, 141, 255, 0.75)); }
+.agent-map-node-service .agent-map-node-icon { background: linear-gradient(135deg, rgba(77, 141, 255, 0.8), rgba(52, 211, 153, 0.68)); }
+
+.agent-map-node-copy { min-width: 0; display: grid; gap: 4px; }
+.agent-map-node-copy strong,
+.agent-map-node-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-map-node-copy strong { font-size: 0.96rem; }
+.agent-map-node-copy span { color: var(--muted); font-size: 0.78rem; }
+
+.agent-map-status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.12);
+  animation: agent-status-pulse 2.8s ease-in-out infinite;
+}
+
+.agent-map-node.status-running .agent-map-status-dot { background: var(--blue); box-shadow: 0 0 0 5px rgba(77, 141, 255, 0.14); }
+.agent-map-node.status-paused .agent-map-status-dot { background: #f59e0b; box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.13); }
+.agent-map-node.status-error .agent-map-status-dot { background: var(--red); box-shadow: 0 0 0 5px rgba(251, 113, 133, 0.13); }
+.agent-map-node.status-disabled .agent-map-status-dot { background: #6b7280; box-shadow: 0 0 0 5px rgba(107, 114, 128, 0.12); }
+
+.agent-map-handle {
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.agent-map-edge path {
+  stroke: rgba(153, 168, 195, 0.42);
+  filter: drop-shadow(0 0 6px rgba(77, 141, 255, 0.18));
+}
+
+.agent-map-edge.active path {
+  stroke: rgba(52, 211, 153, 0.62);
+  stroke-dasharray: 5 14;
+  stroke-linecap: round;
+  animation: agent-edge-lights 7.5s linear infinite;
+  filter: drop-shadow(0 0 7px rgba(52, 211, 153, 0.24));
+}
+
+.agent-map-edge.active.running path {
+  stroke: rgba(77, 141, 255, 0.9);
+  stroke-dasharray: 5 16;
+  animation-duration: 3.8s;
+  filter: drop-shadow(0 0 8px rgba(77, 141, 255, 0.42));
+}
+
+.agent-map-detail {
+  min-height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(190, 208, 235, 0.12);
+  border-radius: 22px;
+  background: rgba(12, 24, 43, 0.7);
+}
+
+.agent-map-detail h3 { font-size: 1.08rem; }
+.agent-map-detail dl { display: grid; gap: 10px; margin: 2px 0 0; }
+.agent-map-detail dt { color: var(--muted); font-size: 0.76rem; }
+.agent-map-detail dd { margin: 3px 0 0; color: var(--ink); }
+
+.agent-map-badge {
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  background: rgba(52, 211, 153, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+}
+
+.agent-map-badge.status-running { background: rgba(77, 141, 255, 0.16); border-color: rgba(77, 141, 255, 0.32); }
+.agent-map-badge.status-paused { background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.3); }
+.agent-map-badge.status-error { background: rgba(251, 113, 133, 0.16); border-color: rgba(251, 113, 133, 0.32); }
+.agent-map-badge.status-disabled { background: rgba(107, 114, 128, 0.16); border-color: rgba(107, 114, 128, 0.3); }
+
+@keyframes agent-orchestrator-glow {
+  0%, 100% { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34), 0 0 0 rgba(52, 211, 153, 0); }
+  50% { box-shadow: 0 20px 52px rgba(0, 0, 0, 0.38), 0 0 30px rgba(52, 211, 153, 0.22); }
+}
+
+@keyframes agent-running-border {
+  0%, 100% { border-color: rgba(77, 141, 255, 0.32); }
+  50% { border-color: rgba(77, 141, 255, 0.78); }
+}
+
+@keyframes agent-status-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.16); opacity: 1; }
+}
+
+@keyframes agent-edge-lights {
+  to { stroke-dashoffset: -42; }
+}
+
 .mywellness-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
@@ -3417,6 +3639,27 @@ label.check input[type="checkbox"]:disabled {
   .market-intel-panel {
     margin-inline: -2px;
   }
+  .agent-map-panel {
+    min-height: auto;
+    padding: 12px;
+    border-radius: 22px;
+  }
+  .agent-map-title {
+    align-items: flex-start;
+  }
+  .agent-map-shell {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+  .agent-map-shell .react-flow {
+    min-height: 430px;
+  }
+  .agent-map-detail {
+    min-height: auto;
+  }
+  .agent-map-shell .react-flow__minimap {
+    display: none;
+  }
   .market-filter-bar {
     grid-template-columns: 1fr;
   }
@@ -3494,4 +3737,13 @@ label.check input[type="checkbox"]:disabled {
 
 .login-form .auth-field:focus-within::before {
   opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-map-node-orchestrator,
+  .agent-map-node.status-running,
+  .agent-map-status-dot,
+  .agent-map-edge.active path {
+    animation: none;
+  }
 }

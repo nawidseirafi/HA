@@ -466,7 +466,7 @@ export type WallDashboardData = {
     low_batteries: Array<WallEntity & { level?: number | null }>;
     unavailable: WallEntity[];
   };
-  agents: {
+  agents: Record<string, Record<string, unknown> | undefined> & {
     invoices: {
       status: string;
       total?: number;
@@ -482,6 +482,38 @@ export type WallDashboardData = {
     mywellness: Partial<AgentStatus> & { status?: string; error?: string };
     market: { status: string; watchlist_count?: number; enabled_count?: number; signals?: Record<string, number>; error?: string };
   };
+};
+
+export type OrchestratorMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
+export type OrchestratorMapNode = {
+  id: string;
+  label: string;
+  subtitle: string;
+  kind: 'orchestrator' | 'agent' | 'service';
+  status: OrchestratorMapStatus;
+  icon: string;
+  last_run?: string;
+  next_action?: string;
+};
+export type OrchestratorMapEdge = {
+  id: string;
+  from: string;
+  to: string;
+  kind: 'primary' | 'secondary';
+  active: boolean;
+  status: OrchestratorMapStatus;
+};
+export type OrchestratorMapData = {
+  updated_at: string;
+  summary: {
+    active: number;
+    paused: number;
+    errors: number;
+    last_activity: string;
+    next_activity: string;
+  };
+  nodes: OrchestratorMapNode[];
+  edges: OrchestratorMapEdge[];
 };
 
 function apiUrl(path: string) {
@@ -549,6 +581,7 @@ export const api = {
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
   settings: () => request<SettingsInfo>('/api/settings'),
   agents: async () => (await request<AgentsResponse>('/api/agents')).agents,
+  orchestratorMap: () => request<OrchestratorMapData>('/api/orchestrator/map'),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
   callHomeAssistantService: (payload: { domain: string; service: string; entity_id?: string | string[]; data?: Record<string, unknown> }) =>
     request<{ ok: boolean; result: unknown }>('/api/homeassistant/service', { method: 'POST', body: JSON.stringify(payload) }),

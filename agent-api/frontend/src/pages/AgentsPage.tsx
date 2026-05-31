@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Bot, CalendarCheck, Dumbbell, FileText, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
-import { api, type AgentManifest, type KnownDashboardRoute } from '../api/client';
+import { api, type AgentManifest, type AgentStatus, type KnownDashboardRoute } from '../api/client';
 import type { Route } from '../App';
+import { AgentMap } from '../components/AgentMap';
 
 interface Props {
   navigate: (route: Route) => void;
@@ -28,12 +29,27 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
 export function AgentsPage({ navigate }: Props) {
   const greeting = getGreeting();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
+  const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, AgentStatus>>>({});
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let mounted = true;
+
     api.agents()
-      .then(setAgents)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Agenten konnten nicht geladen werden.'));
+      .then((nextAgents) => mounted && setAgents(nextAgents))
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Agenten konnten nicht geladen werden.'));
+
+    api.mywellnessStatus()
+      .then((status) => mounted && setAgentStatuses((current) => ({ ...current, mywellness: status })))
+      .catch(() => undefined);
+
+    api.invoiceAgentStatus()
+      .then((status) => mounted && setAgentStatuses((current) => ({ ...current, invoices: status })))
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -42,10 +58,12 @@ export function AgentsPage({ navigate }: Props) {
         <div>
           <span className="eyebrow">Agent Console</span>
           <h1>{greeting}, Nawid</h1>
-          <p>Wähle einen Agenten oder prüfe den aktuellen Systembereich.</p>
+          <p>Systemübersicht der lokalen Agenten. Wähle einen Agenten für Details oder nutze die Map zur Orientierung.</p>
         </div>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
+
+      <AgentMap agents={agents} statuses={agentStatuses} navigate={navigate} />
 
       <section className="agent-grid">
         {agents.map((agent) => {

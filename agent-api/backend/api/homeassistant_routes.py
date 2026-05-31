@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from backend.agents.invoices.routes import invoice_service
 from backend.agents.market.report_service import MarketReportService
 from backend.agents.mywellness.routes import mywellness_service
+from backend.agents.vacation.routes import vacation_service
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.waste_service import WasteService
 
@@ -122,6 +123,7 @@ def _agent_summary() -> dict[str, Any]:
     invoices: dict[str, Any]
     market: dict[str, Any]
     mywellness: dict[str, Any]
+    vacation: dict[str, Any]
     try:
         invoice_summary = invoice_service.summary()
         invoice_status = invoice_service.status()
@@ -152,7 +154,11 @@ def _agent_summary() -> dict[str, Any]:
         }
     except Exception as exc:
         market = {"status": "error", "error": str(exc)}
-    return {"invoices": invoices, "mywellness": mywellness, "market": market}
+    try:
+        vacation = vacation_service.status()
+    except Exception as exc:
+        vacation = {"status": "error", "error": str(exc)}
+    return {"invoices": invoices, "mywellness": mywellness, "market": market, "vacation": vacation}
 
 
 def _domain(state: dict[str, Any]) -> str:

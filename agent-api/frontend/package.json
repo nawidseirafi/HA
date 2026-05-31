@@ -13,6 +13,7 @@
     "lucide-react": "^0.468.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "reactflow": "^11.11.4",
     "recharts": "^3.8.1",
     "typescript": "^5.4.0",
     "vite": "^5.2.0"

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import {
     api,
+    type AgentManifest,
     type AgentStatus,
     type WallCover,
     type WallDashboardData,
@@ -39,6 +40,7 @@ import {
     type WallLightRoom,
     type WallTemperatureSensor
 } from '../api/client';
+import {AgentMap} from '../components/AgentMap';
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
@@ -1252,31 +1254,55 @@ function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () 
     );
 }
 
-function AgentsSection({data}: { data: WallDashboardData }) {
-    const wellness = data.agents.mywellness;
-    const invoices = data.agents.invoices;
-    const market = data.agents.market;
+function AgentsSection({data: _data}: { data: WallDashboardData }) {
+    const [agents, setAgents] = useState<AgentManifest[]>([]);
+    const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & { status?: string; error?: string | null }>>>(() => wallAgentStatuses(_data));
+
+    useEffect(() => {
+        setAgentStatuses((current) => ({...wallAgentStatuses(_data), ...current}));
+    }, [_data]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        api.agents()
+            .then((nextAgents) => mounted && setAgents(nextAgents))
+            .catch(() => undefined);
+
+        api.mywellnessStatus()
+            .then((status) => mounted && setAgentStatuses((current) => ({...current, mywellness: status})))
+            .catch(() => undefined);
+
+        api.invoiceAgentStatus()
+            .then((status) => mounted && setAgentStatuses((current) => ({...current, invoices: status})))
+            .catch(() => undefined);
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     return (
-        <div className="wall-card-grid wall-agents-grid">
-            <section className="wall-panel wall-agent-card">
-                <div className="wall-section-title"><span>Invoice Agent</span><Bot size={20}/></div>
-                <h2>{invoiceState(invoices)}</h2>
-                <p>Nächster Scan: {formatAgentNextRun(invoices.next_scheduled_run, invoices.schedule)}</p>
-                <p>{invoices.total ?? 0} Belege · {invoices.needs_review ?? 0} zu prüfen
-                    · {invoices.errors ?? 0} Fehler</p>
-            </section>
-            <section className="wall-panel wall-agent-card">
-                <div className="wall-section-title"><span>MyWellness</span><Activity size={20}/></div>
-                <h2>{wellness.is_running ? 'Läuft' : wellness.enabled === false ? 'Pausiert' : 'Bereit'}</h2>
-                <p>Nächster Lauf: {formatWellnessNextRun(wellness)}</p>
-            </section>
-            <section className="wall-panel wall-agent-card">
-                <div className="wall-section-title"><span>Market Agent</span><Zap size={20}/></div>
-                <h2>{market.status === 'ok' ? 'Bereit' : 'Fehler'}</h2>
-                <p>{market.enabled_count ?? 0}/{market.watchlist_count ?? 0} Watchlist aktiv</p>
-            </section>
+        <div className="wall-agent-map-surface">
+            <AgentMap agents={agents} statuses={agentStatuses} navigate={() => undefined} chrome={false} interactive={false}/>
         </div>
     );
+}
+
+function wallAgentStatuses(data: WallDashboardData): Partial<Record<string, Partial<AgentStatus> & { status?: string; error?: string | null }>> {
+    const agents = data.agents as Record<string, Record<string, unknown> | undefined>;
+    return Object.fromEntries(Object.entries(agents).map(([id, raw]) => [id, {
+        enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : undefined,
+        is_running: raw?.is_running === true,
+        status: stringValue(raw?.status, raw?.current_status, raw?.last_status),
+        current_status: stringValue(raw?.current_status, raw?.status, raw?.last_status),
+        last_error: stringValue(raw?.last_error, raw?.error) || null,
+        error: stringValue(raw?.error, raw?.last_error) || null,
+        last_successful_run: stringValue(raw?.last_successful_run) || null,
+        last_finished_at: stringValue(raw?.last_finished_at) || null,
+        last_started_at: stringValue(raw?.last_started_at) || null,
+        next_scheduled_run: stringValue(raw?.next_scheduled_run) || null,
+    }]));
 }
 
 function homeAgentState(data: WallDashboardData) {
@@ -1534,7 +1560,10 @@ function fritzboxInfo(data: WallDashboardData): FritzboxInfo {
 function internetStatusFromText(value: string, entities: WallEntity[]): InternetStatus {
     const text = value.toLowerCase();
     if (['unavailable', 'unknown', ''].includes(text)) {
-        const hasUnavailable = entities.some((entity) => ['unavailable', 'unknown'].includes(String(entity.state || '').toLowerCase()));
+        const states = entities.map((entity) => String(entity.state || '').toLowerCase());
+        const hasOnline = states.some((state) => /(connected|online|ok|on|up|available|verbunden)/i.test(state));
+        const hasUnavailable = states.some((state) => ['unavailable', 'unknown', 'off', 'down'].includes(state));
+        if (hasOnline) return 'ok';
         return hasUnavailable ? 'down' : 'unknown';
     }
     if (/(disconnect|offline|down|gestört|stoer|fehler|failed|problem|not connected)/i.test(text)) return 'down';
@@ -1572,6 +1601,7 @@ function stringValue(...values: unknown[]) {
 
 function allWallEntities(data: WallDashboardData): WallEntity[] {
     return [
+        ...(data.sensors ?? []),
         ...(data.lights ?? []),
         ...(data.security?.openings ?? []),
         ...(data.security?.problems ?? []),
