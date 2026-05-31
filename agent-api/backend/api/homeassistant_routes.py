@@ -147,7 +147,7 @@ def _agent_summary() -> dict[str, Any]:
     try:
         market_summary = MarketReportService().summary()
         market = {
-            "status": "ok",
+            "status": "paused",
             "watchlist_count": market_summary.get("watchlist_count", 0),
             "enabled_count": market_summary.get("enabled_count", 0),
             "signals": market_summary.get("signals", {}),

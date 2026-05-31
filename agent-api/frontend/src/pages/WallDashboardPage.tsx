@@ -40,7 +40,7 @@ import {
     type WallLightRoom,
     type WallTemperatureSensor
 } from '../api/client';
-import {AgentMap} from '../components/AgentMap';
+import {AgentMap, statusesFromOrchestratorMap} from '../components/AgentMap';
 import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
@@ -1256,35 +1256,52 @@ function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () 
 
 function AgentsSection({data: _data}: { data: WallDashboardData }) {
     const [agents, setAgents] = useState<AgentManifest[]>([]);
-    const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & { status?: string; error?: string | null }>>>(() => wallAgentStatuses(_data));
-
-    useEffect(() => {
-        setAgentStatuses((current) => ({...wallAgentStatuses(_data), ...current}));
-    }, [_data]);
+    const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & {
+        status?: string;
+        current_status?: string;
+        error?: string | null;
+        last_run?: string;
+        next_action?: string;
+    }>>>({});
+    const mergedAgentStatuses = useMemo(() => ({
+        ...wallAgentStatuses(_data),
+        ...agentStatuses,
+    }), [_data, agentStatuses]);
 
     useEffect(() => {
         let mounted = true;
+        let refresh: number | null = null;
 
         api.agents()
             .then((nextAgents) => mounted && setAgents(nextAgents))
             .catch(() => undefined);
 
-        api.mywellnessStatus()
-            .then((status) => mounted && setAgentStatuses((current) => ({...current, mywellness: status})))
-            .catch(() => undefined);
+        const loadStatuses = () => {
+            api.orchestratorMap()
+                .then((map) => mounted && setAgentStatuses((current) => ({...current, ...statusesFromOrchestratorMap(map)})))
+                .catch(() => undefined);
 
-        api.invoiceAgentStatus()
-            .then((status) => mounted && setAgentStatuses((current) => ({...current, invoices: status})))
-            .catch(() => undefined);
+            api.mywellnessStatus()
+                .then((status) => mounted && setAgentStatuses((current) => ({...current, mywellness: status})))
+                .catch(() => undefined);
+
+            api.invoiceAgentStatus()
+                .then((status) => mounted && setAgentStatuses((current) => ({...current, invoices: status})))
+                .catch(() => undefined);
+        };
+
+        loadStatuses();
+        refresh = window.setInterval(loadStatuses, 15000);
 
         return () => {
             mounted = false;
+            if (refresh) window.clearInterval(refresh);
         };
     }, []);
 
     return (
         <div className="wall-agent-map-surface">
-            <AgentMap agents={agents} statuses={agentStatuses} navigate={() => undefined} chrome={false} interactive={false}/>
+            <AgentMap agents={agents} statuses={mergedAgentStatuses} navigate={() => undefined} chrome={false} interactive={false}/>
         </div>
     );
 }

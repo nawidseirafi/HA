@@ -1,4 +1,4 @@
-import { Bot, Database, FileText, Heart, Home, HousePlug, LineChart, Sparkles, Zap } from 'lucide-react';
+import { Bot, CalendarCheck, Database, Dumbbell, FileText, Heart, Home, HousePlug, LineChart, Mail, Settings2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
 import type { LucideProps } from 'lucide-react';
@@ -29,13 +29,6 @@ type MapEdge = {
   variant?: 'primary' | 'secondary';
 };
 
-const agentMeta: Record<string, { label: string; subtext: string; icon: ComponentType<LucideProps>; fallbackStatus: StatusTone }> = {
-  invoices: { label: 'Invoice Agent', subtext: 'Rechnungen verarbeiten', icon: FileText, fallbackStatus: 'active' },
-  mywellness: { label: 'MyWellness Agent', subtext: 'Training & Wellness', icon: Heart, fallbackStatus: 'running' },
-  market: { label: 'Market Agent', subtext: 'Markt-Beobachtung', icon: LineChart, fallbackStatus: 'paused' },
-  vacation: { label: 'Household Service', subtext: 'Haushaltsroutinen', icon: Home, fallbackStatus: 'active' },
-};
-
 const statusLabel: Record<StatusTone, string> = {
   active: 'Aktiv',
   running: 'Läuft',
@@ -46,12 +39,18 @@ const statusLabel: Record<StatusTone, string> = {
 
 const iconMap: Record<string, ComponentType<LucideProps>> = {
   Bot,
+  CalendarCheck,
   Database,
+  Dumbbell,
   FileText,
   Heart,
+  Hearth: Heart,
   Home,
   HousePlug,
   LineChart,
+  Mail,
+  Settings2,
+  ShieldCheck,
   Sparkles,
   Zap,
 };
@@ -245,16 +244,15 @@ function buildAgentNodes(data: WallDashboardData): MapNode[] {
       y: Math.round(210 + Math.sin(fallbackAngle) * 95),
     };
     const position = preferredPositions[index] ?? fallback;
-    const meta = agentMeta[id] ?? { label: titleFromId(id), subtext: 'Automatisierte Aufgabe', icon: Zap, fallbackStatus: 'active' as StatusTone };
     return {
       id,
-      label: meta.label,
-      eyebrow: meta.subtext,
+      label: titleFromId(id),
+      eyebrow: 'Automatisierte Aufgabe',
       status: statusFromRaw(id, raw),
       kind: 'agent',
       x: position.x,
       y: position.y,
-      icon: meta.icon,
+      icon: Zap,
       lastRun: lastRunFromRaw(raw),
       nextRun: nextRunFromRaw(raw),
     };
@@ -359,7 +357,7 @@ function statusFromRaw(id: string, raw?: Record<string, unknown>): StatusTone {
   if (status.includes('running') || status.includes('läuft') || status.includes('laeuft')) return 'running';
   if (status.includes('paused') || status.includes('pause') || status.includes('idle')) return 'paused';
   if (status.includes('disabled') || status.includes('aus')) return 'disabled';
-  if (status === 'ok' && agentMeta[id]?.fallbackStatus) return agentMeta[id].fallbackStatus;
+  if (status === 'ok') return 'active';
   return 'active';
 }
 

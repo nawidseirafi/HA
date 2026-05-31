@@ -9,7 +9,7 @@ api:
 runtime:
   service_object: mywellness_service
 ui:
-  icon: Dumbbell
+  icon: Heart
   dashboard_route: mywellnessDashboard
 settings:
   schedule:

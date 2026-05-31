@@ -8,8 +8,24 @@ import ReactFlow, {
   type NodeTypes,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Bot, BrainCircuit, Database, FileText, Home, HousePlug, LineChart, Sparkles } from 'lucide-react';
-import type { AgentManifest, AgentStatus, KnownDashboardRoute } from '../api/client';
+import {
+  Bot,
+  BrainCircuit,
+  CalendarCheck,
+  Database,
+  Dumbbell,
+  FileText,
+  Heart,
+  Home,
+  HousePlug,
+  LineChart,
+  Mail,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
+import type { AgentManifest, AgentStatus, KnownDashboardRoute, OrchestratorMapData } from '../api/client';
 import type { Route } from '../App';
 import { AgentNode } from './AgentNode';
 import type { AgentMapNodeData, AgentMapServiceDetail, AgentMapStatus } from '../types/agentMap';
@@ -18,6 +34,8 @@ type AgentMapStatusPayload = Partial<AgentStatus> & {
   status?: string;
   current_status?: string;
   error?: string | null;
+  last_run?: string;
+  next_action?: string;
 };
 
 interface Props {
@@ -36,25 +54,21 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   marketDashboard: { name: 'marketDashboard' },
 };
 
-const fallbackAgentInfo: Record<string, Pick<AgentMapNodeData, 'label' | 'description' | 'icon' | 'status'>> = {
-  invoices: {
-    label: 'Invoice Agent',
-    description: 'Importiert, analysiert und archiviert Rechnungen und Belege.',
-    icon: FileText,
-    status: 'ok',
-  },
-  mywellness: {
-    label: 'MyWellness Agent',
-    description: 'Überwacht Kurse, Buchungen und Gesundheitsdaten.',
-    icon: Bot,
-    status: 'running',
-  },
-  market: {
-    label: 'Market Agent',
-    description: 'Erstellt Marktanalysen, Reports und Signale.',
-    icon: LineChart,
-    status: 'paused',
-  },
+const manifestIconMap: Record<string, LucideIcon> = {
+  Bot,
+  CalendarCheck,
+  Database,
+  Dumbbell,
+  FileText,
+  Heart,
+  Hearth: Heart,
+  Home,
+  HousePlug,
+  LineChart,
+  Mail,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
 };
 
 export function AgentMap({ agents, statuses = {}, navigate, chrome = true, interactive = true }: Props) {
@@ -150,23 +164,27 @@ export function AgentMap({ agents, statuses = {}, navigate, chrome = true, inter
 
 function useAgentMapElements(agents: AgentManifest[], statuses: Partial<Record<string, AgentMapStatusPayload>>) {
   return useMemo(() => {
-    const knownAgents = ['invoices', 'mywellness', 'market'];
+    const knownAgents = ['invoices', 'mywellness', 'market', 'vacation'];
     const manifestById = new Map(agents.map((agent) => [agent.id, agent]));
-    const agentNodes = knownAgents.map((id, index) => {
+    const agentIds = [
+      ...knownAgents.filter((id) => manifestById.has(id) || statuses[id]),
+      ...agents.map((agent) => agent.id).filter((id) => !knownAgents.includes(id)),
+    ];
+    const agentNodes = agentIds.map((id, index) => {
       const manifest = manifestById.get(id);
-      const fallback = fallbackAgentInfo[id];
       const status = statusFromAgent(id, manifest, statuses[id]);
       return agentNode(id, {
-        label: fallback.label,
-        description: manifest?.description || fallback.description,
-        icon: fallback.icon,
+        label: manifest?.name || titleFromId(id),
+        description: manifest?.description || 'Automatisierte Aufgabe.',
+        icon: iconForAgent(manifest) ?? Bot,
         status,
         route: routeForAgent(manifest),
-        position: { x: 20 + index * 290, y: 220 },
+        position: agentPosition(index, agentIds.length),
         lastRun: formatLastRun(statuses[id]),
         nextAction: formatNextAction(statuses[id], id),
       });
     });
+    const hasVacationAgent = agentIds.includes('vacation');
 
     const nodes: Node<AgentMapNodeData>[] = [
       agentNode('orchestrator', {
@@ -180,7 +198,7 @@ function useAgentMapElements(agents: AgentManifest[], statuses: Partial<Record<s
         kind: 'orchestrator',
       }),
       ...agentNodes,
-      agentNode('household', {
+      ...(!hasVacationAgent ? [agentNode('household', {
         label: 'Household Service',
         description: 'Bündelt Haushaltslogik wie Abfall, Reminder und Wohnungsstatus.',
         icon: Home,
@@ -189,7 +207,7 @@ function useAgentMapElements(agents: AgentManifest[], statuses: Partial<Record<s
         lastRun: 'Fallback aktiv',
         nextAction: 'Home Assistant synchronisieren',
         kind: 'service',
-      }),
+      })] : []),
       agentNode('database', {
         label: 'SQLite / Database',
         description: 'Persistiert Agentenstatus, Belege, Kurse und Marktberichte.',
@@ -223,19 +241,18 @@ function useAgentMapElements(agents: AgentManifest[], statuses: Partial<Record<s
     ];
 
     const edges: Edge[] = [
-      link('orchestrator', 'invoices', isActive('invoices', nodes), isRunning('invoices', statuses)),
-      link('orchestrator', 'mywellness', isActive('mywellness', nodes), isRunning('mywellness', statuses)),
-      link('orchestrator', 'market', isActive('market', nodes), isRunning('market', statuses)),
-      link('orchestrator', 'household', true, false),
-      link('invoices', 'database', isActive('invoices', nodes), isRunning('invoices', statuses)),
-      link('mywellness', 'database', isActive('mywellness', nodes), isRunning('mywellness', statuses)),
-      link('market', 'database', isActive('market', nodes), isRunning('market', statuses)),
-      link('household', 'database', true, false),
-      link('mywellness', 'homeassistant', isActive('mywellness', nodes), isRunning('mywellness', statuses)),
-      link('household', 'homeassistant', true, false),
-      link('invoices', 'openai', isActive('invoices', nodes), isRunning('invoices', statuses)),
-      link('mywellness', 'openai', isActive('mywellness', nodes), isRunning('mywellness', statuses)),
-      link('market', 'openai', isActive('market', nodes), isRunning('market', statuses)),
+      ...agentIds.map((id) => link('orchestrator', id, isActive(id, nodes), isRunning(id, statuses))),
+      ...agentIds
+        .filter((id) => ['invoices', 'mywellness', 'market', 'vacation'].includes(id))
+        .map((id) => link(id, 'database', isActive(id, nodes), isRunning(id, statuses))),
+      ...(!hasVacationAgent ? [link('orchestrator', 'household', true, false), link('household', 'database', true, false)] : []),
+      ...agentIds
+        .filter((id) => ['mywellness', 'vacation'].includes(id))
+        .map((id) => link(id, 'homeassistant', isActive(id, nodes), isRunning(id, statuses))),
+      ...(!hasVacationAgent ? [link('household', 'homeassistant', true, false)] : []),
+      ...agentIds
+        .filter((id) => ['invoices', 'mywellness', 'market'].includes(id))
+        .map((id) => link(id, 'openai', isActive(id, nodes), isRunning(id, statuses))),
     ];
 
     return { nodes, edges };
@@ -272,11 +289,20 @@ function routeForAgent(agent?: AgentManifest): Route | undefined {
 }
 
 function statusFromAgent(id: string, agent?: AgentManifest, live?: AgentMapStatusPayload): AgentMapStatus {
-  const fallback = fallbackAgentInfo[id]?.status ?? 'ok';
+  const fallback = agent?.enabled === false ? 'disabled' : statusFromManifest(agent);
   if (live) return statusFromLive(live, fallback);
   if (agent?.enabled === false) return 'disabled';
   if (agent?.status?.toLowerCase().includes('paused')) return 'paused';
   return fallback;
+}
+
+function statusFromManifest(agent?: AgentManifest): AgentMapStatus {
+  const raw = String(agent?.status || '').toLowerCase();
+  if (raw.includes('error') || raw.includes('fehler')) return 'error';
+  if (raw.includes('running') || raw.includes('läuft') || raw.includes('laeuft')) return 'running';
+  if (raw.includes('paused') || raw.includes('pause') || raw.includes('idle') || raw.includes('draft')) return 'paused';
+  if (raw.includes('disabled') || raw.includes('aus')) return 'disabled';
+  return 'active';
 }
 
 function statusFromLive(live: AgentMapStatusPayload | undefined, fallback: AgentMapStatus): AgentMapStatus {
@@ -286,7 +312,7 @@ function statusFromLive(live: AgentMapStatusPayload | undefined, fallback: Agent
   if (live?.enabled === false) return 'disabled';
   if (raw.includes('paused') || raw.includes('pause') || raw.includes('idle') || raw.includes('draft')) return 'paused';
   if (raw.includes('disabled') || raw.includes('aus')) return 'disabled';
-  if (raw.includes('active') || raw === 'ok') return 'ok';
+  if (raw.includes('active') || raw === 'ok') return 'active';
   return fallback;
 }
 
@@ -300,10 +326,11 @@ function isActive(id: string, nodes: Node<AgentMapNodeData>[]) {
 }
 
 function formatLastRun(status?: AgentMapStatusPayload) {
-  return formatDate(status?.last_successful_run || status?.last_finished_at || status?.last_started_at) || 'noch keine Live-Daten';
+  return formatDate(status?.last_run || status?.last_successful_run || status?.last_finished_at || status?.last_started_at) || 'noch keine Live-Daten';
 }
 
 function formatNextAction(status: AgentMapStatusPayload | undefined, agentId: string) {
+  if (status?.next_action) return formatDate(status.next_action) || status.next_action;
   if (status?.next_scheduled_action === 'prepare') return 'Kurse vorbereiten';
   if (status?.next_scheduled_action === 'book') return 'Kurse buchen';
   if (status?.next_scheduled_run) return formatDate(status.next_scheduled_run) || 'geplant';
@@ -330,4 +357,45 @@ function statusColor(status: AgentMapStatus) {
   if (status === 'paused') return '#f59e0b';
   if (status === 'error') return '#fb7185';
   return '#6b7280';
+}
+
+export function statusesFromOrchestratorMap(map: OrchestratorMapData): Partial<Record<string, AgentMapStatusPayload>> {
+  return Object.fromEntries(map.nodes.map((node) => [node.id, {
+    status: node.status,
+    current_status: node.status,
+    is_running: node.status === 'running',
+    enabled: node.status !== 'disabled',
+    last_run: node.last_run,
+    next_action: node.next_action,
+  }]));
+}
+
+export function agentStatusLabel(status: AgentMapStatus) {
+  if (status === 'running') return 'Läuft';
+  if (status === 'paused') return 'Pausiert';
+  if (status === 'error') return 'Fehler';
+  if (status === 'disabled') return 'Aus';
+  return 'Aktiv';
+}
+
+export function statusForAgentDisplay(agent: AgentManifest, live?: AgentMapStatusPayload): AgentMapStatus {
+  return statusFromAgent(agent.id, agent, live);
+}
+
+function agentPosition(index: number, count: number) {
+  if (count <= 3) return { x: 20 + index * 290, y: 220 };
+  return { x: -110 + index * 270, y: 220 };
+}
+
+function iconForAgent(agent?: AgentManifest) {
+  if (!agent) return null;
+  return manifestIconMap[agent.icon] ?? null;
+}
+
+function titleFromId(id: string) {
+  return id
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Bot, CalendarCheck, Dumbbell, FileText, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
 import { api, type AgentManifest, type AgentStatus, type KnownDashboardRoute } from '../api/client';
 import type { Route } from '../App';
-import { AgentMap } from '../components/AgentMap';
+import { AgentMap, agentStatusLabel, statusForAgentDisplay, statusesFromOrchestratorMap } from '../components/AgentMap';
 
 interface Props {
   navigate: (route: Route) => void;
@@ -29,7 +29,13 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
 export function AgentsPage({ navigate }: Props) {
   const greeting = getGreeting();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
-  const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, AgentStatus>>>({});
+  const [agentStatuses, setAgentStatuses] = useState<Partial<Record<string, Partial<AgentStatus> & {
+    status?: string;
+    current_status?: string;
+    error?: string | null;
+    last_run?: string;
+    next_action?: string;
+  }>>>({});
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -38,6 +44,10 @@ export function AgentsPage({ navigate }: Props) {
     api.agents()
       .then((nextAgents) => mounted && setAgents(nextAgents))
       .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Agenten konnten nicht geladen werden.'));
+
+    api.orchestratorMap()
+      .then((map) => mounted && setAgentStatuses((current) => ({ ...current, ...statusesFromOrchestratorMap(map) })))
+      .catch(() => undefined);
 
     api.mywellnessStatus()
       .then((status) => mounted && setAgentStatuses((current) => ({ ...current, mywellness: status })))
@@ -69,6 +79,7 @@ export function AgentsPage({ navigate }: Props) {
         {agents.map((agent) => {
           const Icon = iconMap[agent.icon as keyof typeof iconMap] ?? Bot;
           const route = routeForAgent(agent);
+          const status = statusForAgentDisplay(agent, agentStatuses[agent.id]);
           return (
             <button
               className={`agent-card ${agent.enabled ? 'active-agent' : 'planned-agent'}`}
@@ -78,7 +89,7 @@ export function AgentsPage({ navigate }: Props) {
             >
               <div className="agent-icon"><Icon size={24} /></div>
               <div>
-                <span className="eyebrow">{agent.enabled ? 'Aktiv' : 'Installiert'}</span>
+                <span className="eyebrow">{agentStatusLabel(status)}</span>
                 <h2>{agent.name}</h2>
                 <p>{agent.description || 'Agent per Manifest eingebunden.'}</p>
               </div>

@@ -183,18 +183,15 @@ def _first_string(data: dict[str, Any], *keys: str) -> str:
 
 
 def _agent_label(agent_id: str, manifest: dict[str, Any]) -> str:
-    labels = {"invoices": "Invoice Agent", "mywellness": "MyWellness Agent", "market": "Market Agent", "vacation": "Household Service"}
-    return labels.get(agent_id, str(manifest.get("name") or agent_id))
+    return str(manifest.get("name") or agent_id)
 
 
 def _agent_subtitle(agent_id: str, manifest: dict[str, Any]) -> str:
-    subtitles = {"invoices": "Rechnungen verarbeiten", "mywellness": "Training & Wellness", "market": "Markt-Beobachtung", "vacation": "Haushaltsroutinen"}
-    return subtitles.get(agent_id, str(manifest.get("description") or "Automatisierte Aufgabe"))
+    return str(manifest.get("description") or "Automatisierte Aufgabe")
 
 
 def _agent_icon(agent_id: str, manifest: dict[str, Any]) -> str:
-    icons = {"invoices": "FileText", "mywellness": "Heart", "market": "LineChart", "vacation": "Home"}
-    return icons.get(agent_id, str(manifest.get("icon") or "Zap"))
+    return str(manifest.get("icon") or "Zap")
 
 
 def _next_action(agent_id: str) -> str:
