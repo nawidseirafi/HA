@@ -355,9 +355,9 @@ function statusFromRaw(id: string, raw?: Record<string, unknown>): StatusTone {
   if (raw?.is_running === true) return 'running';
   if (raw?.enabled === false) return 'paused';
   if (status.includes('running') || status.includes('läuft') || status.includes('laeuft')) return 'running';
-  if (status.includes('paused') || status.includes('pause') || status.includes('idle')) return 'paused';
+  if (status.includes('paused') || status.includes('pause')) return 'paused';
   if (status.includes('disabled') || status.includes('aus')) return 'disabled';
-  if (status === 'ok') return 'active';
+  if (status === 'ok' || status.includes('idle')) return 'active';
   return 'active';
 }
 
