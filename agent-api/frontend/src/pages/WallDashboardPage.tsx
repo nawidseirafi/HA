@@ -26,6 +26,7 @@ import {
     Thermometer,
     Zap,
     Warehouse,
+    Wifi,
 } from 'lucide-react';
 import {
     api,
@@ -42,6 +43,14 @@ import '../styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
 type BatteryBadge = { label: string; tone: string };
+type InternetStatus = 'ok' | 'down' | 'unstable' | 'unknown';
+type FritzboxInfo = {
+    status: InternetStatus;
+    pillLabel: string;
+    cardValue: string;
+    cardDetail: string;
+    routerName: string;
+};
 const LOW_BATTERY_THRESHOLD = 40;
 type MetricTone =
     | 'info'
@@ -461,6 +470,7 @@ function WallDashboardContent() {
     const activeLights = data?.lights.filter((light) => light.on).length ?? 0;
     const totalLights = data?.lights.length ?? 0;
     const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
+    const internetInfo = data ? fritzboxInfo(data) : unknownFritzboxInfo();
     const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
 
     return (
@@ -484,7 +494,10 @@ function WallDashboardContent() {
                 <header className="wall-header">
                     <div>
                         <span>{formatWallDate(now)}</span>
-                        <h1>{headerTitle}</h1>
+                        <div className="wall-title-row">
+                            <h1>{headerTitle}</h1>
+                            <InternetStatusPill info={internetInfo}/>
+                        </div>
                         <p>{subtitleFor(section, activeLights, totalLights, problemCount, data)}</p>
                     </div>
                     <div className="wall-header-side">
@@ -582,6 +595,7 @@ function HomeSection({
     const issues = data.security.problems.length + data.health.unavailable.length;
     const batterySummary = homeBatterySummary(data);
     const garage = garageCover(data);
+    const internetInfo = fritzboxInfo(data);
     return (
         <div className="wall-home-grid">
             <MetricCard
@@ -624,7 +638,7 @@ function HomeSection({
                 label="Posteingang"
                 value={hasPost ? 'Post da' : 'Leer'}
                 detail={hasPost ? 'Antippen zum Zurücksetzen' : 'Briefkasten'}
-                tone={hasPost && vacation ? 'critical' : hasPost ? 'warn' : 'neutral'}
+                tone={hasPost ? 'critical' : hasPost ? 'warn' : 'neutral'}
                 onClick={hasPost ? onClearPost : undefined}
             />
             <GarageDoorCard
@@ -635,8 +649,13 @@ function HomeSection({
             <MetricCard icon={batterySummary.icon} label="Batterien" value={`${data.health.low_batteries.length}`}
                         detail={`${data.health.battery_total} gesamt`} tone={batterySummary.tone}
                         onClick={onBatteries}/>
-            <MetricCard icon={<Bot size={24}/>} label="Agenten" value={homeAgentState(data)}
-                        detail={homeAgentDetail(data)} tone={homeAgentTone(data)} onClick={onAgents}/>
+            <MetricCard
+                icon={<Wifi size={24}/>}
+                label="Fritzbox"
+                value={internetInfo.cardValue}
+                detail={internetInfo.cardDetail}
+                tone={internetMetricTone(internetInfo.status)}
+            />
             <section className="wall-panel wall-span-2">
                 <div className="wall-section-title">
                     <span>Etagen</span>
@@ -1446,6 +1465,138 @@ function ListPanel({title, items}: {
             ))}
         </section>
     );
+}
+
+
+function InternetStatusPill({info}: { info: FritzboxInfo }) {
+    return <span className={`wall-internet-pill ${info.status}`}/>;
+}
+
+function unknownFritzboxInfo(): FritzboxInfo {
+    return {
+        status: 'unknown',
+        pillLabel: 'Unbekannt',
+        cardValue: 'Unbekannt',
+        cardDetail: 'Fritzbox-Daten nicht geladen',
+        routerName: 'Fritzbox',
+    };
+}
+
+function fritzboxInfo(data: WallDashboardData): FritzboxInfo {
+    const source = data as unknown as Record<string, unknown>;
+    const explicit = firstRecord(source.fritzbox, source.fritz_box, source.internet, source.network);
+    const entities = allWallEntities(data);
+    const fritzEntities = entities.filter((entity) => {
+        const text = `${entity.entity_id} ${entity.name} ${entity.area || ''}`.toLowerCase();
+        return text.includes('fritz') || text.includes('wan') || text.includes('internet') || text.includes('dsl');
+    });
+
+    const explicitStatus = explicit ? stringValue(explicit.status, explicit.internet_status, explicit.connection, explicit.state) : '';
+    const relevantState = stringValue(
+        explicitStatus,
+        findEntityValue(fritzEntities, ['internet', 'connection']),
+        findEntityValue(fritzEntities, ['wan']),
+        findEntityValue(fritzEntities, ['dsl']),
+    );
+    const status = internetStatusFromText(relevantState, fritzEntities);
+    const routerName = stringValue(explicit?.name, explicit?.model, findEntityName(fritzEntities, ['fritz']), 'Fritzbox');
+    const down = stringValue(
+        explicit?.downstream,
+        explicit?.download,
+        explicit?.rx_rate,
+        findEntityValue(fritzEntities, ['downstream']),
+        findEntityValue(fritzEntities, ['download']),
+    );
+    const up = stringValue(
+        explicit?.upstream,
+        explicit?.upload,
+        explicit?.tx_rate,
+        findEntityValue(fritzEntities, ['upstream']),
+        findEntityValue(fritzEntities, ['upload']),
+    );
+    const ip = stringValue(explicit?.external_ip, explicit?.ip, explicit?.wan_ip, findEntityValue(fritzEntities, ['external', 'ip']));
+    const uptime = stringValue(explicit?.uptime, findEntityValue(fritzEntities, ['uptime']));
+    const detailParts = [
+        down || up ? `↓ ${down || '--'} · ↑ ${up || '--'}` : '',
+        ip ? `IP ${ip}` : '',
+        uptime ? `Uptime ${uptime}` : '',
+    ].filter(Boolean);
+
+    return {
+        status,
+        pillLabel: internetStatusLabel(status),
+        cardValue: status === 'ok' ? 'Internet OK' : status === 'down' ? 'Gestört' : status === 'unstable' ? 'Instabil' : 'Unbekannt',
+        cardDetail: detailParts[0] || routerName,
+        routerName,
+    };
+}
+
+function internetStatusFromText(value: string, entities: WallEntity[]): InternetStatus {
+    const text = value.toLowerCase();
+    if (['unavailable', 'unknown', ''].includes(text)) {
+        const hasUnavailable = entities.some((entity) => ['unavailable', 'unknown'].includes(String(entity.state || '').toLowerCase()));
+        return hasUnavailable ? 'down' : 'unknown';
+    }
+    if (/(disconnect|offline|down|gestört|stoer|fehler|failed|problem|not connected)/i.test(text)) return 'down';
+    if (/(instabil|unstable|reconnect|packet|loss|warning|warn|limited)/i.test(text)) return 'unstable';
+    if (/(connected|online|ok|on|up|available|verbunden)/i.test(text)) return 'ok';
+    return 'unknown';
+}
+
+function internetStatusLabel(status: InternetStatus) {
+    if (status === 'ok') return 'Internet OK';
+    if (status === 'down') return 'Internet gestört';
+    if (status === 'unstable') return 'Instabil';
+    return 'Unbekannt';
+}
+
+function internetMetricTone(status: InternetStatus): MetricTone {
+    if (status === 'ok') return 'ok';
+    if (status === 'down') return 'critical';
+    if (status === 'unstable') return 'warn';
+    return 'neutral';
+}
+
+function firstRecord(...values: unknown[]): Record<string, unknown> | null {
+    return values.find((value): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)) ?? null;
+}
+
+function stringValue(...values: unknown[]) {
+    for (const value of values) {
+        if (value === null || value === undefined) continue;
+        const text = String(value).trim();
+        if (text) return text;
+    }
+    return '';
+}
+
+function allWallEntities(data: WallDashboardData): WallEntity[] {
+    return [
+        ...(data.lights ?? []),
+        ...(data.security?.openings ?? []),
+        ...(data.security?.problems ?? []),
+        ...(data.health?.unavailable ?? []),
+        ...(data.health?.batteries ?? []),
+        ...(data.switches ?? []),
+        ...(data.media_players ?? []),
+        ...(data.temperature_sensors ?? []),
+    ] as WallEntity[];
+}
+
+function findEntityValue(entities: WallEntity[], needles: string[]) {
+    const entity = entities.find((item) => {
+        const text = `${item.entity_id} ${item.name}`.toLowerCase();
+        return needles.every((needle) => text.includes(needle));
+    });
+    return entity ? deviceValue(entity) : '';
+}
+
+function findEntityName(entities: WallEntity[], needles: string[]) {
+    const entity = entities.find((item) => {
+        const text = `${item.entity_id} ${item.name}`.toLowerCase();
+        return needles.every((needle) => text.includes(needle));
+    });
+    return entity?.name || '';
 }
 
 function titleFor(section: WallSection) {
