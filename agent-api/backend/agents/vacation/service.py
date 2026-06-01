@@ -13,6 +13,7 @@ from backend.paths import AGENTS_DIR
 from backend.services.core.ha_client import HomeAssistantClient
 from backend.services.messaging import MessagingService
 from backend.services.waste_service import WasteService
+from .services.ai_service import VacationAIService
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,7 @@ class VacationService:
             )
         active_period = self._active_period()
         summary = self._summary_counts()
+        latest_ai = self.latest_ai_analysis()
         agent = {
             "enabled": config["enabled"],
             "status": current_status if current_status != "idle" else "active",
@@ -161,6 +163,7 @@ class VacationService:
             "vacation_mode": vacation_mode,
             "period": period,
             "summary": summary,
+            "ai_analysis": latest_ai,
             "calendar_entity": calendar.get("entity_id"),
             "calendar_source": calendar.get("source"),
             "calendar_candidates": calendar.get("candidates", []),
@@ -285,11 +288,69 @@ class VacationService:
                 "select * from presence_profiles order by room, weekday limit ?",
                 (limit,),
             ).fetchall()
+            ai_analyses = connection.execute(
+                "select * from vacation_ai_analyses order by created_at desc, id desc limit ?",
+                (limit,),
+            ).fetchall()
         return {
             "periods": [dict(row) for row in periods],
             "events": [self._decode_event(dict(row)) for row in events],
             "reminders": [dict(row) for row in reminders],
             "presence_profiles": [dict(row) for row in profiles],
+            "ai_analyses": [self._decode_ai_analysis(dict(row)) for row in ai_analyses],
+        }
+
+    def latest_ai_analysis(self) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "select * from vacation_ai_analyses order by created_at desc, id desc limit 1"
+            ).fetchone()
+        return self._decode_ai_analysis(dict(row)) if row else None
+
+    def analyze_with_ai(self, trigger: str = "manual") -> dict[str, Any]:
+        context = self.build_ai_context()
+        try:
+            analysis = VacationAIService().analyze(context)
+            fallback = False
+            error = None
+        except Exception as exc:
+            analysis = VacationAIService().fallback(context, reason=str(exc))
+            fallback = True
+            error = str(exc)
+        saved = self._save_ai_analysis(analysis=analysis, context=context, trigger=trigger, fallback=fallback, error=error)
+        self._message_from_ai_analysis(saved)
+        self.create_event(
+            event_type="vacation_ai_analysis",
+            severity="warning" if saved["risk_level"] in {"medium", "high"} else "info",
+            message=saved["summary"],
+            payload={"analysis_id": saved["id"], "trigger": trigger, "fallback": fallback},
+        )
+        return saved
+
+    def build_ai_context(self) -> dict[str, Any]:
+        status = self.get_status()
+        reminders = self.get_reminders(status="open", limit=100)
+        profiles = self.get_profiles(limit=100)
+        history = self.history(limit=50)
+        house = self._house_ai_inputs()
+        return {
+            "vacation_mode": status.get("vacation_mode"),
+            "active_period": status.get("active_period"),
+            "next_vacation": status.get("period"),
+            "reminders": reminders,
+            "open_windows": house["open_windows"],
+            "open_doors": house["open_doors"],
+            "critical_batteries": house["critical_batteries"],
+            "internet_status": house["internet_status"],
+            "device_issues": house["device_issues"],
+            "presence_profile_summary": {
+                "status": profiles.get("status"),
+                "analyzed_days": profiles.get("analyzed_days"),
+                "profile_count": profiles.get("profile_count"),
+                "confidence": profiles.get("confidence"),
+            },
+            "historical_vacations": history.get("periods", [])[:20],
+            "historical_events": history.get("events", [])[:20],
         }
 
     def run(
@@ -317,6 +378,12 @@ class VacationService:
             reminders = self.refresh_reminders(vacation_mode=vacation_mode, period=period)
             notification = self.send_pre_departure_notification(reminders, period)
             profiles = self.refresh_presence_profiles()
+            ai_analysis = self._maybe_auto_ai_analysis(
+                vacation_mode=vacation_mode,
+                period=period,
+                reminders=reminders,
+                profiles=profiles,
+            )
             result = {
                 "status": "ok",
                 "message": "Vacation-Agent bereit.",
@@ -329,6 +396,7 @@ class VacationService:
                 "reminders": len(reminders),
                 "notification": notification,
                 "profiles": len(profiles),
+                "ai_analysis": ai_analysis,
             }
             self._last_error = None
             self._last_run = result
@@ -377,7 +445,25 @@ class VacationService:
         service = "turn_on" if active else "turn_off"
         self._ha().call_service("input_boolean", service, {"entity_id": mode_entity})
         state = self.get_vacation_mode_state()
-        return {"ok": True, "vacation_mode": state}
+        self.create_event(
+            event_type="vacation_mode_enabled" if active else "vacation_mode_disabled",
+            severity="info",
+            message="Vacation Mode aktiviert." if active else "Vacation Mode deaktiviert.",
+            payload={"source": mode_entity, "state": state},
+        )
+        ai_analysis = None
+        if active and self.config()["enabled"]:
+            try:
+                ai_analysis = self.analyze_with_ai(trigger="vacation_mode_enabled")
+            except Exception as exc:
+                logger.exception("Vacation AI analysis after mode change failed.")
+                self.create_event(
+                    event_type="vacation_ai_failed",
+                    severity="warning",
+                    message=str(exc),
+                    payload={"trigger": "vacation_mode_enabled"},
+                )
+        return {"ok": True, "vacation_mode": state, "ai_analysis": ai_analysis}
 
     def enable_vacation_mode(self) -> dict[str, Any]:
         return self.set_vacation_mode(True)
@@ -445,7 +531,7 @@ class VacationService:
         except Exception as exc:
             self._last_error = str(exc)
             self._close_generated_reminders()
-            return [
+            reminders = [
                 self._save_reminder(
                     reminder_type="internet",
                     title="Internetproblem erkannt",
@@ -453,12 +539,18 @@ class VacationService:
                     severity="critical",
                 )
             ]
+            for reminder in reminders:
+                self._message_from_reminder(reminder)
+            return reminders
         self._close_generated_reminders()
         period = period or {}
         pre_departure = self._is_pre_departure_window(period)
         candidates = self._reminder_candidates(states, vacation_mode=bool(vacation_mode), period=period, pre_departure=pre_departure)
         candidates.extend(self._waste_reminders_from_service(period, pre_departure=pre_departure))
-        return [self._save_reminder(**candidate) for candidate in candidates]
+        reminders = [self._save_reminder(**candidate) for candidate in candidates]
+        for reminder in reminders:
+            self._message_from_reminder(reminder)
+        return reminders
 
     def send_pre_departure_notification(self, reminders: list[dict[str, Any]], period: dict[str, Any]) -> dict[str, Any]:
         config = self.config()
@@ -713,6 +805,24 @@ class VacationService:
                 )
                 """
             )
+            db.execute(
+                """
+                create table if not exists vacation_ai_analyses (
+                    id integer primary key autoincrement,
+                    summary text not null,
+                    risk_level text not null default 'low',
+                    recommendations_json text not null default '[]',
+                    warnings_json text not null default '[]',
+                    travel_preparation_score integer not null default 0,
+                    raw_context_json text not null default '{}',
+                    raw_response_json text not null default '{}',
+                    trigger text,
+                    fallback integer not null default 0,
+                    error text,
+                    created_at text not null
+                )
+                """
+            )
             self._ensure_column(db, "vacation_periods", "source", "text")
             self._ensure_column(db, "vacation_periods", "payload_json", "text not null default '{}'")
             self._ensure_column(db, "vacation_periods", "active", "integer not null default 0")
@@ -722,6 +832,7 @@ class VacationService:
             db.execute("create index if not exists idx_vacation_events_created on vacation_events(created_at)")
             db.execute("create index if not exists idx_vacation_reminders_status_due on vacation_reminders(status, due_at)")
             db.execute("create index if not exists idx_presence_profiles_room_weekday on presence_profiles(room, weekday)")
+            db.execute("create index if not exists idx_vacation_ai_analyses_created on vacation_ai_analyses(created_at)")
             db.commit()
         finally:
             if close_connection and db is not None:
@@ -754,6 +865,191 @@ class VacationService:
         except (TypeError, json.JSONDecodeError):
             row["payload"] = {}
         return row
+
+    def _decode_ai_analysis(self, row: dict[str, Any]) -> dict[str, Any]:
+        try:
+            recommendations = json.loads(row.pop("recommendations_json", "[]") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            recommendations = []
+        try:
+            warnings = json.loads(row.pop("warnings_json", "[]") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            warnings = []
+        try:
+            context = json.loads(row.pop("raw_context_json", "{}") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            context = {}
+        try:
+            raw_response = json.loads(row.pop("raw_response_json", "{}") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            raw_response = {}
+        row["recommendations"] = recommendations if isinstance(recommendations, list) else []
+        row["warnings"] = warnings if isinstance(warnings, list) else []
+        row["raw_context"] = context if isinstance(context, dict) else {}
+        row["raw_response"] = raw_response if isinstance(raw_response, dict) else {}
+        row["fallback"] = bool(row.get("fallback"))
+        return row
+
+    def _save_ai_analysis(
+        self,
+        analysis: dict[str, Any],
+        context: dict[str, Any],
+        trigger: str,
+        fallback: bool = False,
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        risk_level = str(analysis.get("risk_level") or "low").lower()
+        if risk_level not in {"low", "medium", "high"}:
+            risk_level = "low"
+        try:
+            raw_score = int(float(analysis.get("travel_preparation_score") or 0))
+        except (TypeError, ValueError):
+            raw_score = 0
+        score = int(max(0, min(100, raw_score)))
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                insert into vacation_ai_analyses (
+                    summary,
+                    risk_level,
+                    recommendations_json,
+                    warnings_json,
+                    travel_preparation_score,
+                    raw_context_json,
+                    raw_response_json,
+                    trigger,
+                    fallback,
+                    error,
+                    created_at
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(analysis.get("summary") or "").strip(),
+                    risk_level,
+                    json.dumps(analysis.get("recommendations") or [], ensure_ascii=False),
+                    json.dumps(analysis.get("warnings") or [], ensure_ascii=False),
+                    score,
+                    json.dumps(context, ensure_ascii=False, sort_keys=True),
+                    json.dumps(analysis, ensure_ascii=False, sort_keys=True),
+                    trigger,
+                    1 if fallback else 0,
+                    error,
+                    utc_now(),
+                ),
+            )
+            connection.commit()
+            row = connection.execute("select * from vacation_ai_analyses where id = ?", (cursor.lastrowid,)).fetchone()
+        return self._decode_ai_analysis(dict(row))
+
+    def _message_from_ai_analysis(self, analysis: dict[str, Any]) -> None:
+        recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+        warnings = analysis.get("warnings") if isinstance(analysis.get("warnings"), list) else []
+        lines = [str(item).strip() for item in [*warnings, *recommendations] if str(item or "").strip()]
+        if not lines:
+            lines = [str(analysis.get("summary") or "Keine offenen Urlaubsvorbereitungen erkannt.").strip()]
+        severity = "critical" if analysis.get("risk_level") == "high" else "warning" if analysis.get("risk_level") == "medium" else "info"
+        try:
+            MessagingService().create_message(
+                source="vacation",
+                category="vacation",
+                severity=severity,
+                title="Urlaubsvorbereitung",
+                message="Vor der Abreise sollten folgende Punkte beachtet werden:\n" + self._bullet_list(lines[:8]),
+                payload={
+                    "analysis_id": analysis.get("id"),
+                    "risk_level": analysis.get("risk_level"),
+                    "travel_preparation_score": analysis.get("travel_preparation_score"),
+                },
+            )
+        except Exception:
+            logger.exception("Vacation AI analysis could not be written to MessagingService.")
+
+    def _maybe_auto_ai_analysis(
+        self,
+        vacation_mode: bool,
+        period: dict[str, Any],
+        reminders: list[dict[str, Any]],
+        profiles: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        if not self.config()["enabled"]:
+            return None
+        trigger = self._auto_ai_trigger(vacation_mode=vacation_mode, period=period)
+        if not trigger:
+            return None
+        if self._ai_trigger_already_done(trigger):
+            return None
+        return self.analyze_with_ai(trigger=trigger)
+
+    def _auto_ai_trigger(self, vacation_mode: bool, period: dict[str, Any]) -> str | None:
+        if vacation_mode:
+            return f"during_vacation:{utc_now()[:10]}"
+        start_value = self._date_only(period.get("start_date"))
+        if not start_value:
+            return None
+        try:
+            start_date = datetime.fromisoformat(start_value).date()
+        except ValueError:
+            return None
+        today = datetime.now(timezone.utc).date()
+        days_until = (start_date - today).days
+        if days_until == 1:
+            return f"24h_before_departure:{start_value}"
+        if days_until == 0:
+            return f"12h_before_departure:{start_value}"
+        return None
+
+    def _ai_trigger_already_done(self, trigger: str) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                select id from vacation_ai_analyses
+                where trigger = ?
+                order by created_at desc, id desc limit 1
+                """,
+                (trigger,),
+            ).fetchone()
+        return row is not None
+
+    def _house_ai_inputs(self) -> dict[str, Any]:
+        try:
+            states = self._ha().get_states()
+        except Exception as exc:
+            return {
+                "open_windows": [],
+                "open_doors": [],
+                "critical_batteries": [],
+                "internet_status": {"status": "unknown", "message": str(exc)},
+                "device_issues": [],
+            }
+        open_windows: list[str] = []
+        open_doors: list[str] = []
+        critical_batteries: list[str] = []
+        device_issues: list[str] = []
+        internet_problem = False
+        for state in states:
+            entity_id = str(state.get("entity_id") or "")
+            value = str(state.get("state") or "").lower()
+            attributes = state.get("attributes") or {}
+            device_class = str(attributes.get("device_class") or "").lower()
+            if entity_id.startswith("binary_sensor.") and device_class in {"door", "window", "opening"} and value == "on":
+                target = open_doors if device_class == "door" else open_windows
+                target.append(self._room_from_state(state))
+            battery_value = self._battery_value(state)
+            if battery_value is not None and battery_value <= 20:
+                critical_batteries.append(self._friendly_name(state))
+            if value in {"unavailable", "unknown"} and not entity_id.startswith(("weather.", "calendar.")):
+                if self._looks_like_internet_state(state):
+                    internet_problem = True
+                else:
+                    device_issues.append(self._friendly_name(state))
+        return {
+            "open_windows": sorted(set(open_windows)),
+            "open_doors": sorted(set(open_doors)),
+            "critical_batteries": sorted(set(critical_batteries)),
+            "internet_status": {"status": "unstable" if internet_problem else "ok"},
+            "device_issues": sorted(set(device_issues))[:20],
+        }
 
     def _ensure_column(self, db: sqlite3.Connection, table: str, column: str, definition: str) -> None:
         columns = {row[1] for row in db.execute(f"pragma table_info({table})").fetchall()}
@@ -797,17 +1093,30 @@ class VacationService:
         return dict(row)
 
     def _message_from_reminder(self, reminder: dict[str, Any]) -> None:
+        title = str(reminder.get("title") or "Vacation Reminder")
+        message = str(reminder.get("message") or "")
+        if not message.strip():
+            return
+        if self._vacation_message_exists(title, message):
+            return
         try:
             MessagingService().create_message(
                 source="vacation",
                 category="vacation",
                 severity=str(reminder.get("severity") or "info"),
-                title=str(reminder.get("title") or "Vacation Reminder"),
-                message=str(reminder.get("message") or ""),
+                title=title,
+                message=message,
                 payload={"reminder_id": reminder.get("id"), "reminder_type": reminder.get("reminder_type")},
             )
         except Exception:
             logger.exception("Vacation reminder could not be written to MessagingService.")
+
+    def _vacation_message_exists(self, title: str, message: str) -> bool:
+        try:
+            messages = MessagingService().get_messages_by_source("vacation", limit=100)
+        except Exception:
+            return False
+        return any(item.get("title") == title and item.get("message") == message for item in messages)
 
     def _reminder_candidates(self, states: list[dict[str, Any]], vacation_mode: bool, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
         windows: list[str] = []
@@ -849,6 +1158,13 @@ class VacationService:
                     waste_items.append((self._waste_label(name), waste_date))
 
         candidates: list[dict[str, Any]] = []
+        if pre_departure:
+            candidates.append({
+                "reminder_type": "travel_preparation",
+                "title": "Urlaub beginnt bald",
+                "message": "Der erkannte Urlaub beginnt bald. Bitte prüfe vor der Abreise die offenen Hinweise im Message Center.",
+                "severity": "info",
+            })
         if waste_items:
             label, due_at = sorted(waste_items, key=lambda item: item[1])[0]
             candidates.append({
@@ -957,6 +1273,7 @@ class VacationService:
             "battery",
             "waste",
             "lights",
+            "travel_preparation",
         )
         placeholders = ",".join("?" for _ in generated_types)
         with self._connect() as connection:

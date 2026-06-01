@@ -44,6 +44,16 @@ def vacation_history(limit: int = 100):
     return vacation_service.history(limit=limit)
 
 
+@router.get("/ai/latest")
+def vacation_ai_latest():
+    return {"analysis": vacation_service.latest_ai_analysis()}
+
+
+@router.post("/ai/analyze")
+def analyze_vacation_ai():
+    return {"analysis": vacation_service.analyze_with_ai(trigger="manual")}
+
+
 @router.get("/config")
 def vacation_config():
     return vacation_service.config()

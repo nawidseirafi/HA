@@ -6,27 +6,25 @@ import {
   CalendarDays,
   History,
   Plane,
-  Power,
   RefreshCw,
   ShieldCheck,
   UserRoundCheck,
 } from 'lucide-react';
 import {
   api,
-  type PresenceProfile,
+  type MessageCenterItem,
+  type VacationAIAnalysis,
   type VacationHistory,
   type VacationPeriod,
   type VacationProfilesResponse,
-  type VacationReminder,
   type VacationStatus,
 } from '../api/client';
 
-type VacationTab = 'overview' | 'vacation' | 'reminders' | 'presence' | 'history';
+type VacationTab = 'overview' | 'vacation' | 'presence' | 'history';
 
 const tabs: Array<{ id: VacationTab; label: string; icon: typeof Plane }> = [
   { id: 'overview', label: 'Übersicht', icon: ShieldCheck },
   { id: 'vacation', label: 'Urlaub', icon: Plane },
-  { id: 'reminders', label: 'Reminder', icon: BellRing },
   { id: 'presence', label: 'Anwesenheit', icon: UserRoundCheck },
   { id: 'history', label: 'Historie', icon: History },
 ];
@@ -34,9 +32,9 @@ const tabs: Array<{ id: VacationTab; label: string; icon: typeof Plane }> = [
 export function VacationDashboard() {
   const [activeTab, setActiveTab] = useState<VacationTab>('overview');
   const [status, setStatus] = useState<VacationStatus | null>(null);
-  const [reminders, setReminders] = useState<VacationReminder[]>([]);
   const [history, setHistory] = useState<VacationHistory | null>(null);
   const [profileStats, setProfileStats] = useState<VacationProfilesResponse | null>(null);
+  const [messages, setMessages] = useState<MessageCenterItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -45,16 +43,16 @@ export function VacationDashboard() {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const [nextStatus, nextReminders, nextHistory, nextProfiles] = await Promise.all([
+      const [nextStatus, nextHistory, nextProfiles, nextMessages] = await Promise.all([
         api.vacationStatus(),
-        api.vacationReminders(),
         api.vacationHistory(100),
         api.vacationProfiles(100),
+        api.messages(100),
       ]);
       setStatus(nextStatus);
-      setReminders(nextReminders.reminders);
       setHistory(nextHistory);
       setProfileStats(nextProfiles);
+      setMessages(nextMessages.messages.filter((item) => item.source === 'vacation'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Vacation Dashboard konnte nicht geladen werden.');
     } finally {
@@ -114,16 +112,31 @@ export function VacationDashboard() {
     }
   };
 
+  const analyzeAi = async () => {
+    setLoading(true);
+    setNotice('');
+    setError('');
+    try {
+      await api.analyzeVacationAi();
+      setNotice('Vacation AI wurde neu analysiert.');
+      await load(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Vacation AI konnte nicht analysieren.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const agent = status?.agent;
   const period = status?.period;
   const mode = status?.vacation_mode;
+  const aiAnalysis = status?.ai_analysis;
   const modeActive = Boolean(mode?.active ?? status?.vacation_mode_active);
   const events = history?.events ?? [];
   const periods = history?.periods ?? [];
+  const aiAnalyses = history?.ai_analyses ?? [];
   const profiles = profileStats?.profiles ?? history?.presence_profiles ?? [];
-  const lastActivity = events[0]?.created_at || agent?.last_run || periods[0]?.created_at;
-  const schedulerActive = Boolean(agent?.scheduler_running && (agent?.enabled ?? status?.enabled));
-  const scheduleText = agent?.schedule_times?.length ? agent.schedule_times.join(', ') : '-';
+  const unreadVacationMessages = messages.filter((item) => !item.read).length;
 
   return (
     <div className="page-stack wellness-app vacation-app">
@@ -131,7 +144,7 @@ export function VacationDashboard() {
         <div>
           <span className="eyebrow">Vacation Agent</span>
           <h1>Vacation Agent</h1>
-          <p>Überwacht Urlaubsmodus, Reminder, Historie und spätere Anwesenheitssimulation.</p>
+          <p>Überwacht Urlaubsmodus, Kalender, Historie und spätere Anwesenheitssimulation.</p>
         </div>
         <button className="icon-button" type="button" onClick={() => load()} disabled={loading} aria-label="Aktualisieren">
           <RefreshCw size={19} />
@@ -181,16 +194,14 @@ export function VacationDashboard() {
           </section>
 
           <section className="wellness-card-grid">
+            <StatCard icon={<ShieldCheck size={20} />} label="Agent Status" value={agent?.enabled ?? status?.enabled ? 'Aktiv' : 'Inaktiv'} tone={agent?.enabled ?? status?.enabled ? 'success' : 'muted'} />
             <StatCard icon={<Plane size={20} />} label="Vacation Mode" value={modeActive ? 'Aktiv' : 'Aus'} tone={modeActive ? 'warning' : 'success'} />
-            <StatCard icon={<CalendarDays size={20} />} label="Urlaubszeitraum" value={formatPeriodValue(period)} tone={period?.start_date ? 'info' : 'muted'} />
-            <StatCard icon={<BellRing size={20} />} label="Reminder" value={`${status?.summary?.reminders ?? reminders.length}`} tone={reminders.length ? 'warning' : 'success'} />
-            <StatCard icon={<UserRoundCheck size={20} />} label="Presence Profiles" value={`${status?.summary?.profiles ?? profileStats?.profile_count ?? profiles.length}`} tone={profiles.length ? 'success' : 'muted'} />
-            <StatCard icon={<History size={20} />} label="Letzte Aktivität" value={formatDateTime(lastActivity)} tone="muted" />
-            <StatCard icon={<CalendarDays size={20} />} label="Kalenderquelle" value={periodSourceLabel(period?.source)} tone={period?.source === 'homeassistant_calendar' ? 'success' : 'muted'} />
-            <StatCard icon={<RefreshCw size={20} />} label="Automatik" value={schedulerActive ? 'Läuft' : 'Aus'} tone={schedulerActive ? 'success' : 'muted'} />
-            <StatCard icon={<CalendarCheck size={20} />} label="Zeitplan" value={scheduleText} tone="info" />
-            <StatCard icon={<History size={20} />} label="Letzter Auto-Lauf" value={formatDateTime(agent?.last_scheduled_run)} tone="muted" />
+            <StatCard icon={<CalendarDays size={20} />} label="Nächster Urlaub" value={period?.title || formatPeriodValue(period)} tone={period?.start_date ? 'info' : 'muted'} />
+            <StatCard icon={<ShieldCheck size={20} />} label="KI-Einschätzung" value={aiAnalysis ? `${riskLabel(aiAnalysis.risk_level)} · ${aiAnalysis.travel_preparation_score}%` : '-'} tone={aiAnalysis ? (aiAnalysis.risk_level === 'high' ? 'critical' : aiAnalysis.risk_level === 'medium' ? 'warning' : 'success') : 'muted'} />
+            <StatCard icon={<BellRing size={20} />} label="Nachrichten" value={`${unreadVacationMessages} ungelesen / ${messages.length}`} tone={unreadVacationMessages ? 'warning' : 'success'} />
+            <StatCard icon={<UserRoundCheck size={20} />} label="Anwesenheit" value={profileStats?.status === 'profile_available' ? 'Profile vorhanden' : 'Lernphase'} tone={profiles.length ? 'success' : 'info'} />
           </section>
+          <AiAnalysisPanel analysis={aiAnalysis} loading={loading} onAnalyze={analyzeAi} />
         </>
       )}
 
@@ -224,26 +235,10 @@ export function VacationDashboard() {
             <StatCard icon={<Plane size={20} />} label="Urlaubsdauer" value={period?.duration_days ? `${period.duration_days} Tage` : periodDurationValue(period)} tone="success" />
           </section>
           {status?.calendar_error && <section className="panel error-panel">{status.calendar_error}</section>}
+          <section className="panel">
+            Lokale Planung bleibt Fallback, wenn kein passender Kalenderurlaub erkannt wurde.
+          </section>
         </>
-      )}
-
-      {activeTab === 'reminders' && (
-        <section className="wellness-booking-summary dense">
-          <TableHeader eyebrow="Reminder" title="Offene Reminder" count={reminders.length} />
-          <div className="vacation-list">
-            {reminders.map((reminder) => (
-              <article key={reminder.id} className="vacation-row">
-                <span className={`vacation-severity ${severityTone(reminder)}`}>{severityLabel(reminder)}</span>
-                <div>
-                  <strong>{reminder.title || reminder.reminder_type || 'Reminder'}</strong>
-                  <small>{reminder.message || '-'}</small>
-                </div>
-                <em>{formatDateTime(reminder.due_at || reminder.created_at)}</em>
-              </article>
-            ))}
-            {reminders.length === 0 && <EmptyState icon={<BellRing size={18} />} text="Keine offenen Reminder vorhanden." />}
-          </div>
-        </section>
       )}
 
       {activeTab === 'presence' && (
@@ -294,7 +289,39 @@ export function VacationDashboard() {
             </div>
           </section>
           <section className="wellness-booking-summary dense">
-            <TableHeader eyebrow="Events" title="Agent Events" count={events.length} />
+            <TableHeader eyebrow="KI" title="KI-Analysen" count={aiAnalyses.length} />
+            <div className="vacation-list">
+              {aiAnalyses.slice(0, 20).map((analysis) => (
+                <article key={analysis.id} className="vacation-row">
+                  <span className={`vacation-severity ${analysis.risk_level === 'high' ? 'critical' : analysis.risk_level === 'medium' ? 'warning' : 'info'}`}>{riskLabel(analysis.risk_level)}</span>
+                  <div>
+                    <strong>{analysis.travel_preparation_score}% Vorbereitung</strong>
+                    <small>{analysis.summary}</small>
+                  </div>
+                  <em>{formatDateTime(analysis.created_at)}</em>
+                </article>
+              ))}
+              {aiAnalyses.length === 0 && <EmptyState icon={<ShieldCheck size={18} />} text="Noch keine KI-Analysen vorhanden." />}
+            </div>
+          </section>
+          <section className="wellness-booking-summary dense">
+            <TableHeader eyebrow="Messages" title="Erzeugte Nachrichten" count={messages.length} />
+            <div className="vacation-list">
+              {messages.slice(0, 20).map((message) => (
+                <article key={message.id} className="vacation-row">
+                  <span className={`vacation-severity ${message.severity}`}>{message.read ? 'Gelesen' : 'Neu'}</span>
+                  <div>
+                    <strong>{message.title}</strong>
+                    <small>{message.message}</small>
+                  </div>
+                  <em>{formatDateTime(message.created_at)}</em>
+                </article>
+              ))}
+              {messages.length === 0 && <EmptyState icon={<BellRing size={18} />} text="Noch keine Vacation Nachrichten vorhanden." />}
+            </div>
+          </section>
+          <section className="wellness-booking-summary dense">
+            <TableHeader eyebrow="Events" title="Wichtige Events" count={events.length} />
             <div className="vacation-list">
               {events.slice(0, 20).map((event) => (
                 <article key={event.id} className="vacation-row">
@@ -337,6 +364,53 @@ function TableHeader({ eyebrow, title, count }: { eyebrow: string; title: string
   );
 }
 
+function AiAnalysisPanel({ analysis, loading, onAnalyze }: { analysis?: VacationAIAnalysis | null; loading: boolean; onAnalyze: () => void }) {
+  const riskTone = analysis?.risk_level === 'high' ? 'critical' : analysis?.risk_level === 'medium' ? 'warning' : 'info';
+  return (
+    <section className="wellness-booking-summary dense">
+      <div className="section-title">
+        <div>
+          <span className="eyebrow">KI-Einschätzung</span>
+          <h2>Urlaubsvorbereitung</h2>
+        </div>
+        <button className="button secondary" type="button" onClick={onAnalyze} disabled={loading}>
+          Neu analysieren
+        </button>
+      </div>
+      {analysis ? (
+        <>
+          <section className="wellness-card-grid compact">
+            <StatCard icon={<ShieldCheck size={20} />} label="Risk Level" value={riskLabel(analysis.risk_level)} tone={riskTone} />
+            <StatCard icon={<Plane size={20} />} label="Preparation Score" value={`${analysis.travel_preparation_score}%`} tone={analysis.travel_preparation_score >= 80 ? 'success' : analysis.travel_preparation_score >= 55 ? 'warning' : 'critical'} />
+            <StatCard icon={<History size={20} />} label="Letzte Analyse" value={formatDateTime(analysis.created_at)} tone="muted" />
+          </section>
+          <p>{analysis.summary}</p>
+          <AiList title="Empfehlungen" items={analysis.recommendations} />
+          <AiList title="Warnungen" items={analysis.warnings} />
+        </>
+      ) : (
+        <EmptyState icon={<ShieldCheck size={18} />} text="Noch keine KI-Einschätzung vorhanden." />
+      )}
+    </section>
+  );
+}
+
+function AiList({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="vacation-list compact">
+      {items.map((item, index) => (
+        <article key={`${title}-${index}`} className="vacation-row">
+          <span className="vacation-severity info">{title}</span>
+          <div>
+            <strong>{item}</strong>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   return <div className="wellness-empty-state">{icon} {text}</div>;
 }
@@ -359,7 +433,13 @@ function formatDateTime(value?: string | null) {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date).replace(',', '');
 }
 
 function formatPeriodValue(period?: VacationStatus['period'] | null) {
@@ -385,18 +465,10 @@ function periodDuration(period: VacationPeriod) {
   return periodDurationValue(period);
 }
 
-function severityTone(reminder: VacationReminder) {
-  const value = `${reminder.severity || reminder.status || reminder.reminder_type || ''}`.toLowerCase();
-  if (value.includes('critical') || value.includes('high')) return 'critical';
-  if (value.includes('warn') || value.includes('medium')) return 'warning';
-  return 'info';
-}
-
-function severityLabel(reminder: VacationReminder) {
-  const tone = severityTone(reminder);
-  if (tone === 'critical') return 'Critical';
-  if (tone === 'warning') return 'Warning';
-  return 'Info';
+function riskLabel(value?: string | null) {
+  if (value === 'high') return 'Hoch';
+  if (value === 'medium') return 'Mittel';
+  return 'Niedrig';
 }
 
 function periodSourceLabel(source?: string | null) {

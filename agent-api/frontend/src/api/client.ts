@@ -620,6 +620,7 @@ export type WallDashboardData = {
       vacation_mode_active?: boolean | null;
       history_active?: boolean;
       open_reminders?: number;
+      ai_analysis?: VacationAIAnalysis | null;
       error?: string;
     };
   };
@@ -696,6 +697,7 @@ export type VacationStatus = {
     events: number;
     profiles: number;
   };
+  ai_analysis?: VacationAIAnalysis | null;
   enabled: boolean;
   current_status: string;
   vacation_mode_active?: boolean | null;
@@ -714,11 +716,25 @@ export type VacationStatus = {
   log_path?: string;
 };
 
+export type VacationAIAnalysis = {
+  id: number;
+  summary: string;
+  risk_level: 'low' | 'medium' | 'high';
+  recommendations: string[];
+  warnings: string[];
+  travel_preparation_score: number;
+  trigger?: string | null;
+  fallback?: boolean;
+  error?: string | null;
+  created_at: string;
+};
+
 export type VacationHistory = {
   periods: VacationPeriod[];
   events: VacationEvent[];
   reminders: VacationReminder[];
   presence_profiles: PresenceProfile[];
+  ai_analyses?: VacationAIAnalysis[];
 };
 
 export type VacationProfilesResponse = {
@@ -877,6 +893,8 @@ export const api = {
   vacationReminders: () => request<{ reminders: VacationReminder[] }>('/api/vacation/reminders'),
   vacationProfiles: (limit = 100) => request<VacationProfilesResponse>(`/api/vacation/profiles?limit=${limit}`),
   vacationHistory: (limit = 100) => request<VacationHistory>(`/api/vacation/history?limit=${limit}`),
+  vacationAiLatest: () => request<{ analysis: VacationAIAnalysis | null }>('/api/vacation/ai/latest'),
+  analyzeVacationAi: () => request<{ analysis: VacationAIAnalysis }>('/api/vacation/ai/analyze', { method: 'POST' }),
   enableVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/enable', { method: 'POST' }),
   disableVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/disable', { method: 'POST' }),
   toggleVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/toggle', { method: 'POST' }),

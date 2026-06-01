@@ -86,14 +86,24 @@ def orchestrator_map() -> dict[str, Any]:
     ]
     if "vacation" in agent_ids:
         vacation = next(agent for agent in agents if agent["id"] == "vacation")
-        edges.append({
-            "id": "vacation-homeassistant",
-            "from": "vacation",
-            "to": "homeassistant",
-            "kind": "secondary",
-            "active": _is_active(vacation["status"]),
-            "status": vacation["status"],
-        })
+        edges.extend([
+            {
+                "id": "vacation-homeassistant",
+                "from": "vacation",
+                "to": "homeassistant",
+                "kind": "secondary",
+                "active": _is_active(vacation["status"]),
+                "status": vacation["status"],
+            },
+            {
+                "id": "vacation-openai",
+                "from": "vacation",
+                "to": "openai",
+                "kind": "secondary",
+                "active": _is_active(vacation["status"]),
+                "status": vacation["status"],
+            },
+        ])
     if "mywellness" in agent_ids:
         mywellness = next(agent for agent in agents if agent["id"] == "mywellness")
         edges.append({
