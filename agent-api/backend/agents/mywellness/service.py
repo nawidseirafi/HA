@@ -67,9 +67,6 @@ class MyWellnessService:
         state = self._read_status()
         running = self._is_running()
         state["is_running"] = running
-        state["current_status"] = "running" if running else state.get("current_status", "idle")
-        if not running and state.get("current_status") == "error" and not state.get("last_error"):
-            state["current_status"] = "idle"
         state["enabled"] = bool(settings["enabled"])
         state["prepare_enabled"] = bool(settings["prepare_enabled"])
         state["booking_enabled"] = bool(settings["booking_enabled"])
@@ -88,10 +85,21 @@ class MyWellnessService:
         next_scheduled = self._next_scheduled() if state.get("enabled", True) else None
         state["next_scheduled_run"] = next_scheduled["run_at"] if next_scheduled else None
         state["next_scheduled_action"] = next_scheduled["action_type"] if next_scheduled else None
-        if not running and state.get("current_status") == "running":
-            state["current_status"] = "idle"
+        current_status = self._control_status(settings, state, running)
+        state["status"] = current_status
+        state["current_status"] = current_status
         self._write_status(state)
         return state
+
+    def _control_status(self, settings: dict[str, Any], state: dict[str, Any], running: bool) -> str:
+        if running:
+            return "running"
+        if not settings.get("enabled"):
+            return "disabled"
+        raw = str(settings.get("last_status") or state.get("current_status") or "").lower()
+        if settings.get("last_error") or state.get("last_error") or "error" in raw or "failed" in raw:
+            return "error"
+        return "active"
 
     def start(self, mode: str = "prepare") -> dict[str, Any]:
         return self.run_action(mode, dry_run=False, async_run=True)

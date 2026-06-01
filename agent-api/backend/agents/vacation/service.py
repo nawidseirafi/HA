@@ -169,6 +169,7 @@ class VacationService:
             "calendar_candidates": calendar.get("candidates", []),
             "calendar_error": calendar.get("error"),
             "enabled": agent["enabled"],
+            "status": agent["status"],
             "current_status": agent["status"],
             "mode_entity": config["mode_entity"],
             "vacation_mode_active": vacation_mode.get("active"),

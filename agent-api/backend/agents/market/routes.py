@@ -89,7 +89,10 @@ def delete_watchlist_item(item_id: int):
 
 @router.post("/run")
 def run_market_agent():
-    return agent.run()
+    result = agent.run()
+    if result.get("run_status") == "completed":
+        return {**result, "status": "completed", "current_status": "active"}
+    return result
 
 
 @router.post("/analyze/{symbol}")

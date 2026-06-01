@@ -4,11 +4,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from backend.agents.registry import discover_agent_manifests
-from backend.agents.invoices.routes import invoice_service
-from backend.agents.market.report_service import MarketReportService
-from backend.agents.mywellness.routes import mywellness_service
-from backend.agents.vacation.routes import vacation_service
+from backend.agents.registry import discover_agent_manifests, get_agent_control
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.orchestrator_control_service import OrchestratorControlService
 
@@ -155,14 +151,13 @@ def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
 
 def _agent_status(agent_id: str) -> dict[str, Any]:
     try:
-        if agent_id == "invoices":
-            return invoice_service.status()
-        if agent_id == "mywellness":
-            return mywellness_service.status()
-        if agent_id == "market":
-            return {"status": "paused", **MarketReportService().summary()}
-        if agent_id == "vacation":
-            return vacation_service.status()
+        control = get_agent_control(agent_id)
+        if control and "status" in control.capabilities():
+            result = control.execute("status")
+            data = result.get("data") if isinstance(result.get("data"), dict) else {}
+            if isinstance(data, dict):
+                data.setdefault("status", result.get("status"))
+                return data
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
     return {}
@@ -210,8 +205,6 @@ def _status_tone(agent_id: str, manifest: dict[str, Any], status_data: dict[str,
         return "paused"
     if "idle" in raw or raw in {"ok", "active", "ready"}:
         return "active"
-    if agent_id == "market":
-        return "paused"
     return "active"
 
 

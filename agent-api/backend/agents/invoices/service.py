@@ -213,10 +213,11 @@ class InvoiceService:
         settings = self._agent_settings()
         running = self.run_lock.locked()
         next_scheduled = self._next_scheduled(settings["schedule"]) if settings["enabled"] else None
-        current_status = "running" if running else settings["last_status"]
+        current_status = self._control_status(settings, running)
         return {
             "enabled": settings["enabled"],
             "is_running": running,
+            "status": current_status,
             "current_status": current_status,
             "last_status": settings["last_status"],
             "last_successful_run": settings["last_successful_run"],
@@ -228,6 +229,16 @@ class InvoiceService:
             "next_scheduled_run": next_scheduled,
             "updated_at": settings["updated_at"],
         }
+
+    def _control_status(self, settings: dict[str, Any], running: bool) -> str:
+        if running:
+            return "running"
+        if not settings.get("enabled"):
+            return "disabled"
+        raw = str(settings.get("last_status") or "").lower()
+        if settings.get("last_error") or "error" in raw or "failed" in raw:
+            return "error"
+        return "active"
 
     def enable(self) -> dict[str, Any]:
         self._write_agent_settings(enabled=True, last_status="enabled", last_error=None)

@@ -2,7 +2,7 @@
 
 Stand: 2026-06-01
 
-Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Monitoring und P2.5 Agent-Control. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
+Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Monitoring, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
 
 # Systemuebersicht
 
@@ -22,6 +22,7 @@ Das Backend bindet zentrale Router ein:
 - Household
 - Infrastructure
 - Home Assistant Wall API
+- Messaging
 - Waste
 - Settings
 - dynamisch geladene Agent-Router aus Manifesten
@@ -41,6 +42,8 @@ Wichtige UI-Bereiche:
 - Invoice Dashboard
 - MyWellness Dashboard
 - Market Dashboard
+- Vacation Dashboard
+- Message Center im Wall Dashboard
 
 # Ordnerstruktur
 
@@ -68,6 +71,7 @@ agent-api/
 │   │   ├── homeassistant_service.py
 │   │   ├── household_service.py
 │   │   ├── infrastructure_service.py
+│   │   ├── messaging/
 │   │   ├── orchestrator_control_service.py
 │   │   ├── settings_service.py
 │   │   ├── waste_service.py
@@ -185,14 +189,16 @@ Die Map enthaelt:
 - Edges von Agenten zu Datenbank/OpenAI/Home Assistant
 - normalisierte Statuswerte
 - Control-Informationen je Node
+- Agent-Runtime-Status wird generisch ueber den Agent-Control-Vertrag (`status`) gelesen; keine Agent-Sonderlogik in der Map.
 
 Statuswerte:
 
 - `active`
 - `running`
-- `paused`
 - `disabled`
 - `error`
+
+`paused` ist als UI-/Zukunftswert bekannt, gehoert aber nicht zum Basisstatus der aktuell angeglichenen Agenten.
 
 Agent-Metadaten wie Name, Icon und Description kommen aus Manifesten.
 
@@ -234,13 +240,15 @@ Der Control Service:
 - liefert `405`, wenn eine Aktion nicht unterstuetzt wird
 - verwendet keine `orchestrator.db`
 
+Auch die Orchestrator Map nutzt fuer Agent-Status denselben generischen Control-Vertrag.
+
 Aktuell erkannte Capabilities:
 
 ```text
 invoices:    status, start, stop, enable, disable, toggle, run
-market:      run
+market:      status, enable, disable, toggle, run
 mywellness:  status, start, stop, enable, disable, toggle, run
-vacation:    status, run
+vacation:    status, start, stop, enable, disable, toggle, run
 ```
 
 # Agenten
@@ -312,6 +320,7 @@ Verantwortung:
 - Logs und Status verwalten
 - Health-Daten aus Home Assistant / Withings importieren
 - Recovery-Analyse mit LLM
+- eigene Health-, Kurs-, Buchungs-, Recovery- und AI-Historie speichern
 
 Datenbank:
 
@@ -330,6 +339,17 @@ Home-Assistant-Bezug:
 
 - MyWellness Health liest Gesundheitsdaten ueber Home Assistant Entities.
 - In der Agent Map gibt es deshalb eine Edge `mywellness -> homeassistant`.
+- Health-Sync laeuft geplant und schreibt Snapshots sowie geaenderte Kennzahlen in `mywellness.db`.
+- Reine Dashboard-GETs sollen read-only bleiben. Kurs- und Health-Historie wird ueber bewusste Agent-Laeufe, Health-Sync, Prepare/Book oder manuelle Aktionen geschrieben.
+
+Historische Tabellen:
+
+- `health_history`
+- `health_snapshots`
+- `course_history`
+- `booking_history`
+- `recovery_history`
+- `ai_recommendations`
 
 Control:
 
@@ -375,9 +395,13 @@ Wichtige Services:
 
 Control:
 
+- `status`
+- `enable`
+- `disable`
+- `toggle`
 - `run`
 
-Hinweis: `enable`/`disable` sind aktuell nicht als Agent-Control implementiert und liefern ueber den Orchestrator sauber `405 unsupported`.
+Hinweis: Market besitzt eine einfache Enabled/Disabled-Konfiguration und wird ueber die Agent Console steuerbar dargestellt.
 
 ## Vacation Agent
 
@@ -391,7 +415,28 @@ Verantwortung:
 
 - Vacation Mode aus Home Assistant lesen
 - Vacation-Status fuer Household/Wall bereitstellen
-- Run-Status und Logs liefern
+- `input_boolean.vacation_mode` ueber Vacation Dashboard und Wall Dashboard setzen
+- Kalender/CalDAV-Events ueber Home Assistant erkennen
+- Urlaubsperioden, Events, Reminder, Presence Profiles und KI-Analysen historisieren
+- Reminder regelbasiert erzeugen
+- wichtige Vacation-Hinweise als Messages ueber den zentralen Messaging Service schreiben
+- Presence Profiles fuer spaetere Anwesenheitssimulation vorbereiten
+- Vacation-Analyse mit zentralem LLM-Client erzeugen
+- Run-Status, Scheduler-Status und Logs liefern
+
+Datenbank:
+
+```text
+agent-api/data/vacation/vacation.db
+```
+
+Tabellen:
+
+- `vacation_periods`
+- `vacation_events`
+- `vacation_reminders`
+- `presence_profiles`
+- `vacation_ai_analyses`
 
 Konfiguration:
 
@@ -399,16 +444,25 @@ Konfiguration:
 agent-api/backend/agents/vacation/config.yaml
 ```
 
-Aktueller Architekturhinweis:
+Architekturhinweis:
 
-- `vacation/config.yaml` enthaelt `enabled: true`.
-- `vacation/manifest.yaml` enthaelt aktuell `enabled: false`.
-- Dadurch ist Vacation als Runtime-Konzept vorhanden, wird aber ueber die Manifest-Registry nicht wie ein aktivierter Agent-Router eingebunden.
-- Der Orchestrator und Household koennen den Service trotzdem direkt als Datenquelle nutzen, weil `orchestrator_routes.py` und `household_routes.py` ihn importieren.
+- Vacation Agent und Vacation Mode sind getrennte Konzepte.
+- Vacation Agent ist der dauerhaft vorhandene Dienst.
+- Vacation Mode ist nur der Hauszustand in Home Assistant: `input_boolean.vacation_mode`.
+- Wall Dashboard steuert ausschliesslich Vacation Mode, nicht den Agenten.
+- Vacation Dashboard verwaltet Agent Status, Vacation Mode, Urlaub/Kalender, Anwesenheit, Historie und KI-Einschaetzung.
+- Der Reminder-Tab wurde aus dem Vacation Dashboard entfernt. Wichtige Hinweise laufen ueber den Messaging Service und das Message Center.
+- Es gibt keine automatische Lampen-, Jalousie- oder Geraetesteuerung.
+- Die Vacation-KI darf keine Home-Assistant-Aktionen ausfuehren. Sie erzeugt nur Analyse, Empfehlungen, Warnungen und Zusammenfassungen.
 
 Control:
 
 - `status`
+- `start`
+- `stop`
+- `enable`
+- `disable`
+- `toggle`
 - `run`
 
 # Gemeinsame Services
@@ -543,6 +597,47 @@ Regeln:
 - keine neue Datenbank
 - keine bestehenden Agent APIs ersetzen
 
+## Messaging Service
+
+Ordner:
+
+```text
+agent-api/backend/services/messaging/
+```
+
+Rolle:
+
+Zentrale Nachrichten- und Hinweis-Infrastruktur fuer Agenten und Systemmeldungen.
+
+Datenbank:
+
+```text
+agent-api/data/messaging/messages.db
+```
+
+Tabellen:
+
+- `messages`
+- `notification_targets`
+
+API:
+
+- `GET /api/messages`
+- `GET /api/messages/unread-count`
+- `GET /api/messages/source/{source}`
+- `POST /api/messages`
+- `POST /api/messages/{id}/read`
+- `POST /api/messages/read-all`
+- `DELETE /api/messages/{id}`
+- `DELETE /api/messages`
+
+Architekturregeln:
+
+- Agenten duerfen Messages erzeugen, aber das Message Center ist die zentrale UI fuer Hinweise.
+- Vacation Reminder bleiben intern bestehen, wichtige Hinweise werden aber zusaetzlich als menschenlesbare Messages erzeugt.
+- Wall Dashboard zeigt eine Glocke und ein Message Center. Bei ungelesenen Nachrichten kann die Glocke dezent animieren; ein Badge ist optional und nicht Teil des Architekturvertrags.
+- Push-Architektur ist ueber `notification_targets` vorbereitet, aber automatische Push-Auslieferung ist noch nicht global umgesetzt.
+
 # Home Assistant Integration
 
 Home Assistant ist aktuell Datenquelle fuer:
@@ -553,6 +648,7 @@ Home Assistant ist aktuell Datenquelle fuer:
 - Poststatus
 - Waste/Abfall
 - Vacation Mode
+- Vacation Kalender/CalDAV Events
 - MyWellness Health
 - Infrastructure/Fritzbox
 
@@ -609,6 +705,13 @@ Genutzt wird LLM aktuell vor allem fuer:
 - Invoice AI Extraction
 - Market Analysis
 - MyWellness Health/Recovery Analyse
+- Vacation Analyse und Urlaubsvorbereitung
+
+Regeln:
+
+- Agenten nutzen die zentrale LLM-Factory.
+- Vacation nutzt keinen eigenen Provider und keine eigene API-Key-Konfiguration.
+- Vacation-KI erzeugt keine Steuerbefehle und keine Home-Assistant-Service-Calls.
 
 # Datenbanken
 
@@ -618,6 +721,8 @@ Aktuell verwendete Datenbanken:
 agent-api/data/invoices/invoices.db
 agent-api/data/market/market.db
 agent-api/data/mywellness/mywellness.db
+agent-api/data/vacation/vacation.db
+agent-api/data/messaging/messages.db
 ```
 
 Nicht vorhanden:
@@ -647,6 +752,8 @@ Zentrale APIs:
 /api/invoices
 /api/mywellness
 /api/market
+/api/vacation
+/api/messages
 ```
 
 Wichtige Orchestrator-Endpunkte:
@@ -730,6 +837,8 @@ Rolle:
 - zeigt Household- und Infrastructure-Daten
 - Fritzbox-Kachel kombiniert Infrastructure-Status mit HA-Entities fuer Upload/Download, IP und Uptime
 - bleibt read-only bezogen auf Agent-Control
+- Vacation-Kachel steuert ausschliesslich `input_boolean.vacation_mode`
+- Glocke/Message Center zeigt zentrale Messages aus `/api/messages`; Badge/Rahmen sind reine UI-Details.
 
 ## Settings
 
@@ -770,20 +879,15 @@ Hinweis:
 
 # Bekannte Architekturhinweise
 
-## Vacation Manifest vs Config
+## Vacation Agent vs Vacation Mode
 
-Aktuelle Abweichung:
+Vacation Agent und Vacation Mode sind bewusst getrennt:
 
-- `backend/agents/vacation/config.yaml`: `enabled: true`
-- `backend/agents/vacation/manifest.yaml`: `enabled: false`
-
-Auswirkung:
-
-- Settings kann Vacation als Runtime-Config aktiv anzeigen.
-- Registry betrachtet Vacation im Manifest als deaktiviert.
-- Orchestrator/Household nutzen Vacation trotzdem als importierte Statusquelle.
-
-Diese Abweichung sollte bewusst entschieden werden: entweder Manifest aktivieren oder Vacation als bewusst read-only/experimentell dokumentieren.
+- Vacation Agent ist ein dauerhaft vorhandener Dienst mit eigener Historie.
+- Vacation Mode ist der Home-Assistant-Hauszustand `input_boolean.vacation_mode`.
+- Agent-Control startet/stoppt/aktiviert/deaktiviert den Agenten.
+- Vacation Mode wird ueber Wall Dashboard und Vacation Dashboard geschaltet.
+- Die Aktivierung von Vacation Mode startet keine Geraeteautomation.
 
 ## Orchestrator Control ist live, aber ohne Persistenz
 
@@ -822,6 +926,8 @@ Frontend Wall Dashboard
         -> WasteService
         -> VacationService.status
         -> InfrastructureService
+  -> /api/messages
+     -> MessagingService
 
 Frontend Settings
   -> /api/settings
@@ -831,6 +937,13 @@ Agent Map
      -> Registry Manifests
      -> Agent Runtime Status
      -> Control Capabilities
+
+Vacation Dashboard
+  -> /api/vacation/status
+  -> /api/vacation/history
+  -> /api/vacation/profiles
+  -> /api/messages
+  -> /api/vacation/ai/analyze
 ```
 
 # Was aktuell nicht umgesetzt ist
@@ -842,4 +955,6 @@ Agent Map
 - keine zentralen Start-All/Stop-All-Endpunkte
 - keine Control-Buttons im Wall-Dashboard
 - keine Persistenz fuer Infrastructure-Verlauf
-
+- keine automatische Anwesenheitssimulation
+- keine automatische Lampen-/Jalousie-/Geraetesteuerung durch Vacation
+- keine globale automatische Push-Auslieferung ueber Messaging Targets

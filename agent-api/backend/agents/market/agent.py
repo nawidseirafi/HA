@@ -20,11 +20,14 @@ class MarketAgent:
         self.news = MarketNewsService()
         self.analysis = MarketAnalysisService()
         self.symbol_resolver = MarketSymbolResolver()
+        self._running = False
+        self._last_error: str | None = None
+        self._last_run: str | None = None
 
     def config(self) -> dict[str, Any]:
         config = load_agent_section("market")
         return {
-            "enabled": bool(config.get("enabled", True)),
+            "enabled": self._bool_config(config.get("enabled", True)),
             "database_path": config.get("database_path", "data/market/market.db"),
             "log_path": config.get("log_path", "logs/market.log"),
             "price_provider": config.get("price_provider", "yahoo"),
@@ -33,16 +36,27 @@ class MarketAgent:
 
     def status(self) -> dict[str, Any]:
         config = self.config()
+        if self._last_error:
+            current_status = "error"
+        elif not config["enabled"]:
+            current_status = "disabled"
+        elif self._running:
+            current_status = "running"
+        else:
+            current_status = "active"
         return {
             "enabled": config["enabled"],
-            "current_status": "active" if config["enabled"] else "disabled",
-            "status": "active" if config["enabled"] else "disabled",
-            "last_error": None,
+            "is_running": self._running,
+            "current_status": current_status,
+            "status": current_status,
+            "last_error": self._last_error,
+            "last_successful_run": self._last_run,
             "settings": config,
         }
 
     def enable(self) -> dict[str, Any]:
         self._write_config(enabled=True)
+        self._last_error = None
         return self.status()
 
     def disable(self) -> dict[str, Any]:
@@ -62,10 +76,33 @@ class MarketAgent:
 
     def run(self) -> dict[str, Any]:
         if not self.config()["enabled"]:
-            return {"status": "disabled", "reports": [], "disclaimer": "Keine Finanzberatung."}
-        entries = self.store.watchlist(enabled_only=True)
-        reports = [self.analyze_symbol(entry["symbol"]) for entry in entries]
-        return {"status": "completed", "reports": reports, "disclaimer": "Keine Finanzberatung."}
+            return {"status": "disabled", "current_status": "disabled", "reports": [], "disclaimer": "Keine Finanzberatung."}
+        if self._running:
+            return {"status": "running", "current_status": "running", "reports": [], "disclaimer": "Keine Finanzberatung."}
+        self._running = True
+        self._last_error = None
+        try:
+            entries = self.store.watchlist(enabled_only=True)
+            reports = [self.analyze_symbol(entry["symbol"]) for entry in entries]
+            self._last_run = utc_now()
+            return {
+                "status": "active",
+                "current_status": "active",
+                "run_status": "completed",
+                "reports": reports,
+                "disclaimer": "Keine Finanzberatung.",
+            }
+        except Exception as exc:
+            self._last_error = str(exc)
+            return {
+                "status": "error",
+                "current_status": "error",
+                "message": str(exc),
+                "reports": [],
+                "disclaimer": "Keine Finanzberatung.",
+            }
+        finally:
+            self._running = False
 
     def analyze_symbol(self, symbol: str) -> dict[str, Any]:
         symbol = symbol.strip().upper()
@@ -209,3 +246,10 @@ class MarketAgent:
         data["market"] = section
         with path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(data, handle, allow_unicode=True, sort_keys=False)
+
+    def _bool_config(self, value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return True
+        return str(value).strip().lower() not in {"0", "false", "no", "off", "disabled"}
