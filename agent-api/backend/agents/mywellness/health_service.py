@@ -6,6 +6,10 @@ from typing import Any
 from .service import MyWellnessService
 from .ai_service import MyWellnessAIService
 from .store import (
+    get_booking_stats,
+    get_health_trend,
+    get_latest_metrics,
+    get_recovery_history,
     save_ai_recommendation,
     save_health_metric,
     save_health_snapshot,
@@ -242,10 +246,12 @@ class MyWellnessHealthService:
             )
         scores = self._scores(metrics)
         courses = self._recent_courses()
+        history_context = self._history_context()
         payload = {
             "user_profile": self._profile_payload(),
             "metrics": self._ai_metrics(metrics),
             "withings": self._withings_payload(metrics),
+            "history_context": history_context,
             "recovery_score": scores["recovery_score"],
             "stress_score": scores["stress_score"],
             "training_readiness": scores["training_readiness"],
@@ -299,6 +305,110 @@ class MyWellnessHealthService:
                 "select * from mywellness_health_metrics order by metric_date desc, id desc limit 1"
             ).fetchone()
         return self._decode_metric(dict(row)) if row else None
+
+    def _history_context(self) -> dict[str, Any]:
+        latest = get_latest_metrics()
+        return {
+            "latest_metrics": self._compact_latest_metrics(latest),
+            "health_trends": {
+                "weight_30d": self._trend_summary("weight", 30),
+                "weight_90d": self._trend_summary("weight", 90),
+                "hrv_30d": self._trend_summary("hrv", 30),
+                "resting_heart_rate_90d": self._trend_summary("resting_heart_rate", 90),
+                "sleep_duration_30d": self._trend_summary("sleep_duration", 30),
+                "sleep_score_30d": self._trend_summary("sleep_score", 30),
+                "steps_30d": self._trend_summary("steps", 30),
+            },
+            "recovery_30d": self._recovery_summary(30),
+            "bookings_90d": self._booking_summary(90),
+        }
+
+    def _compact_latest_metrics(self, latest: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        compact: dict[str, Any] = {}
+        for metric_name, item in latest.items():
+            compact[metric_name] = {
+                "value": item.get("metric_value"),
+                "unit": item.get("unit"),
+                "source": item.get("source"),
+                "measured_at": item.get("measured_at"),
+            }
+        return compact
+
+    def _trend_summary(self, metric_name: str, days: int) -> dict[str, Any]:
+        rows = get_health_trend(metric_name, days)
+        values = [
+            {
+                "value": self._float(row.get("metric_value")),
+                "measured_at": row.get("measured_at"),
+                "unit": row.get("unit"),
+                "source": row.get("source"),
+            }
+            for row in rows
+        ]
+        values = [item for item in values if item["value"] is not None]
+        if not values:
+            return {"days": days, "count": 0, "status": "insufficient_data"}
+        first = values[0]
+        last = values[-1]
+        numbers = [float(item["value"]) for item in values]
+        delta = round(float(last["value"]) - float(first["value"]), 2)
+        avg = round(sum(numbers) / len(numbers), 2)
+        return {
+            "days": days,
+            "count": len(values),
+            "first": {"value": first["value"], "measured_at": first["measured_at"]},
+            "last": {"value": last["value"], "measured_at": last["measured_at"]},
+            "delta": delta,
+            "average": avg,
+            "min": min(numbers),
+            "max": max(numbers),
+            "unit": last.get("unit") or first.get("unit"),
+            "direction": self._trend_direction(delta),
+        }
+
+    def _recovery_summary(self, days: int) -> dict[str, Any]:
+        rows = get_recovery_history(days)
+        if not rows:
+            return {"days": days, "count": 0, "status": "insufficient_data"}
+        scores = [self._float(row.get("score")) for row in rows]
+        scores = [score for score in scores if score is not None]
+        status_counts: dict[str, int] = {}
+        for row in rows:
+            status = str(row.get("status") or "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        latest = rows[0]
+        return {
+            "days": days,
+            "count": len(rows),
+            "average_score": round(sum(scores) / len(scores), 2) if scores else None,
+            "min_score": min(scores) if scores else None,
+            "max_score": max(scores) if scores else None,
+            "status_counts": status_counts,
+            "latest": {
+                "score": latest.get("score"),
+                "status": latest.get("status"),
+                "summary": latest.get("summary"),
+                "created_at": latest.get("created_at"),
+            },
+        }
+
+    def _booking_summary(self, days: int) -> dict[str, Any]:
+        stats = get_booking_stats(days)
+        action_counts = {item["action"]: item["count"] for item in stats.get("actions", [])}
+        return {
+            "days": days,
+            "actions": action_counts,
+            "booked_count": action_counts.get("booked", 0),
+            "attended_count": action_counts.get("attended", 0),
+            "cancelled_count": action_counts.get("cancelled", 0),
+            "frequent_courses": stats.get("frequent_courses", [])[:5],
+            "preferred_hours": stats.get("by_hour", [])[:5],
+        }
+
+    def _trend_direction(self, delta: float) -> str:
+        if abs(delta) < 0.01:
+            return "stable"
+        return "up" if delta > 0 else "down"
 
     def _save_health_history(self, metrics: dict[str, Any], raw_states: dict[str, Any], source: str) -> None:
         try:
