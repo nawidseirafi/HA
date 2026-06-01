@@ -132,7 +132,6 @@ class MyWellnessHealthService:
         }
 
     def settings(self) -> dict[str, Any]:
-        self._ensure_schema()
         with self._connect() as connection:
             row = connection.execute("select * from mywellness_health_settings where id = 1").fetchone()
         if not row:
@@ -504,7 +503,12 @@ class MyWellnessHealthService:
     def _connect(self) -> sqlite3.Connection:
         db_path = MyWellnessService.get_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(db_path)
+        connection = sqlite3.connect(db_path, timeout=30)
+        connection.execute("pragma busy_timeout = 30000")
+        try:
+            connection.execute("pragma journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
         connection.row_factory = sqlite3.Row
         return connection
 

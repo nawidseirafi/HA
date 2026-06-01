@@ -226,7 +226,9 @@ class MyWellnessService:
     def bookings(self) -> dict[str, Any]:
         state = self._read_status()
         try:
-            courses = self._fetch_courses()
+            courses = self._courses_from_db_cache()
+            if not courses:
+                courses = state.get("upcoming_courses") or state.get("available_courses") or []
             state["current_bookings"] = self._bookings_from_courses(courses)
             state["last_bookings_refresh"] = utc_now()
             state["last_error"] = None
@@ -252,8 +254,7 @@ class MyWellnessService:
                 self._write_status(state)
                 return {"courses": courses}
 
-            # Fallback: API laden
-            courses = self._upcoming_courses()
+            courses = state.get("upcoming_courses") or []
             state["upcoming_courses"] = courses
             state["current_bookings"] = self._bookings_from_courses(courses)
             state["last_upcoming_refresh"] = utc_now()
@@ -852,7 +853,12 @@ class MyWellnessService:
     def _connect(self) -> sqlite3.Connection:
         db_path = self.get_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(db_path)
+        connection = sqlite3.connect(db_path, timeout=30)
+        connection.execute("pragma busy_timeout = 30000")
+        try:
+            connection.execute("pragma journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -930,28 +936,29 @@ class MyWellnessService:
                     utc_now(),
                 ),
             )
-            connection.execute(
-                """
-                update mywellness_settings
-                set prepare_time = coalesce(nullif(prepare_time, ''), ?),
-                    booking_time = coalesce(nullif(booking_time, ''), ?),
-                    health_sync_time = coalesce(nullif(health_sync_time, ''), ?),
-                    days = coalesce(days, ?),
-                    desired_courses = case when desired_courses is null or desired_courses = '[]' then ? else desired_courses end
-                where id = 1
-                """,
-                (
-                    self._config_schedule()[0],
-                    self._config_schedule()[1],
-                    self._config_health_sync_time(),
-                    self._config_days(),
-                    json.dumps(self._config_desired_courses(), ensure_ascii=False),
-                ),
-            )
+            row = connection.execute("select * from mywellness_settings where id = 1").fetchone()
+            if row:
+                updates: dict[str, Any] = {}
+                config_schedule = self._config_schedule()
+                if not row["prepare_time"]:
+                    updates["prepare_time"] = config_schedule[0]
+                if not row["booking_time"]:
+                    updates["booking_time"] = config_schedule[1]
+                if not row["health_sync_time"]:
+                    updates["health_sync_time"] = self._config_health_sync_time()
+                if row["days"] is None:
+                    updates["days"] = self._config_days()
+                if row["desired_courses"] is None:
+                    updates["desired_courses"] = json.dumps(self._config_desired_courses(), ensure_ascii=False)
+                if updates:
+                    assignments = ", ".join(f"{field} = ?" for field in updates)
+                    connection.execute(
+                        f"update mywellness_settings set {assignments}, updated_at = ? where id = 1",
+                        (*updates.values(), utc_now()),
+                    )
             connection.commit()
 
     def _settings(self) -> dict[str, Any]:
-        self._ensure_schema()
         with self._connect() as connection:
             row = connection.execute("select * from mywellness_settings where id = 1").fetchone()
         if row is None:

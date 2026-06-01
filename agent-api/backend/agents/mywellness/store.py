@@ -20,7 +20,12 @@ def get_db_path() -> Path:
 def connect() -> sqlite3.Connection:
     database_path = get_db_path()
     database_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(database_path)
+    connection = sqlite3.connect(database_path, timeout=30)
+    connection.execute("pragma busy_timeout = 30000")
+    try:
+        connection.execute("pragma journal_mode = WAL")
+    except sqlite3.OperationalError:
+        pass
     connection.row_factory = sqlite3.Row
     ensure_schema(connection)
     return connection
