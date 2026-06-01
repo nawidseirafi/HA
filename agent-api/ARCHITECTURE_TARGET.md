@@ -262,7 +262,8 @@ Semantik:
 - `enable()` aktiviert den Agenten als Laufzeit-/Planungszustand.
 - `disable()` deaktiviert den Agenten als Laufzeit-/Planungszustand, ohne APIs zu entfernen.
 - Start/Stop/Enable/Disable müssen idempotent sein.
-- Statuswerte müssen auf `active`, `running`, `paused`, `disabled`, `error` normalisierbar sein.
+- Statuswerte müssen mindestens auf `active`, `running`, `disabled`, `error` normalisierbar sein.
+- `paused` ist optional fuer spaetere Pause/Resume-Funktionen.
 
 Bestehende Orchestrator-API:
 
@@ -361,7 +362,7 @@ backend/
 - Agent-Statusmodell schriftlich festlegen: `active`, `running`, `paused`, `disabled`, `error`.
 - `/api/orchestrator/map` zur einzigen Quelle für Agent-Map-Status im Frontend machen.
 - Alle Agent-Metadaten im Frontend aus Manifesten beziehen.
-- Prüfen, ob MyWellness `idle` als `paused` oder `active` dargestellt werden soll. Fachlich wirkt `enabled + idle` eher wie `active`, während `disabled` orange/grau sein sollte.
+- MyWellness `enabled + nicht laufend` wird als `active` dargestellt.
 - Secrets aus `agent-api.service` entfernen und konsequent über Environment-Datei laden.
 - Dashboard-GETs read-only halten. Schreibende Datenimporte nur ueber explizite Aktionen oder Scheduler.
 
