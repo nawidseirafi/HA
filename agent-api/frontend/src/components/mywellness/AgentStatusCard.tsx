@@ -21,12 +21,14 @@ function nextScheduledTime(status: AgentStatus | null) {
   const action = nextScheduledAction(status);
   if (action === 'book') return formatTime(status?.booking_time);
   if (action === 'prepare') return formatTime(status?.prepare_time);
+  if (action === 'health_sync') return formatTime(status?.health_sync_time);
   return formatDate(status?.next_scheduled_run);
 }
 
 function nextScheduledAction(status: AgentStatus | null) {
   if (status?.next_scheduled_action) return status.next_scheduled_action;
   if (!status?.next_scheduled_run) return null;
+  if (status.health_sync_enabled !== false && status.prepare_enabled === false && status.booking_enabled === false) return 'health_sync';
   if (status.prepare_enabled !== false && status.booking_enabled === false) return 'prepare';
   if (status.booking_enabled !== false && status.prepare_enabled === false) return 'book';
   const planned = new Date(status.next_scheduled_run);
@@ -34,6 +36,7 @@ function nextScheduledAction(status: AgentStatus | null) {
     const plannedTime = `${String(planned.getHours()).padStart(2, '0')}:${String(planned.getMinutes()).padStart(2, '0')}`;
     if (status.prepare_time?.slice(0, 5) === plannedTime) return 'prepare';
     if (status.booking_time?.slice(0, 5) === plannedTime) return 'book';
+    if (status.health_sync_time?.slice(0, 5) === plannedTime) return 'health_sync';
   }
   return null;
 }
@@ -48,7 +51,7 @@ export function AgentStatusCard({ status }: Props) {
   const current = status?.current_status ?? 'loading';
   const tone = statusClass(current);
   const action = nextScheduledAction(status);
-  const nextLabel = action === 'book' ? 'Nächste Buchung' : action === 'prepare' ? 'Nächster Kurs-Scan' : 'Nächster geplanter Lauf';
+  const nextLabel = action === 'book' ? 'Nächste Buchung' : action === 'prepare' ? 'Nächster Kurs-Scan' : action === 'health_sync' ? 'Nächster Health-Sync' : 'Nächster geplanter Lauf';
 
   return (
     <section className={`panel mywellness-status status-${tone}`}>

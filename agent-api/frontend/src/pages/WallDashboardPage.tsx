@@ -2106,12 +2106,14 @@ function formatWellnessNextRun(wellness: Partial<AgentStatus> & { status?: strin
     const action = nextWellnessAction(wellness);
     if (action === 'book' && wellness.booking_time) return wellness.booking_time.slice(0, 5);
     if (action === 'prepare' && wellness.prepare_time) return wellness.prepare_time.slice(0, 5);
+    if (action === 'health_sync' && wellness.health_sync_time) return wellness.health_sync_time.slice(0, 5);
     return wellness.next_scheduled_run ? formatDateTime(wellness.next_scheduled_run) : 'nicht geplant';
 }
 
 function nextWellnessAction(wellness: Partial<AgentStatus>) {
     if (wellness.next_scheduled_action) return wellness.next_scheduled_action;
     if (!wellness.next_scheduled_run) return null;
+    if (wellness.health_sync_enabled !== false && wellness.prepare_enabled === false && wellness.booking_enabled === false) return 'health_sync';
     if (wellness.prepare_enabled !== false && wellness.booking_enabled === false) return 'prepare';
     if (wellness.booking_enabled !== false && wellness.prepare_enabled === false) return 'book';
     const planned = new Date(wellness.next_scheduled_run);
@@ -2119,6 +2121,7 @@ function nextWellnessAction(wellness: Partial<AgentStatus>) {
     const plannedTime = `${pad(planned.getHours())}:${pad(planned.getMinutes())}`;
     if (wellness.prepare_time?.slice(0, 5) === plannedTime) return 'prepare';
     if (wellness.booking_time?.slice(0, 5) === plannedTime) return 'book';
+    if (wellness.health_sync_time?.slice(0, 5) === plannedTime) return 'health_sync';
     return null;
 }
 

@@ -18,7 +18,7 @@ AGENT_SCRIPT = AGENTS_DIR / "mywellness" / "mywellness.py"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
-from .store import delete_prepared_courses, list_prepared_courses, replace_live_courses
+from .store import delete_prepared_courses, list_prepared_courses, replace_live_courses, save_booking_history, save_course_history
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -73,11 +73,14 @@ class MyWellnessService:
         state["enabled"] = bool(settings["enabled"])
         state["prepare_enabled"] = bool(settings["prepare_enabled"])
         state["booking_enabled"] = bool(settings["booking_enabled"])
+        state["health_sync_enabled"] = bool(settings["health_sync_enabled"])
         state["last_prepare_run"] = settings["last_prepare_run"]
         state["last_booking_run"] = settings["last_booking_run"]
+        state["last_health_sync_run"] = settings["last_health_sync_run"]
         state["last_status"] = settings["last_status"]
         state["prepare_time"] = settings["prepare_time"]
         state["booking_time"] = settings["booking_time"]
+        state["health_sync_time"] = settings["health_sync_time"]
         state["days"] = settings["days"]
         state["desired_courses"] = settings["desired_courses"]
         state["last_error"] = settings["last_error"] or state.get("last_error")
@@ -175,10 +178,15 @@ class MyWellnessService:
             updates["enabled"] = enabled
             updates["prepare_enabled"] = enabled
             updates["booking_enabled"] = enabled
+            updates["health_sync_enabled"] = enabled
         if "prepare_time" in payload:
             updates["prepare_time"] = self._normalize_time_string(payload["prepare_time"], "prepare_time")
         if "booking_time" in payload:
             updates["booking_time"] = self._normalize_time_string(payload["booking_time"], "booking_time")
+        if "health_sync_enabled" in payload:
+            updates["health_sync_enabled"] = bool(payload["health_sync_enabled"])
+        if "health_sync_time" in payload:
+            updates["health_sync_time"] = self._normalize_time_string(payload["health_sync_time"], "health_sync_time")
         if "days" in payload:
             days = int(payload["days"])
             if days < 0 or days > 14:
@@ -386,7 +394,8 @@ class MyWellnessService:
                 if 0 <= seconds_from_schedule < 2:
                     last_run[run_key] = utc_now()
                     if not self._is_running():
-                        threading.Thread(target=self._run_subprocess, args=(action_type,), daemon=True).start()
+                        target = self._run_health_sync if action_type == "health_sync" else self._run_subprocess
+                        threading.Thread(target=target, args=(action_type,), daemon=True).start()
                     else:
                         self._insert_log(action_type, "skipped", "Uebersprungen, Agent laeuft bereits.")
             self.scheduler_stop.wait(1)
@@ -395,7 +404,58 @@ class MyWellnessService:
         settings = self._settings()
         prepare = self._parse_time(settings.get("prepare_time"), time(17, 0, 0))
         book = self._parse_time(settings.get("booking_time"), time(20, 59, 58))
-        return [("prepare", prepare, "prepare_enabled"), ("book", book, "booking_enabled")]
+        health_sync = self._parse_time(settings.get("health_sync_time"), time(23, 30, 0))
+        return [
+            ("prepare", prepare, "prepare_enabled"),
+            ("book", book, "booking_enabled"),
+            ("health_sync", health_sync, "health_sync_enabled"),
+        ]
+
+    def _run_health_sync(self, action_type: str = "health_sync") -> dict[str, Any]:
+        if not self.run_lock.acquire(blocking=False):
+            message = "Uebersprungen, MyWellnessAgent laeuft bereits."
+            self._insert_log(action_type, "skipped", message)
+            return {"action_type": action_type, "status": "skipped", "message": message}
+        started_at = utc_now()
+        start_time = time_module.monotonic()
+        try:
+            self._insert_log(action_type, "running", "Health-Sync gestartet.")
+            from .health_service import MyWellnessHealthService
+
+            health_service = MyWellnessHealthService()
+            settings = health_service.settings()
+            if not settings.get("enabled", True):
+                message = "Health-Sync uebersprungen, Health-Analyse ist deaktiviert."
+                duration = time_module.monotonic() - start_time
+                self._record_action_result(action_type, "skipped", message, duration, started_at)
+                return {"action_type": action_type, "status": "skipped", "message": message}
+
+            result: dict[str, Any] = {}
+            errors: list[str] = []
+            try:
+                result["homeassistant"] = health_service.import_from_ha()
+            except Exception as exc:
+                errors.append(f"Home Assistant: {exc}")
+            try:
+                result["withings"] = health_service.import_withings_metrics_from_ha()
+            except Exception as exc:
+                errors.append(f"Withings: {exc}")
+
+            duration = time_module.monotonic() - start_time
+            if errors:
+                message = "; ".join(errors)
+                self._record_action_result(action_type, "error", message, duration, started_at)
+                return {"action_type": action_type, "status": "error", "message": message, "result": result}
+            self._record_action_result(action_type, "ok", "Health-Sync abgeschlossen.", duration, started_at)
+            return {"action_type": action_type, "status": "ok", "result": result}
+        except Exception as exc:
+            duration = time_module.monotonic() - start_time
+            message = str(exc)
+            self._record_action_result(action_type, "error", message, duration, started_at)
+            self._agent_log(f"Health-Sync Fehler: {message}")
+            return {"action_type": action_type, "status": "error", "message": message}
+        finally:
+            self.run_lock.release()
 
     def _command(self, action_type: str, dry_run: bool = False) -> list[str]:
         python = PROJECT_DIR / "venv" / "bin" / "python"
@@ -474,6 +534,15 @@ class MyWellnessService:
         self._agent_log(message)
         if action == "book":
             delete_prepared_courses(str(course.get("partitionDate") or ""), [course_id])
+        try:
+            save_booking_history(
+                booking_id=str(course.get("bookingUserStatus") or course.get("id") or ""),
+                course_id=course_id,
+                action="booked" if action == "book" else "cancelled",
+            )
+            save_course_history({**course, "status": "booked" if action == "book" else "cancelled"})
+        except Exception as exc:
+            self._agent_log(f"Historie konnte nicht gespeichert werden: {exc}")
         refreshed = self._upcoming_courses()
         state = self._read_status()
         state["upcoming_courses"] = refreshed
@@ -806,12 +875,15 @@ class MyWellnessService:
                     enabled integer not null default 1,
                     prepare_enabled integer not null default 1,
                     booking_enabled integer not null default 1,
+                    health_sync_enabled integer not null default 1,
                     prepare_time text not null default '17:00:00',
                     booking_time text not null default '20:59:58',
+                    health_sync_time text not null default '23:30:00',
                     days integer not null default 2,
                     desired_courses text not null default '[]',
                     last_prepare_run text,
                     last_booking_run text,
+                    last_health_sync_run text,
                     last_status text not null default 'idle',
                     last_error text,
                     updated_at text not null
@@ -834,8 +906,11 @@ class MyWellnessService:
             extra_columns = {
                 "prepare_time": "text not null default '17:00:00'",
                 "booking_time": "text not null default '20:59:58'",
+                "health_sync_enabled": "integer not null default 1",
+                "health_sync_time": "text not null default '23:30:00'",
                 "days": "integer not null default 2",
                 "desired_courses": "text not null default '[]'",
+                "last_health_sync_run": "text",
             }
             for column, definition in extra_columns.items():
                 if column not in existing_columns:
@@ -843,12 +918,13 @@ class MyWellnessService:
             connection.execute(
                 """
                 insert or ignore into mywellness_settings
-                (id, enabled, prepare_enabled, booking_enabled, prepare_time, booking_time, days, desired_courses, last_status, updated_at)
-                values (1, 1, 1, 1, ?, ?, ?, ?, 'idle', ?)
+                (id, enabled, prepare_enabled, booking_enabled, health_sync_enabled, prepare_time, booking_time, health_sync_time, days, desired_courses, last_status, updated_at)
+                values (1, 1, 1, 1, 1, ?, ?, ?, ?, ?, 'idle', ?)
                 """,
                 (
                     self._config_schedule()[0],
                     self._config_schedule()[1],
+                    self._config_health_sync_time(),
                     self._config_days(),
                     json.dumps(self._config_desired_courses(), ensure_ascii=False),
                     utc_now(),
@@ -859,6 +935,7 @@ class MyWellnessService:
                 update mywellness_settings
                 set prepare_time = coalesce(nullif(prepare_time, ''), ?),
                     booking_time = coalesce(nullif(booking_time, ''), ?),
+                    health_sync_time = coalesce(nullif(health_sync_time, ''), ?),
                     days = coalesce(days, ?),
                     desired_courses = case when desired_courses is null or desired_courses = '[]' then ? else desired_courses end
                 where id = 1
@@ -866,6 +943,7 @@ class MyWellnessService:
                 (
                     self._config_schedule()[0],
                     self._config_schedule()[1],
+                    self._config_health_sync_time(),
                     self._config_days(),
                     json.dumps(self._config_desired_courses(), ensure_ascii=False),
                 ),
@@ -881,12 +959,15 @@ class MyWellnessService:
                 "enabled": True,
                 "prepare_enabled": True,
                 "booking_enabled": True,
+                "health_sync_enabled": True,
                 "prepare_time": "17:00:00",
                 "booking_time": "20:59:58",
+                "health_sync_time": "23:30:00",
                 "days": 2,
                 "desired_courses": [],
                 "last_prepare_run": None,
                 "last_booking_run": None,
+                "last_health_sync_run": None,
                 "last_status": "idle",
                 "last_error": None,
                 "updated_at": utc_now(),
@@ -895,6 +976,7 @@ class MyWellnessService:
         item["enabled"] = bool(item["enabled"])
         item["prepare_enabled"] = bool(item["prepare_enabled"])
         item["booking_enabled"] = bool(item["booking_enabled"])
+        item["health_sync_enabled"] = bool(item.get("health_sync_enabled", 1))
         item["days"] = int(item.get("days") or 2)
         try:
             item["desired_courses"] = json.loads(item.get("desired_courses") or "[]")
@@ -907,12 +989,15 @@ class MyWellnessService:
             "enabled",
             "prepare_enabled",
             "booking_enabled",
+            "health_sync_enabled",
             "prepare_time",
             "booking_time",
+            "health_sync_time",
             "days",
             "desired_courses",
             "last_prepare_run",
             "last_booking_run",
+            "last_health_sync_run",
             "last_status",
             "last_error",
         }
@@ -964,6 +1049,8 @@ class MyWellnessService:
             updates["last_prepare_run"] = started_at
         if action_type == "book":
             updates["last_booking_run"] = started_at
+        if action_type == "health_sync":
+            updates["last_health_sync_run"] = started_at
         self._write_settings(**updates)
         self._insert_log(action_type, status, f"{message} Laufzeit: {duration:.1f}s", duration_seconds=duration)
 
@@ -1016,6 +1103,10 @@ class MyWellnessService:
             self._normalize_time_string(schedule[0] if len(schedule) > 0 else "17:00:00", "prepare_time"),
             self._normalize_time_string(schedule[1] if len(schedule) > 1 else "20:59:58", "booking_time"),
         ]
+
+    def _config_health_sync_time(self) -> str:
+        config = load_agent_section("mywellness")
+        return self._normalize_time_string(config.get("health_sync_time", "23:30:00"), "health_sync_time")
 
     def _config_days(self) -> int:
         config = load_agent_section("mywellness")

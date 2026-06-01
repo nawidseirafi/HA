@@ -30,8 +30,10 @@ export type AgentStatus = {
   enabled: boolean;
   prepare_enabled?: boolean;
   booking_enabled?: boolean;
+  health_sync_enabled?: boolean;
   prepare_time?: string;
   booking_time?: string;
+  health_sync_time?: string;
   days?: number;
   desired_courses?: string[];
   is_running: boolean;
@@ -40,8 +42,9 @@ export type AgentStatus = {
   last_successful_run: string | null;
   last_prepare_run?: string | null;
   last_booking_run?: string | null;
+  last_health_sync_run?: string | null;
   next_scheduled_run: string | null;
-  next_scheduled_action?: 'prepare' | 'book' | null;
+  next_scheduled_action?: 'prepare' | 'book' | 'health_sync' | null;
   last_error: string | null;
   last_started_at?: string | null;
   last_finished_at?: string | null;
@@ -54,8 +57,10 @@ export type MyWellnessSettingsPayload = {
   enabled?: boolean;
   prepare_enabled?: boolean;
   booking_enabled?: boolean;
+  health_sync_enabled?: boolean;
   prepare_time?: string;
   booking_time?: string;
+  health_sync_time?: string;
   days?: number;
   desired_courses?: string[];
 };

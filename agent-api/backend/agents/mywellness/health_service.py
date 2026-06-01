@@ -5,6 +5,12 @@ from typing import Any
 
 from .service import MyWellnessService
 from .ai_service import MyWellnessAIService
+from .store import (
+    save_ai_recommendation,
+    save_health_metric,
+    save_health_snapshot,
+    save_recovery_analysis,
+)
 from backend.services.homeassistant_service import HomeAssistantService
 
 
@@ -170,6 +176,7 @@ class MyWellnessHealthService:
             metrics[metric_name] = self._numeric_state(state)
 
         item = self._insert_metrics(metrics, raw_states)
+        self._save_health_history(item, raw_states, source="homeassistant")
         return {"metrics": item, "errors": errors}
 
     def withings_entities(self) -> dict[str, Any]:
@@ -196,6 +203,7 @@ class MyWellnessHealthService:
             metrics[metric_name] = self._metric_value(state, metric_name)
         raw_states["mapping_source"] = mapping_source
         item = self._insert_metrics(metrics, raw_states)
+        self._save_health_history(item, raw_states, source="withings")
         return {"metrics": item, "missing": missing, "mapping_source": mapping_source}
 
     def latest_withings(self) -> dict[str, Any]:
@@ -266,7 +274,9 @@ class MyWellnessHealthService:
             "warnings_json": json.dumps(ai_raw.get("warnings") or [], ensure_ascii=False),
             "ai_raw_json": json.dumps({**ai_raw, "error": ai_error} if ai_error else ai_raw, ensure_ascii=False),
         }
-        return {"report": self._insert_report(report), "metrics": metrics}
+        inserted_report = self._insert_report(report)
+        self._save_recovery_history(inserted_report, ai_raw, payload)
+        return {"report": inserted_report, "metrics": metrics}
 
     def latest_report(self) -> dict[str, Any] | None:
         with self._connect() as connection:
@@ -289,6 +299,71 @@ class MyWellnessHealthService:
                 "select * from mywellness_health_metrics order by metric_date desc, id desc limit 1"
             ).fetchone()
         return self._decode_metric(dict(row)) if row else None
+
+    def _save_health_history(self, metrics: dict[str, Any], raw_states: dict[str, Any], source: str) -> None:
+        try:
+            snapshot = {
+                "source": source,
+                "metrics": metrics,
+                "raw_states": raw_states,
+                "created_at": utc_now(),
+            }
+            save_health_snapshot(snapshot)
+            field_by_metric = {**self.metric_fields, **self.withings_metric_fields}
+            for metric_name, entity_field in field_by_metric.items():
+                if metric_name not in metrics:
+                    continue
+                raw_state = raw_states.get(entity_field) if isinstance(raw_states, dict) else None
+                unit = self._unit_from_raw_state(raw_state)
+                measured_at = self._measured_at_from_raw_state(raw_state) or metrics.get("created_at") or utc_now()
+                save_health_metric(
+                    metric_name=metric_name,
+                    metric_value=metrics.get(metric_name),
+                    unit=unit,
+                    source=source,
+                    measured_at=measured_at,
+                )
+        except Exception:
+            return
+
+    def _save_recovery_history(self, report: dict[str, Any], ai_raw: dict[str, Any], payload: dict[str, Any]) -> None:
+        try:
+            save_recovery_analysis(
+                score=report.get("recovery_score"),
+                status=report.get("recovery_state"),
+                summary=report.get("summary"),
+                raw={"report": report, "ai": ai_raw, "context": payload},
+                created_at=report.get("created_at"),
+            )
+            recommendation = report.get("recommendation")
+            if recommendation:
+                save_ai_recommendation(
+                    recommendation_type="recovery",
+                    title=report.get("recommended_workout_type") or report.get("recovery_state") or "Recovery Empfehlung",
+                    recommendation=recommendation,
+                    confidence=report.get("training_readiness"),
+                    raw_context={"report": report, "context": payload},
+                    created_at=report.get("created_at"),
+                )
+        except Exception:
+            return
+
+    def _unit_from_raw_state(self, raw_state: Any) -> str | None:
+        if not isinstance(raw_state, dict):
+            return None
+        if raw_state.get("unit"):
+            return raw_state.get("unit")
+        state = raw_state.get("state") if isinstance(raw_state.get("state"), dict) else None
+        attributes = state.get("attributes") if state and isinstance(state.get("attributes"), dict) else {}
+        return attributes.get("unit_of_measurement")
+
+    def _measured_at_from_raw_state(self, raw_state: Any) -> str | None:
+        if not isinstance(raw_state, dict):
+            return None
+        state = raw_state.get("state") if isinstance(raw_state.get("state"), dict) else None
+        if not state:
+            return None
+        return state.get("last_changed") or state.get("last_updated")
 
     def _connect(self) -> sqlite3.Connection:
         db_path = MyWellnessService.get_db_path()

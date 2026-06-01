@@ -66,6 +66,91 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         )
         """
     )
+    connection.execute(
+        """
+        create table if not exists health_history (
+            id integer primary key autoincrement,
+            metric_name text not null,
+            metric_value real,
+            unit text,
+            source text,
+            measured_at text not null,
+            created_at text not null
+        )
+        """
+    )
+    connection.execute(
+        """
+        create table if not exists health_snapshots (
+            id integer primary key autoincrement,
+            snapshot_json text not null,
+            created_at text not null
+        )
+        """
+    )
+    connection.execute(
+        """
+        create table if not exists course_history (
+            id integer primary key autoincrement,
+            course_id text,
+            course_name text,
+            trainer text,
+            location text,
+            start_time text,
+            end_time text,
+            status text,
+            imported_at text
+        )
+        """
+    )
+    connection.execute(
+        """
+        create table if not exists booking_history (
+            id integer primary key autoincrement,
+            booking_id text,
+            course_id text,
+            action text,
+            created_at text
+        )
+        """
+    )
+    connection.execute(
+        """
+        create table if not exists recovery_history (
+            id integer primary key autoincrement,
+            score real,
+            status text,
+            summary text,
+            raw_json text,
+            created_at text
+        )
+        """
+    )
+    connection.execute(
+        """
+        create table if not exists ai_recommendations (
+            id integer primary key autoincrement,
+            recommendation_type text,
+            title text,
+            recommendation text,
+            confidence real,
+            raw_context_json text,
+            created_at text
+        )
+        """
+    )
+    connection.execute(
+        "create index if not exists idx_health_history_metric_time on health_history(metric_name, measured_at)"
+    )
+    connection.execute(
+        "create index if not exists idx_course_history_course_time on course_history(course_id, start_time, status)"
+    )
+    connection.execute(
+        "create index if not exists idx_booking_history_created on booking_history(created_at)"
+    )
+    connection.execute(
+        "create index if not exists idx_recovery_history_created on recovery_history(created_at)"
+    )
     connection.commit()
 
 
@@ -99,6 +184,9 @@ def replace_prepared_courses(target_date: str, event_items: Iterable[dict[str, A
     with connect() as connection:
         connection.execute("delete from courses where source = 'prepare'")
         upsert_courses(connection, courses)
+        for course in courses:
+            save_course_history(course, connection=connection)
+        connection.commit()
 
 
 def prepared_course_ids(target_date: str) -> dict[str, str]:
@@ -161,6 +249,9 @@ def replace_live_courses(courses: Iterable[dict[str, Any]]) -> None:
     with connect() as connection:
         connection.execute("delete from courses where source = 'live'")
         upsert_courses(connection, [course_from_api(item, source="live") for item in items])
+        for item in items:
+            save_course_history(item, connection=connection)
+        connection.commit()
 
 
 def upsert_courses(connection: sqlite3.Connection, courses: Iterable[dict[str, Any]]) -> None:
@@ -328,6 +419,284 @@ def record_run(mode: str, status: str, started_at: str, finished_at: Optional[st
         connection.commit()
 
 
+def save_health_metric(
+    metric_name: str,
+    metric_value: Any,
+    unit: str | None = None,
+    source: str | None = None,
+    measured_at: str | None = None,
+    *,
+    connection: sqlite3.Connection | None = None,
+) -> dict[str, Any] | None:
+    name = _history_metric_name(metric_name)
+    if not name:
+        return None
+    value = _float_or_none(metric_value)
+    if value is None:
+        return None
+    normalized_source = _history_source(source)
+    measured = measured_at or utc_now()
+    close_connection = connection is None
+    db = connection or connect()
+    try:
+        latest = db.execute(
+            """
+            select * from health_history
+            where metric_name = ? and coalesce(source, '') = coalesce(?, '')
+            order by measured_at desc, id desc
+            limit 1
+            """,
+            (name, normalized_source),
+        ).fetchone()
+        if latest and _float_or_none(latest["metric_value"]) == value:
+            return None
+        cursor = db.execute(
+            """
+            insert into health_history (metric_name, metric_value, unit, source, measured_at, created_at)
+            values (?, ?, ?, ?, ?, ?)
+            """,
+            (name, value, unit, normalized_source, measured, utc_now()),
+        )
+        if close_connection:
+            db.commit()
+        row = db.execute("select * from health_history where id = ?", (cursor.lastrowid,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        if close_connection:
+            db.close()
+
+
+def save_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            insert into health_snapshots (snapshot_json, created_at)
+            values (?, ?)
+            """,
+            (json.dumps(snapshot, ensure_ascii=False, sort_keys=True), utc_now()),
+        )
+        connection.commit()
+        row = connection.execute("select * from health_snapshots where id = ?", (cursor.lastrowid,)).fetchone()
+    item = dict(row)
+    item["snapshot_json"] = _json_value(item.get("snapshot_json"), {})
+    return item
+
+
+def save_course_history(course: dict[str, Any], *, connection: sqlite3.Connection | None = None) -> dict[str, Any] | None:
+    imported_at = utc_now()
+    course_id = str(course.get("id") or course.get("course_id") or "").strip() or None
+    start_time = course.get("startTime") or course.get("starts_at") or course.get("start_time")
+    status = _course_history_status(course)
+    close_connection = connection is None
+    db = connection or connect()
+    try:
+        latest = None
+        if course_id:
+            latest = db.execute(
+                """
+                select * from course_history
+                where course_id = ? and coalesce(start_time, '') = coalesce(?, '')
+                order by imported_at desc, id desc
+                limit 1
+                """,
+                (course_id, start_time),
+            ).fetchone()
+        if latest and latest["status"] == status:
+            return None
+        cursor = db.execute(
+            """
+            insert into course_history (
+                course_id, course_name, trainer, location, start_time, end_time, status, imported_at
+            )
+            values (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                course_id,
+                course.get("title") or course.get("name") or course.get("course_name"),
+                course.get("trainer"),
+                course.get("studio") or course.get("location") or course.get("room"),
+                start_time,
+                course.get("endTime") or course.get("ends_at") or course.get("end_time"),
+                status,
+                imported_at,
+            ),
+        )
+        if close_connection:
+            db.commit()
+        row = db.execute("select * from course_history where id = ?", (cursor.lastrowid,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        if close_connection:
+            db.close()
+
+
+def save_booking_history(
+    booking_id: str | None = None,
+    course_id: str | None = None,
+    action: str = "booked",
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    timestamp = created_at or utc_now()
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            insert into booking_history (booking_id, course_id, action, created_at)
+            values (?, ?, ?, ?)
+            """,
+            (booking_id, course_id, _booking_action(action), timestamp),
+        )
+        connection.commit()
+        row = connection.execute("select * from booking_history where id = ?", (cursor.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def save_recovery_analysis(
+    score: Any,
+    status: str | None,
+    summary: str | None,
+    raw: dict[str, Any] | str | None = None,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    raw_json = raw if isinstance(raw, str) else json.dumps(raw or {}, ensure_ascii=False, sort_keys=True)
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            insert into recovery_history (score, status, summary, raw_json, created_at)
+            values (?, ?, ?, ?, ?)
+            """,
+            (_float_or_none(score), status, summary, raw_json, created_at or utc_now()),
+        )
+        connection.commit()
+        row = connection.execute("select * from recovery_history where id = ?", (cursor.lastrowid,)).fetchone()
+    return _decode_json_row(dict(row), "raw_json", {})
+
+
+def save_ai_recommendation(
+    recommendation_type: str | None,
+    title: str | None,
+    recommendation: str | None,
+    confidence: Any = None,
+    raw_context: dict[str, Any] | str | None = None,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    raw_json = raw_context if isinstance(raw_context, str) else json.dumps(raw_context or {}, ensure_ascii=False, sort_keys=True)
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            insert into ai_recommendations (
+                recommendation_type, title, recommendation, confidence, raw_context_json, created_at
+            )
+            values (?, ?, ?, ?, ?, ?)
+            """,
+            (recommendation_type, title, recommendation, _float_or_none(confidence), raw_json, created_at or utc_now()),
+        )
+        connection.commit()
+        row = connection.execute("select * from ai_recommendations where id = ?", (cursor.lastrowid,)).fetchone()
+    return _decode_json_row(dict(row), "raw_context_json", {})
+
+
+def get_health_trend(metric_name: str, days: int = 30) -> list[dict[str, Any]]:
+    since = _since(days)
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            select * from health_history
+            where metric_name = ? and measured_at >= ?
+            order by measured_at asc, id asc
+            """,
+            (_history_metric_name(metric_name), since),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_latest_metrics() -> dict[str, dict[str, Any]]:
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            select h.*
+            from health_history h
+            join (
+                select metric_name, max(measured_at || printf('%012d', id)) as latest_key
+                from health_history
+                group by metric_name
+            ) latest
+              on latest.metric_name = h.metric_name
+             and latest.latest_key = h.measured_at || printf('%012d', h.id)
+            order by h.metric_name
+            """
+        ).fetchall()
+    return {row["metric_name"]: dict(row) for row in rows}
+
+
+def get_recovery_history(days: int = 30) -> list[dict[str, Any]]:
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            select * from recovery_history
+            where created_at >= ?
+            order by created_at desc, id desc
+            """,
+            (_since(days),),
+        ).fetchall()
+    return [_decode_json_row(dict(row), "raw_json", {}) for row in rows]
+
+
+def get_booking_stats(days: int = 30) -> dict[str, Any]:
+    since = _since(days)
+    with connect() as connection:
+        by_action = connection.execute(
+            """
+            select action, count(*) as count
+            from booking_history
+            where created_at >= ?
+            group by action
+            order by action
+            """,
+            (since,),
+        ).fetchall()
+        frequent_courses = connection.execute(
+            """
+            select coalesce(ch.course_name, bh.course_id, bh.booking_id, 'unknown') as course_name,
+                   count(*) as count
+            from booking_history bh
+            left join (
+                select course_id, course_name
+                from course_history
+                where id in (select max(id) from course_history group by course_id)
+            ) ch on ch.course_id = bh.course_id
+            where bh.created_at >= ?
+              and bh.action in ('booked', 'attended')
+            group by course_name
+            order by count desc, course_name
+            limit 20
+            """,
+            (since,),
+        ).fetchall()
+        by_hour = connection.execute(
+            """
+            select substr(coalesce(ch.start_time, bh.created_at), 12, 2) as hour,
+                   count(*) as count
+            from booking_history bh
+            left join (
+                select course_id, start_time
+                from course_history
+                where id in (select max(id) from course_history group by course_id)
+            ) ch on ch.course_id = bh.course_id
+            where bh.created_at >= ?
+              and bh.action in ('booked', 'attended')
+            group by hour
+            order by hour
+            """,
+            (since,),
+        ).fetchall()
+    return {
+        "days": days,
+        "actions": [dict(row) for row in by_action],
+        "frequent_courses": [dict(row) for row in frequent_courses],
+        "by_hour": [dict(row) for row in by_hour if row["hour"]],
+    }
+
+
 def _course_start_time(item: dict[str, Any], partition_date: str) -> Optional[str]:
     if item.get("startDateTime"):
         return str(item["startDateTime"])
@@ -375,3 +744,70 @@ def _partition_from_start(value: Any) -> str:
     if len(text) >= 8 and text[:8].isdigit():
         return text[:8]
     return ""
+
+
+def _history_metric_name(value: Any) -> str:
+    aliases = {
+        "sleep_hours": "sleep_duration",
+        "withings_heart_rate": "resting_heart_rate",
+        "heart_rate": "heart_rate",
+    }
+    name = str(value or "").strip()
+    return aliases.get(name, name)
+
+
+def _history_source(value: Any) -> str:
+    source = str(value or "").strip().lower()
+    if source in {"home_assistant", "home-assistant", "ha"}:
+        return "homeassistant"
+    if source in {"home_assistant_withings", "homeassistant_withings"}:
+        return "withings"
+    return source
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(str(value).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _json_value(value: Any, default: Any) -> Any:
+    try:
+        return json.loads(value or "")
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _decode_json_row(row: dict[str, Any], field: str, default: Any) -> dict[str, Any]:
+    row[field] = _json_value(row.get(field), default)
+    return row
+
+
+def _since(days: int) -> str:
+    bounded_days = min(max(int(days or 30), 1), 3650)
+    return (datetime.now(timezone.utc) - timedelta(days=bounded_days)).isoformat(timespec="seconds")
+
+
+def _course_history_status(course: dict[str, Any]) -> str:
+    status = str(course.get("status") or course.get("booking_status") or "available").strip().lower()
+    if course.get("booked") or course.get("is_participant"):
+        return "booked"
+    if status in {"cancelled", "canceled"}:
+        return "cancelled"
+    if status in {"attended", "missed", "booked"}:
+        return status
+    return "available"
+
+
+def _booking_action(action: str) -> str:
+    normalized = str(action or "").strip().lower()
+    return {
+        "book": "booked",
+        "booking": "booked",
+        "unbook": "cancelled",
+        "cancel": "cancelled",
+        "canceled": "cancelled",
+    }.get(normalized, normalized or "booked")

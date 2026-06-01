@@ -29,7 +29,14 @@ RETRY_DELAY = 0.1  # Schneller Retry
 REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
 
 from backend.services.core.ha_client import HomeAssistantClient
-from backend.agents.mywellness.store import delete_prepared_courses, load_agent_settings, prepared_course_ids, record_run, replace_prepared_courses
+from backend.agents.mywellness.store import (
+    delete_prepared_courses,
+    load_agent_settings,
+    prepared_course_ids,
+    record_run,
+    replace_prepared_courses,
+    save_booking_history,
+)
 
 agent_settings = load_agent_settings()
 desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES
@@ -258,6 +265,14 @@ def book_saved_course_ids():
                     successful_bookings.append(result["course_name"])
                     if result["course_name"] in course_ids:
                         successful_course_ids.append(course_ids[result["course_name"]])
+                        try:
+                            save_booking_history(
+                                booking_id=course_ids[result["course_name"]],
+                                course_id=course_ids[result["course_name"]],
+                                action="booked",
+                            )
+                        except Exception as history_error:
+                            log(f"{course_name}: Buchungshistorie konnte nicht gespeichert werden: {history_error}")
             except Exception as e:
                 all_results.append(f"{course_name}: Fehler: {e}")
     log("\n\n".join(all_results))

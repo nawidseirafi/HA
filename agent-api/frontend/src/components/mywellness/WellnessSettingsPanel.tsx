@@ -21,8 +21,10 @@ function toTimeInput(value?: string) {
 
 export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }: Props) {
   const [agentEnabled, setAgentEnabled] = useState(true);
+  const [healthSyncEnabled, setHealthSyncEnabled] = useState(true);
   const [prepareTime, setPrepareTime] = useState('17:00:00');
   const [bookingTime, setBookingTime] = useState('20:59:58');
+  const [healthSyncTime, setHealthSyncTime] = useState('23:30:00');
   const [days, setDays] = useState(2);
   const [courses, setCourses] = useState('Cross-Power\nBody Workout\nFunctional Training');
   const [healthSettings, setHealthSettings] = useState<MyWellnessHealthSettings | null>(null);
@@ -34,8 +36,10 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
   useEffect(() => {
     if (!status) return;
     setAgentEnabled(status.enabled !== false);
+    setHealthSyncEnabled(status.health_sync_enabled !== false);
     setPrepareTime(toTimeInput(status.prepare_time) || '17:00:00');
     setBookingTime(toTimeInput(status.booking_time) || '20:59:58');
+    setHealthSyncTime(toTimeInput(status.health_sync_time) || '23:30:00');
     setDays(status.days ?? 2);
     setCourses((status.desired_courses ?? []).join('\n'));
   }, [status]);
@@ -117,8 +121,10 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           event.preventDefault();
           onSave({
             enabled: agentEnabled,
+            health_sync_enabled: healthSyncEnabled,
             prepare_time: prepareTime,
             booking_time: bookingTime,
+            health_sync_time: healthSyncTime,
             days,
             desired_courses: courses.split(/\r?\n|,/).map((course) => course.trim()).filter(Boolean),
           });
@@ -150,6 +156,17 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           <label className="wellness-field">
             <small>Automatisch buchen</small>
             <input type="time" step="1" value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} />
+          </label>
+        </div>
+        <div className="wellness-setting-row">
+          <label className="wellness-toggle-line">
+            <input type="checkbox" checked={healthSyncEnabled} onChange={(event) => setHealthSyncEnabled(event.target.checked)} />
+            <span />
+            <strong>Health-Sync aktiv</strong>
+          </label>
+          <label className="wellness-field">
+            <small>Health-Sync</small>
+            <input type="time" step="1" value={healthSyncTime} onChange={(event) => setHealthSyncTime(event.target.value)} />
           </label>
         </div>
       </section>

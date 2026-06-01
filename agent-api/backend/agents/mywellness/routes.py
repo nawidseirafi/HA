@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from .service import MyWellnessService
 from .health_service import MyWellnessHealthService
+from .store import get_booking_stats, get_health_trend, get_latest_metrics, get_recovery_history
 
 
 router = APIRouter(tags=["my_wellness"])
@@ -28,8 +29,10 @@ class SettingsPayload(BaseModel):
     enabled: Optional[bool] = None
     prepare_enabled: Optional[bool] = None
     booking_enabled: Optional[bool] = None
+    health_sync_enabled: Optional[bool] = None
     prepare_time: Optional[str] = None
     booking_time: Optional[str] = None
+    health_sync_time: Optional[str] = None
     days: Optional[int] = None
     desired_courses: Optional[list[str]] = None
 
@@ -198,3 +201,23 @@ def mywellness_health_withings_latest():
 @router.post("/api/mywellness/health/withings/discover")
 def mywellness_health_withings_discover():
     return mywellness_health_service.discover_withings_entities()
+
+
+@router.get("/api/mywellness/history/metrics")
+def mywellness_history_metrics():
+    return {"metrics": get_latest_metrics()}
+
+
+@router.get("/api/mywellness/history/recovery")
+def mywellness_history_recovery(days: int = Query(30, ge=1, le=3650)):
+    return {"history": get_recovery_history(days=days)}
+
+
+@router.get("/api/mywellness/history/bookings")
+def mywellness_history_bookings(days: int = Query(30, ge=1, le=3650)):
+    return get_booking_stats(days=days)
+
+
+@router.get("/api/mywellness/history/trends")
+def mywellness_history_trends(metric_name: str = Query(..., min_length=1), days: int = Query(30, ge=1, le=3650)):
+    return {"metric_name": metric_name, "days": days, "trend": get_health_trend(metric_name, days=days)}
