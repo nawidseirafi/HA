@@ -122,6 +122,8 @@ export function VacationDashboard() {
   const periods = history?.periods ?? [];
   const profiles = profileStats?.profiles ?? history?.presence_profiles ?? [];
   const lastActivity = events[0]?.created_at || agent?.last_run || periods[0]?.created_at;
+  const schedulerActive = Boolean(agent?.scheduler_running && (agent?.enabled ?? status?.enabled));
+  const scheduleText = agent?.schedule_times?.length ? agent.schedule_times.join(', ') : '-';
 
   return (
     <div className="page-stack wellness-app vacation-app">
@@ -185,6 +187,9 @@ export function VacationDashboard() {
             <StatCard icon={<UserRoundCheck size={20} />} label="Presence Profiles" value={`${status?.summary?.profiles ?? profileStats?.profile_count ?? profiles.length}`} tone={profiles.length ? 'success' : 'muted'} />
             <StatCard icon={<History size={20} />} label="Letzte Aktivität" value={formatDateTime(lastActivity)} tone="muted" />
             <StatCard icon={<CalendarDays size={20} />} label="Kalenderquelle" value={periodSourceLabel(period?.source)} tone={period?.source === 'homeassistant_calendar' ? 'success' : 'muted'} />
+            <StatCard icon={<RefreshCw size={20} />} label="Automatik" value={schedulerActive ? 'Läuft' : 'Aus'} tone={schedulerActive ? 'success' : 'muted'} />
+            <StatCard icon={<CalendarCheck size={20} />} label="Zeitplan" value={scheduleText} tone="info" />
+            <StatCard icon={<History size={20} />} label="Letzter Auto-Lauf" value={formatDateTime(agent?.last_scheduled_run)} tone="muted" />
           </section>
         </>
       )}

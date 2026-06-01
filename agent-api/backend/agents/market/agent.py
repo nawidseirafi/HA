@@ -4,6 +4,7 @@ import yaml
 
 from backend.config import load_agent_section
 from backend.paths import AGENTS_DIR
+from backend.services.messaging import MessagingService
 
 from .analysis_service import MarketAnalysisService
 from .data_service import MarketDataService
@@ -173,7 +174,26 @@ class MarketAgent:
         saved = self.store.save_report(report)
         saved["news"] = news_items
         saved["disclaimer"] = "Keine Finanzberatung."
+        self._create_market_message(saved)
         return saved
+
+    def _create_market_message(self, report: dict[str, Any]) -> None:
+        signal = str(report.get("signal") or "watch")
+        if signal not in {"bullish", "bearish"}:
+            return
+        title = "Kaufchance erkannt" if signal == "bullish" else "Starke Marktbewegung"
+        severity = "info" if signal == "bullish" else "warning"
+        try:
+            MessagingService().create_message(
+                source="market",
+                category="market",
+                severity=severity,
+                title=title,
+                message=f"{report.get('symbol')} wurde mit Signal {signal} bewertet.",
+                payload={"symbol": report.get("symbol"), "report_id": report.get("id"), "signal": signal},
+            )
+        except Exception:
+            pass
 
     def _write_config(self, **updates: Any) -> None:
         path = AGENTS_DIR / "market" / "config.yaml"

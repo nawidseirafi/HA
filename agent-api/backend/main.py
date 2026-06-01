@@ -18,6 +18,7 @@ from backend.api.settings_routes import router as settings_router
 from backend.api.waste_routes import router as waste_router
 from backend.paths import FRONTEND_DIST, LOG_DIR
 from backend.services.auth_service import user_from_request
+from backend.services.messaging.routes import router as messaging_router
 
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -74,6 +75,7 @@ app.include_router(homeassistant_router)
 app.include_router(orchestrator_router)
 app.include_router(waste_router)
 app.include_router(agents_router)
+app.include_router(messaging_router)
 include_agent_routers(app)
 app.include_router(settings_router)
 

@@ -1,6 +1,7 @@
 import json
 import logging
 import sqlite3
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ import yaml
 from backend.config import load_agent_section, resolve_api_path
 from backend.paths import AGENTS_DIR
 from backend.services.core.ha_client import HomeAssistantClient
+from backend.services.messaging import MessagingService
 from backend.services.waste_service import WasteService
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,10 @@ class VacationService:
     def __init__(self, ha_client: HomeAssistantClient | None = None) -> None:
         self._ha_client = ha_client
         self._last_run: dict[str, Any] | None = None
+        self._last_scheduled_run: str | None = None
         self._last_error: str | None = None
+        self.scheduler_stop = threading.Event()
+        self.scheduler_thread: threading.Thread | None = None
         self._ensure_schema()
 
     def config(self) -> dict[str, Any]:
@@ -37,6 +42,7 @@ class VacationService:
             "calendar_entity": config.get("calendar_entity", "auto"),
             "calendar_keywords": config.get("calendar_keywords") or list(DEFAULT_CALENDAR_KEYWORDS),
             "pre_departure_days": int(config.get("pre_departure_days", 3) or 3),
+            "schedule_times": self._schedule_times(config.get("schedule_times")),
             "notifications": config.get("notifications") if isinstance(config.get("notifications"), dict) else {},
             "database_path": str(self.db_path()),
             "log_path": str(self.log_path()),
@@ -63,9 +69,40 @@ class VacationService:
             updates["enabled"] = bool(payload["enabled"])
         if "calendar_entity" in payload:
             updates["calendar_entity"] = str(payload["calendar_entity"] or "auto").strip() or "auto"
+        if "schedule_times" in payload and isinstance(payload["schedule_times"], list):
+            updates["schedule_times"] = [str(item).strip()[:5] for item in payload["schedule_times"] if str(item).strip()]
         if updates:
             self._write_config(**updates)
         return self.get_status()
+
+    def start_scheduler(self) -> None:
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            return
+        self.scheduler_stop.clear()
+        self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
+        self.scheduler_thread.start()
+        self._log("Vacation scheduler gestartet.")
+
+    def stop_scheduler(self) -> None:
+        self.scheduler_stop.set()
+
+    def _scheduler_loop(self) -> None:
+        last_run_keys: set[str] = set()
+        while not self.scheduler_stop.is_set():
+            now = datetime.now()
+            today_key = now.date().isoformat()
+            last_run_keys = {key for key in last_run_keys if key.startswith(today_key)}
+            config = self.config()
+            if config["enabled"]:
+                for schedule_time in config["schedule_times"]:
+                    run_key = f"{today_key}:{schedule_time}"
+                    if run_key in last_run_keys:
+                        continue
+                    if self._time_due(now, schedule_time):
+                        self._last_scheduled_run = utc_now()
+                        self.run(dry_run=False)
+                        last_run_keys.add(run_key)
+            self.scheduler_stop.wait(30)
 
     def get_status(self) -> dict[str, Any]:
         config = self.config()
@@ -107,6 +144,9 @@ class VacationService:
             "last_run": self._last_run.get("finished_at") if isinstance(self._last_run, dict) else None,
             "last_check": self._last_run.get("started_at") if isinstance(self._last_run, dict) else None,
             "last_error": error,
+            "scheduler_running": bool(self.scheduler_thread and self.scheduler_thread.is_alive()),
+            "schedule_times": config["schedule_times"],
+            "last_scheduled_run": self._last_scheduled_run,
         }
         period = {
             "start_date": (calendar_period or active_period or {}).get("start_date"),
@@ -454,6 +494,8 @@ class VacationService:
                 message=title,
                 payload={"tag": tag, "reminders": [item.get("id") for item in actionable], "period": period},
             )
+            for item in actionable:
+                self._message_from_reminder(item)
             return {"sent": True, "tag": tag, "reminders": len(actionable)}
         except Exception as exc:
             self.create_event(
@@ -753,6 +795,19 @@ class VacationService:
                 connection.commit()
                 row = connection.execute("select * from vacation_reminders where id = ?", (cursor.lastrowid,)).fetchone()
         return dict(row)
+
+    def _message_from_reminder(self, reminder: dict[str, Any]) -> None:
+        try:
+            MessagingService().create_message(
+                source="vacation",
+                category="vacation",
+                severity=str(reminder.get("severity") or "info"),
+                title=str(reminder.get("title") or "Vacation Reminder"),
+                message=str(reminder.get("message") or ""),
+                payload={"reminder_id": reminder.get("id"), "reminder_type": reminder.get("reminder_type")},
+            )
+        except Exception:
+            logger.exception("Vacation reminder could not be written to MessagingService.")
 
     def _reminder_candidates(self, states: list[dict[str, Any]], vacation_mode: bool, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
         windows: list[str] = []
@@ -1168,3 +1223,19 @@ class VacationService:
         data["vacation"] = section
         with path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(data, handle, allow_unicode=True, sort_keys=False)
+
+    def _schedule_times(self, value: Any) -> list[str]:
+        values = value if isinstance(value, list) else ["07:30", "20:30"]
+        result: list[str] = []
+        for item in values:
+            text = str(item or "").strip()
+            if len(text) >= 5 and text[2] == ":":
+                result.append(text[:5])
+        return result or ["07:30", "20:30"]
+
+    def _time_due(self, now: datetime, schedule_time: str) -> bool:
+        try:
+            hour, minute = [int(part) for part in schedule_time.split(":", 1)]
+        except ValueError:
+            return False
+        return now.hour == hour and now.minute == minute

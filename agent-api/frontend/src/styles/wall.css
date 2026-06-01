@@ -195,6 +195,165 @@
   padding: 0 18px;
 }
 
+.wall-message-button {
+  position: relative;
+  min-width: 44px;
+  justify-content: center;
+  padding: 0 12px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.wall-message-button span {
+  display: none !important;
+}
+
+.wall-message-button svg {
+  color: var(--foreground);
+  transform-origin: 50% 10%;
+  transition: color 160ms ease;
+}
+
+.wall-message-button.has-unread {
+  animation: wall-bell-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes wall-bell-glow {
+  0%,100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+.wall-message-button.has-unread svg {
+  color: #f59e0b;
+  fill: #f59e0b;
+  filter:
+    drop-shadow(0 0 4px rgba(245,158,11,0.5))
+    drop-shadow(0 0 12px rgba(245,158,11,0.35));
+  animation: wall-bell-ring 0.75s ease-in-out infinite;
+}
+
+@keyframes wall-bell-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(18deg);
+  }
+  20% {
+    transform: rotate(-18deg);
+  }
+  30% {
+    transform: rotate(16deg);
+  }
+  40% {
+    transform: rotate(-16deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+  60% {
+    transform: rotate(-12deg);
+  }
+  70% {
+    transform: rotate(8deg);
+  }
+  80% {
+    transform: rotate(-8deg);
+  }
+  90% {
+    transform: rotate(4deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.wall-message-center {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.wall-message-center-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.wall-message-center-head span,
+.wall-message-group h3 {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wall-message-center-head strong {
+  display: block;
+  font-size: 1.25rem;
+}
+
+.wall-message-center-head button {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0 12px;
+  background: var(--muted);
+}
+
+.wall-message-group {
+  display: grid;
+  gap: 10px;
+}
+
+.wall-message-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--muted);
+}
+
+.wall-message-card.unread {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.wall-message-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  font-weight: 900;
+  background: var(--primary);
+}
+
+.wall-message-card.warning .wall-message-icon { background: var(--state-warn); }
+.wall-message-card.critical .wall-message-icon { background: var(--state-critical); }
+
+.wall-message-card p {
+  margin: 3px 0;
+  color: var(--foreground);
+}
+
+.wall-message-card small,
+.wall-message-empty {
+  color: var(--muted-foreground);
+}
+
 .wall-error,
 .wall-loading {
   padding: 18px 20px;
@@ -1921,7 +2080,8 @@ button.wall-room-card {
   .agent-status-node.status-running,
   .agent-status-dot,
   .agent-status-edge.active path,
-  .wall-internet-pill.ok {
+  .wall-internet-pill.ok,
+  .wall-message-button.has-unread svg {
     animation: none;
   }
 }

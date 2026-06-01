@@ -389,6 +389,21 @@ export type MarketSummary = {
   disclaimer: string;
 };
 
+export type MessageSeverity = 'info' | 'warning' | 'critical';
+
+export type MessageCenterItem = {
+  id: number;
+  source: string;
+  category: string;
+  severity: MessageSeverity;
+  title: string;
+  message: string;
+  payload?: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
+  read_at?: string | null;
+};
+
 export type WallEntity = {
   entity_id: string;
   name: string;
@@ -658,6 +673,9 @@ export type VacationStatus = {
     last_run?: string | null;
     last_check?: string | null;
     last_error?: string | null;
+    scheduler_running?: boolean;
+    schedule_times?: string[];
+    last_scheduled_run?: string | null;
   };
   vacation_mode?: {
     active?: boolean | null;
@@ -837,6 +855,12 @@ export const api = {
   settings: () => request<SettingsInfo>('/api/settings'),
   agents: async () => (await request<AgentsResponse>('/api/agents')).agents,
   orchestratorMap: () => request<OrchestratorMapData>('/api/orchestrator/map'),
+  messages: (limit = 100) => request<{ messages: MessageCenterItem[] }>(`/api/messages?limit=${limit}`),
+  unreadMessageCount: () => request<{ unread_count: number }>('/api/messages/unread-count'),
+  markMessageRead: (id: number) => request<MessageCenterItem>(`/api/messages/${id}/read`, { method: 'POST' }),
+  markAllMessagesRead: () => request<{ updated: number }>('/api/messages/read-all', { method: 'POST' }),
+  deleteAllMessages: () => request<{ deleted: number }>('/api/messages', { method: 'DELETE' }),
+  deleteMessage: (id: number) => request<{ ok: boolean }>(`/api/messages/${id}`, { method: 'DELETE' }),
   agentControl: (agentId: string) => request<AgentControlInfo>(`/api/orchestrator/agents/${agentId}/control`),
   executeAgentControl: (agentId: string, action: AgentControlAction, payload?: Record<string, unknown>) =>
     request<AgentControlResult>(`/api/orchestrator/agents/${agentId}/control/${action}`, {

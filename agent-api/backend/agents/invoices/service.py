@@ -16,6 +16,7 @@ import yaml
 from fastapi import HTTPException, UploadFile
 
 from backend.config import load_agent_runtime_config
+from backend.services.messaging import MessagingService
 from backend.paths import API_DIR, PROJECT_DIR
 
 logger = logging.getLogger(__name__)
@@ -608,12 +609,24 @@ class InvoiceService:
         destination = self.inbox_dir / stored_name
         with destination.open("wb") as output_file:
             shutil.copyfileobj(file.file, output_file)
-        return {
+        result = {
             "status": "uploaded",
             "filename": safe_name,
             "stored_filename": stored_name,
             "path": str(destination),
         }
+        try:
+            MessagingService().create_message(
+                source="invoice",
+                category="invoice",
+                severity="info",
+                title="Rechnung verarbeitet",
+                message=f"Beleg {safe_name} wurde hochgeladen.",
+                payload={"filename": safe_name, "stored_filename": stored_name},
+            )
+        except Exception:
+            pass
+        return result
 
     def run_agent(self) -> dict[str, Any]:
         if not self.run_lock.acquire(blocking=False):

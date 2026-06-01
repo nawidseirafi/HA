@@ -8,6 +8,7 @@ import {
     BatteryFull,
     BatteryMedium,
     BatteryWarning,
+    Bell,
     Bot,
     ChevronRight,
     CloudSun,
@@ -31,6 +32,7 @@ import {
 import {
     api,
     type AgentStatus,
+    type MessageCenterItem,
     type WallCover,
     type WallDashboardData,
     type WallEntity,
@@ -143,6 +145,69 @@ function shortWasteType(value: string) {
     return value;
 }
 
+function MessageCenter({ messages, onDeleteAll }: { messages: MessageCenterItem[]; onDeleteAll: () => void }) {
+    const groups = groupMessagesByDay(messages);
+    return (
+        <section className="wall-message-center">
+            <div className="wall-message-center-head">
+                <div>
+                    <span>Nachrichten</span>
+                    <strong>Message Center</strong>
+                </div>
+                <button type="button" onClick={onDeleteAll}>Alle löschen</button>
+            </div>
+            {groups.length === 0 && <div className="wall-message-empty">Keine Nachrichten vorhanden.</div>}
+            {groups.map((group) => (
+                <div className="wall-message-group" key={group.label}>
+                    <h3>{group.label}</h3>
+                    {group.items.map((item) => (
+                        <article key={item.id} className={`wall-message-card ${item.severity} ${item.read ? 'read' : 'unread'}`}>
+                            <span className="wall-message-icon">{messageIcon(item)}</span>
+                            <div>
+                                <strong>{item.title}</strong>
+                                <p>{item.message}</p>
+                                <small>{sourceLabel(item.source)} · {formatDateTime(item.created_at)} · {item.read ? 'gelesen' : 'ungelesen'}</small>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            ))}
+        </section>
+    );
+}
+
+function groupMessagesByDay(messages: MessageCenterItem[]) {
+    const formatter = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' });
+    const today = formatter.format(new Date());
+    const groups = new Map<string, MessageCenterItem[]>();
+    for (const item of messages) {
+        const date = new Date(item.created_at);
+        const label = Number.isNaN(date.getTime()) ? 'Unbekannt' : formatter.format(date) === today ? 'Heute' : formatter.format(date);
+        groups.set(label, [...(groups.get(label) ?? []), item]);
+    }
+    return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
+}
+
+function messageIcon(item: MessageCenterItem) {
+    if (item.severity === 'critical') return '!';
+    if (item.severity === 'warning') return '!';
+    if (item.source === 'market') return '^';
+    return 'i';
+}
+
+function sourceLabel(source: string) {
+    const labels: Record<string, string> = {
+        vacation: 'Vacation Agent',
+        mywellness: 'MyWellness Agent',
+        market: 'Market Agent',
+        invoice: 'Invoice Agent',
+        household: 'Household',
+        system: 'System',
+        orchestrator: 'Orchestrator',
+    };
+    return labels[source] || source;
+}
+
 function isBasementArea(area?: string) {
     const value = normalizeArea(area);
     return value.includes('basement') || value.includes('keller');
@@ -217,6 +282,9 @@ function WallDashboardContent() {
     const [busyEntity, setBusyEntity] = useState('');
     const [error, setError] = useState('');
     const [runtimeError, setRuntimeError] = useState('');
+    const [messages, setMessages] = useState<MessageCenterItem[]>([]);
+    const [unreadMessages, setUnreadMessages] = useState(0);
+    const [messageCenterOpen, setMessageCenterOpen] = useState(false);
     const [now, setNow] = useState(new Date());
     const brightnessTimers = useRef<Record<string, number>>({});
     const refreshTimer = useRef<number | null>(null);
@@ -225,8 +293,14 @@ function WallDashboardContent() {
         if (!silent) setLoading(true);
         setError('');
         try {
-            const next = await api.wallDashboard();
+            const [next, messageData, unreadData] = await Promise.all([
+                api.wallDashboard(),
+                api.messages(60),
+                api.unreadMessageCount(),
+            ]);
             setData(next);
+            setMessages(messageData.messages);
+            setUnreadMessages(unreadData.unread_count);
             setSelectedFloor((currentFloor) => (
                 currentFloor === 'Alle Etagen' || next.light_groups.some((group) => group.area === currentFloor)
                     ? currentFloor
@@ -238,6 +312,28 @@ function WallDashboardContent() {
             if (!silent) setLoading(false);
         }
     }, []);
+
+    const openMessageCenter = async () => {
+        setMessageCenterOpen((current) => !current);
+        try {
+            const [messageData, unreadData] = await Promise.all([api.messages(60), api.unreadMessageCount()]);
+            setMessages(messageData.messages);
+            setUnreadMessages(unreadData.unread_count);
+        } catch {
+            // Dashboard data remains usable even if the message center is unavailable.
+        }
+    };
+
+    const deleteAllMessages = async () => {
+        try {
+            await api.deleteAllMessages();
+            const [messageData, unreadData] = await Promise.all([api.messages(60), api.unreadMessageCount()]);
+            setMessages(messageData.messages);
+            setUnreadMessages(unreadData.unread_count);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Nachrichten konnten nicht gelöscht werden.');
+        }
+    };
 
     useEffect(() => {
         load();
@@ -509,11 +605,18 @@ function WallDashboardContent() {
                     </div>
                     <div className="wall-header-side">
                         <strong>{formatClock(now)}</strong>
+                        <button className={`wall-message-button ${unreadMessages ? 'has-unread' : ''}`} type="button" onClick={openMessageCenter} aria-label="Nachrichten">
+                            <Bell size={18}/>
+                            {unreadMessages > 0 && <span>{unreadMessages > 99 ? '99+' : unreadMessages}</span>}
+                        </button>
                         <button type="button" onClick={() => load()} disabled={loading} aria-label="Aktualisieren">
                             <RefreshCw size={18}/> Aktualisieren
                         </button>
                     </div>
                 </header>
+                {messageCenterOpen && (
+                    <MessageCenter messages={messages} onDeleteAll={deleteAllMessages} />
+                )}
 
                 {error && <section className="wall-error">{error}</section>}
                 {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}

@@ -14,6 +14,9 @@ vacation:
   database_path: data/vacation/vacation.db
   log_path: logs/vacation.log
   pre_departure_days: 3
+  schedule_times:
+  - '07:30'
+  - '20:30'
   notifications:
     enabled: true
     notify_service: notify.mobile_app_system_error_404

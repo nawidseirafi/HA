@@ -16,6 +16,7 @@ from .store import (
     save_recovery_analysis,
 )
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.messaging import MessagingService
 
 
 def utc_now() -> str:
@@ -282,6 +283,7 @@ class MyWellnessHealthService:
         }
         inserted_report = self._insert_report(report)
         self._save_recovery_history(inserted_report, ai_raw, payload)
+        self._create_recovery_message(inserted_report)
         return {"report": inserted_report, "metrics": metrics}
 
     def latest_report(self) -> dict[str, Any] | None:
@@ -455,6 +457,30 @@ class MyWellnessHealthService:
                     raw_context={"report": report, "context": payload},
                     created_at=report.get("created_at"),
                 )
+        except Exception:
+            return
+
+    def _create_recovery_message(self, report: dict[str, Any]) -> None:
+        score = int(report.get("recovery_score") or 0)
+        if score >= 70:
+            title = "Recovery verbessert"
+            severity = "info"
+            message = f"Recovery Score liegt bei {score}. Training nach Plan ist eher möglich."
+        elif score < 50:
+            title = "Niedrige Recovery"
+            severity = "warning"
+            message = "Heute eher Regeneration einplanen."
+        else:
+            return
+        try:
+            MessagingService().create_message(
+                source="mywellness",
+                category="mywellness",
+                severity=severity,
+                title=title,
+                message=message,
+                payload={"report_id": report.get("id"), "recovery_score": score},
+            )
         except Exception:
             return
 
