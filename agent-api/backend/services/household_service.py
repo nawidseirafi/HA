@@ -7,8 +7,7 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
 
 
 class HouseholdService:
-    def __init__(
-        self,
+    def __init__(        self,
         ha_service: HomeAssistantService | None = None,
         waste_service: WasteService | None = None,
         infrastructure_service: InfrastructureService | None = None,
@@ -174,6 +173,15 @@ class HouseholdService:
                 "reason": "Urlaubsmodus ist aktiv und Briefkasten meldet Post.",
                 "source": "household",
             })
+
+        for item in vacation.get("reminders", []) if isinstance(vacation, dict) else []:
+            if isinstance(item, dict):
+                reminders.append({
+                    "priority": str(item.get("severity") or "medium"),
+                    "message": str(item.get("title") or item.get("message") or "Vacation Reminder"),
+                    "reason": str(item.get("message") or item.get("reminder_type") or "Vacation-Agent Reminder"),
+                    "source": "vacation",
+                })
 
         if infrastructure.get("status") == "down":
             reminders.append({

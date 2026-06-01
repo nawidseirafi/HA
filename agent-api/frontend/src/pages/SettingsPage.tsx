@@ -205,6 +205,7 @@ export function SettingsPage() {
             </div>
             <SettingRow label="Registry aktiv" value={settings.agents.vacation.registry_enabled} />
             <SettingRow label="API Prefix" value={settings.agents.vacation.api_prefix || '-'} />
+            <PathRow label="Datenbank" value={settings.agents.vacation.database} />
             <SettingRow label="Mode Entity" value={settings.agents.vacation.mode_entity || '-'} />
             <SettingRow label="Dry Run Default" value={settings.agents.vacation.dry_run_default} />
           </article>

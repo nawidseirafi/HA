@@ -37,6 +37,21 @@ export function MarketDashboardPage({ navigate }: { navigate: (route: Route) => 
     }
   };
 
+  const setAgentEnabled = async (enabled: boolean) => {
+    setBusy(true);
+    setError('');
+    try {
+      await (enabled ? api.enableMarketAgent() : api.disableMarketAgent());
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'MarketAgent konnte nicht geschaltet werden.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const agentEnabled = summary?.agent?.enabled ?? true;
+
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -46,8 +61,11 @@ export function MarketDashboardPage({ navigate }: { navigate: (route: Route) => 
           <p className="market-disclaimer">Keine Finanzberatung.</p>
         </div>
         <div className="button-row">
+          <button className={agentEnabled ? 'button secondary' : 'button primary'} onClick={() => setAgentEnabled(!agentEnabled)} disabled={busy}>
+            {agentEnabled ? 'Agent deaktivieren' : 'Agent aktivieren'}
+          </button>
           <button className="button secondary" onClick={() => navigate({ name: 'marketWatchlist' })}>Watchlist</button>
-          <MarketRunButton busy={busy} onRun={run} />
+          <MarketRunButton busy={busy || !agentEnabled} onRun={run} />
         </div>
       </header>
 

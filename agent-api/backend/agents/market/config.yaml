@@ -1,6 +1,5 @@
-
 market:
-  enabled: true
+  enabled: false
   database_path: data/market/market.db
   log_path: logs/market.log
   price_provider: yahoo

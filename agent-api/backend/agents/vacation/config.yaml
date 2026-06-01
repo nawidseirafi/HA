@@ -1,4 +1,20 @@
 vacation:
-  enabled: false
+  enabled: true
   mode_entity: input_boolean.vacation_mode
+  calendar_entity: auto
+  calendar_keywords:
+  - urlaub
+  - vacation
+  - abwesenheit
+  - reise
+  - travel
+  - holiday
+  - ferie
+  - ferien
+  database_path: data/vacation/vacation.db
   log_path: logs/vacation.log
+  pre_departure_days: 3
+  notifications:
+    enabled: true
+    notify_service: notify.mobile_app_system_error_404
+    persistent: false

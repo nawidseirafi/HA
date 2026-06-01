@@ -1,6 +1,7 @@
 import type { Invoice, MonthSummary, Summary, YearSummary } from '../types/invoice';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const RAW_API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const API_BASE = normalizeApiBase(RAW_API_BASE);
 const TOKEN_KEY = 'robotersteve.agent-api.token';
 const SESSION_TOKEN_KEY = 'robotersteve.agent-api.session-token';
 
@@ -81,7 +82,7 @@ export type AgentsResponse = {
   agents: AgentManifest[];
 };
 
-export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard';
+export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard';
 
 export type MyWellnessHealthSettings = {
   id?: number;
@@ -270,6 +271,7 @@ export type SettingsInfo = {
       enabled: boolean;
       registry_enabled?: boolean | null;
       api_prefix?: string;
+      database: PathSetting;
       mode_entity?: string;
       dry_run_default?: boolean;
     };
@@ -372,6 +374,12 @@ export type MarketNews = {
 };
 
 export type MarketSummary = {
+  agent?: {
+    enabled: boolean;
+    current_status?: string;
+    status?: string;
+    last_error?: string | null;
+  };
   watchlist_count: number;
   enabled_count: number;
   signals: Record<MarketSignal, number>;
@@ -590,8 +598,117 @@ export type WallDashboardData = {
     };
     mywellness: Partial<AgentStatus> & { status?: string; error?: string };
     market: { status: string; watchlist_count?: number; enabled_count?: number; signals?: Record<string, number>; error?: string };
+    vacation?: {
+      status?: string;
+      current_status?: string;
+      vacation_mode?: boolean | { active?: boolean | null; source?: string; updated_at?: string | null } | null;
+      vacation_mode_active?: boolean | null;
+      history_active?: boolean;
+      open_reminders?: number;
+      error?: string;
+    };
   };
   household?: HouseholdSummary;
+};
+
+export type VacationReminder = {
+  id: number;
+  reminder_type?: string | null;
+  title?: string | null;
+  message?: string | null;
+  status?: string | null;
+  severity?: string | null;
+  due_at?: string | null;
+  created_at: string;
+};
+
+export type VacationEvent = {
+  id: number;
+  event_type: string;
+  severity: string;
+  message: string;
+  payload?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type VacationPeriod = {
+  id: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  source?: string | null;
+  active: number | boolean;
+  payload?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type PresenceProfile = {
+  id: number;
+  room?: string | null;
+  weekday?: number | null;
+  avg_on_time?: string | null;
+  avg_off_time?: string | null;
+  confidence?: number | null;
+  updated_at: string;
+};
+
+export type VacationStatus = {
+  agent?: {
+    enabled: boolean;
+    status: string;
+    last_run?: string | null;
+    last_check?: string | null;
+    last_error?: string | null;
+  };
+  vacation_mode?: {
+    active?: boolean | null;
+    source?: string;
+    updated_at?: string | null;
+    error?: string | null;
+  };
+  period?: {
+    start_date?: string | null;
+    end_date?: string | null;
+    source?: string | null;
+    title?: string | null;
+    calendar_entity?: string | null;
+    duration_days?: number | null;
+  };
+  summary?: {
+    reminders: number;
+    events: number;
+    profiles: number;
+  };
+  enabled: boolean;
+  current_status: string;
+  vacation_mode_active?: boolean | null;
+  mode_entity?: string;
+  calendar_entity?: string | null;
+  calendar_source?: string | null;
+  calendar_error?: string | null;
+  calendar_candidates?: Array<{ entity_id: string; name?: string; score?: number; matched_events?: number }>;
+  active_period?: VacationPeriod | null;
+  history_active?: boolean;
+  reminders?: VacationReminder[];
+  open_reminders?: number;
+  last_run?: Record<string, unknown> | null;
+  last_error?: string | null;
+  database_path?: string;
+  log_path?: string;
+};
+
+export type VacationHistory = {
+  periods: VacationPeriod[];
+  events: VacationEvent[];
+  reminders: VacationReminder[];
+  presence_profiles: PresenceProfile[];
+};
+
+export type VacationProfilesResponse = {
+  status: string;
+  analyzed_days: number;
+  profile_count: number;
+  confidence: number;
+  profiles: PresenceProfile[];
 };
 
 export type OrchestratorMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
@@ -645,13 +762,22 @@ export type OrchestratorMapData = {
   edges: OrchestratorMapEdge[];
 };
 
+function normalizeApiBase(value: string) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (trimmed.startsWith('//')) return `${window.location.protocol}${trimmed}`;
+  if (trimmed.startsWith('localhost') || /^\d{1,3}(?:\.\d{1,3}){3}/.test(trimmed)) return `http://${trimmed}`;
+  return trimmed;
+}
+
 function apiUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   if (!API_BASE) return normalizedPath;
   try {
     return new URL(normalizedPath, API_BASE).toString();
   } catch {
-    throw new Error(`API-Adresse ist ungueltig: ${API_BASE}`);
+    throw new Error(`API-Adresse ist ungueltig: ${RAW_API_BASE}`);
   }
 }
 
@@ -671,7 +797,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(message === 'The string did not match the expected pattern.'
       ? 'API-Adresse konnte vom Browser nicht verarbeitet werden. Bitte VITE_API_BASE pruefen oder leer lassen, wenn Frontend und Backend auf demselben Port laufen.'
-      : message + 'hallo');
+      : message);
   }
   if (!response.ok) {
     const text = await response.text();
@@ -718,9 +844,40 @@ export const api = {
       body: JSON.stringify(payload ?? {}),
     }),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
+  vacationStatus: () => request<VacationStatus>('/api/vacation/status'),
+  enableVacationAgent: () => request<VacationStatus>('/api/vacation/enable', { method: 'POST' }),
+  disableVacationAgent: () => request<VacationStatus>('/api/vacation/disable', { method: 'POST' }),
+  toggleVacationAgent: () => request<VacationStatus>('/api/vacation/toggle', { method: 'POST' }),
+  updateVacationSettings: (payload: { enabled?: boolean; calendar_entity?: string }) =>
+    request<VacationStatus>('/api/vacation/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  vacationReminders: () => request<{ reminders: VacationReminder[] }>('/api/vacation/reminders'),
+  vacationProfiles: (limit = 100) => request<VacationProfilesResponse>(`/api/vacation/profiles?limit=${limit}`),
+  vacationHistory: (limit = 100) => request<VacationHistory>(`/api/vacation/history?limit=${limit}`),
+  enableVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/enable', { method: 'POST' }),
+  disableVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/disable', { method: 'POST' }),
+  toggleVacationMode: () => request<{ ok: boolean; vacation_mode: VacationStatus['vacation_mode'] }>('/api/vacation/mode/toggle', { method: 'POST' }),
+  saveVacationPeriod: (payload?: { start_date?: string; end_date?: string }) =>
+    request<{ ok: boolean; period: VacationPeriod; status: VacationStatus }>('/api/vacation/start', {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
+  closeVacationPeriod: (payload?: { end_date?: string }) =>
+    request<{ ok: boolean; ended_at: string; status: VacationStatus }>('/api/vacation/end', {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
+  runVacationAgent: (payload?: Record<string, unknown>) =>
+    request<AgentControlResult>('/api/orchestrator/agents/vacation/control/run', {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
   callHomeAssistantService: (payload: { domain: string; service: string; entity_id?: string | string[]; data?: Record<string, unknown> }) =>
     request<{ ok: boolean; result: unknown }>('/api/homeassistant/service', { method: 'POST', body: JSON.stringify(payload) }),
   marketSummary: () => request<MarketSummary>('/api/market/summary'),
+  marketStatus: () => request<NonNullable<MarketSummary['agent']>>('/api/market/status'),
+  enableMarketAgent: () => request<NonNullable<MarketSummary['agent']>>('/api/market/enable', { method: 'POST' }),
+  disableMarketAgent: () => request<NonNullable<MarketSummary['agent']>>('/api/market/disable', { method: 'POST' }),
+  toggleMarketAgent: () => request<NonNullable<MarketSummary['agent']>>('/api/market/toggle', { method: 'POST' }),
   marketWatchlist: async () => (await request<{ items: MarketWatchlistItem[]; disclaimer: string }>('/api/market/watchlist')).items,
   createMarketWatchlistItem: (payload: MarketWatchlistPayload) =>
     request<MarketWatchlistItem>('/api/market/watchlist', { method: 'POST', body: JSON.stringify(payload) }),

@@ -1,4 +1,4 @@
-import { Activity, BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, HeartPulse, LineChart, ListChecks, LogOut, Play, Settings, Upload, X } from 'lucide-react';
+import { Activity, BarChart3, BellRing, Bot, CalendarDays, Dumbbell, Gauge, HeartPulse, LineChart, ListChecks, LogOut, Plane, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '../api/client';
@@ -17,7 +17,8 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
   const [busy, setBusy] = useState(false);
   const isMarketArea = route.name === 'marketDashboard' || route.name === 'marketWatchlist' || route.name === 'marketReports' || route.name === 'marketSymbol';
   const isMyWellnessArea = route.name === 'mywellnessDashboard' || route.name === 'mywellnessCourses' || route.name === 'mywellnessBookings' || route.name === 'mywellnessHistory' || route.name === 'mywellnessHealth';
-  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || isMyWellnessArea || isMarketArea;
+  const isVacationArea = route.name === 'vacationDashboard';
+  const isNeutralArea = route.name === 'agents' || route.name === 'settings' || isMyWellnessArea || isMarketArea || isVacationArea;
 
   const runAgent = async () => {
     setBusy(true);
@@ -86,6 +87,11 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
               <BarChart3 size={18} /> Marktberichte
             </button>
           </>
+        )}
+        {isVacationArea && (
+          <button className="active" onClick={() => navigate({ name: 'vacationDashboard' })}>
+            <Plane size={18} /> Vacation
+          </button>
         )}
         {!isNeutralArea && (
           <>

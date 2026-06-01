@@ -224,6 +224,7 @@ def get_settings() -> dict[str, Any]:
                 "enabled": bool(vacation_config.get("enabled", False)),
                 "registry_enabled": manifests.get("vacation").enabled if manifests.get("vacation") else None,
                 "api_prefix": manifests.get("vacation").api_prefix if manifests.get("vacation") else "",
+                "database": _path_info(API_DIR, vacation_config.get("database_path", data_dir / "vacation" / "vacation.db")),
                 "mode_entity": vacation_config.get("mode_entity", ""),
                 "dry_run_default": True,
             },

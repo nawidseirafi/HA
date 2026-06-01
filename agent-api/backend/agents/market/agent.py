@@ -1,5 +1,10 @@
 from typing import Any
 
+import yaml
+
+from backend.config import load_agent_section
+from backend.paths import AGENTS_DIR
+
 from .analysis_service import MarketAnalysisService
 from .data_service import MarketDataService
 from .news_service import MarketNewsService
@@ -15,7 +20,48 @@ class MarketAgent:
         self.analysis = MarketAnalysisService()
         self.symbol_resolver = MarketSymbolResolver()
 
+    def config(self) -> dict[str, Any]:
+        config = load_agent_section("market")
+        return {
+            "enabled": bool(config.get("enabled", True)),
+            "database_path": config.get("database_path", "data/market/market.db"),
+            "log_path": config.get("log_path", "logs/market.log"),
+            "price_provider": config.get("price_provider", "yahoo"),
+            "news_provider": config.get("news_provider", "fallback"),
+        }
+
+    def status(self) -> dict[str, Any]:
+        config = self.config()
+        return {
+            "enabled": config["enabled"],
+            "current_status": "active" if config["enabled"] else "disabled",
+            "status": "active" if config["enabled"] else "disabled",
+            "last_error": None,
+            "settings": config,
+        }
+
+    def enable(self) -> dict[str, Any]:
+        self._write_config(enabled=True)
+        return self.status()
+
+    def disable(self) -> dict[str, Any]:
+        self._write_config(enabled=False)
+        return self.status()
+
+    def toggle(self) -> dict[str, Any]:
+        return self.disable() if self.config()["enabled"] else self.enable()
+
+    def update_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        if "enabled" in payload:
+            updates["enabled"] = bool(payload["enabled"])
+        if updates:
+            self._write_config(**updates)
+        return self.status()
+
     def run(self) -> dict[str, Any]:
+        if not self.config()["enabled"]:
+            return {"status": "disabled", "reports": [], "disclaimer": "Keine Finanzberatung."}
         entries = self.store.watchlist(enabled_only=True)
         reports = [self.analyze_symbol(entry["symbol"]) for entry in entries]
         return {"status": "completed", "reports": reports, "disclaimer": "Keine Finanzberatung."}
@@ -128,3 +174,18 @@ class MarketAgent:
         saved["news"] = news_items
         saved["disclaimer"] = "Keine Finanzberatung."
         return saved
+
+    def _write_config(self, **updates: Any) -> None:
+        path = AGENTS_DIR / "market" / "config.yaml"
+        data: dict[str, Any] = {}
+        if path.exists():
+            with path.open("r", encoding="utf-8") as handle:
+                loaded = yaml.safe_load(handle) or {}
+                data = loaded if isinstance(loaded, dict) else {}
+        section = data.get("market")
+        if not isinstance(section, dict):
+            section = {}
+        section.update(updates)
+        data["market"] = section
+        with path.open("w", encoding="utf-8") as handle:
+            yaml.safe_dump(data, handle, allow_unicode=True, sort_keys=False)

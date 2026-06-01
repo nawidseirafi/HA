@@ -84,7 +84,17 @@ function postStatus(data: WallDashboardData) {
 }
 
 function vacationStatus(data: WallDashboardData) {
-    return data.waste?.context?.vacation_mode === true;
+    const agentVacationMode = data.agents.vacation?.vacation_mode;
+    const agentVacationActive = agentVacationMode && typeof agentVacationMode === 'object'
+        ? agentVacationMode.active === true
+        : agentVacationMode === true;
+    return agentVacationActive || data.agents.vacation?.vacation_mode_active === true || data.household?.vacation?.vacation_mode === true || data.waste?.context?.vacation_mode === true;
+}
+
+function vacationDetail(data: WallDashboardData) {
+    const vacation = data.agents.vacation;
+    if (vacation?.error) return String(vacation.error);
+    return vacationStatus(data) ? 'Haus im Urlaubsmodus' : 'Antippen zum Aktivieren';
 }
 
 function wasteTitle(data: WallDashboardData) {
@@ -350,11 +360,7 @@ function WallDashboardContent() {
         setBusyEntity(entityId);
         setError('');
         try {
-            await api.callHomeAssistantService({
-                domain: 'input_boolean',
-                service: nextOn ? 'turn_on' : 'turn_off',
-                entity_id: entityId
-            });
+            await (nextOn ? api.enableVacationMode() : api.disableVacationMode());
             scheduleRefresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Urlaubsmodus konnte nicht geschaltet werden.');
@@ -625,7 +631,7 @@ function HomeSection({
                 icon={<Plane size={24}/>}
                 label="Vacation Mode"
                 value={vacation ? 'Aktiv' : 'Aus'}
-                detail={vacation ? 'Antippen zum Deaktivieren' : 'Antippen zum Aktivieren'}
+                detail={vacationDetail(data)}
                 tone={vacation ? 'warn' : 'neutral'}
                 onClick={onToggleVacation}
             />

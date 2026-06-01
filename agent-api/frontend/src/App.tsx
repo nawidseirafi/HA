@@ -16,6 +16,7 @@ import { MarketDashboardPage } from './pages/market/MarketDashboardPage';
 import { MarketReportsPage } from './pages/market/MarketReportsPage';
 import { MarketSymbolPage } from './pages/market/MarketSymbolPage';
 import { MarketWatchlistPage } from './pages/market/MarketWatchlistPage';
+import { VacationDashboard } from './pages/VacationDashboard';
 import { WallDashboardPage } from './pages/WallDashboardPage';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -32,6 +33,7 @@ export type Route =
   | { name: 'marketWatchlist' }
   | { name: 'marketReports' }
   | { name: 'marketSymbol'; symbol: string }
+  | { name: 'vacationDashboard' }
   | { name: 'invoiceDashboard' }
   | { name: 'years' }
   | { name: 'year'; year: number }
@@ -59,6 +61,7 @@ function parseRoute(): Route {
   if (parts[0] === 'market' && parts[1] === 'reports') return { name: 'marketReports' };
   if (parts[0] === 'market' && parts[1]) return { name: 'marketSymbol', symbol: parts[1].toUpperCase() };
   if (parts[0] === 'market') return { name: 'marketDashboard' };
+  if (parts[0] === 'vacationDashboard' || parts[0] === 'vacation') return { name: 'vacationDashboard' };
   if (parts[0] === 'years') return { name: 'years' };
   if (parts[0] === 'agents') return { name: 'agents' };
   if (parts[0] === 'mywellness' && parts[1] === 'courses') return { name: 'mywellnessCourses' };
@@ -105,6 +108,7 @@ function AppContent() {
     if (route.name === 'marketWatchlist') return <MarketWatchlistPage navigate={navigate} />;
     if (route.name === 'marketReports') return <MarketReportsPage navigate={navigate} />;
     if (route.name === 'marketSymbol') return <MarketSymbolPage symbol={route.symbol} />;
+    if (route.name === 'vacationDashboard') return <VacationDashboard />;
     if (route.name === 'years') return <YearsPage navigate={navigate} />;
     if (route.name === 'year') return <YearPage year={route.year} navigate={navigate} />;
     if (route.name === 'month') return <MonthPage year={route.year} month={route.month} navigate={navigate} />;
@@ -140,6 +144,7 @@ function routeToPath(route: Route) {
   if (route.name === 'marketWatchlist') return '/market/watchlist';
   if (route.name === 'marketReports') return '/market/reports';
   if (route.name === 'marketSymbol') return `/market/${encodeURIComponent(route.symbol)}`;
+  if (route.name === 'vacationDashboard') return '/vacationDashboard';
   if (route.name === 'invoiceDashboard') return '/invoices';
   if (route.name === 'years') return '/invoices/years';
   if (route.name === 'year') return `/invoices/years/${route.year}`;

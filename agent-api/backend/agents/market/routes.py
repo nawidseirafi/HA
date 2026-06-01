@@ -28,6 +28,36 @@ class WatchlistPayload(BaseModel):
     enabled: bool = True
 
 
+class SettingsPayload(BaseModel):
+    enabled: bool | None = None
+
+
+@router.get("/status")
+def status():
+    return agent.status()
+
+
+@router.post("/enable")
+def enable_market_agent():
+    return agent.enable()
+
+
+@router.post("/disable")
+def disable_market_agent():
+    return agent.disable()
+
+
+@router.post("/toggle")
+def toggle_market_agent():
+    return agent.toggle()
+
+
+@router.put("/settings")
+def update_market_settings(payload: SettingsPayload):
+    data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    return agent.update_settings(data)
+
+
 @router.get("/watchlist")
 def watchlist():
     return {"items": store.watchlist(), "disclaimer": "Keine Finanzberatung."}
@@ -100,4 +130,4 @@ def latest_report_for_symbol(symbol: str):
 
 @router.get("/summary")
 def summary():
-    return store.summary()
+    return {**store.summary(), "agent": agent.status()}

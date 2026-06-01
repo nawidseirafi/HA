@@ -68,6 +68,18 @@ class HomeAssistantClient:
         r.raise_for_status()
         return r.json()
 
+    def get_calendars(self):
+        url = f"{self.base_url}/api/calendars"
+        r = requests.get(url, headers=self.headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_calendar_events(self, entity_id, start, end):
+        url = f"{self.base_url}/api/calendars/{entity_id}"
+        r = requests.get(url, headers=self.headers, params={"start": start, "end": end}, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
     def call_service(self, domain, service, data):
         url = f"{self.base_url}/api/services/{domain}/{service}"
         r = requests.post(url, headers=self.headers, json=data, timeout=10)
