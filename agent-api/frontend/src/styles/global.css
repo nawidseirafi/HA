@@ -1044,6 +1044,16 @@ p { color: var(--muted); line-height: 1.65; }
   text-align: left;
 }
 .agent-card p { color: var(--muted); }
+.agent-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.agent-card-actions .button {
+  min-height: 34px;
+  padding: 7px 10px;
+}
 .agent-icon {
   width: 48px;
   height: 48px;

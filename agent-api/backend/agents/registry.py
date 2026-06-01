@@ -6,6 +6,8 @@ from typing import Any
 import yaml
 from fastapi import FastAPI
 
+from backend.agents.control import AgentControlAdapter, BaseAgentControl
+from backend.config import load_agent_section
 from backend.paths import BACKEND_DIR
 
 
@@ -72,6 +74,17 @@ def agent_runtime_services() -> list[Any]:
     return services
 
 
+def get_agent_control(agent_id: str) -> BaseAgentControl | None:
+    manifest = next((item for item in discover_agent_manifests() if item.id == agent_id), None)
+    if not manifest or not manifest.route_module or not manifest.service_object:
+        return None
+    module = importlib.import_module(manifest.route_module)
+    service = getattr(module, manifest.service_object, None)
+    if service is None:
+        return None
+    return AgentControlAdapter(agent_id=manifest.id, service=service)
+
+
 def _load_manifest(path: Path) -> AgentManifest | None:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -88,7 +101,7 @@ def _load_manifest(path: Path) -> AgentManifest | None:
         name=str(data.get("name") or agent_id),
         description=str(data.get("description") or ""),
         icon=str(ui.get("icon") or "Bot"),
-        enabled=bool(data.get("enabled", True)),
+        enabled=_agent_enabled(agent_id),
         status=str(data.get("status") or "active"),
         dashboard_route=ui.get("dashboard_route"),
         api_prefix=str(api.get("prefix") or ""),
@@ -97,3 +110,8 @@ def _load_manifest(path: Path) -> AgentManifest | None:
         settings=data.get("settings") or {},
         source_path=path,
     )
+
+
+def _agent_enabled(agent_id: str) -> bool:
+    config = load_agent_section(agent_id)
+    return bool(config.get("enabled", True))

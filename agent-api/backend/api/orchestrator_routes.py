@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from backend.agents.registry import discover_agent_manifests
 from backend.agents.invoices.routes import invoice_service
@@ -9,9 +10,20 @@ from backend.agents.market.report_service import MarketReportService
 from backend.agents.mywellness.routes import mywellness_service
 from backend.agents.vacation.routes import vacation_service
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.orchestrator_control_service import OrchestratorControlService
 
 
 router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
+control_service = OrchestratorControlService()
+
+
+class ControlPayload(BaseModel):
+    action: str | None = None
+    mode: str | None = None
+    dry_run: bool | None = None
+
+    class Config:
+        extra = "allow"
 
 
 @router.get("/map")
@@ -27,6 +39,7 @@ def orchestrator_map() -> dict[str, Any]:
             "kind": "orchestrator",
             "status": "running" if any(agent["status"] == "running" for agent in agents) else "active",
             "icon": "Bot",
+            "control": _read_only_control(),
         },
         *agents,
         *services,
@@ -99,6 +112,17 @@ def orchestrator_map() -> dict[str, Any]:
     }
 
 
+@router.get("/agents/{agent_id}/control")
+def agent_control(agent_id: str) -> dict[str, Any]:
+    return control_service.get_control_capabilities(agent_id)
+
+
+@router.post("/agents/{agent_id}/control/{action}")
+def execute_agent_control(agent_id: str, action: str, payload: ControlPayload | None = None) -> dict[str, Any]:
+    data = payload.model_dump(exclude_none=True) if payload and hasattr(payload, "model_dump") else payload.dict(exclude_none=True) if payload else {}
+    return control_service.execute(agent_id, action, data)
+
+
 def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
     agent_id = str(manifest.get("id") or "")
     status_data = _agent_status(agent_id)
@@ -111,6 +135,7 @@ def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "icon": _agent_icon(agent_id, manifest),
         "enabled": bool(manifest.get("enabled", True)),
+        "control": _control_info(agent_id),
         "dashboard_route": manifest.get("dashboard_route"),
         "api_prefix": manifest.get("api_prefix"),
         "last_run": _first_string(status_data, "last_successful_run", "last_finished_at", "last_started_at"),
@@ -140,10 +165,25 @@ def _service_nodes() -> list[dict[str, Any]]:
     except Exception:
         ha_status = "error"
     return [
-        {"id": "openai", "label": "OpenAI", "subtitle": "Modelle & Verarbeitung", "kind": "service", "status": "active", "icon": "Sparkles"},
-        {"id": "database", "label": "Database", "subtitle": "Daten & Historie", "kind": "service", "status": "active", "icon": "Database"},
-        {"id": "homeassistant", "label": "Home Assistant", "subtitle": "Smart Home Bridge", "kind": "service", "status": ha_status, "icon": "HousePlug"},
+        {"id": "openai", "label": "OpenAI", "subtitle": "Modelle & Verarbeitung", "kind": "service", "status": "active", "icon": "Sparkles", "control": _read_only_control()},
+        {"id": "database", "label": "Database", "subtitle": "Daten & Historie", "kind": "service", "status": "active", "icon": "Database", "control": _read_only_control()},
+        {"id": "homeassistant", "label": "Home Assistant", "subtitle": "Smart Home Bridge", "kind": "service", "status": ha_status, "icon": "HousePlug", "control": _read_only_control()},
     ]
+
+
+def _control_info(agent_id: str) -> dict[str, Any]:
+    try:
+        info = control_service.get_control_capabilities(agent_id)
+    except Exception:
+        return _read_only_control()
+    return {
+        "supported": bool(info.get("supported")),
+        "actions": info.get("actions") or [],
+    }
+
+
+def _read_only_control() -> dict[str, Any]:
+    return {"supported": False, "actions": []}
 
 
 def _status_tone(agent_id: str, manifest: dict[str, Any], status_data: dict[str, Any]) -> str:

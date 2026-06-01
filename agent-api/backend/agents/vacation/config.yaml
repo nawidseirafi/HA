@@ -1,4 +1,4 @@
 vacation:
-  enabled: true
+  enabled: false
   mode_entity: input_boolean.vacation_mode
   log_path: logs/vacation.log

@@ -239,7 +239,7 @@ export type SettingsInfo = {
   agents: {
     invoices: {
       enabled: boolean;
-      manifest_enabled?: boolean | null;
+      registry_enabled?: boolean | null;
       api_prefix?: string;
       upload_dir: PathSetting;
       database: PathSetting;
@@ -251,7 +251,7 @@ export type SettingsInfo = {
     };
     mywellness: {
       enabled: boolean;
-      manifest_enabled?: boolean | null;
+      registry_enabled?: boolean | null;
       api_prefix?: string;
       database: PathSetting;
       days: number;
@@ -263,14 +263,14 @@ export type SettingsInfo = {
     };
     vacation: {
       enabled: boolean;
-      manifest_enabled?: boolean | null;
+      registry_enabled?: boolean | null;
       api_prefix?: string;
       mode_entity?: string;
       dry_run_default?: boolean;
     };
     market?: {
       enabled: boolean;
-      manifest_enabled?: boolean | null;
+      registry_enabled?: boolean | null;
       api_prefix?: string;
       database: PathSetting;
       price_provider: string;
@@ -590,6 +590,21 @@ export type WallDashboardData = {
 };
 
 export type OrchestratorMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
+export type AgentControlAction = 'status' | 'start' | 'stop' | 'enable' | 'disable' | 'toggle' | 'run';
+export type AgentControlInfo = {
+  agent_id?: string;
+  enabled?: boolean;
+  supported: boolean;
+  actions: AgentControlAction[];
+};
+export type AgentControlResult = {
+  agent_id: string;
+  action: AgentControlAction;
+  ok: boolean;
+  status: string;
+  message: string;
+  data: Record<string, unknown>;
+};
 export type OrchestratorMapNode = {
   id: string;
   label: string;
@@ -598,6 +613,7 @@ export type OrchestratorMapNode = {
   status: OrchestratorMapStatus;
   icon: string;
   enabled?: boolean;
+  control?: AgentControlInfo;
   dashboard_route?: string | null;
   api_prefix?: string | null;
   last_run?: string;
@@ -690,6 +706,12 @@ export const api = {
   settings: () => request<SettingsInfo>('/api/settings'),
   agents: async () => (await request<AgentsResponse>('/api/agents')).agents,
   orchestratorMap: () => request<OrchestratorMapData>('/api/orchestrator/map'),
+  agentControl: (agentId: string) => request<AgentControlInfo>(`/api/orchestrator/agents/${agentId}/control`),
+  executeAgentControl: (agentId: string, action: AgentControlAction, payload?: Record<string, unknown>) =>
+    request<AgentControlResult>(`/api/orchestrator/agents/${agentId}/control/${action}`, {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
   callHomeAssistantService: (payload: { domain: string; service: string; entity_id?: string | string[]; data?: Record<string, unknown> }) =>
     request<{ ok: boolean; result: unknown }>('/api/homeassistant/service', { method: 'POST', body: JSON.stringify(payload) }),

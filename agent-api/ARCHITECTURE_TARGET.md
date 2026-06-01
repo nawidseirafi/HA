@@ -13,6 +13,7 @@ Der wichtigste Grundsatz: Die vorhandene Registry bleibt Discovery-Schicht. Der 
 - Agenten behalten ihre Domänen-Datenbanken.
 - Neue Querschnittsdaten bekommen eigene Datenbanken.
 - Orchestrator koordiniert, aber besitzt keine Fachlogik der Agenten.
+- Orchestrator darf Agenten zentral starten und stoppen, aber nur über einen einheitlichen Agent-Control-Vertrag.
 
 # Minimale Änderungen
 
@@ -203,6 +204,43 @@ Wichtig:
 - Runtime-Status kommt aus Agent-Services.
 - UI sollte nicht eigene Agent-Metadaten hardcoden.
 
+# Agent Control Contract
+
+Ziel: Der Orchestrator soll alle Agenten zentral starten, stoppen und später optional pausieren können, ohne Fachlogik der Agenten zu übernehmen.
+
+Jeder Agent mit `runtime.service_object` sollte folgende Methoden unterstützen:
+
+- `status() -> dict`
+- `enable() -> dict`
+- `disable() -> dict`
+- `start_scheduler() -> None`
+- `stop_scheduler() -> None`
+- optional `run(...) -> dict`
+- optional `pause() -> dict` und `resume() -> dict`
+
+Semantik:
+
+- `start_scheduler()` startet nur geplante Hintergrundläufe.
+- `stop_scheduler()` stoppt nur geplante Hintergrundläufe und löscht keine Fachdaten.
+- `enable()` aktiviert den Agenten als Laufzeit-/Planungszustand.
+- `disable()` deaktiviert den Agenten als Laufzeit-/Planungszustand, ohne APIs zu entfernen.
+- Start/Stop/Enable/Disable müssen idempotent sein.
+- Statuswerte müssen auf `active`, `running`, `paused`, `disabled`, `error` normalisierbar sein.
+
+Empfohlene Orchestrator-API:
+
+- `POST /api/orchestrator/agents/{agent_id}/start`
+- `POST /api/orchestrator/agents/{agent_id}/stop`
+- `POST /api/orchestrator/agents/start-all`
+- `POST /api/orchestrator/agents/stop-all`
+
+Wichtig:
+
+- Bestehende Agent-Endpunkte bleiben erhalten.
+- Orchestrator ruft nur den Control-Vertrag auf.
+- Agenten besitzen weiterhin ihre Fachlogik, Datenbanken und Konfiguration.
+- Agent-Metadaten kommen weiterhin aus `manifest.yaml`.
+
 # Empfohlene Zielmodule
 
 Minimal und kompatibel:
@@ -252,12 +290,13 @@ backend/
 - Wall-Dashboard schrittweise auf `HouseholdService.summary()` umstellen.
 - Datenmodell für `household.db` finalisieren, aber erst nach stabiler Service-Fassade anlegen.
 - Orchestrator-Status-Events entwerfen, aber noch nicht breit in Agenten einbauen.
+- Agent-Control-Vertrag für `enable`, `disable`, `start_scheduler`, `stop_scheduler` dokumentieren und bestehende Agenten dagegen prüfen.
 
 ## P3
 
 - `orchestrator.db` einführen, wenn Statusmodell und Map stabil sind.
+- Zentrale Orchestrator-Start/Stop-Endpunkte für einzelne Agenten und alle Agenten implementieren.
 - FritzBox-/Infrastructure-Service ergänzen.
 - Agent-Abhängigkeiten für Map und Scheduling modellieren.
 - LLM-Factory bereinigen: Claude-Pfad entweder implementieren oder aus der Konfiguration entfernen.
 - Langfristig ältere und neue Home-Assistant-Clients konsolidieren.
-

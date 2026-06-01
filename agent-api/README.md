@@ -10,12 +10,15 @@ roboterSteve/
 │   ├── backend/
 │   │   ├── main.py
 │   │   ├── paths.py
-│   │   ├── api/                  # Querschnitts-APIs: Auth, Settings
-│   │   ├── services/             # Querschnitts-Services (LLM, Home Assistant)
+│   │   ├── api/                  # Querschnitts-APIs: Auth, Settings, Orchestrator, Household
+│   │   ├── services/             # Querschnitts-Services (LLM, Home Assistant, Household, Infrastructure)
 │   │   └── agents/
+│   │       ├── control.py        # Einheitlicher Agent-Control-Vertrag
+│   │       ├── registry.py       # Manifest Discovery und Runtime-Service Lookup
 │   │       ├── invoices/         # InvoiceAgent API, Service, Exporte, CLI
 │   │       ├── market/           # MarketAgent API, Analyse-/Datenservices, CLI
-│   │       └── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
+│   │       ├── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
+│   │       └── vacation/         # Vacation Mode / Home-Assistant-Kontext
 │   ├── frontend/
 │   │   └── src/                 # React-App
 │   ├── config.yaml
@@ -168,6 +171,23 @@ GET  /api/mywellness/health/withings/entities
 POST /api/mywellness/health/withings/import
 GET  /api/mywellness/health/withings/latest
 POST /api/mywellness/health/withings/discover
+```
+
+**Agents / Orchestrator / Household:**
+```text
+GET  /api/agents
+GET  /api/orchestrator/map
+GET  /api/orchestrator/agents/{agent_id}/control
+POST /api/orchestrator/agents/{agent_id}/control/{action}
+GET  /api/household/status
+GET  /api/household/summary
+GET  /api/household/reminders
+GET  /api/infrastructure/status
+GET  /api/infrastructure/summary
+GET  /api/homeassistant/wall
+GET  /api/waste/status
+GET  /api/waste/next
+GET  /api/waste/reminders
 ```
 
 **Kompatible alte Endpunkte:**
@@ -405,7 +425,6 @@ backend/agents/example/
 id: example
 name: Example Agent
 description: Kurzbeschreibung fuer die Agenten-Uebersicht.
-enabled: true
 status: active
 api:
   prefix: /api/example
@@ -418,7 +437,54 @@ ui:
 settings: {}
 ```
 
+`enabled` gehoert nicht ins Manifest. Ob ein Agent aktiv ist, wird aus `backend/agents/<id>/config.yaml` gelesen:
+
+```yaml
+example:
+  enabled: true
+```
+
 `routes.py` muss einen FastAPI-`router` exportieren. Wenn `runtime.service_object` gesetzt ist und dieses Objekt `start_scheduler()` / `stop_scheduler()` besitzt, ruft die API diese Methoden beim Starten und Stoppen automatisch auf.
+
+### Orchestrator Control Contract
+
+Der Orchestrator steuert Agenten ueber einen einheitlichen Control-Vertrag. Capabilities werden aus dem `runtime.service_object` des Manifests abgeleitet.
+
+Unterstuetzte Control-Aktionen:
+
+- `status`
+- `start`
+- `stop`
+- `enable`
+- `disable`
+- `toggle`
+- `run`
+
+Moegliche Service-Methoden:
+
+- `status() -> dict`
+- `start() -> dict` oder `start_scheduler() -> None`
+- `stop() -> dict` oder `stop_scheduler() -> None`
+- `enable() -> dict`
+- `disable() -> dict`
+- `toggle() -> dict`
+- `run(...) -> dict`, `run_agent() -> dict` oder `run_action(...) -> dict`
+
+Regeln:
+
+- `stop_scheduler()` darf keine Datenbanken loeschen und keine Agent-Fachdaten veraendern.
+- `disable()` darf bestehende APIs nicht entfernen; es aendert nur Laufzeit-/Planungsstatus.
+- `enable()` und `disable()` sollen idempotent sein.
+- Statuswerte fuer den Orchestrator muessen auf `active`, `running`, `paused`, `disabled`, `error` abbildbar sein.
+- Agent-Metadaten wie Name, Icon und Description kommen weiter ausschliesslich aus `manifest.yaml`.
+- Fachlogik bleibt im Agenten; der Orchestrator ruft nur den Control-Vertrag auf.
+
+Aktuelle Orchestrator-Control-Endpunkte:
+
+- `GET /api/orchestrator/agents/{agent_id}/control`
+- `POST /api/orchestrator/agents/{agent_id}/control/{action}`
+
+Diese Endpunkte ersetzen bestehende Agent-APIs nicht, sondern liegen als zentrale Steuerungsschicht darueber. Unsupported Actions liefern `405`.
 
 **Bekannte UI-Icons:** `Bot`, `FileText`, `Dumbbell`, `LineChart`, `Mail`, `CalendarCheck`, `Home`, `Settings2`.
 

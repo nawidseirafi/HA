@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, CalendarCheck, Dumbbell, FileText, Heart, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
-import { api, type AgentManifest, type KnownDashboardRoute } from '../api/client';
+import { api, type AgentControlAction, type AgentManifest, type KnownDashboardRoute, type OrchestratorMapData } from '../api/client';
 import type { Route } from '../App';
 import { AgentMap, agentStatusLabel, statusForAgentDisplay, statusesFromOrchestratorMap } from '../components/AgentMap';
 
@@ -31,7 +31,10 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
 export function AgentsPage({ navigate }: Props) {
   const greeting = getGreeting();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
+  const [mapData, setMapData] = useState<OrchestratorMapData | null>(null);
   const [agentStatuses, setAgentStatuses] = useState<ReturnType<typeof statusesFromOrchestratorMap>>({});
+  const [controlBusy, setControlBusy] = useState('');
+  const [controlMessage, setControlMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -44,7 +47,11 @@ export function AgentsPage({ navigate }: Props) {
 
     const loadStatuses = () => {
       api.orchestratorMap()
-        .then((map) => mounted && setAgentStatuses(statusesFromOrchestratorMap(map)))
+        .then((map) => {
+          if (!mounted) return;
+          setMapData(map);
+          setAgentStatuses(statusesFromOrchestratorMap(map));
+        })
         .catch(() => undefined);
     };
     loadStatuses();
@@ -56,6 +63,26 @@ export function AgentsPage({ navigate }: Props) {
     };
   }, []);
 
+  const refreshMap = async () => {
+    const map = await api.orchestratorMap();
+    setMapData(map);
+    setAgentStatuses(statusesFromOrchestratorMap(map));
+  };
+
+  const executeControl = async (agentId: string, action: AgentControlAction) => {
+    setControlBusy(`${agentId}:${action}`);
+    setControlMessage('');
+    try {
+      const result = await api.executeAgentControl(agentId, action);
+      setControlMessage(result.message || `${agentId}: ${action} ausgefuehrt.`);
+      await refreshMap();
+    } catch (err) {
+      setControlMessage(err instanceof Error ? err.message : `${agentId}: ${action} fehlgeschlagen.`);
+    } finally {
+      setControlBusy('');
+    }
+  };
+
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -66,6 +93,7 @@ export function AgentsPage({ navigate }: Props) {
         </div>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
+      {controlMessage && <section className="panel agent-note"><Bot size={20} /><span>{controlMessage}</span></section>}
 
       <AgentMap navigate={navigate} />
 
@@ -74,21 +102,51 @@ export function AgentsPage({ navigate }: Props) {
           const Icon = iconMap[agent.icon as keyof typeof iconMap] ?? Bot;
           const route = routeForAgent(agent);
           const status = statusForAgentDisplay(agent, agentStatuses[agent.id]);
+          const control = mapData?.nodes.find((node) => node.id === agent.id)?.control;
+          const actions = control?.actions ?? [];
           const cardState = status === 'disabled' ? 'planned-agent' : 'active-agent';
           return (
-            <button
+            <article
               className={`agent-card ${cardState}`}
               key={agent.id}
-              disabled={!route}
-              onClick={() => route && navigate(route)}
             >
               <div className="agent-icon"><Icon size={24} /></div>
               <div>
                 <span className="eyebrow">{agentStatusLabel(status)}</span>
                 <h2>{agent.name}</h2>
                 <p>{agent.description || 'Agent per Manifest eingebunden.'}</p>
+                <div className="agent-card-actions">
+                  {route && <button className="button secondary" onClick={() => navigate(route)}>Öffnen</button>}
+                  {control?.supported && actionForRun(actions) && (
+                    <button
+                      className="button"
+                      disabled={controlBusy === `${agent.id}:${actionForRun(actions)}`}
+                      onClick={() => executeControl(agent.id, actionForRun(actions)!)}
+                    >
+                      {actionForRun(actions) === 'start' ? 'Start' : 'Run'}
+                    </button>
+                  )}
+                  {control?.supported && actions.includes('stop') && (
+                    <button
+                      className="button secondary"
+                      disabled={controlBusy === `${agent.id}:stop`}
+                      onClick={() => executeControl(agent.id, 'stop')}
+                    >
+                      Stop
+                    </button>
+                  )}
+                  {control?.supported && actions.includes(status === 'disabled' ? 'enable' : 'disable') && (
+                    <button
+                      className="button secondary"
+                      disabled={controlBusy === `${agent.id}:${status === 'disabled' ? 'enable' : 'disable'}`}
+                      onClick={() => executeControl(agent.id, status === 'disabled' ? 'enable' : 'disable')}
+                    >
+                      {status === 'disabled' ? 'Enable' : 'Disable'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </button>
+            </article>
           );
         })}
       </section>
@@ -99,6 +157,12 @@ export function AgentsPage({ navigate }: Props) {
       </section>
     </div>
   );
+}
+
+function actionForRun(actions: AgentControlAction[]) {
+  if (actions.includes('start')) return 'start';
+  if (actions.includes('run')) return 'run';
+  return null;
 }
 
 function routeForAgent(agent: AgentManifest): Route | null {

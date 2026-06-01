@@ -1,7 +1,6 @@
 id: mywellness
 name: MyWellness-Agent
 description: Kurse finden, Buchungen pruefen und den Agenten manuell steuern.
-enabled: true
 status: active
 api:
   prefix: /api/mywellness

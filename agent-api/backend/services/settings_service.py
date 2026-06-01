@@ -198,7 +198,7 @@ def get_settings() -> dict[str, Any]:
         "agents": {
             "invoices": {
                 "enabled": bool(invoice_runtime.get("enabled", invoice_config.get("enabled", True))),
-                "manifest_enabled": manifests.get("invoices").enabled if manifests.get("invoices") else None,
+                "registry_enabled": manifests.get("invoices").enabled if manifests.get("invoices") else None,
                 "api_prefix": manifests.get("invoices").api_prefix if manifests.get("invoices") else "",
                 "upload_dir": _path_info(API_DIR, invoice_config.get("upload_dir")),
                 "database": invoice_db,
@@ -210,7 +210,7 @@ def get_settings() -> dict[str, Any]:
             },
             "mywellness": {
                 "enabled": bool(mywellness_runtime.get("enabled", mywellness_config.get("enabled", False))),
-                "manifest_enabled": manifests.get("mywellness").enabled if manifests.get("mywellness") else None,
+                "registry_enabled": manifests.get("mywellness").enabled if manifests.get("mywellness") else None,
                 "api_prefix": manifests.get("mywellness").api_prefix if manifests.get("mywellness") else "",
                 "database": {"path": str(mywellness_db), "exists": mywellness_db.exists() if mywellness_db else False},
                 "days": mywellness_runtime.get("days", mywellness_config.get("days", 2)),
@@ -222,14 +222,14 @@ def get_settings() -> dict[str, Any]:
             },
             "vacation": {
                 "enabled": bool(vacation_config.get("enabled", False)),
-                "manifest_enabled": manifests.get("vacation").enabled if manifests.get("vacation") else None,
+                "registry_enabled": manifests.get("vacation").enabled if manifests.get("vacation") else None,
                 "api_prefix": manifests.get("vacation").api_prefix if manifests.get("vacation") else "",
                 "mode_entity": vacation_config.get("mode_entity", ""),
                 "dry_run_default": True,
             },
             "market": {
                 "enabled": bool(market_config.get("enabled", False)),
-                "manifest_enabled": manifests.get("market").enabled if manifests.get("market") else None,
+                "registry_enabled": manifests.get("market").enabled if manifests.get("market") else None,
                 "api_prefix": manifests.get("market").api_prefix if manifests.get("market") else "",
                 "database": _path_info(API_DIR, market_config.get("database_path", data_dir / "market" / "market.db")),
                 "price_provider": market_config.get("price_provider", "yahoo"),

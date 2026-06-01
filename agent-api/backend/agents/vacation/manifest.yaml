@@ -1,7 +1,6 @@
 id: vacation
 name: Vacation-Agent
 description: Anwesenheit simulieren und Home-Assistant-Regeln fuer Abwesenheit vorbereiten.
-enabled: false
 status: draft
 api:
   prefix: /api/vacation

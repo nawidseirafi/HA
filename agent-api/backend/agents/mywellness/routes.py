@@ -62,18 +62,18 @@ class HealthSettingsPayload(BaseModel):
     ha_entity_withings_rem_sleep: Optional[str] = None
 
 
-@router.get("/api/agent/status")
+@router.get("/api/mywellness/status")
 def agent_status():
     return mywellness_service.status()
 
 
-@router.post("/api/agent/start")
+@router.post("/api/mywellness/start")
 def start_agent(payload: StartAgentPayload | None = None):
     mode = payload.mode if payload else "prepare"
     return mywellness_service.start(mode=mode or "prepare")
 
 
-@router.post("/api/agent/stop")
+@router.post("/api/mywellness/stop")
 def stop_agent():
     return mywellness_service.stop()
 
