@@ -7,6 +7,8 @@ import { InvoiceDetailPage } from './pages/finance/InvoiceDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
+import { AgentMapPage } from './pages/AgentMapPage';
+import { MessagesPage } from './pages/MessagesPage';
 import { MyWellnessDashboardPage } from './pages/mywellness/MyWellnessDashboardPage';
 import { MyWellnessCoursesPage } from './pages/mywellness/MyWellnessCoursesPage';
 import { MyWellnessBookingsPage } from './pages/mywellness/MyWellnessBookingsPage';
@@ -24,6 +26,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 export type Route =
   | { name: 'wall' }
   | { name: 'agents' }
+  | { name: 'agentList' }
+  | { name: 'agentMap' }
+  | { name: 'agentMessages' }
   | { name: 'mywellnessDashboard' }
   | { name: 'mywellnessCourses' }
   | { name: 'mywellnessBookings' }
@@ -63,6 +68,13 @@ function parseRoute(): Route {
   if (parts[0] === 'market') return { name: 'marketDashboard' };
   if (parts[0] === 'vacationDashboard' || parts[0] === 'vacation') return { name: 'vacationDashboard' };
   if (parts[0] === 'years') return { name: 'years' };
+  if (parts[0] === 'agents' && (parts[1] === 'invoices' || parts[1] === 'invoiceDashboard')) return { name: 'invoiceDashboard' };
+  if (parts[0] === 'agents' && (parts[1] === 'market' || parts[1] === 'marketDashboard')) return { name: 'marketDashboard' };
+  if (parts[0] === 'agents' && (parts[1] === 'mywellness' || parts[1] === 'mywellnessDashboard')) return { name: 'mywellnessDashboard' };
+  if (parts[0] === 'agents' && (parts[1] === 'vacation-dashboard' || parts[1] === 'vacationDashboard')) return { name: 'vacationDashboard' };
+  if (parts[0] === 'agents' && parts[1] === 'list') return { name: 'agentList' };
+  if (parts[0] === 'agents' && parts[1] === 'map') return { name: 'agentMap' };
+  if (parts[0] === 'agents' && parts[1] === 'messages') return { name: 'agentMessages' };
   if (parts[0] === 'agents') return { name: 'agents' };
   if (parts[0] === 'mywellness' && parts[1] === 'courses') return { name: 'mywellnessCourses' };
   if (parts[0] === 'mywellness' && parts[1] === 'bookings') return { name: 'mywellnessBookings' };
@@ -98,7 +110,10 @@ function AppContent() {
 
   const page = useMemo(() => {
     if (route.name === 'wall') return <WallDashboardPage />;
-    if (route.name === 'agents') return <AgentsPage navigate={navigate} />;
+    if (route.name === 'agents') return <AgentsPage navigate={navigate} variant="overview" />;
+    if (route.name === 'agentList') return <AgentsPage navigate={navigate} variant="agents" />;
+    if (route.name === 'agentMap') return <AgentMapPage navigate={navigate} />;
+    if (route.name === 'agentMessages') return <MessagesPage />;
     if (route.name === 'mywellnessDashboard') return <MyWellnessDashboardPage navigate={navigate} />;
     if (route.name === 'mywellnessCourses') return <MyWellnessCoursesPage navigate={navigate} />;
     if (route.name === 'mywellnessBookings') return <MyWellnessBookingsPage navigate={navigate} />;
@@ -135,6 +150,9 @@ function AppContent() {
 function routeToPath(route: Route) {
   if (route.name === 'wall') return '/wall';
   if (route.name === 'agents') return '/agents';
+  if (route.name === 'agentList') return '/agents/list';
+  if (route.name === 'agentMap') return '/agents/map';
+  if (route.name === 'agentMessages') return '/agents/messages';
   if (route.name === 'mywellnessDashboard') return '/mywellness';
   if (route.name === 'mywellnessCourses') return '/mywellness/courses';
   if (route.name === 'mywellnessBookings') return '/mywellness/bookings';

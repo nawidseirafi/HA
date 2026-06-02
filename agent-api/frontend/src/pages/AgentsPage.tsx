@@ -6,6 +6,7 @@ import { AgentMap, agentStatusLabel, statusForAgentDisplay, statusesFromOrchestr
 
 interface Props {
   navigate: (route: Route) => void;
+  variant?: 'overview' | 'agents';
 }
 
 const iconMap = {
@@ -29,7 +30,7 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   vacationDashboard: { name: 'vacationDashboard' },
 };
 
-export function AgentsPage({ navigate }: Props) {
+export function AgentsPage({ navigate, variant = 'overview' }: Props) {
   const greeting = getGreeting();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
   const [mapData, setMapData] = useState<OrchestratorMapData | null>(null);
@@ -89,14 +90,18 @@ export function AgentsPage({ navigate }: Props) {
       <header className="page-header">
         <div>
           <span className="eyebrow">Agent Console</span>
-          <h1>{greeting}, Nawid</h1>
-          <p>Systemübersicht der lokalen Agenten. Wähle einen Agenten für Details oder nutze die Map zur Orientierung.</p>
+          <h1>{variant === 'agents' ? 'Agenten' : `${greeting}, Nawid`}</h1>
+          <p>
+            {variant === 'agents'
+              ? 'Alle lokalen Agenten mit Status, Dashboard-Zugriff und gemeinsamem Control-Vertrag.'
+              : 'Systemübersicht der lokalen Agenten. Wähle einen Agenten für Details oder nutze die Map zur Orientierung.'}
+          </p>
         </div>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
       {controlMessage && <section className="panel agent-note"><Bot size={20} /><span>{controlMessage}</span></section>}
 
-      <AgentMap navigate={navigate} />
+      {variant === 'overview' && <AgentMap navigate={navigate} />}
 
       <section className="agent-grid">
         {agents.map((agent) => {
@@ -108,16 +113,23 @@ export function AgentsPage({ navigate }: Props) {
           const cardState = status === 'disabled' ? 'planned-agent' : 'active-agent';
           return (
             <article
-              className={`agent-card ${cardState}`}
+              className={`agent-card ${cardState} ${route ? 'clickable' : ''}`}
               key={agent.id}
+              role={route ? 'button' : undefined}
+              tabIndex={route ? 0 : undefined}
+              onClick={() => route && navigate(route)}
+              onKeyDown={(event) => {
+                if (!route || (event.key !== 'Enter' && event.key !== ' ')) return;
+                event.preventDefault();
+                navigate(route);
+              }}
             >
               <div className="agent-icon"><Icon size={24} /></div>
               <div>
                 <span className="eyebrow">{agentStatusLabel(status)}</span>
                 <h2>{agent.name}</h2>
                 <p>{agent.description || 'Agent per Manifest eingebunden.'}</p>
-                <div className="agent-card-actions">
-                  {route && <button className="button secondary" onClick={() => navigate(route)}>Öffnen</button>}
+                <div className="agent-card-actions" onClick={(event) => event.stopPropagation()}>
                   {control?.supported && actionForRun(actions) && (
                     <button
                       className="button"
