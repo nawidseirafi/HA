@@ -9,11 +9,11 @@ agent-api/frontend/node_modules/
 agent-api/frontend/dist/
 agent-api/.env
 agent-api/agent-api.service
-agent-api/data/
-!agent-api/data/.gitkeep
 HA/secrets.yaml
 .idea/
-/build/
-/old/
+/agent-api/data/invoices/
+/agent-api/data/market/
+/agent-api/data/messaging/
+/agent-api/data/mywellness/
+/agent-api/data/vacation/
 /agent-api/build/
-/agent-api/data/
