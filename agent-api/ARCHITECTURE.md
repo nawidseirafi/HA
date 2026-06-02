@@ -114,14 +114,15 @@ Aufgaben:
 - `backend/agents/*/manifest.yaml` entdecken
 - Manifestdaten in `AgentManifest` laden
 - sichere Metadaten per `public_dict()` bereitstellen
-- aktivierte Agent-Router dynamisch einbinden
+- Agent-Router dynamisch einbinden
 - Runtime-Service-Objekte finden
 - Agent-Control-Adapter per `get_agent_control(agent_id)` bereitstellen
 
 Aktuell gilt:
 
-- `enabled: false` im Manifest verhindert das automatische Einbinden des Agent-Routers ueber `include_agent_routers(app)`.
-- `get_agent_control(agent_id)` kann dennoch ein Service-Objekt ueber `runtime.service_object` finden, wenn `route_module` importierbar ist.
+- Agent-Router werden eingebunden, wenn ein `route_module` vorhanden ist. Runtime-Disabled darf APIs nicht entfernen, weil sonst Enable/Status-Endpunkte nicht erreichbar waeren.
+- `agent_runtime_services()` startet Scheduler/Runtime-Dienste nur fuer aktivierte Agenten.
+- `get_agent_control(agent_id)` kann ein Service-Objekt ueber `runtime.service_object` finden, wenn `route_module` importierbar ist.
 - Die Registry speichert keinen Runtime-State und nutzt keine eigene Datenbank.
 
 # Agent-Control-Vertrag

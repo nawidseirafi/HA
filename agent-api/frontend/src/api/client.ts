@@ -801,7 +801,8 @@ function normalizeApiBase(value: string) {
   if (!trimmed) return '';
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
   if (trimmed.startsWith('//')) return `${window.location.protocol}${trimmed}`;
-  if (trimmed.startsWith('localhost') || /^\d{1,3}(?:\.\d{1,3}){3}/.test(trimmed)) return `http://${trimmed}`;
+  if (trimmed.startsWith('/')) return trimmed;
+  if (/^[a-z0-9.-]+(?::\d+)?(?:\/.*)?$/i.test(trimmed)) return `http://${trimmed}`;
   return trimmed;
 }
 
@@ -811,7 +812,7 @@ function apiUrl(path: string) {
   try {
     return new URL(normalizedPath, API_BASE).toString();
   } catch {
-    throw new Error(`API-Adresse ist ungueltig: ${RAW_API_BASE}`);
+    return normalizedPath;
   }
 }
 
@@ -829,8 +830,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(message === 'The string did not match the expected pattern.'
-      ? 'API-Adresse konnte vom Browser nicht verarbeitet werden. Bitte VITE_API_BASE pruefen oder leer lassen, wenn Frontend und Backend auf demselben Port laufen.'
+    throw new Error(message.toLowerCase().includes('string did not match')
+      ? `API-Adresse konnte vom Browser nicht verarbeitet werden. Bitte VITE_API_BASE pruefen oder leer lassen, wenn Frontend und Backend auf demselben Port laufen. Aktuell: ${RAW_API_BASE || '(leer)'}`
       : message);
   }
   if (!response.ok) {

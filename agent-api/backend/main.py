@@ -33,11 +33,18 @@ logging.basicConfig(
 class SPAStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as exc:
             if exc.status_code == 404 and "." not in path.rsplit("/", 1)[-1]:
-                return await super().get_response("index.html", scope)
+                response = await super().get_response("index.html", scope)
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                return response
             raise
+        if path in {"", ".", "/", "index.html"} or "." not in path.rsplit("/", 1)[-1]:
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        elif path.startswith("assets/"):
+            response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+        return response
 
 app = FastAPI(
     title="RoboterSteve Agent API",

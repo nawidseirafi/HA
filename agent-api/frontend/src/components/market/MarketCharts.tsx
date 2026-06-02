@@ -135,8 +135,9 @@ export function MarketSentimentDonut({ summary }: { summary: MarketSummary | nul
 }
 
 export function MiniSparkline({ symbol, changePercent }: { symbol: string; changePercent?: number | null }) {
-  const data = buildSparklineData(symbol, changePercent ?? 0);
-  const positive = (changePercent ?? 0) >= 0;
+  const safeChange = finiteNumber(changePercent, 0);
+  const data = buildSparklineData(symbol, safeChange);
+  const positive = safeChange >= 0;
   return (
     <div className="market-sparkline">
       <ResponsiveContainer width="100%" height="100%">
@@ -162,7 +163,7 @@ function buildPerformanceData(reports: MarketReport[], range: Range) {
   const days = rangeDays[range];
   const latest = reports.slice(0, 8);
   const averageChange = latest.length
-    ? latest.reduce((sum, report) => sum + (report.change_percent ?? 0), 0) / latest.length
+    ? latest.reduce((sum, report) => sum + finiteNumber(report.change_percent, 0), 0) / latest.length
     : 0;
   return Array.from({ length: Math.min(days, range === '1Y' ? 52 : days) }, (_, index) => {
     const progress = index / Math.max(Math.min(days, range === '1Y' ? 52 : days) - 1, 1);
@@ -176,12 +177,19 @@ function buildPerformanceData(reports: MarketReport[], range: Range) {
 }
 
 function buildSparklineData(symbol: string, changePercent: number) {
-  const seed = symbol.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const safeSymbol = String(symbol || "MARKET");
+  const safeChange = finiteNumber(changePercent, 0);
+  const seed = safeSymbol.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return Array.from({ length: 16 }, (_, index) => {
     const wave = Math.sin((seed + index * 19) / 11) * 1.2;
-    const trend = (changePercent / 16) * index;
-    return { value: Number((100 + wave + trend).toFixed(2)) };
+    const trend = (safeChange / 16) * index;
+    return { value: finiteNumber(Number((100 + wave + trend).toFixed(2)), 100) };
   });
+}
+
+function finiteNumber(value: unknown, fallback: number) {
+  const number = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function MarketTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {

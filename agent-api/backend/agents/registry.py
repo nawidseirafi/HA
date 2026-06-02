@@ -54,7 +54,7 @@ def discover_agent_manifests() -> list[AgentManifest]:
 
 def include_agent_routers(app: FastAPI) -> None:
     for manifest in discover_agent_manifests():
-        if not manifest.enabled or not manifest.route_module:
+        if not manifest.route_module:
             continue
         module = importlib.import_module(manifest.route_module)
         router = getattr(module, "router", None)

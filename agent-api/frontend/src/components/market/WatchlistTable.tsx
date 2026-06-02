@@ -20,7 +20,7 @@ export function WatchlistTable({
   onAnalyze: (item: MarketWatchlistItem) => void;
   onOpen: (symbol: string) => void;
 }) {
-  const reportBySymbol = new Map((latestReports ?? []).map((report) => [report.symbol, report]));
+  const reportBySymbol = new Map((latestReports ?? []).map((report) => [String(report.symbol || '').toUpperCase(), report]));
   return (
     <div className="panel">
       <div className="section-title">
@@ -49,16 +49,17 @@ export function WatchlistTable({
             {items.map((item) => (
               <tr key={item.id} onDoubleClick={() => onOpen(item.symbol)}>
                 {(() => {
-                  const report = reportBySymbol.get(item.symbol);
-                  const change = report?.change_percent ?? null;
+                  const symbol = String(item.symbol || '').toUpperCase();
+                  const report = reportBySymbol.get(symbol);
+                  const change = finiteNumber(report?.change_percent);
                   return (
                     <>
-                <td data-label="Symbol"><button className="table-link" onClick={() => onOpen(item.symbol)}>{item.symbol}</button></td>
+                <td data-label="Symbol"><button className="table-link" onClick={() => onOpen(symbol)}>{symbol || '-'}</button></td>
                 <td data-label="Name">{item.name}</td>
                 <td data-label="Typ">{item.asset_type}</td>
                 <td data-label="Exchange">{item.exchange || '-'}</td>
                 <td data-label="Currency">{item.currency}</td>
-                <td data-label="Trend"><MiniSparkline symbol={item.symbol} changePercent={change} /></td>
+                <td data-label="Trend"><MiniSparkline symbol={symbol} changePercent={change} /></td>
                 <td data-label="%"><span className={(change ?? 0) >= 0 ? 'market-positive' : 'market-negative'}>{formatPercent(change)}</span></td>
                 <td data-label="Aktiv">{item.enabled ? 'Ja' : 'Nein'}</td>
                 <td data-label="Notizen">{item.notes || '-'}</td>
@@ -82,4 +83,9 @@ export function WatchlistTable({
       </div>
     </div>
   );
+}
+
+function finiteNumber(value: unknown) {
+  const number = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
 }
