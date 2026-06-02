@@ -151,9 +151,11 @@ Wichtig:
 - Bestehende Agent-Daten bleiben in `invoices.db`, `mywellness.db`, `market.db`.
 - `orchestrator.db` speichert Querschnittsstatus, nicht Rechnungen, Kurse oder Marktberichte.
 
-# Scheduler Service
+# Scheduler Agent
 
-Nicht sofort umsetzen. Ein zentraler Scheduler Service ist eine spaetere Infrastrukturkomponente und ersetzt die bestehenden Agent-Scheduler erst nach einer kontrollierten Migration.
+Status: Version 1.0 umgesetzt.
+
+Der Scheduler Agent ist die zentrale Zeitsteuerung der Plattform. Er ersetzt bestehende Agent-Scheduler noch nicht hart, sondern stellt den gemeinsamen Scheduler-Vertrag bereit und migriert geplante Laeufe schrittweise in eine zentrale Steuerung.
 
 Ziel:
 
@@ -171,46 +173,37 @@ Wichtige Regeln:
 - Der Scheduler fuehrt Agenten ueber den Agent-Control-Vertrag aus, nicht ueber agent-spezifische Imports.
 - Fachliche Daten bleiben in den jeweiligen Agent-/Service-Datenbanken.
 
-Moegliches spaeteres Modul:
+Umgesetztes Modul:
 
 ```text
-backend/services/scheduler_service.py
-backend/services/scheduler_store.py
+backend/agents/scheduler/service.py
+backend/agents/scheduler/store.py
+backend/agents/scheduler/routes.py
 data/scheduler/scheduler.db
 ```
 
-Moegliche Tabellen:
+Tabellen:
 
-- `scheduled_jobs`
-  - `id`
-  - `owner_type` (`agent` oder `service`)
-  - `owner_id`
-  - `action`
-  - `schedule_json`
-  - `enabled`
-  - `last_run`
-  - `next_run`
-  - `created_at`
-  - `updated_at`
-- `scheduled_runs`
-  - `id`
-  - `job_id`
-  - `status`
-  - `started_at`
-  - `finished_at`
-  - `duration_seconds`
-  - `error`
-  - `payload_json`
+- `scheduler_tasks`
+- `scheduler_runs`
 
-Beispiele:
+Standard-Tasks:
 
-- `invoices/run`
-- `mywellness/run prepare`
-- `mywellness/health_sync`
-- `vacation/check`
-- `vacation/ai_analyze`
-- `market/run`
-- `infrastructure/check`
+- Market Analyse um 06:00, 12:00 und 18:00
+- Infrastructure Health Check alle 5 Minuten
+- Vacation Statuspruefung taeglich
+- Household Fensterpruefung um 22:00
+- Invoice Agent Lauf um 22:00
+- MyWellness Prepare um 17:00 und Book um 20:59
+
+Agenten deklarieren empfohlene Scheduler-Defaults optional im eigenen `manifest.yaml`. Der Scheduler legt fehlende Tasks automatisch an, ueberschreibt aber keine bestehenden lokalen Anpassungen.
+
+Weiterhin offen fuer spaetere Versionen:
+
+- Task-Abhaengigkeiten
+- Task-Ketten und Task-Gruppen
+- Kalender-Integration
+- vollstaendige Migration aller bestehenden Agent-internen Scheduler
 
 # Agent-Domaenenhistorien
 
@@ -437,7 +430,7 @@ backend/
 4. Messaging Service als zentrale Hinweis-/Message-Schicht verwenden.
 5. Household Service als Fassade über Waste/Vacation/HA-Kontext weiter stabilisieren.
 6. Infrastructure Service V1 als zentrale Netzwerk-/FritzBox-Schicht nutzen.
-7. Scheduler Service als Zielkomponente spezifizieren, aber noch nicht aktiv migrieren.
+7. Scheduler Agent/Service V1 als zentrale Zeitsteuerung nutzen; Manifest-Defaults nur als Initialwerte behandeln.
 8. Erst danach bei Bedarf `household.db` anlegen.
 9. Erst danach `orchestrator.db` anlegen.
 
@@ -465,7 +458,7 @@ backend/
 
 - `orchestrator.db` einführen, wenn Statusmodell und Map stabil sind.
 - Zentrale Orchestrator-Start/Stop-Endpunkte für einzelne Agenten und alle Agenten implementieren.
-- Scheduler Service entwerfen und schrittweise parallel zu bestehenden Agent-Schedulern einfuehren.
+- Scheduler schrittweise als Quelle der Wahrheit fuer aktive Laufzeiten ausbauen; bestehende Agent-Defaults duerfen Scheduler-Tasks nicht ueberschreiben.
 - Infrastructure Service um weitere stabile HA-Signale, Aggregationen und Push-Ziele erweitern.
 - Agent-Abhängigkeiten für Map und Scheduling modellieren.
 - LLM-Factory bereinigen: Claude-Pfad entweder implementieren oder aus der Konfiguration entfernen.

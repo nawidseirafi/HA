@@ -94,7 +94,7 @@ export type AgentsResponse = {
   agents: AgentManifest[];
 };
 
-export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard';
+export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard';
 
 export type MyWellnessHealthSettings = {
   id?: number;
@@ -805,6 +805,59 @@ export type VacationProfilesResponse = {
 
 export type OrchestratorMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
 export type AgentControlAction = 'status' | 'start' | 'stop' | 'enable' | 'disable' | 'toggle' | 'run';
+export type SchedulerScheduleType = 'once' | 'recurring' | 'cron' | 'condition';
+export type SchedulerTask = {
+  id: number;
+  name: string;
+  description: string;
+  enabled: boolean;
+  schedule_type: SchedulerScheduleType;
+  schedule: Record<string, unknown>;
+  next_run: string | null;
+  last_run: string | null;
+  target_agent: string;
+  target_action: string;
+  action_type: string;
+  action_payload: Record<string, unknown>;
+  source?: string;
+  default_key?: string | null;
+  status: 'active' | 'disabled' | 'paused' | 'error' | string;
+  failure_count: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type SchedulerRun = {
+  id: number;
+  task_id: number | null;
+  task_name: string;
+  status: string;
+  message: string;
+  started_at: string;
+  finished_at: string | null;
+  payload: Record<string, unknown>;
+};
+export type SchedulerSummary = {
+  active_tasks: number;
+  total_tasks: number;
+  next_run: string | null;
+  next_task: SchedulerTask | null;
+  today_executed: number;
+  errors: number;
+  updated_at: string;
+};
+export type SchedulerStatus = {
+  enabled: boolean;
+  is_running: boolean;
+  current_status: string;
+  status: string;
+  last_error: string | null;
+  last_successful_run: string | null;
+  next_scheduled_run: string | null;
+  scheduler_running: boolean;
+  settings: Record<string, unknown>;
+  summary: SchedulerSummary;
+};
 export type AgentControlInfo = {
   agent_id?: string;
   enabled?: boolean;
@@ -823,7 +876,7 @@ export type OrchestratorMapNode = {
   id: string;
   label: string;
   subtitle: string;
-  kind: 'orchestrator' | 'agent' | 'service';
+  kind: 'orchestrator' | 'agent' | 'platform' | 'service';
   status: OrchestratorMapStatus;
   icon: string;
   enabled?: boolean;
@@ -1000,6 +1053,17 @@ export const api = {
     request<{ reports: MarketReport[]; news: MarketNews[]; signal_history?: MarketSignalHistoryItem[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}`),
   marketLatestSymbolReport: (symbol: string) =>
     request<{ report: MarketReport; news: MarketNews[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}/latest`),
+  schedulerStatus: () => request<SchedulerStatus>('/api/scheduler/status'),
+  schedulerSummary: () => request<SchedulerSummary>('/api/scheduler/summary'),
+  schedulerTasks: (status = 'all') =>
+    request<{ tasks: SchedulerTask[] }>(`/api/scheduler/tasks?status=${encodeURIComponent(status)}`),
+  schedulerRuns: (limit = 50) => request<{ runs: SchedulerRun[] }>(`/api/scheduler/runs?limit=${limit}`),
+  runScheduler: () => request<{ status: string; executed: number; runs: SchedulerRun[] }>('/api/scheduler/run', { method: 'POST' }),
+  runSchedulerTask: (id: number) => request<SchedulerRun & { task: SchedulerTask }>(`/api/scheduler/tasks/${id}/run`, { method: 'POST' }),
+  updateSchedulerTask: (id: number, payload: Partial<SchedulerTask>) =>
+    request<SchedulerTask>(`/api/scheduler/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  enableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/enable`, { method: 'POST' }),
+  disableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/disable`, { method: 'POST' }),
   summary: () => request<Summary>('/api/invoices/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),

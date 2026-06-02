@@ -32,8 +32,6 @@ export function WatchlistTable({
               <th>Exchange</th>
               <th>Währung</th>
               <th>Aktiv</th>
-              <th>Input</th>
-              <th>Details</th>
               <th>Aktionen</th>
             </tr>
           </thead>
@@ -52,9 +50,10 @@ export function WatchlistTable({
                 <td data-label="Exchange">{item.exchange || '-'}</td>
                 <td data-label="Währung">{item.currency}</td>
                 <td data-label="Aktiv">{item.enabled ? 'Ja' : 'Nein'}</td>
-                 <td data-label="Aktionen">
+                <td data-label="Aktionen">
                   <div className="icon-actions">
                     <button title="Details" onClick={() => onOpen(symbol)}><ExternalLink size={16} /></button>
+                    <button title="Bearbeiten" onClick={() => onEdit(item)}><Edit3 size={16} /></button>
                     <button title="Löschen" onClick={() => onDelete(item)}><Trash2 size={16} /></button>
                   </div>
                 </td>
@@ -64,7 +63,7 @@ export function WatchlistTable({
               </tr>
             ))}
             {items.length === 0 && (
-              <tr><td colSpan={11}>Noch keine Watchlist-Einträge vorhanden.</td></tr>
+              <tr><td colSpan={9}>Noch keine Watchlist-Einträge vorhanden.</td></tr>
             )}
           </tbody>
         </table>

@@ -4,7 +4,7 @@ import type { Route } from '../App';
 
 export type AgentMapStatus = 'active' | 'running' | 'paused' | 'error' | 'disabled';
 
-export type AgentMapNodeKind = 'orchestrator' | 'agent' | 'service' | 'external' | 'database';
+export type AgentMapNodeKind = 'orchestrator' | 'agent' | 'platform' | 'service' | 'external' | 'database';
 
 export type AgentMapNodeData = {
   id: string;

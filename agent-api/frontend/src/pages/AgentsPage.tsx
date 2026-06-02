@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bot, CalendarCheck, Dumbbell, FileText, Heart, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
+import { Bot, CalendarCheck, CalendarDays, Dumbbell, FileText, Heart, Home, LineChart, Mail, Settings2, ShieldCheck } from 'lucide-react';
 import { api, type AgentControlAction, type AgentManifest, type KnownDashboardRoute, type OrchestratorMapData } from '../api/client';
 import type { Route } from '../App';
 import { AgentMap, agentStatusLabel, statusForAgentDisplay, statusesFromOrchestratorMap } from '../components/AgentMap';
@@ -12,6 +12,7 @@ interface Props {
 const iconMap = {
   Bot,
   CalendarCheck,
+  CalendarDays,
   Dumbbell,
   FileText,
   Heart,
@@ -28,6 +29,7 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   mywellnessDashboard: { name: 'mywellnessDashboard' },
   marketDashboard: { name: 'marketDashboard' },
   vacationDashboard: { name: 'vacationDashboard' },
+  schedulerDashboard: { name: 'schedulerDashboard' },
 };
 
 export function AgentsPage({ navigate, variant = 'overview' }: Props) {

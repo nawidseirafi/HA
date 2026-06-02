@@ -93,7 +93,8 @@ agent-api/
 │   ├── infrastructure/
 │   ├── market/
 │   ├── messaging/
-│   └── mywellness/
+│   ├── mywellness/
+│   └── scheduler/
 ├── frontend/
 └── config.yaml
 ```
@@ -177,6 +178,83 @@ Control-Ergebnis:
   "data": {}
 }
 ```
+
+# Scheduler Agent
+
+Status: Version 1.0 umgesetzt.
+
+Der Scheduler Agent ist die zentrale Zeitsteuerung der Plattform. Er besitzt keine Fachlogik, sondern entscheidet nur, wann definierte Tasks ausgefuehrt werden. Die Ausfuehrung erfolgt ueber bestehende Agent-Control-Actions oder reine Service-Checks.
+
+Dateien:
+
+```text
+backend/agents/scheduler/
+data/scheduler/scheduler.db
+```
+
+Unterstuetzte Schedule-Typen:
+
+- `once`
+- `recurring`
+- `cron`
+- `condition`
+
+Unterstuetzte Actions:
+
+- `start_agent`
+- `stop_agent`
+- `execute_action`
+- `create_message`
+- `call_webhook`
+- `http_request`
+- `infrastructure_check`
+- `household_check`
+
+Standard-Tasks:
+
+- Market Analyse um 06:00, 12:00 und 18:00
+- Infrastructure Health Check alle 5 Minuten
+- Vacation Statuspruefung taeglich
+- Household Fensterpruefung um 22:00
+- Invoice Agent Lauf um 22:00
+- MyWellness Prepare um 17:00 und Book um 20:59
+
+Agenten koennen eigene Scheduler-Defaults in ihrem `manifest.yaml` deklarieren:
+
+```yaml
+scheduler:
+  tasks:
+    - default_key: example:run:0800
+      name: Beispiel Agent Lauf 08:00
+      schedule_type: recurring
+      schedule:
+        time: "08:00"
+      target_action: run
+```
+
+Der Scheduler registriert fehlende Manifest-Tasks beim Start automatisch. Bestehende Tasks werden anhand von `default_key` oder Name erkannt und nicht ueberschrieben, damit lokal geaenderte Zeiten erhalten bleiben.
+
+Der Scheduler ist ueber den gemeinsamen Agent-Control-Vertrag steuerbar:
+
+```text
+GET  /api/orchestrator/agents/scheduler/control
+POST /api/orchestrator/agents/scheduler/control/{action}
+```
+
+Eigene API:
+
+```text
+GET  /api/scheduler/status
+GET  /api/scheduler/summary
+GET  /api/scheduler/tasks
+GET  /api/scheduler/runs
+POST /api/scheduler/run
+POST /api/scheduler/tasks/{id}/run
+POST /api/scheduler/tasks/{id}/enable
+POST /api/scheduler/tasks/{id}/disable
+```
+
+Wichtige Scheduler-Ereignisse werden ueber den Messaging Service als Orchestrator-Nachrichten erzeugt.
 
 # Orchestrator
 
@@ -391,11 +469,14 @@ agent-api/backend/agents/market/
 
 Verantwortung:
 
-- Watchlist verwalten
-- Kursdaten laden
-- News laden
-- Marktberichte erzeugen
-- Signale speichern
+- Watchlist verwalten und Assets per Name, Symbol, ISIN oder WKN aufloesen
+- Asset Type automatisch erkennen (`stock`, `etf`, `fund`, `etc`, `crypto`, `index`)
+- Kursdaten und kompakte News-/Stimmungsdaten laden
+- Watchlist nur bei manuellem Run oder Scheduler-Lauf analysieren
+- kompakte Signale `buy`, `hold`, `watch`, `sell` speichern
+- Discovery-Ideen erzeugen, ohne die Watchlist zu veraendern
+- Signal-Historie mit Timestamp, Signal, Confidence, Risiko und Kurzgrund speichern
+- relevante Signalwechsel als Messages erzeugen
 
 Datenbank:
 
@@ -420,6 +501,8 @@ Control:
 - `run`
 
 Hinweis: Market besitzt eine einfache Enabled/Disabled-Konfiguration und wird ueber die Agent Console steuerbar dargestellt.
+
+Market Dashboard ist bewusst kompakt: keine langen News-Texte, keine Marktberichte als Hauptmenue. Reports bleiben im Backend/Archiv abrufbar.
 
 ## Vacation Agent
 

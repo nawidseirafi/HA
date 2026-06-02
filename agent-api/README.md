@@ -1,6 +1,6 @@
 # RoboterSteve - AI Agent System
 
-Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness, Vacation und Boersenanalyse. Zentrale Querschnittsdienste liefern Messaging, Household-Status und Infrastructure/FritzBox-Status ueber Home Assistant.
+Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness, Vacation, Boersenanalyse und zentrale Zeitsteuerung. Zentrale Querschnittsdienste liefern Messaging, Household-Status und Infrastructure/FritzBox-Status ueber Home Assistant.
 
 ## Projektstruktur
 
@@ -18,6 +18,7 @@ roboterSteve/
 │   │       ├── invoices/         # InvoiceAgent API, Service, Exporte, CLI
 │   │       ├── market/           # MarketAgent API, Analyse-/Datenservices, CLI
 │   │       ├── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
+│   │       ├── scheduler/        # Scheduler Agent V1, zentrale Task-Zeitsteuerung
 │   │       └── vacation/         # Vacation Agent, Vacation Mode, Historie, Kalender, KI-Hinweise
 │   ├── frontend/
 │   │   └── src/                 # React-App
@@ -25,6 +26,8 @@ roboterSteve/
 │   └── requirements.txt
 └── venv/                        # Gemeinsame Python-Umgebung
 ```
+
+Agenten koennen optionale Scheduler-Defaults im eigenen `manifest.yaml` mitbringen. Der Scheduler registriert fehlende Defaults automatisch ueber `scheduler.tasks`, ohne bestehende lokale Tasks zu ueberschreiben.
 
 ## Entwicklung
 
@@ -347,6 +350,14 @@ cd agent-api
 ../venv/bin/python -m backend.agents.market.market run
 ../venv/bin/python -m backend.agents.market.market analyze --symbol AAPL
 ```
+
+Market Agent V1:
+
+- Watchlist-Eingaben per Name, Symbol, ISIN oder WKN.
+- Resolver normalisiert Symbol, Name, ISIN/WKN, Asset Type, Exchange und Waehrung.
+- Analysen laufen nur durch manuellen Run oder Scheduler-Task, nicht beim Dashboard-Aufruf.
+- Dashboard zeigt kompakte Signale, Discovery-Ideen und Watchlist-Signale; lange Marktberichte bleiben im Backend/Archiv.
+- Signalwechsel werden ueber den Messaging Service gemeldet.
 
 ## Konfiguration - Rechnungs-Agent
 

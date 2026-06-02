@@ -1,0 +1,15 @@
+id: scheduler
+name: Scheduler-Agent
+description: Zentrale Zeitsteuerung fuer Agent-Runs, Service-Checks und wiederkehrende Aufgaben.
+status: active
+api:
+  prefix: /api/scheduler
+  route_module: backend.agents.scheduler.routes
+runtime:
+  service_object: scheduler_service
+ui:
+  icon: CalendarDays
+  dashboard_route: schedulerDashboard
+settings:
+  role: central_time_control
+

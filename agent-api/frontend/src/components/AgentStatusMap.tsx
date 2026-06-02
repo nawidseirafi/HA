@@ -1,11 +1,11 @@
-import { Bot, CalendarCheck, Database, Dumbbell, FileText, Heart, Home, HousePlug, LineChart, Mail, Settings2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { Bell, Bot, CalendarCheck, CalendarDays, Database, Dumbbell, FileText, Heart, Home, HousePlug, LineChart, Mail, Settings2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
 import type { LucideProps } from 'lucide-react';
 import { api, type OrchestratorMapData, type OrchestratorMapNode, type WallDashboardData } from '../api/client';
 
 type StatusTone = 'active' | 'running' | 'paused' | 'error' | 'disabled';
-type NodeKind = 'orchestrator' | 'agent' | 'service';
+type NodeKind = 'orchestrator' | 'agent' | 'platform' | 'service';
 
 type MapNode = {
   id: string;
@@ -40,6 +40,8 @@ const statusLabel: Record<StatusTone, string> = {
 const iconMap: Record<string, ComponentType<LucideProps>> = {
   Bot,
   CalendarCheck,
+  CalendarDays,
+  Bell,
   Database,
   Dumbbell,
   FileText,
@@ -54,6 +56,8 @@ const iconMap: Record<string, ComponentType<LucideProps>> = {
   Sparkles,
   Zap,
 };
+
+const platformNodeIds = new Set(['scheduler', 'messaging', 'household']);
 
 export function AgentStatusMap({ data }: { data: WallDashboardData }) {
   const [orchestratorMap, setOrchestratorMap] = useState<OrchestratorMapData | null>(null);
@@ -100,7 +104,7 @@ export function AgentStatusMap({ data }: { data: WallDashboardData }) {
 
       <div className="agent-status-map-canvas" aria-hidden="true">
         <div className="agent-status-map-stage">
-          <svg className="agent-status-map-lines" viewBox="0 0 1280 620" role="presentation">
+          <svg className="agent-status-map-lines" viewBox="0 0 1280 760" role="presentation">
             {edges.map((edge) => {
               const from = nodeById.get(edge.from);
               const to = nodeById.get(edge.to);
@@ -191,7 +195,7 @@ function nodesFromOrchestratorMap(nodes: OrchestratorMapNode[]): MapNode[] {
       label: node.label,
       eyebrow: node.subtitle,
       status: node.status,
-      kind: node.kind,
+      kind: platformNodeIds.has(node.id) ? 'platform' : node.kind,
       x: position.x,
       y: position.y,
       icon: iconMap[node.icon] ?? Zap,
@@ -203,14 +207,17 @@ function nodesFromOrchestratorMap(nodes: OrchestratorMapNode[]): MapNode[] {
 
 function positionForNode(node: OrchestratorMapNode, index: number) {
   const fixed: Record<string, { x: number; y: number }> = {
-    orchestrator: { x: 640, y: 310 },
-    invoices: { x: 170, y: 115 },
-    mywellness: { x: 485, y: 115 },
-    market: { x: 795, y: 115 },
-    vacation: { x: 1110, y: 115 },
-    homeassistant: { x: 260, y: 520 },
-    openai: { x: 640, y: 520 },
-    database: { x: 1020, y: 520 },
+    orchestrator: { x: 640, y: 70 },
+    scheduler: { x: 430, y: 265 },
+    messaging: { x: 850, y: 265 },
+    market: { x: 110, y: 470 },
+    invoices: { x: 360, y: 470 },
+    vacation: { x: 610, y: 470 },
+    household: { x: 860, y: 470 },
+    mywellness: { x: 1110, y: 470 },
+    homeassistant: { x: 260, y: 660 },
+    openai: { x: 640, y: 660 },
+    database: { x: 1020, y: 660 },
   };
   if (fixed[node.id]) return fixed[node.id];
   if (node.kind === 'agent') return { x: 170 + (index % 4) * 310, y: 115 + Math.floor(index / 4) * 92 };

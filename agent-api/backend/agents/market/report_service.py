@@ -119,12 +119,19 @@ class MarketReportService:
                     symbol text not null,
                     signal text not null,
                     confidence real not null default 0,
+                    risk_level text not null default 'medium',
                     summary text not null default '',
+                    short_reason text not null default '',
                     report_id integer,
                     created_at text not null
                 )
                 """
             )
+            existing_history_columns = {row["name"] for row in connection.execute("pragma table_info(market_signal_history)").fetchall()}
+            if "risk_level" not in existing_history_columns:
+                connection.execute("alter table market_signal_history add column risk_level text not null default 'medium'")
+            if "short_reason" not in existing_history_columns:
+                connection.execute("alter table market_signal_history add column short_reason text not null default ''")
             connection.commit()
 
     def watchlist(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -291,18 +298,26 @@ class MarketReportService:
     def _insert_signal_history(self, connection: sqlite3.Connection, report_id: int, report: dict[str, Any]) -> None:
         connection.execute(
             """
-            insert into market_signal_history (symbol, signal, confidence, summary, report_id, created_at)
-            values (?, ?, ?, ?, ?, ?)
+            insert into market_signal_history (symbol, signal, confidence, risk_level, summary, short_reason, report_id, created_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(report.get("symbol") or "").upper(),
                 str(report.get("recommendation") or report.get("signal") or "watch"),
                 float(report.get("confidence") or 0),
+                str(report.get("risk_level") or "medium"),
                 str(report.get("summary") or ""),
+                self._short_reason(report),
                 report_id,
                 utc_now(),
             ),
         )
+
+    def _short_reason(self, report: dict[str, Any]) -> str:
+        text = str(report.get("summary") or report.get("reasoning") or "").replace("\n", " ").strip()
+        if len(text) <= 150:
+            return text
+        return text[:147].rstrip(" .,;:") + "..."
 
     def _update_report_v1_columns(self, connection: sqlite3.Connection, report_id: int, report: dict[str, Any]) -> None:
         connection.execute(
@@ -431,7 +446,7 @@ class MarketReportService:
             "signals": counts,
             "top_gainers": sorted_by_change[:5],
             "top_losers": list(reversed(sorted_by_change[-5:])),
-            "latest_reports": latest[:10],
+            "latest_reports": latest,
             "discovery_reports": self.latest_discovery_reports(limit=5),
             "disclaimer": "Keine Finanzberatung.",
         }

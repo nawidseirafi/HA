@@ -9,9 +9,11 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
+  Bell,
   Bot,
   BrainCircuit,
   CalendarCheck,
+  CalendarDays,
   Database,
   Dumbbell,
   FileText,
@@ -44,12 +46,15 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   mywellnessDashboard: { name: 'mywellnessDashboard' },
   marketDashboard: { name: 'marketDashboard' },
   vacationDashboard: { name: 'vacationDashboard' },
+  schedulerDashboard: { name: 'schedulerDashboard' },
 };
 
 const iconMap: Record<string, LucideIcon> = {
   Bot,
   BrainCircuit,
   CalendarCheck,
+  CalendarDays,
+  Bell,
   Database,
   Dumbbell,
   FileText,
@@ -219,14 +224,17 @@ function agentNodeFromMap(mapNode: OrchestratorMapNode, index: number): Node<Age
 
 function positionForNode(node: OrchestratorMapNode, index: number) {
   const fixed: Record<string, { x: number; y: number }> = {
-    orchestrator: { x: 310, y: 20 },
-    invoices: { x: 20, y: 220 },
-    mywellness: { x: 310, y: 220 },
-    market: { x: 600, y: 220 },
-    vacation: { x: 890, y: 220 },
-    openai: { x: -150, y: 430 },
-    database: { x: 310, y: 430 },
-    homeassistant: { x: 760, y: 430 },
+    orchestrator: { x: 390, y: 20 },
+    scheduler: { x: 180, y: 190 },
+    messaging: { x: 600, y: 190 },
+    market: { x: -150, y: 380 },
+    invoices: { x: 120, y: 380 },
+    vacation: { x: 390, y: 380 },
+    household: { x: 660, y: 380 },
+    mywellness: { x: 930, y: 380 },
+    openai: { x: -120, y: 590 },
+    database: { x: 330, y: 590 },
+    homeassistant: { x: 780, y: 590 },
   };
   if (fixed[node.id]) return fixed[node.id];
   if (node.kind === 'agent') return { x: 20 + (index % 4) * 290, y: 220 + Math.floor(index / 4) * 140 };
@@ -236,6 +244,7 @@ function positionForNode(node: OrchestratorMapNode, index: number) {
 
 function nodeKind(node: OrchestratorMapNode): AgentMapNodeData['kind'] {
   if (node.kind === 'orchestrator') return 'orchestrator';
+  if (node.kind === 'platform' || ["scheduler", "messaging", "household"].includes(node.id)) return 'platform';
   if (node.kind === 'agent') return 'agent';
   if (node.id === 'database') return 'database';
   if (node.id === 'openai' || node.id === 'homeassistant') return 'external';

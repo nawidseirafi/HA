@@ -9,9 +9,10 @@ interface Props {
   mode?: 'booking' | 'health' | 'all';
   onClose: () => void;
   onSave: (payload: MyWellnessSettingsPayload) => void;
+  onOpenScheduler?: () => void;
 }
 
-export function WellnessSettingsDrawer({ open, status, loading, mode = 'all', onClose, onSave }: Props) {
+export function WellnessSettingsDrawer({ open, status, loading, mode = 'all', onClose, onSave, onOpenScheduler }: Props) {
   if (!open) return null;
   const copy = mode === 'health'
     ? 'Health, Withings und Home Assistant konfigurieren.'
@@ -30,7 +31,7 @@ export function WellnessSettingsDrawer({ open, status, loading, mode = 'all', on
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Schließen"><X size={18} /></button>
         </header>
-        <WellnessSettingsPanel status={status} loading={loading} mode={mode} onSave={onSave} />
+        <WellnessSettingsPanel status={status} loading={loading} mode={mode} onSave={onSave} onOpenScheduler={onOpenScheduler} />
         {mode !== 'booking' && <p className="wellness-ha-note">Health-Daten werden nur aus Home Assistant gelesen und lokal in SQLite gespeichert.</p>}
       </aside>
     </div>

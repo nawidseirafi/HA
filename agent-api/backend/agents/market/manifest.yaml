@@ -12,3 +12,26 @@ ui:
   dashboard_route: marketDashboard
 settings:
   disclaimer: Keine Finanzberatung.
+scheduler:
+  tasks:
+    - default_key: market:analysis:0600
+      name: Market Analyse 06:00
+      description: Fuehrt die Watchlist- und Discovery-Analyse des Market Agents morgens aus.
+      schedule_type: recurring
+      schedule:
+        time: "06:00"
+      target_action: run
+    - default_key: market:analysis:1200
+      name: Market Analyse 12:00
+      description: Fuehrt die Market Analyse mittags aus.
+      schedule_type: recurring
+      schedule:
+        time: "12:00"
+      target_action: run
+    - default_key: market:analysis:1800
+      name: Market Analyse 18:00
+      description: Fuehrt die Market Analyse abends aus.
+      schedule_type: recurring
+      schedule:
+        time: "18:00"
+      target_action: run

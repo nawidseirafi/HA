@@ -27,6 +27,7 @@ export function AgentNode({ data, selected }: NodeProps<AgentMapNodeData>) {
 function nodeKindLabel(kind: AgentMapNodeData['kind']) {
   if (kind === 'orchestrator') return 'Systemsteuerung';
   if (kind === 'agent') return 'Agent';
+  if (kind === 'platform') return 'Platform Service';
   if (kind === 'database') return 'Datenhaltung';
   if (kind === 'external') return 'Externes System';
   return 'Service';

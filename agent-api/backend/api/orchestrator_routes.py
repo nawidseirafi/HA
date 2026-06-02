@@ -27,6 +27,7 @@ def orchestrator_map() -> dict[str, Any]:
     agents = [_agent_node(manifest.public_dict()) for manifest in discover_agent_manifests()]
     agent_ids = {agent["id"] for agent in agents}
     services = _service_nodes()
+    scheduler = next((agent for agent in agents if agent["id"] == "scheduler"), None)
     nodes = [
         {
             "id": "orchestrator",
@@ -40,19 +41,9 @@ def orchestrator_map() -> dict[str, Any]:
         *agents,
         *services,
     ]
+    primary_edges = _primary_edges(agents, services, scheduler)
     edges = [
-        *[
-            {
-                "id": f"orchestrator-{agent_id}",
-                "from": "orchestrator",
-                "to": agent_id,
-                "kind": "primary",
-                "active": _is_active(agent["status"]),
-                "status": agent["status"],
-            }
-            for agent in agents
-            for agent_id in [agent["id"]]
-        ],
+        *primary_edges,
         *[
             {
                 "id": f"{agent_id}-database",
@@ -137,7 +128,7 @@ def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
         "id": agent_id,
         "label": _agent_label(agent_id, manifest),
         "subtitle": _agent_subtitle(agent_id, manifest),
-        "kind": "agent",
+        "kind": "platform" if agent_id == "scheduler" else "agent",
         "status": status,
         "icon": _agent_icon(agent_id, manifest),
         "enabled": bool(manifest.get("enabled", True)),
@@ -170,10 +161,71 @@ def _service_nodes() -> list[dict[str, Any]]:
     except Exception:
         ha_status = "error"
     return [
+        {"id": "messaging", "label": "Message Center", "subtitle": "Nachrichten & Hinweise", "kind": "platform", "status": "active", "icon": "Bell", "control": _read_only_control()},
+        {"id": "household", "label": "Household", "subtitle": "Haushaltsstatus & Checks", "kind": "platform", "status": "active", "icon": "Home", "control": _read_only_control()},
         {"id": "openai", "label": "OpenAI", "subtitle": "Modelle & Verarbeitung", "kind": "service", "status": "active", "icon": "Sparkles", "control": _read_only_control()},
         {"id": "database", "label": "Database", "subtitle": "Daten & Historie", "kind": "service", "status": "active", "icon": "Database", "control": _read_only_control()},
         {"id": "homeassistant", "label": "Home Assistant", "subtitle": "Smart Home Bridge", "kind": "service", "status": ha_status, "icon": "HousePlug", "control": _read_only_control()},
     ]
+
+
+def _primary_edges(agents: list[dict[str, Any]], services: list[dict[str, Any]], scheduler: dict[str, Any] | None) -> list[dict[str, Any]]:
+    service_by_id = {service["id"]: service for service in services}
+    if not scheduler:
+        return [
+            {
+                "id": f"orchestrator-{agent['id']}",
+                "from": "orchestrator",
+                "to": agent["id"],
+                "kind": "primary",
+                "active": _is_active(agent["status"]),
+                "status": agent["status"],
+            }
+            for agent in agents
+        ]
+
+    edges = [
+        {
+            "id": "orchestrator-scheduler",
+            "from": "orchestrator",
+            "to": "scheduler",
+            "kind": "primary",
+            "active": _is_active(scheduler["status"]),
+            "status": scheduler["status"],
+        }
+    ]
+    if "messaging" in service_by_id:
+        messaging = service_by_id["messaging"]
+        edges.append({
+            "id": "orchestrator-messaging",
+            "from": "orchestrator",
+            "to": "messaging",
+            "kind": "primary",
+            "active": True,
+            "status": messaging["status"],
+        })
+    scheduled_targets = {"market", "invoices", "vacation", "mywellness"}
+    for agent in agents:
+        if agent["id"] in scheduled_targets:
+            edges.append({
+                "id": f"scheduler-{agent['id']}",
+                "from": "scheduler",
+                "to": agent["id"],
+                "kind": "primary",
+                "active": _is_active(agent["status"]),
+                "status": agent["status"],
+            })
+    if "household" in service_by_id:
+        household = service_by_id["household"]
+        edges.append({
+            "id": "scheduler-household",
+            "from": "scheduler",
+            "to": "household",
+            "kind": "primary",
+            "active": True,
+            "status": household["status"],
+        })
+    return edges
 
 
 def _control_info(agent_id: str) -> dict[str, Any]:

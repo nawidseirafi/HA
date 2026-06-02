@@ -107,6 +107,11 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
                 <Plane size={18} /> Vacation Dashboard
               </button>
             )}
+            {agentContext.kind === 'scheduler' && (
+              <button className={route.name === 'schedulerDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'schedulerDashboard' })}>
+                <CalendarDays size={18} /> Zeitsteuerung
+              </button>
+            )}
             <button onClick={onLogout}>
               <LogOut size={18} /> Abmelden
             </button>
@@ -143,7 +148,7 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
 }
 
 type AgentContext = {
-  kind: 'invoice' | 'market' | 'mywellness' | 'vacation';
+  kind: 'invoice' | 'market' | 'mywellness' | 'vacation' | 'scheduler';
   label: string;
   subtitle: string;
 };
@@ -160,6 +165,9 @@ function getAgentContext(route: Route): AgentContext | null {
   }
   if (route.name === 'vacationDashboard') {
     return { kind: 'vacation', label: 'Vacation Agent', subtitle: 'Vacation Manager' };
+  }
+  if (route.name === 'schedulerDashboard') {
+    return { kind: 'scheduler', label: 'Scheduler Agent', subtitle: 'Zeitsteuerung' };
   }
   return null;
 }

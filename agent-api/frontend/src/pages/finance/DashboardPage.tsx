@@ -74,7 +74,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     }
   };
 
-  const saveInvoiceSettings = async (payload: { enabled: boolean; schedule: string[] }) => {
+  const saveInvoiceSettings = async (payload: { enabled: boolean }) => {
     setBusy(true);
     setAgentError('');
     try {
@@ -252,6 +252,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
         loading={busy}
         onClose={() => setSettingsOpen(false)}
         onSave={saveInvoiceSettings}
+        onOpenScheduler={() => {
+          setSettingsOpen(false);
+          navigate({ name: 'schedulerDashboard' });
+        }}
       />
     </div>
   );
@@ -263,12 +267,14 @@ function InvoiceSettingsDrawer({
   loading,
   onClose,
   onSave,
+  onOpenScheduler,
 }: {
   open: boolean;
   status: AgentStatus | null;
   loading: boolean;
   onClose: () => void;
-  onSave: (payload: { enabled: boolean; schedule: string[] }) => void;
+  onSave: (payload: { enabled: boolean }) => void;
+  onOpenScheduler: () => void;
 }) {
   const [enabled, setEnabled] = useState(true);
   const [dailyRun, setDailyRun] = useState('22:00');
@@ -300,7 +306,6 @@ function InvoiceSettingsDrawer({
               event.preventDefault();
               onSave({
                 enabled,
-                schedule: [dailyRun].filter(Boolean),
               });
             }}
           >
@@ -309,8 +314,15 @@ function InvoiceSettingsDrawer({
                 <span><CalendarClock size={18} /></span>
                 <div>
                   <h3>Automationen</h3>
-                  <p>Lege fest, wann der Agent einmal täglich neue E-Mails und Dateien verarbeitet.</p>
+                  <p>Zeitplan wird über den Scheduler verwaltet. Diese Zeit ist nur der Agent-Default.</p>
                 </div>
+              </div>
+              <div className="wellness-scheduler-note">
+                <strong>Aktive Laufzeiten liegen im Scheduler.</strong>
+                <span>Änderungen im Scheduler haben Vorrang und werden nicht durch Invoice-Defaults überschrieben.</span>
+                <button className="button secondary" type="button" onClick={onOpenScheduler}>
+                  Zeitplan bearbeiten
+                </button>
               </div>
               <div className="invoice-settings-card">
                 <label className="wellness-toggle-line invoice-toggle-line">
@@ -325,12 +337,12 @@ function InvoiceSettingsDrawer({
               </div>
               <div className="invoice-time-card">
                 <label className="wellness-field invoice-time-field">
-                  <small>Nächster täglicher Scan</small>
-                  <input type="time" value={dailyRun} onChange={(event) => setDailyRun(event.target.value)} aria-label="Täglicher Scan" />
+                  <small>Default täglicher Scan</small>
+                  <input type="time" value={dailyRun} readOnly disabled aria-label="Täglicher Scan" />
                 </label>
                 <div>
                   <strong>{dailyRun}</strong>
-                  <span>einmal pro Tag</span>
+                  <span>im Scheduler bearbeiten</span>
                 </div>
               </div>
             </section>

@@ -257,7 +257,18 @@ export function MyWellnessDashboardPage({ navigate }: { navigate: (route: Route)
       </section>
 
       <WellnessActivityFeed items={logs} compact />
-      <WellnessSettingsDrawer open={drawerOpen} status={status} loading={loading} mode="booking" onClose={() => setDrawerOpen(false)} onSave={saveSettings} />
+      <WellnessSettingsDrawer
+        open={drawerOpen}
+        status={status}
+        loading={loading}
+        mode="booking"
+        onClose={() => setDrawerOpen(false)}
+        onSave={saveSettings}
+        onOpenScheduler={() => {
+          setDrawerOpen(false);
+          navigate({ name: 'schedulerDashboard' });
+        }}
+      />
     </div>
   );
 }

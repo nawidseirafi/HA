@@ -323,10 +323,10 @@ class MarketAgent:
             ("watch", "buy"),
             ("sell", "buy"),
         }
-        if not relevant_transition and recommendation not in {"buy", "sell"} and confidence < 85:
+        if not relevant_transition:
             return
-        title = "Signalwechsel erkannt" if relevant_transition else ("Kaufsignal erkannt" if recommendation == "buy" else "Marktrisiko erkannt")
-        severity = "info" if recommendation == "buy" else "warning"
+        title = "Market Signalwechsel"
+        severity = "warning" if recommendation == "sell" else "info"
         message = self._market_message_text(report, recommendation, confidence, previous)
         try:
             MessagingService().create_message(
@@ -343,16 +343,10 @@ class MarketAgent:
     def _market_message_text(self, report: dict[str, Any], recommendation: str, confidence: float, previous: str = "") -> str:
         name = report.get("resolved_name") or report.get("symbol")
         summary = str(report.get("summary") or "").strip()
+        risk = str(report.get("risk_level") or "medium").capitalize()
         if previous:
-            return (
-                f"Asset: {name}\n\n"
-                f"Signalwechsel:\n{previous.upper()} -> {recommendation.upper()}\n\n"
-                f"Confidence: {confidence:.0f}%\n\n"
-                f"Grund:\n{summary}"
-            )
-        if recommendation == "buy":
-            return f"{name} zeigt ein positives Marktsignal. Confidence {confidence:.0f}%. {summary}".strip()
-        return f"{name} zeigt ein erhoehtes Risikosignal. Confidence {confidence:.0f}%. {summary}".strip()
+            return f"{name} wechselte von {previous.upper()} zu {recommendation.upper()}. Confidence {confidence:.0f} %. {summary} Risiko {risk}.".strip()
+        return f"{name} zeigt ein {recommendation.upper()} Signal. Confidence {confidence:.0f} %. {summary} Risiko {risk}.".strip()
 
     def _infer_asset_type(self, symbol: str) -> str:
         if symbol.startswith("^"):

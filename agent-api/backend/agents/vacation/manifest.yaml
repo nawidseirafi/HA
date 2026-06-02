@@ -13,3 +13,12 @@ ui:
 settings:
   mode_entity: input_boolean.vacation_mode
   dry_run_default: true
+scheduler:
+  tasks:
+    - default_key: vacation:status-check:0800
+      name: Vacation Statuspruefung
+      description: Aktualisiert Vacation Status, Kalendererkennung, Reminder und Historie taeglich.
+      schedule_type: recurring
+      schedule:
+        time: "08:00"
+      target_action: run

@@ -19,6 +19,7 @@ import { MarketReportsPage } from './pages/market/MarketReportsPage';
 import { MarketSymbolPage } from './pages/market/MarketSymbolPage';
 import { MarketWatchlistPage } from './pages/market/MarketWatchlistPage';
 import { VacationDashboard } from './pages/VacationDashboard';
+import { SchedulerDashboardPage } from './pages/scheduler/SchedulerDashboardPage';
 import { WallDashboardPage } from './pages/WallDashboardPage';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -39,6 +40,7 @@ export type Route =
   | { name: 'marketReports' }
   | { name: 'marketSymbol'; symbol: string }
   | { name: 'vacationDashboard' }
+  | { name: 'schedulerDashboard' }
   | { name: 'invoiceDashboard' }
   | { name: 'years' }
   | { name: 'year'; year: number }
@@ -67,11 +69,13 @@ function parseRoute(): Route {
   if (parts[0] === 'market' && parts[1]) return { name: 'marketSymbol', symbol: parts[1].toUpperCase() };
   if (parts[0] === 'market') return { name: 'marketDashboard' };
   if (parts[0] === 'vacationDashboard' || parts[0] === 'vacation') return { name: 'vacationDashboard' };
+  if (parts[0] === 'scheduler' || parts[0] === 'schedulerDashboard') return { name: 'schedulerDashboard' };
   if (parts[0] === 'years') return { name: 'years' };
   if (parts[0] === 'agents' && (parts[1] === 'invoices' || parts[1] === 'invoiceDashboard')) return { name: 'invoiceDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'market' || parts[1] === 'marketDashboard')) return { name: 'marketDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'mywellness' || parts[1] === 'mywellnessDashboard')) return { name: 'mywellnessDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'vacation-dashboard' || parts[1] === 'vacationDashboard')) return { name: 'vacationDashboard' };
+  if (parts[0] === 'agents' && (parts[1] === 'scheduler' || parts[1] === 'schedulerDashboard')) return { name: 'schedulerDashboard' };
   if (parts[0] === 'agents' && parts[1] === 'list') return { name: 'agentList' };
   if (parts[0] === 'agents' && parts[1] === 'map') return { name: 'agentMap' };
   if (parts[0] === 'agents' && parts[1] === 'messages') return { name: 'agentMessages' };
@@ -124,6 +128,7 @@ function AppContent() {
     if (route.name === 'marketReports') return <MarketReportsPage navigate={navigate} />;
     if (route.name === 'marketSymbol') return <MarketSymbolPage symbol={route.symbol} />;
     if (route.name === 'vacationDashboard') return <VacationDashboard />;
+    if (route.name === 'schedulerDashboard') return <SchedulerDashboardPage />;
     if (route.name === 'years') return <YearsPage navigate={navigate} />;
     if (route.name === 'year') return <YearPage year={route.year} navigate={navigate} />;
     if (route.name === 'month') return <MonthPage year={route.year} month={route.month} navigate={navigate} />;
@@ -163,6 +168,7 @@ function routeToPath(route: Route) {
   if (route.name === 'marketReports') return '/market/reports';
   if (route.name === 'marketSymbol') return `/market/${encodeURIComponent(route.symbol)}`;
   if (route.name === 'vacationDashboard') return '/vacationDashboard';
+  if (route.name === 'schedulerDashboard') return '/scheduler';
   if (route.name === 'invoiceDashboard') return '/invoices';
   if (route.name === 'years') return '/invoices/years';
   if (route.name === 'year') return `/invoices/years/${route.year}`;

@@ -12,6 +12,7 @@ interface Props {
   status: AgentStatus | null;
   loading: boolean;
   onSave: (payload: MyWellnessSettingsPayload) => void;
+  onOpenScheduler?: () => void;
   mode?: 'booking' | 'health' | 'all';
 }
 
@@ -19,7 +20,7 @@ function toTimeInput(value?: string) {
   return (value || '').slice(0, 8);
 }
 
-export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }: Props) {
+export function WellnessSettingsPanel({ status, loading, onSave, onOpenScheduler, mode = 'all' }: Props) {
   const [agentEnabled, setAgentEnabled] = useState(true);
   const [healthSyncEnabled, setHealthSyncEnabled] = useState(true);
   const [prepareTime, setPrepareTime] = useState('17:00:00');
@@ -122,9 +123,6 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           onSave({
             enabled: agentEnabled,
             health_sync_enabled: healthSyncEnabled,
-            prepare_time: prepareTime,
-            booking_time: bookingTime,
-            health_sync_time: healthSyncTime,
             days,
             desired_courses: courses.split(/\r?\n|,/).map((course) => course.trim()).filter(Boolean),
           });
@@ -135,8 +133,17 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           <span><CalendarClock size={18} /></span>
           <div>
             <h3>Automationen</h3>
-            <p>Steuere, wann die Kursliste vorbereitet und Buchungen ausgeführt werden.</p>
+            <p>Zeitplan wird über den Scheduler verwaltet. Diese Werte sind nur die Agent-Defaults.</p>
           </div>
+        </div>
+        <div className="wellness-scheduler-note">
+          <strong>Zeitplan wird über Scheduler verwaltet.</strong>
+          <span>Lokale Zeitänderungen haben dort Vorrang und werden nicht durch Agent-Defaults überschrieben.</span>
+          {onOpenScheduler && (
+            <button className="button secondary" type="button" onClick={onOpenScheduler}>
+              Zeitplan bearbeiten
+            </button>
+          )}
         </div>
         <div className="wellness-setting-row">
           <label className="wellness-toggle-line">
@@ -149,13 +156,13 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
         <div className="wellness-setting-row">
           <label className="wellness-field">
             <small>Kursliste vorbereiten</small>
-            <input type="time" step="1" value={prepareTime} onChange={(event) => setPrepareTime(event.target.value)} />
+            <input type="time" step="1" value={prepareTime} readOnly disabled />
           </label>
         </div>
         <div className="wellness-setting-row">
           <label className="wellness-field">
             <small>Automatisch buchen</small>
-            <input type="time" step="1" value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} />
+            <input type="time" step="1" value={bookingTime} readOnly disabled />
           </label>
         </div>
         <div className="wellness-setting-row">
@@ -166,7 +173,7 @@ export function WellnessSettingsPanel({ status, loading, onSave, mode = 'all' }:
           </label>
           <label className="wellness-field">
             <small>Health-Sync</small>
-            <input type="time" step="1" value={healthSyncTime} onChange={(event) => setHealthSyncTime(event.target.value)} />
+            <input type="time" step="1" value={healthSyncTime} readOnly disabled />
           </label>
         </div>
       </section>
