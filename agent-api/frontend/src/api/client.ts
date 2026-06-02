@@ -988,7 +988,8 @@ export const api = {
   infrastructureStatus: () => request<InfrastructureFullStatus>('/api/infrastructure/status'),
   infrastructureSummary: () => request<InfrastructureSummary>('/api/infrastructure/summary'),
   mywellnessCourses: async () => (await request<{ courses: MyWellnessCourse[]; error?: string }>('/api/mywellness/courses')).courses,
-  mywellnessUpcomingCourses: async () => (await request<{ courses: Course[]; error?: string }>('/api/mywellness/courses/upcoming')).courses,
+  mywellnessUpcomingCourses: async (refresh = false) =>
+    (await request<{ courses: Course[]; error?: string }>(`/api/mywellness/courses/upcoming${refresh ? '?refresh=true' : ''}`)).courses,
   mywellnessBookings: async () => (await request<{ bookings: Course[]; error?: string }>('/api/mywellness/bookings')).bookings,
   bookMywellnessCourse: (courseId: string) =>
     request<{ ok: boolean; message: string; course: Course }>('/api/mywellness/book', { method: 'POST', body: JSON.stringify({ courseId }) }),

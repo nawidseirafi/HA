@@ -248,12 +248,11 @@ class MyWellnessService:
             bookings = state.get("current_bookings") or []
             return {"bookings": bookings or self._bookings_from_logs(), "error": str(exc)}
 
-    def upcoming_courses(self) -> dict[str, Any]:
+    def upcoming_courses(self, force_refresh: bool = False) -> dict[str, Any]:
         state = self._read_status()
         try:
-            # Zuerst aus Datenbank-Cache lesen
-            cached_courses = self._courses_from_db_cache()
-            if cached_courses:
+            cached_courses = [] if force_refresh else self._courses_from_db_cache()
+            if cached_courses and self._courses_cache_covers_horizon(cached_courses):
                 courses = self._filter_upcoming(cached_courses)
                 state["upcoming_courses"] = courses
                 state["current_bookings"] = self._bookings_from_courses(courses)
@@ -262,7 +261,7 @@ class MyWellnessService:
                 self._write_status(state)
                 return {"courses": courses}
 
-            courses = state.get("upcoming_courses") or []
+            courses = self._filter_upcoming(self._fetch_courses(force_refresh=True))
             state["upcoming_courses"] = courses
             state["current_bookings"] = self._bookings_from_courses(courses)
             state["last_upcoming_refresh"] = utc_now()
@@ -778,6 +777,21 @@ class MyWellnessService:
             for course in courses
             if self._course_datetime(course.get("startTime") or course.get("starts_at"), fallback_min=True) <= limit
         ]
+
+    def _courses_cache_covers_horizon(self, courses: list[dict[str, Any]]) -> bool:
+        if not courses:
+            return False
+        _, target_date = self._dates()
+        max_partition = ""
+        for course in courses:
+            partition = str(course.get("partitionDate") or course.get("partition_date") or "").strip()
+            if not partition:
+                start = self._course_datetime(course.get("startTime") or course.get("starts_at"), fallback_min=True)
+                if start != datetime.min:
+                    partition = start.strftime("%Y%m%d")
+            if partition > max_partition:
+                max_partition = partition
+        return max_partition >= target_date
 
     def _bookings_from_output(self, output: str) -> list[dict[str, Any]]:
         names = re.findall(r"Erfolgreich gebucht:\s*(.+)", output or "")

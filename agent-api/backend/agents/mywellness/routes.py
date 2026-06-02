@@ -123,8 +123,8 @@ def mywellness_courses():
 
 
 @router.get("/api/mywellness/courses/upcoming")
-def mywellness_upcoming_courses():
-    return mywellness_service.upcoming_courses()
+def mywellness_upcoming_courses(refresh: bool = Query(False)):
+    return mywellness_service.upcoming_courses(force_refresh=refresh)
 
 
 @router.post("/api/mywellness/book")

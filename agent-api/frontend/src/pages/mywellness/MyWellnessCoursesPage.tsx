@@ -13,11 +13,11 @@ export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (rout
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, refresh = false) => {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const nextCourses = await api.mywellnessUpcomingCourses();
+      const nextCourses = await api.mywellnessUpcomingCourses(refresh);
       setCourses(nextCourses);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kurse konnten nicht geladen werden.');
@@ -67,7 +67,7 @@ export function MyWellnessCoursesPage({ navigate: _navigate }: { navigate: (rout
           <p>Finde verfügbare Sessions und buche direkt deinen Platz.</p>
         </div>
         <div className="button-row">
-          <button className="icon-button" type="button" onClick={() => load()} disabled={loading} aria-label="Kurse aktualisieren"><RefreshCw size={19} /></button>
+          <button className="icon-button" type="button" onClick={() => load(false, true)} disabled={loading} aria-label="Kurse aktualisieren"><RefreshCw size={19} /></button>
         </div>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
