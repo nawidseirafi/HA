@@ -1,22 +1,29 @@
 import { useEffect, useState } from 'react';
-import type { MarketReport, MarketSummary } from '../../api/client';
+import type { ReactNode } from 'react';
+import type { MarketReport, MarketSummary, MarketWatchlistItem } from '../../api/client';
 import { api } from '../../api/client';
 import type { Route } from '../../App';
-import { formatPercent, formatPrice, sourceLabel } from '../../components/market/MarketReportCard';
+import { formatPercent, formatPrice } from '../../components/market/MarketReportCard';
 import { MarketRunButton } from '../../components/market/MarketRunButton';
-import { MarketPerformanceChart, MarketSentimentDonut, MiniSparkline, type MarketRange } from '../../components/market/MarketCharts';
 import { MarketSignalBadge } from '../../components/market/MarketSignalBadge';
+import { MarketSummaryCards } from '../../components/market/MarketSummaryCards';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react';
 
 export function MarketDashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [summary, setSummary] = useState<MarketSummary | null>(null);
+  const [watchlistItems, setWatchlistItems] = useState<MarketWatchlistItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [range, setRange] = useState<MarketRange>('30D');
 
   const load = async () => {
     setError('');
     try {
-      setSummary(await api.marketSummary());
+      const [nextSummary, nextWatchlist] = await Promise.all([
+        api.marketSummary(),
+        api.marketWatchlist(),
+      ]);
+      setSummary(nextSummary);
+      setWatchlistItems(nextWatchlist);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Marktdaten konnten nicht geladen werden.');
     }
@@ -70,79 +77,194 @@ export function MarketDashboardPage({ navigate }: { navigate: (route: Route) => 
       </header>
 
       {error && <section className="panel error-panel">{error}</section>}
-      <MarketTickerStrip reports={summary?.latest_reports ?? []} onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })} />
-
-      <section className="market-dashboard-grid">
-        <div className="market-primary-stack">
-          <MarketPerformanceChart reports={summary?.latest_reports ?? []} range={range} onRangeChange={setRange} />
-          <MarketIntelTable
-            reports={summary?.latest_reports ?? []}
-            onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })}
-            onReports={() => navigate({ name: 'marketReports' })}
-          />
-        </div>
-
-        <aside className="quick-stack market-side-stack">
-          <MarketSentimentDonut summary={summary} />
-          <MarketMovePanel title="Stärkste Gewinner" reports={summary?.top_gainers ?? []} onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })} />
-          <MarketMovePanel title="Stärkste Verlierer" reports={summary?.top_losers ?? []} onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })} />
-          <MarketNewsFlow reports={summary?.latest_reports ?? []} />
-        </aside>
-      </section>
+      <MarketSummaryCards summary={summary} reports={summary?.latest_reports ?? []} watchlistItems={watchlistItems} />
+      <MarketInsightCards summary={summary} onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })} />
+      <MarketDiscoveryPanel reports={summary?.discovery_reports ?? []} onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })} />
+      <MarketIntelTable
+        reports={summary?.latest_reports ?? []}
+        watchlistItems={watchlistItems}
+        onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })}
+      />
     </div>
   );
 }
 
-function MarketTickerStrip({ reports, onOpen }: { reports: MarketReport[]; onOpen: (symbol: string) => void }) {
-  return (
-    <section className="market-ticker-strip">
-      {reports.map((report) => (
-        <button key={report.id} onClick={() => onOpen(report.symbol)}>
-          <strong>{report.symbol}</strong>
-          <span>{formatPrice(report.price)}</span>
-          <b className={(report.change_percent ?? 0) >= 0 ? 'market-positive' : 'market-negative'}>{formatPercent(report.change_percent)}</b>
-          <em className={`market-quality ${report.data_quality ?? 'unknown'}`}>{qualityLabel(report)}</em>
-          <MiniSparkline symbol={report.symbol} changePercent={report.change_percent} />
-        </button>
-      ))}
-      {reports.length === 0 && <div className="market-empty-ticker">Keine Live-Daten. Watchlist anlegen und Marktanalyse starten.</div>}
-    </section>
-  );
-}
-
-function MarketIntelTable({ reports, onOpen, onReports }: { reports: MarketReport[]; onOpen: (symbol: string) => void; onReports: () => void }) {
+function MarketIntelTable({
+  reports,
+  watchlistItems,
+  onOpen,
+}: {
+  reports: MarketReport[];
+  watchlistItems: MarketWatchlistItem[];
+  onOpen: (symbol: string) => void;
+}) {
+  const reportBySymbol = new Map(reports.map((report) => [report.symbol.toUpperCase(), report]));
+  const rows = watchlistItems.map((item) => ({
+    item,
+    report: reportBySymbol.get(item.symbol.toUpperCase()),
+  }));
   return (
     <section className="panel market-intel-panel">
       <div className="section-title">
         <div>
-          <span className="eyebrow">Intelligence Feed</span>
-          <h2>Watchlist Dynamik</h2>
+          <span className="eyebrow">Watchlist</span>
+          <h2>Signale</h2>
         </div>
-        <button className="button ghost" onClick={onReports}>Alle Berichte</button>
       </div>
       <div className="market-intel-table">
-        <div className="market-intel-head">
-          <span>Symbol</span>
-          <span>Signal</span>
-          <span>Preis</span>
-          <span>Move</span>
-          <span>Confidence</span>
-          <span>Daten</span>
-        </div>
-        {reports.map((report) => (
-          <button className="market-intel-row" key={report.id} onClick={() => onOpen(report.symbol)}>
-            <strong>{report.symbol}</strong>
-            <MarketSignalBadge signal={report.signal} />
-            <span>{formatPrice(report.price)}</span>
-            <b className={(report.change_percent ?? 0) >= 0 ? 'market-positive' : 'market-negative'}>{formatPercent(report.change_percent)}</b>
-            <span>{Math.round((report.confidence || 0) * 100)}%</span>
-            <small>{report.status === 'error' ? 'Keine echten Daten' : `${sourceLabel(report.analysis_source)} · ${report.quote_provider || '?'} · ${report.news_provider || '?'}`}</small>
+        {rows.map(({ item, report }) => (
+          <button className="market-intel-card" key={item.id} onClick={() => onOpen(item.symbol)}>
+            <div className="market-intel-card-head">
+              <strong>{item.symbol}</strong>
+              {report ? <MarketSignalBadge signal={report.recommendation || report.signal} /> : <span className="market-signal watch">Offen</span>}
+            </div>
+            <div className="market-intel-card-price">
+              <b>{report ? formatPrice(report.price) : '-'}</b>
+              <span className={!report || (report.change_percent ?? 0) >= 0 ? 'market-positive' : 'market-negative'}>{report ? formatPercent(report.change_percent) : '-'}</span>
+            </div>
+            <div className="market-intel-card-meta">
+              <span>{report ? `${Math.round(report.confidence || 0)}% Conf.` : 'Keine Analyse'}</span>
+              <span>{report ? `Risiko ${riskLabel(report.risk_level)}` : item.asset_type}</span>
+              {report && <em className={`market-quality ${report.data_quality ?? 'unknown'}`}>{qualityLabel(report)}</em>}
+            </div>
+            <p>{report ? oneSentence(report.summary, 110) : 'Noch keine Analyse vorhanden. Manuellen Run starten oder Scheduler abwarten.'}</p>
           </button>
         ))}
-        {reports.length === 0 && <p className="muted">Noch keine Reports vorhanden.</p>}
+        {rows.length === 0 && <p className="muted">Noch keine Watchlist-Einträge vorhanden.</p>}
       </div>
     </section>
   );
+}
+
+function riskLabel(value: string | undefined) {
+  if (value === 'low') return 'Low';
+  if (value === 'high') return 'High';
+  return 'Medium';
+}
+
+function MarketInsightCards({ summary, onOpen }: { summary: MarketSummary | null; onOpen: (symbol: string) => void }) {
+  const reports = summary?.latest_reports ?? [];
+  const topBuy = reports
+    .filter((report) => (report.recommendation || report.signal) === 'buy')
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+  const topRisk = selectTopRisk(reports);
+  const topGainer = summary?.top_gainers?.[0] ?? reports.slice().sort((a, b) => (b.change_percent ?? -999) - (a.change_percent ?? -999))[0];
+  const topLoser = summary?.top_losers?.[0] ?? reports.slice().sort((a, b) => (a.change_percent ?? 999) - (b.change_percent ?? 999))[0];
+
+  return (
+    <section className="market-insight-grid" aria-label="Market Insights">
+      <InsightCard
+        icon={<TrendingUp size={20} />}
+        tone="buy"
+        title="Top Buy"
+        report={topBuy}
+        main={topBuy?.symbol}
+        value={topBuy ? `${Math.round(topBuy.confidence || 0)}%` : undefined}
+        detail={topBuy ? oneSentence(topBuy.summary, 120) : undefined}
+        onOpen={onOpen}
+      />
+      <InsightCard
+        icon={<AlertTriangle size={20} />}
+        tone="risk"
+        title="Top Risiko"
+        report={topRisk}
+        main={topRisk?.symbol}
+        value={topRisk ? (topRisk.recommendation || topRisk.signal).toUpperCase() : undefined}
+        detail={topRisk ? oneSentence(topRisk.summary, 120) : undefined}
+        onOpen={onOpen}
+      />
+      <InsightCard
+        icon={<ArrowUpRight size={20} />}
+        tone="winner"
+        title="Top Gewinner"
+        report={topGainer}
+        main={topGainer?.symbol}
+        value={topGainer ? formatPercent(topGainer.change_percent) : undefined}
+        detail={topGainer ? 'Staerkste Tagesperformance.' : undefined}
+        onOpen={onOpen}
+      />
+      <InsightCard
+        icon={<ArrowDownRight size={20} />}
+        tone="loser"
+        title="Top Verlierer"
+        report={topLoser}
+        main={topLoser?.symbol}
+        value={topLoser ? formatPercent(topLoser.change_percent) : undefined}
+        detail={topLoser ? 'Schwaechste Tagesperformance.' : undefined}
+        onOpen={onOpen}
+      />
+    </section>
+  );
+}
+
+function InsightCard({
+  icon,
+  tone,
+  title,
+  report,
+  main,
+  value,
+  detail,
+  onOpen,
+}: {
+  icon: ReactNode;
+  tone: 'buy' | 'risk' | 'winner' | 'loser';
+  title: string;
+  report?: MarketReport;
+  main?: string;
+  value?: string;
+  detail?: string;
+  onOpen: (symbol: string) => void;
+}) {
+  const content = (
+    <>
+      <div className="market-insight-head">
+        <span>{icon}</span>
+        <strong>{title}</strong>
+      </div>
+      <div className="market-insight-body">
+        <b>{main || 'Keine Daten'}</b>
+        <em>{value || '-'}</em>
+        <p>{detail || 'Keine Daten'}</p>
+      </div>
+    </>
+  );
+  if (!report || !main) {
+    return <article className={`market-insight-card ${tone}`}>{content}</article>;
+  }
+  return (
+    <button className={`market-insight-card ${tone}`} type="button" onClick={() => onOpen(report.symbol)}>
+      {content}
+    </button>
+  );
+}
+
+function selectTopRisk(reports: MarketReport[]) {
+  const nonBuyReports = reports.filter((report) => (report.recommendation || report.signal) !== 'buy');
+  const sellReports = nonBuyReports.filter((report) => (report.recommendation || report.signal) === 'sell');
+  if (sellReports.length) {
+    return sellReports
+      .slice()
+      .sort((a, b) => sellRiskScore(b) - sellRiskScore(a))[0];
+  }
+  return nonBuyReports
+    .slice()
+    .sort((a, b) => riskScore(b) - riskScore(a))[0];
+}
+
+function sellRiskScore(report: MarketReport) {
+  const confidenceRisk = 100 - Number(report.confidence || 0);
+  const trendRisk = Math.max(0, -(report.change_percent ?? 0)) * 4;
+  return confidenceRisk + trendRisk;
+}
+
+function riskScore(report: MarketReport) {
+  const signal = report.recommendation || report.signal;
+  const risk = report.risk_level === 'high' ? 40 : report.risk_level === 'medium' ? 20 : 0;
+  const signalRisk = signal === 'sell' ? 60 : signal === 'watch' ? 35 : signal === 'hold' ? 12 : -100;
+  const confidenceRisk = Math.max(0, 100 - Number(report.confidence || 0)) / 2;
+  const trendRisk = Math.max(0, -(report.change_percent ?? 0)) * 3;
+  return risk + signalRisk + confidenceRisk + trendRisk;
 }
 
 function qualityLabel(report: MarketReport) {
@@ -152,61 +274,48 @@ function qualityLabel(report: MarketReport) {
   return 'TEILDATEN';
 }
 
-function MarketNewsFlow({ reports }: { reports: MarketReport[] }) {
-  const news = reports
-    .filter((report) => report.news_summary || report.summary)
-    .slice(0, 6)
-    .map((report) => ({
-      symbol: report.symbol,
-      text: report.news_summary || report.summary,
-      signal: report.signal,
-      time: report.created_at,
-    }));
+function MarketDiscoveryPanel({ reports, onOpen }: { reports: MarketReport[]; onOpen: (symbol: string) => void }) {
+  const topReports = reports.slice(0, 5);
   return (
-    <section className="panel market-news-flow">
+    <section className="panel market-intel-panel">
       <div className="section-title">
         <div>
-          <span className="eyebrow">Newsflow</span>
-          <h2>Marktlage</h2>
+          <span className="eyebrow">Discovery</span>
+          <h2>Top Chancen</h2>
         </div>
       </div>
-      <div className="market-flow-list">
-        {news.map((item) => (
-          <article key={`${item.symbol}-${item.time}`}>
-            <div>
-              <strong>{item.symbol}</strong>
-              <MarketSignalBadge signal={item.signal} />
+      <div className="market-intel-table">
+        {topReports.map((report) => (
+          <button className="market-intel-card" key={`${report.symbol}-${report.created_at}`} onClick={() => onOpen(report.symbol)}>
+            <div className="market-intel-card-head">
+              <strong>{report.symbol}</strong>
+              <MarketSignalBadge signal={report.recommendation || report.signal} />
             </div>
-            <p>{item.text}</p>
-            <small>{new Date(item.time).toLocaleString('de-DE')}</small>
-          </article>
+            <div className="market-intel-card-price">
+              <b>{Math.round(report.confidence || 0)}%</b>
+              <span>{riskLabel(report.risk_level)} Risiko</span>
+            </div>
+            <div className="market-intel-card-meta">
+              <span>{reportName(report)}</span>
+              <em className={`market-quality ${report.data_quality ?? 'unknown'}`}>{qualityLabel(report)}</em>
+            </div>
+            <p>{oneSentence(report.summary)}</p>
+          </button>
         ))}
-        {news.length === 0 && <p className="muted">Noch kein Newsflow vorhanden.</p>}
+        {reports.length === 0 && <p className="muted">Noch keine Marktideen. Analyse starten.</p>}
       </div>
     </section>
   );
 }
 
-function MarketMovePanel({ title, reports, onOpen }: { title: string; reports: MarketSummary['latest_reports']; onOpen: (symbol: string) => void }) {
-  return (
-    <div className="panel">
-      <div className="section-title">
-        <div>
-          <span className="eyebrow">Momentum</span>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      <div className="market-mini-list">
-        {reports.map((report) => (
-          <button key={report.id} onClick={() => onOpen(report.symbol)}>
-            <strong>{report.symbol}</strong>
-            <span className={(report.change_percent ?? 0) >= 0 ? 'market-positive' : 'market-negative'}>
-              {(report.change_percent ?? 0).toFixed(2)}%
-            </span>
-          </button>
-        ))}
-        {reports.length === 0 && <p className="muted">Noch keine Daten.</p>}
-      </div>
-    </div>
-  );
+function reportName(report: MarketReport) {
+  const raw = report.ai_raw_json as { quote?: { name?: string } } | undefined;
+  return raw?.quote?.name || report.symbol;
+}
+
+function oneSentence(value: string, maxLength = 150) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return 'Kurzes Marktsignal ohne langen Bericht.';
+  const firstSentence = text.match(/^[^.!?]+[.!?]?/)?.[0] || text;
+  return firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength - 3).trim()}...` : firstSentence;
 }

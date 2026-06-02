@@ -6,7 +6,7 @@ export function MarketReportCard({ report, onOpen }: { report: MarketReport; onO
     <article className="market-report-card">
       <div className="market-report-head">
         <button className="table-link" onClick={() => onOpen?.(report.symbol)}>{report.symbol}</button>
-        <MarketSignalBadge signal={report.signal} />
+        <MarketSignalBadge signal={report.recommendation || report.signal} />
       </div>
       <div className="market-price-row">
         <strong>{formatPrice(report.price)}</strong>
@@ -20,7 +20,7 @@ export function MarketReportCard({ report, onOpen }: { report: MarketReport; onO
         <span>{report.quote_provider || 'quote ?'}</span>
         <span>{report.news_provider || 'news ?'}</span>
       </div>
-      <small>Confidence {Math.round((report.confidence || 0) * 100)}% · {new Date(report.created_at).toLocaleString('de-DE')}</small>
+      <small>Confidence {Math.round(report.confidence || 0)}% · Risiko {report.risk_level || 'medium'} · {new Date(report.created_at).toLocaleString('de-DE')}</small>
       <b>Keine Finanzberatung.</b>
     </article>
   );

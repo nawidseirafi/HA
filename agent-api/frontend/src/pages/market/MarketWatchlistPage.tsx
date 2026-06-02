@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { MarketReport, MarketWatchlistItem, MarketWatchlistPayload } from '../../api/client';
+import type { MarketWatchlistItem, MarketWatchlistPayload } from '../../api/client';
 import { api } from '../../api/client';
 import type { Route } from '../../App';
 import { WatchlistForm } from '../../components/market/WatchlistForm';
@@ -7,21 +7,15 @@ import { WatchlistTable } from '../../components/market/WatchlistTable';
 
 export function MarketWatchlistPage({ navigate }: { navigate: (route: Route) => void }) {
   const [items, setItems] = useState<MarketWatchlistItem[]>([]);
-  const [latestReports, setLatestReports] = useState<MarketReport[]>([]);
   const [editing, setEditing] = useState<MarketWatchlistItem | null>(null);
   const [busy, setBusy] = useState(false);
-  const [busySymbol, setBusySymbol] = useState('');
   const [error, setError] = useState('');
 
   const load = async () => {
     setError('');
     try {
-      const [watchlist, latest] = await Promise.all([
-        api.marketWatchlist(),
-        api.marketLatestReports().catch(() => ({ reports: [], disclaimer: 'Keine Finanzberatung.' })),
-      ]);
+      const watchlist = await api.marketWatchlist();
       setItems(watchlist);
-      setLatestReports(latest.reports);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Watchlist konnte nicht geladen werden.');
     }
@@ -50,19 +44,6 @@ export function MarketWatchlistPage({ navigate }: { navigate: (route: Route) => 
     await load();
   };
 
-  const analyze = async (item: MarketWatchlistItem) => {
-    setBusySymbol(item.symbol);
-    setError('');
-    try {
-      await api.analyzeMarketSymbol(item.symbol);
-      navigate({ name: 'marketSymbol', symbol: item.symbol });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analyse fehlgeschlagen.');
-    } finally {
-      setBusySymbol('');
-    }
-  };
-
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -77,11 +58,8 @@ export function MarketWatchlistPage({ navigate }: { navigate: (route: Route) => 
       <section className="market-watchlist-layout">
         <WatchlistTable
           items={items}
-          latestReports={latestReports}
-          busySymbol={busySymbol}
           onEdit={setEditing}
           onDelete={remove}
-          onAnalyze={analyze}
           onOpen={(symbol) => navigate({ name: 'marketSymbol', symbol })}
         />
         <WatchlistForm editing={editing} busy={busy} onSubmit={save} onCancel={() => setEditing(null)} />

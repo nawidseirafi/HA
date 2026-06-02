@@ -1,3 +1,5 @@
+import threading
+from datetime import datetime
 from typing import Any
 
 import yaml
@@ -23,6 +25,16 @@ class MarketAgent:
         self._running = False
         self._last_error: str | None = None
         self._last_run: str | None = None
+        self.scheduler_stop = threading.Event()
+        self.scheduler_thread: threading.Thread | None = None
+        self._last_scheduled_run: str | None = None
+        self.discovery_universe = [
+            "Microsoft",
+            "Apple",
+            "MSCI World",
+            "Nvidia",
+            "S&P 500 ETF",
+        ]
 
     def config(self) -> dict[str, Any]:
         config = load_agent_section("market")
@@ -32,6 +44,7 @@ class MarketAgent:
             "log_path": config.get("log_path", "logs/market.log"),
             "price_provider": config.get("price_provider", "yahoo"),
             "news_provider": config.get("news_provider", "fallback"),
+            "schedule": self._schedule_times(config.get("schedule")),
         }
 
     def status(self) -> dict[str, Any]:
@@ -51,8 +64,40 @@ class MarketAgent:
             "status": current_status,
             "last_error": self._last_error,
             "last_successful_run": self._last_run,
+            "scheduler_running": bool(self.scheduler_thread and self.scheduler_thread.is_alive()),
+            "last_scheduled_run": self._last_scheduled_run,
             "settings": config,
         }
+
+    def start_scheduler(self) -> dict[str, Any]:
+        if self.scheduler_thread and self.scheduler_thread.is_alive():
+            return self.status()
+        self.scheduler_stop.clear()
+        self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
+        self.scheduler_thread.start()
+        return self.status()
+
+    def stop_scheduler(self) -> dict[str, Any]:
+        self.scheduler_stop.set()
+        return self.status()
+
+    def _scheduler_loop(self) -> None:
+        last_run: set[str] = set()
+        while not self.scheduler_stop.is_set():
+            now = datetime.now().astimezone()
+            today = now.date().isoformat()
+            if len(last_run) > 20:
+                last_run = {item for item in last_run if item.startswith(today)}
+            if self.config()["enabled"]:
+                for schedule_time in self.config()["schedule"]:
+                    run_key = f"{today}:{schedule_time}"
+                    if run_key in last_run:
+                        continue
+                    if self._time_due(now, schedule_time):
+                        last_run.add(run_key)
+                        self._last_scheduled_run = utc_now()
+                        threading.Thread(target=self.run, daemon=True).start()
+            self.scheduler_stop.wait(30)
 
     def enable(self) -> dict[str, Any]:
         self._write_config(enabled=True)
@@ -70,6 +115,8 @@ class MarketAgent:
         updates: dict[str, Any] = {}
         if "enabled" in payload:
             updates["enabled"] = bool(payload["enabled"])
+        if "schedule" in payload and isinstance(payload["schedule"], list):
+            updates["schedule"] = self._schedule_times(payload["schedule"])
         if updates:
             self._write_config(**updates)
         return self.status()
@@ -83,13 +130,15 @@ class MarketAgent:
         self._last_error = None
         try:
             entries = self.store.watchlist(enabled_only=True)
-            reports = [self.analyze_symbol(entry["symbol"]) for entry in entries]
+            reports = [self.analyze_symbol(entry["symbol"], report_type="watchlist") for entry in entries]
+            discovery_reports = self.update_discovery()
             self._last_run = utc_now()
             return {
                 "status": "active",
                 "current_status": "active",
                 "run_status": "completed",
                 "reports": reports,
+                "discovery_reports": discovery_reports,
                 "disclaimer": "Keine Finanzberatung.",
             }
         except Exception as exc:
@@ -104,18 +153,57 @@ class MarketAgent:
         finally:
             self._running = False
 
-    def analyze_symbol(self, symbol: str) -> dict[str, Any]:
+    def resolve_asset(self, raw_input: str) -> dict[str, Any]:
+        return self.symbol_resolver.resolve_asset(raw_input)
+
+    def create_watchlist_item(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raw_input = str(payload.get("input_name") or payload.get("symbol") or payload.get("name") or "").strip()
+        resolved = self.resolve_asset(raw_input)
+        merged = {
+            **payload,
+            **resolved,
+            "notes": payload.get("notes", ""),
+            "enabled": payload.get("enabled", True),
+        }
+        return self.store.create_watchlist_item(merged)
+
+    def update_watchlist_item(self, item_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        raw_input = str(payload.get("input_name") or payload.get("symbol") or payload.get("name") or "").strip()
+        if raw_input:
+            resolved = self.resolve_asset(raw_input)
+            payload = {**payload, **resolved}
+        return self.store.update_watchlist_item(item_id, payload)
+
+    def update_discovery(self) -> list[dict[str, Any]]:
+        reports: list[dict[str, Any]] = []
+        watchlist_symbols = {item["symbol"].upper() for item in self.store.watchlist()}
+        for raw in self.discovery_universe:
+            try:
+                asset = self.resolve_asset(raw)
+                if asset["symbol"].upper() in watchlist_symbols:
+                    continue
+                reports.append(self._analyze_asset(asset, report_type="discovery"))
+            except Exception:
+                continue
+        return reports[:5]
+
+    def analyze_symbol(self, symbol: str, report_type: str = "watchlist") -> dict[str, Any]:
         symbol = symbol.strip().upper()
         entries = [item for item in self.store.watchlist() if item["symbol"].upper() == symbol]
         item = entries[0] if entries else {
             "symbol": symbol,
             "name": symbol,
+            "resolved_name": symbol,
             "asset_type": "stock",
             "exchange": "",
             "currency": "USD",
             "notes": "",
             "enabled": True,
         }
+        return self._analyze_asset(item, report_type=report_type)
+
+    def _analyze_asset(self, item: dict[str, Any], report_type: str = "watchlist") -> dict[str, Any]:
+        symbol = str(item.get("symbol") or "").strip().upper()
         quote: dict[str, Any] = {}
         news_items: list[dict[str, Any]] = []
         quote_provider = "none"
@@ -156,14 +244,18 @@ class MarketAgent:
             report = {
                 **analysis,
                 "symbol": symbol,
+                "asset_type": self._safe_asset_type(item.get("asset_type"), symbol),
                 "report_date": utc_now()[:10],
                 "price": quote.get("price"),
                 "change_percent": quote.get("change_percent"),
                 "volume": quote.get("volume"),
+                "performance": quote.get("performance") or {},
+                "technical": quote.get("technical") or {},
                 "quote_provider": quote_provider,
                 "news_provider": news_provider,
                 "analysis_source": analysis_source,
                 "data_quality": data_quality,
+                "report_type": report_type,
                 "ai_raw_json": {
                     "analysis": analysis,
                     "quote": quote,
@@ -181,9 +273,12 @@ class MarketAgent:
         except Exception as exc:
             report = {
                 "symbol": symbol,
+                "asset_type": self._safe_asset_type(item.get("asset_type"), symbol),
                 "report_date": utc_now()[:10],
                 "signal": "watch",
+                "recommendation": "watch",
                 "confidence": 0,
+                "risk_level": "medium",
                 "price": quote.get("price") if quote else None,
                 "change_percent": quote.get("change_percent") if quote else None,
                 "volume": quote.get("volume") if quote else None,
@@ -192,10 +287,13 @@ class MarketAgent:
                 "analysis_source": "error",
                 "data_quality": "error",
                 "summary": "",
+                "reasoning": "",
                 "positive_factors": [],
                 "negative_factors": [],
                 "risk_factors": [],
                 "news_summary": "",
+                "time_horizon": "medium",
+                "report_type": report_type,
                 "ai_raw_json": {
                     "error": str(exc),
                     "quote": quote,
@@ -208,29 +306,88 @@ class MarketAgent:
                 "status": "error",
                 "error": str(exc),
             }
+        previous_report = self.store.latest_for_symbol(symbol)
         saved = self.store.save_report(report)
         saved["news"] = news_items
         saved["disclaimer"] = "Keine Finanzberatung."
-        self._create_market_message(saved)
+        self._create_market_message(saved, previous_report)
         return saved
 
-    def _create_market_message(self, report: dict[str, Any]) -> None:
-        signal = str(report.get("signal") or "watch")
-        if signal not in {"bullish", "bearish"}:
+    def _create_market_message(self, report: dict[str, Any], previous_report: dict[str, Any] | None = None) -> None:
+        recommendation = str(report.get("recommendation") or report.get("signal") or "watch")
+        confidence = float(report.get("confidence") or 0)
+        previous = str((previous_report or {}).get("recommendation") or (previous_report or {}).get("signal") or "")
+        relevant_transition = (previous, recommendation) in {
+            ("hold", "buy"),
+            ("buy", "sell"),
+            ("watch", "buy"),
+            ("sell", "buy"),
+        }
+        if not relevant_transition and recommendation not in {"buy", "sell"} and confidence < 85:
             return
-        title = "Kaufchance erkannt" if signal == "bullish" else "Starke Marktbewegung"
-        severity = "info" if signal == "bullish" else "warning"
+        title = "Signalwechsel erkannt" if relevant_transition else ("Kaufsignal erkannt" if recommendation == "buy" else "Marktrisiko erkannt")
+        severity = "info" if recommendation == "buy" else "warning"
+        message = self._market_message_text(report, recommendation, confidence, previous)
         try:
             MessagingService().create_message(
                 source="market",
                 category="market",
                 severity=severity,
                 title=title,
-                message=f"{report.get('symbol')} wurde mit Signal {signal} bewertet.",
-                payload={"symbol": report.get("symbol"), "report_id": report.get("id"), "signal": signal},
+                message=message,
+                payload={"symbol": report.get("symbol"), "report_id": report.get("id"), "previous": previous, "recommendation": recommendation},
             )
         except Exception:
             pass
+
+    def _market_message_text(self, report: dict[str, Any], recommendation: str, confidence: float, previous: str = "") -> str:
+        name = report.get("resolved_name") or report.get("symbol")
+        summary = str(report.get("summary") or "").strip()
+        if previous:
+            return (
+                f"Asset: {name}\n\n"
+                f"Signalwechsel:\n{previous.upper()} -> {recommendation.upper()}\n\n"
+                f"Confidence: {confidence:.0f}%\n\n"
+                f"Grund:\n{summary}"
+            )
+        if recommendation == "buy":
+            return f"{name} zeigt ein positives Marktsignal. Confidence {confidence:.0f}%. {summary}".strip()
+        return f"{name} zeigt ein erhoehtes Risikosignal. Confidence {confidence:.0f}%. {summary}".strip()
+
+    def _infer_asset_type(self, symbol: str) -> str:
+        if symbol.startswith("^"):
+            return "index"
+        if "-USD" in symbol:
+            return "crypto"
+        return "stock"
+
+    def _safe_asset_type(self, value: Any, symbol: str) -> str:
+        text = str(value or "").strip().lower()
+        if text in {"stock", "etf", "fund", "etc", "crypto", "index"}:
+            return text
+        return self._infer_asset_type(symbol)
+
+    def _schedule_times(self, value: Any) -> list[str]:
+        raw = value if isinstance(value, list) else ["06:00", "12:00", "18:00"]
+        normalized: list[str] = []
+        for item in raw:
+            text = str(item).strip()
+            if not text:
+                continue
+            parts = text.split(":")
+            try:
+                hour = int(parts[0])
+                minute = int(parts[1]) if len(parts) > 1 else 0
+            except (ValueError, IndexError):
+                continue
+            if 0 <= hour <= 23 and 0 <= minute <= 59:
+                normalized.append(f"{hour:02d}:{minute:02d}")
+        return normalized or ["06:00", "12:00", "18:00"]
+
+    def _time_due(self, now: datetime, schedule_time: str) -> bool:
+        hour, minute = [int(part) for part in schedule_time.split(":", 1)]
+        scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        return 0 <= (now - scheduled).total_seconds() < 60
 
     def _write_config(self, **updates: Any) -> None:
         path = AGENTS_DIR / "market" / "config.yaml"

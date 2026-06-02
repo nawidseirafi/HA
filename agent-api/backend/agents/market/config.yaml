@@ -4,3 +4,7 @@ market:
   log_path: logs/market.log
   price_provider: yahoo
   news_provider: fallback
+  schedule:
+  - "06:00"
+  - "12:00"
+  - "18:00"

@@ -100,9 +100,6 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
                 <button className={route.name === 'marketWatchlist' ? 'active' : ''} onClick={() => navigate({ name: 'marketWatchlist' })}>
                   <ListChecks size={18} /> Watchlist
                 </button>
-                <button className={route.name === 'marketReports' ? 'active' : ''} onClick={() => navigate({ name: 'marketReports' })}>
-                  <BarChart3 size={18} /> Marktberichte
-                </button>
               </>
             )}
             {agentContext.kind === 'vacation' && (

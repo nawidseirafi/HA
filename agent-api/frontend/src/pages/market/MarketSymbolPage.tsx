@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { MarketNews, MarketReport } from '../../api/client';
+import type { MarketReport, MarketSignalHistoryItem } from '../../api/client';
 import { api } from '../../api/client';
-import { MarketNewsList } from '../../components/market/MarketNewsList';
 import { MarketReportCard, formatPercent, formatPrice } from '../../components/market/MarketReportCard';
 import { MarketSignalBadge } from '../../components/market/MarketSignalBadge';
 import { MarketTrendChart } from '../../components/market/MarketTrendChart';
 
 export function MarketSymbolPage({ symbol }: { symbol: string }) {
   const [reports, setReports] = useState<MarketReport[]>([]);
-  const [news, setNews] = useState<MarketNews[]>([]);
+  const [signalHistory, setSignalHistory] = useState<MarketSignalHistoryItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,7 +16,7 @@ export function MarketSymbolPage({ symbol }: { symbol: string }) {
     try {
       const data = await api.marketSymbolReports(symbol);
       setReports(data.reports);
-      setNews(data.news);
+      setSignalHistory(data.signal_history ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Symbol-Daten konnten nicht geladen werden.');
     }
@@ -85,8 +84,17 @@ export function MarketSymbolPage({ symbol }: { symbol: string }) {
 
       <section className="market-dashboard-grid">
         <div className="panel">
-          <div className="section-title"><div><span className="eyebrow">News</span><h2>Nachrichten</h2></div></div>
-          <MarketNewsList news={news} />
+          <div className="section-title"><div><span className="eyebrow">Signal-Historie</span><h2>Verlauf</h2></div></div>
+          <div className="market-mini-list">
+            {signalHistory.map((item) => (
+              <div key={item.id} className="market-history-row">
+                <strong>{new Date(item.created_at).toLocaleDateString('de-DE')}</strong>
+                <MarketSignalBadge signal={item.signal} />
+                <span>{Math.round(item.confidence || 0)}%</span>
+              </div>
+            ))}
+            {signalHistory.length === 0 && <p className="muted">Noch keine Signal-Historie vorhanden.</p>}
+          </div>
         </div>
         <div className="panel">
           <div className="section-title"><div><span className="eyebrow">Reports</span><h2>Historische Reports</h2></div></div>

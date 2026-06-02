@@ -6,9 +6,9 @@ export function MarketSignalBadge({ signal }: { signal: MarketSignal }) {
 
 export function signalLabel(signal: MarketSignal) {
   return {
-    bullish: 'Bullish',
-    neutral: 'Neutral',
-    bearish: 'Bearish',
+    buy: 'Buy',
+    hold: 'Hold',
+    sell: 'Sell',
     watch: 'Watch',
   }[signal];
 }

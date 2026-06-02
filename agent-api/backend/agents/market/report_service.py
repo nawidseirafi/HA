@@ -11,6 +11,22 @@ REPORT_EXTRA_COLUMNS: dict[str, str] = {
     "news_provider": "text not null default ''",
     "analysis_source": "text not null default ''",
     "data_quality": "text not null default 'unknown'",
+    "asset_type": "text not null default 'stock'",
+    "recommendation": "text not null default 'watch'",
+    "risk_level": "text not null default 'medium'",
+    "reasoning": "text not null default ''",
+    "raw_json": "text not null default '{}'",
+    "time_horizon": "text not null default 'medium'",
+    "report_type": "text not null default 'watchlist'",
+    "performance_json": "text not null default '{}'",
+    "technical_json": "text not null default '{}'",
+}
+
+WATCHLIST_EXTRA_COLUMNS: dict[str, str] = {
+    "input_name": "text not null default ''",
+    "resolved_name": "text not null default ''",
+    "isin": "text not null default ''",
+    "wkn": "text not null default ''",
 }
 
 
@@ -50,6 +66,10 @@ class MarketReportService:
                 )
                 """
             )
+            existing_watchlist_columns = {row["name"] for row in connection.execute("pragma table_info(market_watchlist)").fetchall()}
+            for column, definition in WATCHLIST_EXTRA_COLUMNS.items():
+                if column not in existing_watchlist_columns:
+                    connection.execute(f"alter table market_watchlist add column {column} {definition}")
             connection.execute(
                 """
                 create table if not exists market_reports (
@@ -92,6 +112,19 @@ class MarketReportService:
                 )
                 """
             )
+            connection.execute(
+                """
+                create table if not exists market_signal_history (
+                    id integer primary key autoincrement,
+                    symbol text not null,
+                    signal text not null,
+                    confidence real not null default 0,
+                    summary text not null default '',
+                    report_id integer,
+                    created_at text not null
+                )
+                """
+            )
             connection.commit()
 
     def watchlist(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -115,12 +148,13 @@ class MarketReportService:
             cursor = connection.execute(
                 """
                 insert into market_watchlist
-                (symbol, name, asset_type, exchange, currency, notes, enabled, created_at, updated_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (symbol, name, asset_type, exchange, currency, notes, enabled, created_at, updated_at,
+                 input_name, resolved_name, isin, wkn)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     symbol,
-                    str(payload.get("name") or symbol).strip(),
+                    str(payload.get("resolved_name") or payload.get("name") or symbol).strip(),
                     str(payload.get("asset_type") or "stock").strip(),
                     str(payload.get("exchange") or "").strip(),
                     str(payload.get("currency") or "USD").strip().upper(),
@@ -128,6 +162,10 @@ class MarketReportService:
                     1 if payload.get("enabled", True) else 0,
                     now,
                     now,
+                    str(payload.get("input_name") or payload.get("name") or symbol).strip(),
+                    str(payload.get("resolved_name") or payload.get("name") or symbol).strip(),
+                    str(payload.get("isin") or "").strip().upper(),
+                    str(payload.get("wkn") or "").strip().upper(),
                 ),
             )
             connection.commit()
@@ -148,18 +186,23 @@ class MarketReportService:
             connection.execute(
                 """
                 update market_watchlist
-                set symbol = ?, name = ?, asset_type = ?, exchange = ?, currency = ?, notes = ?, enabled = ?, updated_at = ?
+                set symbol = ?, name = ?, asset_type = ?, exchange = ?, currency = ?, notes = ?, enabled = ?, updated_at = ?,
+                    input_name = ?, resolved_name = ?, isin = ?, wkn = ?
                 where id = ?
                 """,
                 (
                     symbol,
-                    str(data.get("name") or symbol).strip(),
+                    str(data.get("resolved_name") or data.get("name") or symbol).strip(),
                     str(data.get("asset_type") or "stock").strip(),
                     str(data.get("exchange") or "").strip(),
                     str(data.get("currency") or "USD").strip().upper(),
                     str(data.get("notes") or "").strip(),
                     1 if data.get("enabled", True) else 0,
                     utc_now(),
+                    str(data.get("input_name") or data.get("name") or symbol).strip(),
+                    str(data.get("resolved_name") or data.get("name") or symbol).strip(),
+                    str(data.get("isin") or "").strip().upper(),
+                    str(data.get("wkn") or "").strip().upper(),
                     item_id,
                 ),
             )
@@ -218,7 +261,7 @@ class MarketReportService:
                 (
                     report.get("symbol", "").upper(),
                     report.get("report_date") or now[:10],
-                    report.get("signal", "watch"),
+                    report.get("signal") or report.get("recommendation", "watch"),
                     float(report.get("confidence") or 0),
                     report.get("price"),
                     report.get("change_percent"),
@@ -239,7 +282,49 @@ class MarketReportService:
                 ),
             )
             connection.commit()
-            return self.get_report(int(cursor.lastrowid))
+            report_id = int(cursor.lastrowid)
+            self._update_report_v1_columns(connection, report_id, report)
+            self._insert_signal_history(connection, report_id, report)
+            connection.commit()
+            return self.get_report(report_id)
+
+    def _insert_signal_history(self, connection: sqlite3.Connection, report_id: int, report: dict[str, Any]) -> None:
+        connection.execute(
+            """
+            insert into market_signal_history (symbol, signal, confidence, summary, report_id, created_at)
+            values (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(report.get("symbol") or "").upper(),
+                str(report.get("recommendation") or report.get("signal") or "watch"),
+                float(report.get("confidence") or 0),
+                str(report.get("summary") or ""),
+                report_id,
+                utc_now(),
+            ),
+        )
+
+    def _update_report_v1_columns(self, connection: sqlite3.Connection, report_id: int, report: dict[str, Any]) -> None:
+        connection.execute(
+            """
+            update market_reports
+            set asset_type = ?, recommendation = ?, risk_level = ?, reasoning = ?, raw_json = ?,
+                time_horizon = ?, report_type = ?, performance_json = ?, technical_json = ?
+            where id = ?
+            """,
+            (
+                str(report.get("asset_type") or "stock"),
+                str(report.get("recommendation") or report.get("signal") or "watch"),
+                str(report.get("risk_level") or "medium"),
+                str(report.get("reasoning") or ""),
+                json.dumps(report.get("raw_json", report.get("ai_raw_json", report)), ensure_ascii=False),
+                str(report.get("time_horizon") or "medium"),
+                str(report.get("report_type") or "watchlist"),
+                json.dumps(report.get("performance") or {}, ensure_ascii=False),
+                json.dumps(report.get("technical") or {}, ensure_ascii=False),
+                report_id,
+            ),
+        )
 
     def reports(self, symbol: str | None = None, signal: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         clauses: list[str] = []
@@ -282,9 +367,41 @@ class MarketReportService:
             ).fetchall()
             return [self._report_row(row) for row in rows]
 
+    def latest_discovery_reports(self, limit: int = 5) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                select r.*
+                from market_reports r
+                join (
+                    select symbol, max(created_at) as created_at
+                    from market_reports
+                    where report_type = 'discovery'
+                    group by symbol
+                ) latest on latest.symbol = r.symbol and latest.created_at = r.created_at
+                order by r.confidence desc, r.created_at desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [self._report_row(row) for row in rows]
+
     def latest_for_symbol(self, symbol: str) -> dict[str, Any] | None:
         reports = self.reports(symbol=symbol, limit=1)
         return reports[0] if reports else None
+
+    def signal_history(self, symbol: str, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                select * from market_signal_history
+                where upper(symbol) = ?
+                order by created_at desc
+                limit ?
+                """,
+                (symbol.upper(), limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def get_report(self, report_id: int) -> dict[str, Any]:
         with self.connect() as connection:
@@ -304,7 +421,7 @@ class MarketReportService:
     def summary(self) -> dict[str, Any]:
         watchlist = self.watchlist()
         latest = self.latest_reports(enabled_only=True)
-        counts = {signal: 0 for signal in ("bullish", "neutral", "bearish", "watch")}
+        counts = {signal: 0 for signal in ("buy", "hold", "sell", "watch")}
         for report in latest:
             counts[report["signal"]] = counts.get(report["signal"], 0) + 1
         sorted_by_change = sorted(latest, key=lambda item: item.get("change_percent") or 0, reverse=True)
@@ -315,16 +432,31 @@ class MarketReportService:
             "top_gainers": sorted_by_change[:5],
             "top_losers": list(reversed(sorted_by_change[-5:])),
             "latest_reports": latest[:10],
+            "discovery_reports": self.latest_discovery_reports(limit=5),
             "disclaimer": "Keine Finanzberatung.",
         }
 
     def _watchlist_row(self, row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)
         item["enabled"] = bool(item["enabled"])
+        item["input_name"] = item.get("input_name") or item.get("name") or item.get("symbol") or ""
+        item["resolved_name"] = item.get("resolved_name") or item.get("name") or item.get("symbol") or ""
+        item["isin"] = item.get("isin") or ""
+        item["wkn"] = item.get("wkn") or ""
+        if not item.get("asset_type") or item.get("asset_type") == "unknown":
+            item["asset_type"] = "stock"
         return item
 
     def _report_row(self, row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)
+        item["recommendation"] = self._normalize_signal(item.get("recommendation") or item.get("signal") or "watch")
+        item["signal"] = item["recommendation"]
+        item["risk_level"] = item.get("risk_level") or "medium"
+        try:
+            confidence = float(item.get("confidence") or 0)
+            item["confidence"] = confidence * 100 if 0 < confidence <= 1 else confidence
+        except (TypeError, ValueError):
+            item["confidence"] = 0
         for field in ("positive_factors", "negative_factors", "risk_factors"):
             try:
                 item[field] = json.loads(item.get(field) or "[]")
@@ -334,4 +466,18 @@ class MarketReportService:
             item["ai_raw_json"] = json.loads(item.get("ai_raw_json") or "{}")
         except json.JSONDecodeError:
             item["ai_raw_json"] = {"raw": item.get("ai_raw_json")}
+        for field in ("raw_json", "performance_json", "technical_json"):
+            try:
+                item[field] = json.loads(item.get(field) or "{}")
+            except json.JSONDecodeError:
+                item[field] = {"raw": item.get(field)}
         return item
+
+    def _normalize_signal(self, value: Any) -> str:
+        text = str(value or "watch").strip().lower()
+        return {
+            "bullish": "buy",
+            "neutral": "hold",
+            "bearish": "sell",
+            "avoid": "sell",
+        }.get(text, text if text in {"buy", "hold", "watch", "sell"} else "watch")

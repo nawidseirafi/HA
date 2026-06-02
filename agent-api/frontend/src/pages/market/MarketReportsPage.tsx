@@ -52,9 +52,9 @@ export function MarketReportsPage({ navigate }: { navigate: (route: Route) => vo
         <datalist id="market-symbols">{uniqueSymbols.map((value) => <option value={value} key={value} />)}</datalist>
         <label>Signal<select value={signal} onChange={(event) => setSignal(event.target.value as MarketSignal | '')}>
           <option value="">Alle</option>
-          <option value="bullish">Bullish</option>
-          <option value="neutral">Neutral</option>
-          <option value="bearish">Bearish</option>
+          <option value="buy">Buy</option>
+          <option value="hold">Hold</option>
+          <option value="sell">Sell</option>
           <option value="watch">Watch</option>
         </select></label>
         <button className="button primary" onClick={load}>Filtern</button>

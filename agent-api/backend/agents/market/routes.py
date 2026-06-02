@@ -19,9 +19,13 @@ def payload_dict(payload: BaseModel) -> dict:
 
 
 class WatchlistPayload(BaseModel):
-    symbol: str
+    input_name: str | None = None
+    symbol: str = ""
     name: str = ""
-    asset_type: Literal["stock", "etf", "crypto", "index"] = "stock"
+    resolved_name: str = ""
+    isin: str = ""
+    wkn: str = ""
+    asset_type: Literal["stock", "etf", "fund", "etc", "crypto", "index"] = "stock"
     exchange: str = ""
     currency: str = "USD"
     notes: str = ""
@@ -66,7 +70,7 @@ def watchlist():
 @router.post("/watchlist")
 def create_watchlist_item(payload: WatchlistPayload):
     try:
-        return store.create_watchlist_item(payload_dict(payload))
+        return agent.create_watchlist_item(payload_dict(payload))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -74,7 +78,7 @@ def create_watchlist_item(payload: WatchlistPayload):
 @router.put("/watchlist/{item_id}")
 def update_watchlist_item(item_id: int, payload: WatchlistPayload):
     try:
-        return store.update_watchlist_item(item_id, payload_dict(payload))
+        return agent.update_watchlist_item(item_id, payload_dict(payload))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
@@ -85,6 +89,14 @@ def update_watchlist_item(item_id: int, payload: WatchlistPayload):
 def delete_watchlist_item(item_id: int):
     store.delete_watchlist_item(item_id)
     return {"ok": True}
+
+
+@router.get("/watchlist/resolve")
+def resolve_watchlist_input(q: str = Query(..., min_length=1)):
+    try:
+        return {"asset": agent.resolve_asset(q), "disclaimer": "Keine Finanzberatung."}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/run")
@@ -119,8 +131,14 @@ def reports_for_symbol(symbol: str, limit: int = Query(default=100, ge=1, le=500
     return {
         "reports": store.reports(symbol=symbol, limit=limit),
         "news": store.news(symbol),
+        "signal_history": store.signal_history(symbol, limit=limit),
         "disclaimer": "Keine Finanzberatung.",
     }
+
+
+@router.get("/signals/{symbol}/history")
+def signal_history(symbol: str, limit: int = Query(default=50, ge=1, le=200)):
+    return {"history": store.signal_history(symbol, limit=limit), "disclaimer": "Keine Finanzberatung."}
 
 
 @router.get("/reports/{symbol}/latest")

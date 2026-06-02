@@ -329,13 +329,17 @@ export type SettingsInfo = {
   };
 };
 
-export type MarketSignal = 'bullish' | 'neutral' | 'bearish' | 'watch';
+export type MarketSignal = 'buy' | 'hold' | 'sell' | 'watch';
 
 export type MarketWatchlistItem = {
   id: number;
+  input_name?: string;
   symbol: string;
   name: string;
-  asset_type: 'stock' | 'etf' | 'crypto' | 'index';
+  resolved_name?: string;
+  isin?: string;
+  wkn?: string;
+  asset_type: 'stock' | 'etf' | 'fund' | 'etc' | 'crypto' | 'index';
   exchange: string;
   currency: string;
   notes: string;
@@ -351,11 +355,14 @@ export type MarketReport = {
   symbol: string;
   report_date: string;
   signal: MarketSignal;
+  recommendation?: MarketSignal;
   confidence: number;
+  risk_level?: 'low' | 'medium' | 'high';
   price: number | null;
   change_percent: number | null;
   volume: number | null;
   summary: string;
+  reasoning?: string;
   positive_factors: string[];
   negative_factors: string[];
   risk_factors: string[];
@@ -367,6 +374,10 @@ export type MarketReport = {
   news_provider?: string;
   analysis_source?: 'llm' | 'heuristic' | 'error' | '';
   data_quality?: 'real' | 'partial' | 'error' | 'unknown';
+  asset_type?: 'stock' | 'etf' | 'fund' | 'etc' | 'crypto' | 'index';
+  report_type?: 'watchlist' | 'discovery';
+  performance_json?: Record<string, number | null>;
+  technical_json?: Record<string, unknown>;
   created_at: string;
   news?: MarketNews[];
   disclaimer?: string;
@@ -384,6 +395,16 @@ export type MarketNews = {
   created_at?: string;
 };
 
+export type MarketSignalHistoryItem = {
+  id: number;
+  symbol: string;
+  signal: MarketSignal;
+  confidence: number;
+  summary: string;
+  report_id?: number | null;
+  created_at: string;
+};
+
 export type MarketSummary = {
   agent?: {
     enabled: boolean;
@@ -397,6 +418,7 @@ export type MarketSummary = {
   top_gainers: MarketReport[];
   top_losers: MarketReport[];
   latest_reports: MarketReport[];
+  discovery_reports?: MarketReport[];
   disclaimer: string;
 };
 
@@ -962,6 +984,8 @@ export const api = {
   disableMarketAgent: () => request<NonNullable<MarketSummary['agent']>>('/api/market/disable', { method: 'POST' }),
   toggleMarketAgent: () => request<NonNullable<MarketSummary['agent']>>('/api/market/toggle', { method: 'POST' }),
   marketWatchlist: async () => (await request<{ items: MarketWatchlistItem[]; disclaimer: string }>('/api/market/watchlist')).items,
+  resolveMarketWatchlistInput: (q: string) =>
+    request<{ asset: MarketWatchlistPayload; disclaimer: string }>(`/api/market/watchlist/resolve?q=${encodeURIComponent(q)}`),
   createMarketWatchlistItem: (payload: MarketWatchlistPayload) =>
     request<MarketWatchlistItem>('/api/market/watchlist', { method: 'POST', body: JSON.stringify(payload) }),
   updateMarketWatchlistItem: (id: number, payload: MarketWatchlistPayload) =>
@@ -973,7 +997,7 @@ export const api = {
     request<{ reports: MarketReport[]; disclaimer: string }>(`/api/market/reports${params.toString() ? `?${params}` : ''}`),
   marketLatestReports: () => request<{ reports: MarketReport[]; disclaimer: string }>('/api/market/reports/latest'),
   marketSymbolReports: (symbol: string) =>
-    request<{ reports: MarketReport[]; news: MarketNews[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}`),
+    request<{ reports: MarketReport[]; news: MarketNews[]; signal_history?: MarketSignalHistoryItem[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}`),
   marketLatestSymbolReport: (symbol: string) =>
     request<{ report: MarketReport; news: MarketNews[]; disclaimer: string }>(`/api/market/reports/${encodeURIComponent(symbol)}/latest`),
   summary: () => request<Summary>('/api/invoices/summary'),
