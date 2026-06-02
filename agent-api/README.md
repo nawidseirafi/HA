@@ -1,6 +1,6 @@
 # RoboterSteve - AI Agent System
 
-Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness und Boersenanalyse.
+Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness, Vacation und Boersenanalyse. Zentrale Querschnittsdienste liefern Messaging, Household-Status und Infrastructure/FritzBox-Status ueber Home Assistant.
 
 ## Projektstruktur
 
@@ -10,15 +10,15 @@ roboterSteve/
 │   ├── backend/
 │   │   ├── main.py
 │   │   ├── paths.py
-│   │   ├── api/                  # Querschnitts-APIs: Auth, Settings, Orchestrator, Household
-│   │   ├── services/             # Querschnitts-Services (LLM, Home Assistant, Household, Infrastructure)
+│   │   ├── api/                  # Querschnitts-APIs: Auth, Settings, Orchestrator, Household, Infrastructure
+│   │   ├── services/             # Querschnitts-Services (LLM, Home Assistant, Household, Infrastructure, Messaging)
 │   │   └── agents/
 │   │       ├── control.py        # Einheitlicher Agent-Control-Vertrag
 │   │       ├── registry.py       # Manifest Discovery und Runtime-Service Lookup
 │   │       ├── invoices/         # InvoiceAgent API, Service, Exporte, CLI
 │   │       ├── market/           # MarketAgent API, Analyse-/Datenservices, CLI
 │   │       ├── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
-│   │       └── vacation/         # Vacation Mode / Home-Assistant-Kontext
+│   │       └── vacation/         # Vacation Agent, Vacation Mode, Historie, Kalender, KI-Hinweise
 │   ├── frontend/
 │   │   └── src/                 # React-App
 │   ├── config.yaml
@@ -106,6 +106,28 @@ AGENT_API_JWT_SECRET=dein-geheimer-schluessel
 
 Lokaler Fallback für Entwicklung ist `admin` / `admin`. `AGENT_API_JWT_SECRET` sollte für echte Nutzung gesetzt werden.
 
+### Infrastructure
+
+Infrastructure ist ein zentraler Backend-Service, kein Agent. Home Assistant bleibt Datenquelle; es gibt keine direkte FritzBox API.
+
+```yaml
+infrastructure:
+  enabled: true
+  database_path: data/infrastructure/infrastructure.db
+  entities:
+    internet_status: ""
+    fritzbox_status: ""
+    connected_devices: ""
+    wifi_status: ""
+    wan_status: ""
+    upload_speed: ""
+    download_speed: ""
+    external_ip: ""
+    uptime: ""
+```
+
+Wenn Entity IDs leer sind, nutzt der Service robuste Home-Assistant-Discovery und ignoriert technische Entities wie Reload/Reconnect/Restart/Update/Identify.
+
 ## Agent API (Web-Interface)
 
 ### API-Endpunkte
@@ -171,9 +193,47 @@ GET  /api/mywellness/health/withings/entities
 POST /api/mywellness/health/withings/import
 GET  /api/mywellness/health/withings/latest
 POST /api/mywellness/health/withings/discover
+GET  /api/mywellness/history/metrics
+GET  /api/mywellness/history/recovery
+GET  /api/mywellness/history/bookings
+GET  /api/mywellness/history/trends
 ```
 
-**Agents / Orchestrator / Household:**
+**Market:**
+```text
+GET    /api/market/status
+POST   /api/market/enable
+POST   /api/market/disable
+POST   /api/market/toggle
+POST   /api/market/run
+GET    /api/market/summary
+GET    /api/market/watchlist
+POST   /api/market/watchlist
+PUT    /api/market/watchlist/{id}
+DELETE /api/market/watchlist/{id}
+GET    /api/market/reports
+GET    /api/market/reports/latest
+POST   /api/market/analyze/{symbol}
+```
+
+**Vacation:**
+```text
+GET  /api/vacation/status
+GET  /api/vacation/history
+GET  /api/vacation/reminders
+GET  /api/vacation/profiles
+POST /api/vacation/enable
+POST /api/vacation/disable
+POST /api/vacation/toggle
+PUT  /api/vacation/settings
+POST /api/vacation/mode/enable
+POST /api/vacation/mode/disable
+POST /api/vacation/mode/toggle
+GET  /api/vacation/ai/latest
+POST /api/vacation/ai/analyze
+```
+
+**Agents / Orchestrator / Household / Infrastructure:**
 ```text
 GET  /api/agents
 GET  /api/orchestrator/map
@@ -184,10 +244,26 @@ GET  /api/household/summary
 GET  /api/household/reminders
 GET  /api/infrastructure/status
 GET  /api/infrastructure/summary
+GET  /api/infrastructure/events
+GET  /api/infrastructure/events/recent
+GET  /api/infrastructure/outages
+POST /api/infrastructure/check
 GET  /api/homeassistant/wall
 GET  /api/waste/status
 GET  /api/waste/next
 GET  /api/waste/reminders
+```
+
+**Messaging:**
+```text
+GET    /api/messages
+GET    /api/messages/unread-count
+GET    /api/messages/source/{source}
+POST   /api/messages
+POST   /api/messages/{id}/read
+POST   /api/messages/read-all
+DELETE /api/messages/{id}
+DELETE /api/messages
 ```
 
 **Kompatible alte Endpunkte:**

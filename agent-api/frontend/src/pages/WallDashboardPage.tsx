@@ -1665,7 +1665,7 @@ function internetStatusFromText(value: string, entities: WallEntity[]): Internet
         if (hasOnline) return 'ok';
         return hasUnavailable ? 'down' : 'unknown';
     }
-    if (/(disconnect|offline|down|gestört|stoer|fehler|failed|problem|not connected)/i.test(text)) return 'down';
+    if (/(critical|disconnect|offline|down|gestört|stoer|fehler|failed|problem|not connected)/i.test(text)) return 'down';
     if (/(instabil|unstable|reconnect|packet|loss|warning|warn|limited)/i.test(text)) return 'unstable';
     if (/(connected|online|ok|on|up|available|verbunden)/i.test(text)) return 'ok';
     return 'unknown';

@@ -81,7 +81,17 @@ def _configured_entities(config: dict[str, Any]) -> dict[str, str]:
     merged = {**household_entities, **infrastructure_entities}
     return {
         key: str(merged.get(key) or "").strip()
-        for key in ("internet_status", "fritzbox_status", "connected_devices", "wifi_status")
+        for key in (
+            "internet_status",
+            "fritzbox_status",
+            "connected_devices",
+            "wifi_status",
+            "wan_status",
+            "upload_speed",
+            "download_speed",
+            "external_ip",
+            "uptime",
+        )
     }
 
 

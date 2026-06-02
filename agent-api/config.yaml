@@ -16,11 +16,18 @@ home_assistant:
   token: HA_TOKEN
 
 infrastructure:
+  enabled: true
+  database_path: data/infrastructure/infrastructure.db
   entities:
     internet_status: ""
     fritzbox_status: ""
     connected_devices: ""
     wifi_status: ""
+    wan_status: ""
+    upload_speed: ""
+    download_speed: ""
+    external_ip: ""
+    uptime: ""
 
 llm:
   provider: "openai"  # Options: gemini, openai, claude, llama

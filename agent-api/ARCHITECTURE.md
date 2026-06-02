@@ -1,8 +1,8 @@
 # RoboterSteve Architektur README - Ist-Zustand
 
-Stand: 2026-06-01
+Stand: 2026-06-02
 
-Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Monitoring, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
+Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Service V1, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness/Invoice-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
 
 # Systemuebersicht
 
@@ -37,13 +37,21 @@ Wichtige UI-Bereiche:
 
 - Agent Console
 - Agent Map
+- Nachrichten-Bereich der Agent Console (`/agents/messages`)
 - Wall Dashboard
-- Settings
+- System/Settings
 - Invoice Dashboard
 - MyWellness Dashboard
 - Market Dashboard
 - Vacation Dashboard
 - Message Center im Wall Dashboard
+
+Die Sidebar trennt zwei Navigationskontexte:
+
+- Global Console Context: `Uebersicht`, `Agenten`, `Agent Map`, `Nachrichten`, `System`, `Abmelden`
+- Agent Detail Context: `Zur Agent Console` plus nur agent-spezifische Menuepunkte und `Abmelden`
+
+Globale Agent-Console-Menuepunkte werden in Agent-Dashboards nicht mehr angezeigt.
 
 # Ordnerstruktur
 
@@ -82,7 +90,9 @@ agent-api/
 │   └── paths.py
 ├── data/
 │   ├── invoices/
+│   ├── infrastructure/
 │   ├── market/
+│   ├── messaging/
 │   └── mywellness/
 ├── frontend/
 └── config.yaml
@@ -276,6 +286,7 @@ Verantwortung:
 - Review-Status
 - Export nach Excel/PDF/ZIP
 - E-Mail- und optional Portal-Import
+- Archiv-Cleanup fuer unreferenzierte Dateien
 
 Datenbank:
 
@@ -303,6 +314,12 @@ Control:
 - `run`
 
 Hinweis: `start`/`stop` werden ueber Scheduler-Methoden abgebildet, `run` ueber `run_agent()`.
+
+Archiv-Cleanup:
+
+- Referenzierte Archivdateien werden gegen alte und neue Projektpfade aufgeloest.
+- Alte absolute Pfade wie `.../ai-agent/data/invoices/archive/...` werden auf das aktuelle `agent-api/data/invoices/archive/...` remapped.
+- Technische Dateien wie `.DS_Store` und `index.xlsx` werden nicht als Belegdateien behandelt.
 
 ## MyWellness Agent
 
@@ -550,7 +567,7 @@ agent-api/backend/services/infrastructure_service.py
 
 Rolle:
 
-Live-Status fuer Netzwerk/Fritzbox/Infrastruktur aus Home Assistant.
+Zentrale V1-Unterbau-Komponente fuer Netzwerk/FritzBox/Internet-Status aus Home Assistant. InfrastructureService ist ein Backend-Service, kein Agent, besitzt keine Agent-Control-Capabilities und ruft keine Home-Assistant-Services auf.
 
 Signale:
 
@@ -558,26 +575,67 @@ Signale:
 - `fritzbox_status`
 - `connected_devices`
 - `wifi_status`
+- `wan_status`
+- `upload_speed`
+- `download_speed`
+- `external_ip`
+- `uptime`
+
+Datenbank:
+
+```text
+agent-api/data/infrastructure/infrastructure.db
+```
+
+Tabellen:
+
+- `infrastructure_events`
+- `infrastructure_state`
 
 Config:
 
 ```yaml
 infrastructure:
+  enabled: true
+  database_path: data/infrastructure/infrastructure.db
   entities:
     internet_status: ""
     fritzbox_status: ""
     connected_devices: ""
     wifi_status: ""
+    wan_status: ""
+    upload_speed: ""
+    download_speed: ""
+    external_ip: ""
+    uptime: ""
 ```
 
 Wenn keine Entity IDs konfiguriert sind, versucht der Service passende Home-Assistant-Entities automatisch anhand von Namen wie `fritz`, `fritzbox`, `internet`, `wan`, `dsl`, `wifi`, `wlan` und `connected devices` zu entdecken.
+
+Discovery-Regeln:
+
+- Technische Entities wie `Reload`, `Reconnect`, `Restart`, `Neu starten`, `Update` und `Identify` werden ignoriert.
+- Es wird nur gelesen, nie geschaltet.
+- Home Assistant bleibt alleinige Datenquelle.
+
+Event-Regeln:
+
+- `online -> offline` startet ein offenes `internet_outage` Event mit Severity `critical`.
+- `offline -> online` schliesst das Event und berechnet `duration_seconds`.
+- `unstable` erzeugt ein Warning-Event.
+- `unknown` wird nicht als Ausfall gezaehlt.
+- Relevante Events erzeugen menschenlesbare Messages ueber den Messaging Service.
 
 API:
 
 - `GET /api/infrastructure/status`
 - `GET /api/infrastructure/summary`
+- `GET /api/infrastructure/events`
+- `GET /api/infrastructure/events/recent`
+- `GET /api/infrastructure/outages`
+- `POST /api/infrastructure/check`
 
-Es gibt aktuell keine direkte FritzBox API und keine Infrastructure-Datenbank.
+Es gibt aktuell keine direkte FritzBox API.
 
 ## OrchestratorControlService
 
@@ -720,6 +778,7 @@ Aktuell verwendete Datenbanken:
 
 ```text
 agent-api/data/invoices/invoices.db
+agent-api/data/infrastructure/infrastructure.db
 agent-api/data/market/market.db
 agent-api/data/mywellness/mywellness.db
 agent-api/data/vacation/vacation.db
@@ -730,11 +789,12 @@ Nicht vorhanden:
 
 - `orchestrator.db`
 - `household.db`
-- `infrastructure.db`
 
 Architekturregel im aktuellen Stand:
 
 - Agent-Fachdaten bleiben in den jeweiligen Agent-Datenbanken.
+- Infrastructure-Events bleiben in `infrastructure.db`.
+- Messaging-Nachrichten bleiben in `messages.db`.
 - Orchestrator und Household arbeiten aktuell live bzw. ueber bestehende Agent-Services.
 
 # API Struktur

@@ -530,7 +530,8 @@ export type HouseholdSummary = Pick<HouseholdStatus, 'ok' | 'updated_at' | 'wast
   };
 };
 
-export type InfrastructureStatus = 'ok' | 'down' | 'unstable' | 'unknown';
+export type InfrastructureStatus = 'ok' | 'down' | 'unstable' | 'warning' | 'critical' | 'unknown';
+export type InfrastructureOnlineStatus = 'online' | 'offline' | 'unstable' | 'unknown';
 
 export type InfrastructureCheck = {
   key: 'internet_status' | 'fritzbox_status' | 'connected_devices' | 'wifi_status' | string;
@@ -549,10 +550,15 @@ export type InfrastructureSummary = {
   ok: boolean;
   updated_at: string;
   status: InfrastructureStatus;
+  title?: string;
+  subtitle?: string;
   label: string;
   detail: string;
   router: string;
   connected_devices: number | null;
+  outages_24h?: number;
+  outage_duration_24h_seconds?: number;
+  last_outage?: Record<string, unknown> | null;
   wifi: InfrastructureStatus;
   checks: Record<string, InfrastructureCheck>;
 };
@@ -560,6 +566,25 @@ export type InfrastructureSummary = {
 export type InfrastructureFullStatus = {
   ok: boolean;
   updated_at: string;
+  internet?: {
+    status: InfrastructureOnlineStatus;
+    source: string;
+    updated_at: string;
+  };
+  fritzbox?: {
+    status: 'online' | 'offline' | 'unknown';
+    model?: string | null;
+    uptime?: string | number | null;
+    external_ip?: string | number | null;
+  };
+  wifi?: {
+    status: 'online' | 'offline' | 'unknown';
+  };
+  traffic?: {
+    upload?: string | null;
+    download?: string | null;
+  };
+  connected_devices?: number | null;
   home_assistant: { configured: boolean };
   configured_entities: Record<string, string>;
   checks: Record<string, InfrastructureCheck>;

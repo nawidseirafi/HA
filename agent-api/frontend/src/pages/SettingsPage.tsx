@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { api, type PathSetting, type SettingsInfo } from '../api/client';
+import { api, type InfrastructureSummary, type PathSetting, type SettingsInfo } from '../api/client';
 
 function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
   return <span className={`settings-badge ${ok ? 'ok' : 'warn'}`}>{label ?? (ok ? 'aktiv' : 'fehlt')}</span>;
@@ -38,6 +38,7 @@ function SettingRow({ label, value }: { label: string; value: string | number | 
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<SettingsInfo | null>(null);
+  const [infrastructure, setInfrastructure] = useState<InfrastructureSummary | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +46,12 @@ export function SettingsPage() {
     setLoading(true);
     setError('');
     try {
-      setSettings(await api.settings());
+      const [nextSettings, nextInfrastructure] = await Promise.all([
+        api.settings(),
+        api.infrastructureSummary().catch(() => null),
+      ]);
+      setSettings(nextSettings);
+      setInfrastructure(nextInfrastructure);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Settings konnten nicht geladen werden.');
     } finally {
@@ -254,8 +260,14 @@ export function SettingsPage() {
                   <span className="eyebrow">Integration</span>
                   <h2>Infrastructure</h2>
                 </div>
-                <StatusBadge ok={settings.integrations.infrastructure.auto_discovery} label="HA Live" />
+                <StatusBadge ok={infrastructure?.status === 'ok'} label={infrastructureStatusLabel(infrastructure?.status)} />
               </div>
+              <SettingRow label="Internet Status" value={infrastructure?.title || '-'} />
+              <SettingRow label="FritzBox Status" value={infrastructure?.subtitle || '-'} />
+              <SettingRow label="Verbundene Geräte" value={infrastructure?.connected_devices ?? '-'} />
+              <SettingRow label="Ausfälle 24h" value={infrastructure?.outages_24h ?? 0} />
+              <SettingRow label="Letzte Störung" value={formatInfrastructureOutage(infrastructure?.last_outage)} />
+              <SettingRow label="Letzte Prüfung" value={formatDateTime(infrastructure?.updated_at)} />
               <SettingRow label="Quelle" value={settings.integrations.infrastructure.source} />
               <SettingRow label="Auto Discovery" value={settings.integrations.infrastructure.auto_discovery} />
               <SettingRow label="Direkte FritzBox API" value={settings.integrations.infrastructure.direct_fritzbox_api} />
@@ -280,4 +292,31 @@ export function SettingsPage() {
       )}
     </div>
   );
+}
+
+function infrastructureStatusLabel(status?: string | null) {
+  if (status === 'ok') return 'OK';
+  if (status === 'warning') return 'Warnung';
+  if (status === 'critical') return 'Kritisch';
+  return 'Unbekannt';
+}
+
+function formatInfrastructureOutage(value?: Record<string, unknown> | null) {
+  if (!value) return '-';
+  const title = String(value.title || value.event_type || 'Störung');
+  const started = formatDateTime(String(value.started_at || value.created_at || ''));
+  return `${title}${started !== '-' ? ` · ${started}` : ''}`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date).replace(',', '');
 }

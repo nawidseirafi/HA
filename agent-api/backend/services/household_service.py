@@ -183,18 +183,19 @@ class HouseholdService:
                     "source": "vacation",
                 })
 
-        if infrastructure.get("status") == "down":
+        infrastructure_status = str(infrastructure.get("status") or "")
+        if infrastructure_status in {"down", "critical"}:
             reminders.append({
                 "priority": "high",
                 "message": "Internet oder Netzwerk gestört",
-                "reason": str(infrastructure.get("detail") or "Infrastructure Status meldet Störung."),
+                "reason": str(infrastructure.get("subtitle") or infrastructure.get("detail") or "Infrastructure Status meldet Störung."),
                 "source": "infrastructure",
             })
-        elif infrastructure.get("status") == "unstable":
+        elif infrastructure_status in {"unstable", "warning"}:
             reminders.append({
                 "priority": "medium",
                 "message": "Internet oder Netzwerk instabil",
-                "reason": str(infrastructure.get("detail") or "Infrastructure Status meldet Instabilität."),
+                "reason": str(infrastructure.get("subtitle") or infrastructure.get("detail") or "Infrastructure Status meldet Instabilität."),
                 "source": "infrastructure",
             })
 

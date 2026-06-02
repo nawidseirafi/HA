@@ -27,6 +27,7 @@ Empfohlene Minimalroute:
 4. Household-Themen aus `homeassistant_routes.py` und `waste_service.py` schrittweise in einen Household Service kapseln.
 5. Neue Persistenz nur für neue Querschnittsfunktionen anlegen:
    - `messaging/messages.db` ist umgesetzt.
+   - `infrastructure/infrastructure.db` ist umgesetzt.
    - `household.db` und `orchestrator.db` bleiben optionale spätere Schritte.
 6. Frontend Agent Map weiter gegen ein stabiles `/api/orchestrator/map`-Datenmodell bauen.
 
@@ -150,6 +151,67 @@ Wichtig:
 - Bestehende Agent-Daten bleiben in `invoices.db`, `mywellness.db`, `market.db`.
 - `orchestrator.db` speichert Querschnittsstatus, nicht Rechnungen, Kurse oder Marktberichte.
 
+# Scheduler Service
+
+Nicht sofort umsetzen. Ein zentraler Scheduler Service ist eine spaetere Infrastrukturkomponente und ersetzt die bestehenden Agent-Scheduler erst nach einer kontrollierten Migration.
+
+Ziel:
+
+- Agent-Runs zentral planen
+- `last_run` und `next_run` pro Job speichern
+- Run-Status sichtbar machen
+- Jobs fuer Infrastructure, Vacation, MyWellness, Market und Invoice verwalten
+- einmalige und geplante Laeufe einheitlich beschreiben
+
+Wichtige Regeln:
+
+- Bestehende Agent-Scheduler werden nicht gebrochen.
+- Agenten behalten bis zur Migration ihre bestehenden `start_scheduler()` / `stop_scheduler()` Implementierungen.
+- Der Orchestrator nutzt den Scheduler spaeter nur koordinierend.
+- Der Scheduler fuehrt Agenten ueber den Agent-Control-Vertrag aus, nicht ueber agent-spezifische Imports.
+- Fachliche Daten bleiben in den jeweiligen Agent-/Service-Datenbanken.
+
+Moegliches spaeteres Modul:
+
+```text
+backend/services/scheduler_service.py
+backend/services/scheduler_store.py
+data/scheduler/scheduler.db
+```
+
+Moegliche Tabellen:
+
+- `scheduled_jobs`
+  - `id`
+  - `owner_type` (`agent` oder `service`)
+  - `owner_id`
+  - `action`
+  - `schedule_json`
+  - `enabled`
+  - `last_run`
+  - `next_run`
+  - `created_at`
+  - `updated_at`
+- `scheduled_runs`
+  - `id`
+  - `job_id`
+  - `status`
+  - `started_at`
+  - `finished_at`
+  - `duration_seconds`
+  - `error`
+  - `payload_json`
+
+Beispiele:
+
+- `invoices/run`
+- `mywellness/run prepare`
+- `mywellness/health_sync`
+- `vacation/check`
+- `vacation/ai_analyze`
+- `market/run`
+- `infrastructure/check`
+
 # Agent-Domaenenhistorien
 
 Bereits umgesetzt bzw. Zielregel:
@@ -162,25 +224,46 @@ Bereits umgesetzt bzw. Zielregel:
 
 # FritzBox / Infrastructure Monitoring
 
-FritzBox und Infrastruktur sollten als eigene Datenquelle modelliert werden, nicht direkt in bestehende Agenten eingebaut.
+FritzBox und Infrastruktur sind als eigene Unterbau-Komponente umgesetzt und werden nicht direkt in bestehende Agenten eingebaut.
 
-Minimaler Einstieg:
+Status: Infrastructure Service V1 umgesetzt.
 
-- Neuer Service `backend/services/infrastructure_service.py`
-- Status zunächst live berechnen, später optional in `household.db` oder `orchestrator.db` persistieren.
-- Mögliche Signale:
-  - Internet erreichbar
-  - FritzBox erreichbar
-  - WAN/IP-Status
-  - WLAN/Gästenetz Status
-  - wichtige Geräte online/offline
-  - Latenz/Fehlerstatus
+Dateien:
+
+```text
+backend/services/infrastructure_service.py
+backend/services/infrastructure_store.py
+backend/api/infrastructure_routes.py
+data/infrastructure/infrastructure.db
+```
+
+Signale:
+
+- Internet erreichbar
+- FritzBox erreichbar
+- WAN/IP-Status
+- WLAN Status
+- verbundene Geräte
+- Upload/Download
+- externe IP
+- Uptime
+
+Regeln:
+
+- Home Assistant bleibt Datenquelle.
+- Keine direkte FritzBox API.
+- Keine Home-Assistant-Service-Calls.
+- Infrastructure ist kein Agent und besitzt keine Agent-Control-Capabilities.
+- Statuswechsel werden in `infrastructure_events` historisiert.
+- Der aktuelle Zustand wird in `infrastructure_state` gespeichert.
+- Relevante warning/critical Ereignisse erzeugen Messages ueber den Messaging Service.
 
 Integration:
 
 - Wall-Dashboard zeigt Infrastruktur-Karte.
-- Orchestrator Map bekommt Service Node `infrastructure` oder `fritzbox`.
-- Household Service kann Infrastrukturwarnungen als Household Events übernehmen.
+- Household Service konsumiert `InfrastructureService.summary()`, besitzt aber keine Infrastructure-Events.
+- System/Settings zeigt kompakte Livewerte.
+- Orchestrator Map kann spaeter optional einen Service Node `infrastructure` bekommen.
 
 # Agent Map Datenmodell
 
@@ -259,6 +342,7 @@ Semantik:
 
 - `start_scheduler()` startet nur geplante Hintergrundläufe.
 - `stop_scheduler()` stoppt nur geplante Hintergrundläufe und löscht keine Fachdaten.
+- Spaeter kann ein zentraler Scheduler diese Verantwortung uebernehmen; bis dahin bleiben bestehende Agent-Scheduler gueltig.
 - `enable()` aktiviert den Agenten als Laufzeit-/Planungszustand.
 - `disable()` deaktiviert den Agenten als Laufzeit-/Planungszustand, ohne APIs zu entfernen.
 - Start/Stop/Enable/Disable müssen idempotent sein.
@@ -333,8 +417,9 @@ backend/
 │   ├── mywellness/
 │   └── vacation/
 ├── services/
-│   ├── household_service.py        # neu, später
-│   ├── infrastructure_service.py   # neu, später
+│   ├── household_service.py        # umgesetzt als Fassade, ohne household.db
+│   ├── infrastructure_service.py   # umgesetzt
+│   ├── infrastructure_store.py     # umgesetzt
 │   ├── messaging/                  # umgesetzt
 │   ├── orchestrator_store.py       # neu, später
 │   └── ...
@@ -351,9 +436,10 @@ backend/
 3. Orchestrator Map als alleinige UI-Quelle für Agent-Status verwenden.
 4. Messaging Service als zentrale Hinweis-/Message-Schicht verwenden.
 5. Household Service als Fassade über Waste/Vacation/HA-Kontext weiter stabilisieren.
-6. Erst danach bei Bedarf `household.db` anlegen.
-7. Erst danach `orchestrator.db` anlegen.
-8. Infrastruktur/FritzBox-Verlauf optional persistieren.
+6. Infrastructure Service V1 als zentrale Netzwerk-/FritzBox-Schicht nutzen.
+7. Scheduler Service als Zielkomponente spezifizieren, aber noch nicht aktiv migrieren.
+8. Erst danach bei Bedarf `household.db` anlegen.
+9. Erst danach `orchestrator.db` anlegen.
 
 # Empfohlene nächste Schritte
 
@@ -379,7 +465,8 @@ backend/
 
 - `orchestrator.db` einführen, wenn Statusmodell und Map stabil sind.
 - Zentrale Orchestrator-Start/Stop-Endpunkte für einzelne Agenten und alle Agenten implementieren.
-- FritzBox-/Infrastructure-Verlauf ergaenzen.
+- Scheduler Service entwerfen und schrittweise parallel zu bestehenden Agent-Schedulern einfuehren.
+- Infrastructure Service um weitere stabile HA-Signale, Aggregationen und Push-Ziele erweitern.
 - Agent-Abhängigkeiten für Map und Scheduling modellieren.
 - LLM-Factory bereinigen: Claude-Pfad entweder implementieren oder aus der Konfiguration entfernen.
 - Langfristig ältere und neue Home-Assistant-Clients konsolidieren.
