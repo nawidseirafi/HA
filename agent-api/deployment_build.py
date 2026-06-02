@@ -20,7 +20,7 @@ print("Frontend build...")
 
 subprocess.run(
     ["npm", "run", "build"],
-    cwd=ROOT / "agent-api" / "frontend",
+    cwd=ROOT / "frontend",
     check=True,
 )
 
@@ -30,7 +30,7 @@ COPY_DIRS = [
 ]
 
 for folder in COPY_DIRS:
-    src = ROOT / "agent-api" / folder
+    src = ROOT / folder
 
     if src.exists():
         shutil.copytree(
@@ -41,7 +41,7 @@ for folder in COPY_DIRS:
 
 # Frontend dist kopieren
 shutil.copytree(
-    ROOT / "agent-api" / "frontend" / "dist",
+    ROOT / "frontend" / "dist",
     TARGET_DIR / "frontend" / "dist",
     dirs_exist_ok=True,
 )
@@ -53,7 +53,7 @@ COPY_FILES = [
 ]
 
 for file_name in COPY_FILES:
-    src = ROOT / "agent-api" / file_name
+    src = ROOT / file_name
 
     if src.exists():
         shutil.copy2(

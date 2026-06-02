@@ -15,3 +15,5 @@ HA/secrets.yaml
 .idea/
 /build/
 /old/
+/agent-api/build/
+/agent-api/data/
