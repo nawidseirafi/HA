@@ -7,7 +7,8 @@ from typing import Any
 import yaml
 from backend.agents.registry import discover_agent_manifests
 from backend.config import load_agent_section
-from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH, FRONTEND_DIST, LOG_DIR
+from backend.logging_config import configured_log_path
+from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH, FRONTEND_DIST
 from backend.services.waste_service import MAILBOX_ENTITY_ID
 
 
@@ -177,6 +178,7 @@ def get_settings() -> dict[str, Any]:
     invoice_db_path = _resolve_path(API_DIR, invoice_config.get("database_path", data_dir / "invoices" / "invoices.db"))
     invoice_db = {"path": str(invoice_db_path), "exists": invoice_db_path.exists() if invoice_db_path else False}
     invoice_runtime = _invoice_runtime_settings(invoice_db_path) if invoice_db_path else {}
+    log_file = configured_log_path(config)
 
     return {
         "api": {
@@ -202,8 +204,7 @@ def get_settings() -> dict[str, Any]:
         },
         "storage": {
             "uploads": _path_info(API_DIR, invoice_config.get("upload_dir") or invoice_config.get("uploads_dir")),
-            "log_file": {"path": str(LOG_DIR / "agent-api.log"), "exists": (LOG_DIR / "agent-api.log").exists()},
-            "configured_log_file": _path_info(API_DIR, config.get("logging", {}).get("file")),
+            "log_file": {"path": str(log_file), "exists": log_file.exists()},
         },
         "agents": {
             "invoices": {

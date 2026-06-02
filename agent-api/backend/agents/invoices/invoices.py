@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from backend.config import load_agent_runtime_config
+from backend.logging_config import LOG_FORMAT, configure_logging
 from backend.paths import API_DIR
 
 
@@ -256,19 +257,10 @@ def _load_archive_cleanup_config(config: dict) -> ArchiveCleanupConfig:
 
 
 def _setup_logging():
-    log_dir = API_DIR / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    configure_logging()
+    formatter = logging.Formatter(LOG_FORMAT)
 
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    # Verhindert doppelte Handler, falls _setup_logging mehrfach aufgerufen wird.
-    if not any(isinstance(h, logging.FileHandler) and getattr(h, "_invoice_agent", False) for h in root.handlers):
-        file_handler = logging.FileHandler(log_dir / "agent.log", encoding="utf-8")
-        file_handler.setFormatter(formatter)
-        file_handler._invoice_agent = True  # type: ignore[attr-defined]
-        root.addHandler(file_handler)
 
     if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler) for h in root.handlers):
         stream_handler = logging.StreamHandler()

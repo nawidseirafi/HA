@@ -132,9 +132,6 @@ export function SettingsPage() {
             </div>
             <PathRow label="Uploads" value={settings.storage.uploads} />
             <PathRow label="Logdatei" value={settings.storage.log_file} />
-            {settings.storage.configured_log_file && (
-              <PathRow label="Config Logdatei" value={settings.storage.configured_log_file} />
-            )}
           </article>
 
           <div className="settings-section-title">

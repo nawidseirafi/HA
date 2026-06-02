@@ -914,7 +914,8 @@ Rolle:
 - zeigt Laufzeit- und Konfigurationsdaten ohne Secret-Werte
 - zeigt Agent-Konfiguration, Registry-Aktivierung und API Prefix
 - zeigt Household und Infrastructure Integration
-- zeigt tatsaechliche Backend-Logdatei und konfigurierte Logdatei
+- zeigt die zentral konfigurierte Backend-Logdatei aus `config.yaml`
+- Settings API gibt den Log-Pfad nur noch als `storage.log_file` zurueck; es gibt keinen zweiten `configured_log_file`-Pfad mehr.
 
 # Deployment Struktur
 
@@ -934,9 +935,12 @@ Logging:
 agent-api/logs/agent-api.log
 ```
 
-Hinweis:
+Quelle der Wahrheit:
 
-- `config.yaml` enthaelt aktuell einen konfigurierten Logging-Pfad `../logs/orchstrator.log`, der nicht der tatsaechlich in `main.py` verwendeten Datei entspricht.
+- `config.yaml` definiert `logging.file`.
+- `backend/logging_config.py` loest den Pfad relativ zu `agent-api/` auf.
+- `backend/main.py`, agentennahe CLI-Starts und die Settings-Seite verwenden denselben Resolver.
+- `/api/settings` zeigt denselben aufgeloesten Pfad in `storage.log_file`.
 
 # Bekannte Architekturhinweise
 

@@ -240,7 +240,6 @@ export type SettingsInfo = {
   storage: {
     uploads: PathSetting;
     log_file: PathSetting;
-    configured_log_file?: PathSetting;
   };
   agents: {
     invoices: {

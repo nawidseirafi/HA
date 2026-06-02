@@ -1,5 +1,6 @@
 import logging
 from backend.config import load_agent_runtime_config
+from backend.logging_config import configure_logging
 from backend.services.llm.factory import create_llm_client
 from backend.services.core.ha_client import HomeAssistantClient
 from .service import VacationService
@@ -9,14 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 vacation_service = VacationService()
-log_path = vacation_service.log_path()
-log_path.parent.mkdir(parents=True, exist_ok=True)
-
-logging.basicConfig(
-    filename=log_path,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
+configure_logging()
 
 def load_config():
     return load_agent_runtime_config("vacation")

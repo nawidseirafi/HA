@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -16,18 +14,13 @@ from backend.api.infrastructure_routes import router as infrastructure_router
 from backend.api.orchestrator_routes import router as orchestrator_router
 from backend.api.settings_routes import router as settings_router
 from backend.api.waste_routes import router as waste_router
-from backend.paths import FRONTEND_DIST, LOG_DIR
+from backend.logging_config import configure_logging
+from backend.paths import FRONTEND_DIST
 from backend.services.auth_service import user_from_request
 from backend.services.messaging.routes import router as messaging_router
 
 
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-logging.basicConfig(
-    filename=LOG_DIR / "agent-api.log",
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+configure_logging()
 
 
 class SPAStaticFiles(StaticFiles):

@@ -78,6 +78,18 @@ playwright install chromium
 
 Die zentrale Konfiguration liegt in `config.yaml`.
 
+### Logging
+
+Die Anwendung verwendet genau eine zentrale App-Logdatei. Quelle der Wahrheit ist `logging.file` in `config.yaml`; relative Pfade werden relativ zu `agent-api/` aufgeloest.
+
+```yaml
+logging:
+  file: "./logs/agent-api.log"
+  level: INFO
+```
+
+Der FastAPI-Start, agentennahe CLI-Starts und die Settings API verwenden denselben Resolver. Die Settings-Seite zeigt deshalb unter `Storage -> Logdatei` den tatsaechlich verwendeten Pfad an.
+
 ### Home Assistant
 
 ```bash
@@ -249,6 +261,7 @@ GET  /api/infrastructure/events/recent
 GET  /api/infrastructure/outages
 POST /api/infrastructure/check
 GET  /api/homeassistant/wall
+GET  /api/settings
 GET  /api/waste/status
 GET  /api/waste/next
 GET  /api/waste/reminders
