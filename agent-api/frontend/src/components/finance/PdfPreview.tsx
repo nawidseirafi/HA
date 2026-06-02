@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Invoice } from '../../types/invoice';
-import { api, getAuthToken } from '../../api/client';
+import { api, getAuthToken, handleUnauthorizedResponse } from '../../api/client';
 
 export function PdfPreview({ invoice }: { invoice: Invoice }) {
   const [src, setSrc] = useState('');
@@ -20,6 +20,7 @@ export function PdfPreview({ invoice }: { invoice: Invoice }) {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           signal: controller.signal,
         });
+        handleUnauthorizedResponse(response);
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text || `Datei konnte nicht geladen werden (${response.status}).`);

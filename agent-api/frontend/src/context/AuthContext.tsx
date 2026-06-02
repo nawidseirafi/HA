@@ -1,5 +1,5 @@
 import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api, clearAuthToken, getAuthToken, setAuthToken } from '../api/client';
+import { AUTH_EXPIRED_EVENT, api, clearAuthToken, getAuthToken, setAuthToken } from '../api/client';
 
 interface LoginInput {
   username: string;
@@ -24,6 +24,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAuthToken();
       setIsAuthenticated(false);
     });
+  }, []);
+
+  useEffect(() => {
+    const onAuthExpired = () => setIsAuthenticated(false);
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({

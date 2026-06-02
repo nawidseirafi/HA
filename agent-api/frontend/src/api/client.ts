@@ -4,6 +4,7 @@ const RAW_API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const API_BASE = normalizeApiBase(RAW_API_BASE);
 const TOKEN_KEY = 'robotersteve.agent-api.token';
 const SESSION_TOKEN_KEY = 'robotersteve.agent-api.session-token';
+export const AUTH_EXPIRED_EVENT = 'robotersteve:auth-expired';
 
 export type AuthResponse = {
   access_token: string;
@@ -25,6 +26,17 @@ export function setAuthToken(token: string, remember: boolean) {
 export function clearAuthToken() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(SESSION_TOKEN_KEY);
+}
+
+export function notifyAuthExpired() {
+  clearAuthToken();
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+export function handleUnauthorizedResponse(response: Response) {
+  if (response.status !== 401) return false;
+  notifyAuthExpired();
+  return true;
 }
 
 export type AgentStatus = {
@@ -859,6 +871,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       : message);
   }
   if (!response.ok) {
+    if (path !== '/api/auth/login') {
+      handleUnauthorizedResponse(response);
+    }
     const text = await response.text();
     let detail = '';
     try {
@@ -878,6 +893,7 @@ async function download(path: string): Promise<{ blob: Blob; filename: string }>
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) {
+    handleUnauthorizedResponse(response);
     const text = await response.text();
     throw new Error(text || `Download failed: ${response.status}`);
   }
@@ -1047,6 +1063,7 @@ export const api = {
       body: data,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
+    handleUnauthorizedResponse(response);
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },

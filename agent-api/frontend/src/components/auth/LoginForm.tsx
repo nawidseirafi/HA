@@ -93,7 +93,7 @@ export function LoginForm({ onLoggedIn }: Props) {
           <span className="remember-switch-track" aria-hidden>
             <span className="remember-switch-thumb" />
           </span>
-          <span className="remember-switch-label">Angemeldet bleiben</span>
+          <span className="remember-switch-label">Auf diesem Gerät angemeldet bleiben</span>
         </label>
       </div>
 
@@ -108,4 +108,3 @@ export function LoginForm({ onLoggedIn }: Props) {
     </form>
   );
 }
-
