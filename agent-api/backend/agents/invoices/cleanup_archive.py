@@ -125,10 +125,13 @@ def _referenced_archive_paths(database_path: Path, archive_dir: Path) -> set[Pat
     try:
         rows = con.execute(
             """
-            select archive_path
+            select archive_path, stored_path
             from invoices
             where status = 'archived'
-              and archive_path is not null and archive_path != ''
+              and (
+                (archive_path is not null and archive_path != '')
+                or (stored_path is not null and stored_path != '')
+              )
             """
         ).fetchall()
     finally:
@@ -137,13 +140,39 @@ def _referenced_archive_paths(database_path: Path, archive_dir: Path) -> set[Pat
     referenced = set()
     archive_root = archive_dir.resolve()
     for row in rows:
-        path = Path(row[0]).expanduser().resolve()
-        try:
-            path.relative_to(archive_root)
-        except ValueError:
-            continue
-        referenced.add(path)
+        for raw_path in row:
+            for candidate in _archive_reference_candidates(raw_path, archive_root):
+                referenced.add(candidate)
     return referenced
+
+
+def _archive_reference_candidates(raw_path: str | None, archive_root: Path) -> set[Path]:
+    if not raw_path:
+        return set()
+    path = Path(str(raw_path)).expanduser()
+    candidates: set[Path] = set()
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(archive_root)
+        candidates.add(resolved)
+    except (OSError, ValueError):
+        pass
+
+    remapped = _remap_archive_path(path, archive_root)
+    if remapped:
+        candidates.add(remapped)
+    return candidates
+
+
+def _remap_archive_path(path: Path, archive_root: Path) -> Path | None:
+    parts = path.parts
+    marker = ("data", "invoices", "archive")
+    for index in range(0, max(len(parts) - len(marker) + 1, 0)):
+        if tuple(parts[index:index + len(marker)]) == marker:
+            relative_parts = parts[index + len(marker):]
+            if relative_parts:
+                return (archive_root / Path(*relative_parts)).resolve()
+    return None
 
 
 def _archive_files(archive_dir: Path) -> set[Path]:
@@ -152,7 +181,7 @@ def _archive_files(archive_dir: Path) -> set[Path]:
     return {
         path.resolve()
         for path in archive_dir.rglob("*")
-        if path.is_file() and path.name != "index.xlsx"
+        if path.is_file() and path.name != "index.xlsx" and not path.name.startswith(".")
     }
 
 

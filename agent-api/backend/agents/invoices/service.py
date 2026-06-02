@@ -762,21 +762,20 @@ class InvoiceService:
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                select archive_path
+                select archive_path, stored_path
                 from invoices
                 where status = 'archived'
-                  and archive_path is not null and archive_path != ''
+                  and (
+                    (archive_path is not null and archive_path != '')
+                    or (stored_path is not null and stored_path != '')
+                  )
                 """
             ).fetchall()
         referenced = set()
         for row in rows:
-            path = Path(str(row["archive_path"])).expanduser()
-            try:
-                resolved = path.resolve()
-            except OSError:
-                continue
-            if self._is_inside_any(resolved, [self.archive_dir]):
-                referenced.add(resolved)
+            for key in ("archive_path", "stored_path"):
+                for candidate in self._archive_reference_candidates(row[key]):
+                    referenced.add(candidate)
         return referenced
 
     def _archive_files(self) -> set[Path]:
@@ -785,8 +784,38 @@ class InvoiceService:
         return {
             path.resolve()
             for path in self.archive_dir.rglob("*")
-            if path.is_file() and path.name != "index.xlsx"
+            if path.is_file() and path.name != "index.xlsx" and not path.name.startswith(".")
         }
+
+    def _archive_reference_candidates(self, raw_path: Any) -> set[Path]:
+        if not raw_path:
+            return set()
+
+        path = Path(str(raw_path)).expanduser()
+        candidates: set[Path] = set()
+
+        for candidate in (path, (API_DIR / path).resolve() if not path.is_absolute() else path):
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if self._is_inside_any(resolved, [self.archive_dir]):
+                candidates.add(resolved)
+
+        remapped = self._remap_archive_path(path)
+        if remapped:
+            candidates.add(remapped)
+        return candidates
+
+    def _remap_archive_path(self, path: Path) -> Optional[Path]:
+        parts = path.parts
+        marker = ("data", "invoices", "archive")
+        for index in range(0, max(len(parts) - len(marker) + 1, 0)):
+            if tuple(parts[index:index + len(marker)]) == marker:
+                relative_parts = parts[index + len(marker):]
+                if relative_parts:
+                    return (self.archive_dir / Path(*relative_parts)).resolve()
+        return None
 
     @staticmethod
     def _remove_empty_dirs(root: Path) -> None:

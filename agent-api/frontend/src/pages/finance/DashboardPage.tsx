@@ -150,7 +150,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       </header>
 
       <section className="kpi-grid">
-        <Kpi icon={Euro} label="Ausgaben aktueller Monat" value={currency(summary?.current_month_total)} note="Live aus FastAPI" tone="blue" />
+        <Kpi icon={Euro} label="Ausgaben aktueller Monat" value={currency(summary?.current_month_total)} note={`${monthNames[currentMonth - 1]} ${currentYear}`} tone="blue" />
         <Kpi icon={WalletCards} label="Ausgaben aktuelles Jahr" value={currency(summary?.current_year_total)} note={`${currentYear} laufend`} tone="violet" />
         <Kpi icon={FileText} label="Belege gesamt" value={summary?.total_invoices ?? 0} note="Archivierte Dokumente" tone="green" />
         <Kpi icon={AlertTriangle} label="Offene Prüfungen" value={summary?.needs_review_count ?? 0} note="Manuelle Kontrolle" tone="yellow" />
