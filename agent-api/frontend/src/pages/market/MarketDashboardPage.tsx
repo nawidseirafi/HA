@@ -223,9 +223,9 @@ function InsightCard({
         <strong>{title}</strong>
       </div>
       <div className="market-insight-body">
-        <b>{main || 'Keine Daten'}</b>
+        <b>{main || 'Kein aktueller Kaufkandidat'}</b>
         <em>{value || '-'}</em>
-        <p>{detail || 'Keine Daten'}</p>
+        <p>{detail || 'Markt derzeit neutral'}</p>
       </div>
     </>
   );
