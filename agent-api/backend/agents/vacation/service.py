@@ -1035,7 +1035,7 @@ class VacationService:
             device_class = str(attributes.get("device_class") or "").lower()
             if entity_id.startswith("binary_sensor.") and device_class in {"door", "window", "opening"} and value == "on":
                 target = open_doors if device_class == "door" else open_windows
-                target.append(self._room_from_state(state))
+                target.append(self._entity_label(state))
             battery_value = self._battery_value(state)
             if battery_value is not None and battery_value <= 20:
                 critical_batteries.append(self._friendly_name(state))
@@ -1142,9 +1142,9 @@ class VacationService:
                 mailbox = True
             if entity_id.startswith("binary_sensor.") and device_class in {"door", "window", "opening"} and value == "on" and (vacation_mode or pre_departure):
                 if device_class == "door":
-                    doors.append(self._room_from_state(state))
+                    doors.append(self._entity_label(state))
                 else:
-                    windows.append(self._room_from_state(state))
+                    windows.append(self._entity_label(state))
             if value in {"unavailable", "unknown"} and not entity_id.startswith(("weather.", "calendar.")):
                 if self._looks_like_internet_state(state):
                     internet_problem = True
@@ -1179,16 +1179,23 @@ class VacationService:
             candidates.append({
                 "reminder_type": "windows",
                 "title": "Fenster offen",
-                "message": "Fenster sind noch offen. Bitte vor der Abreise schließen.",
+                "message": (
+                    f"Folgende Fenster sind noch offen: {', '.join(sorted(set(windows)))}. "
+                    "Bitte vor der Abreise schließen."
+                ),
                 "severity": "critical",
             })
         if doors:
-            candidates.append({
-                "reminder_type": "doors",
-                "title": "Tür offen",
-                "message": "Türen sind noch offen. Bitte vor der Abreise schließen.",
-                "severity": "critical",
-            })
+            if doors:
+                candidates.append({
+                    "reminder_type": "doors",
+                    "title": "Tür offen",
+                    "message": (
+                        f"Folgende Türen sind noch offen: {', '.join(sorted(set(doors)))}. "
+                        "Bitte vor der Abreise schließen."
+                    ),
+                    "severity": "critical",
+                })
         if lights_on:
             candidates.append({
                 "reminder_type": "lights",
@@ -1311,6 +1318,22 @@ class VacationService:
         entity_id = str(state.get("entity_id") or "")
         slug = entity_id.split(".", 1)[-1]
         return slug.replace("_", " ").replace("-", " ").strip().title() or "Gerät"
+
+    def _entity_label(self, state: dict[str, Any]) -> str:
+        attributes = state.get("attributes") or {}
+        for key in ("friendly_name", "name", "device_name"):
+            value = str(attributes.get(key) or "").strip()
+            if value:
+                return value
+        entity_id = str(state.get("entity_id") or "")
+        slug = entity_id.split(".", 1)[-1]
+        return (
+                slug.replace("_", " ")
+                .replace("-", " ")
+                .strip()
+                .title()
+                or "Gerät"
+        )
 
     def _waste_label(self, name: str) -> str:
         text = name.lower()
