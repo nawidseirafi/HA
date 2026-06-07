@@ -548,7 +548,7 @@ class VacationService:
         pre_departure = self._is_pre_departure_window(period)
         candidates = self._reminder_candidates(states, vacation_mode=bool(vacation_mode), period=period, pre_departure=pre_departure)
         candidates.extend(self._waste_reminders_from_service(period, pre_departure=pre_departure))
-        reminders = [self._save_reminder(**candidate) for candidate in candidates]
+        reminders = [self._save_reminder_candidate(candidate) for candidate in candidates]
         for reminder in reminders:
             self._message_from_reminder(reminder)
         return reminders
@@ -1093,12 +1093,30 @@ class VacationService:
                 row = connection.execute("select * from vacation_reminders where id = ?", (cursor.lastrowid,)).fetchone()
         return dict(row)
 
+    def _save_reminder_candidate(self, candidate: dict[str, Any]) -> dict[str, Any]:
+        payload = candidate.get("payload") if isinstance(candidate.get("payload"), dict) else None
+        saved = self._save_reminder(
+            reminder_type=str(candidate.get("reminder_type") or ""),
+            title=str(candidate.get("title") or ""),
+            message=str(candidate.get("message") or ""),
+            severity=str(candidate.get("severity") or "info"),
+            due_at=candidate.get("due_at"),
+            status=str(candidate.get("status") or "open"),
+        )
+        if payload:
+            saved["payload"] = payload
+        return saved
+
     def _message_from_reminder(self, reminder: dict[str, Any]) -> None:
         title = str(reminder.get("title") or "Vacation Reminder")
         message = str(reminder.get("message") or "")
         if not message.strip():
             return
+        if str(reminder.get("reminder_type") or "") == "waste" and not self._is_relevant_waste_reminder(reminder):
+            return
         if self._vacation_message_exists(title, message):
+            return
+        if self._vacation_waste_message_exists(reminder):
             return
         try:
             MessagingService().create_message(
@@ -1107,7 +1125,11 @@ class VacationService:
                 severity=str(reminder.get("severity") or "info"),
                 title=title,
                 message=message,
-                payload={"reminder_id": reminder.get("id"), "reminder_type": reminder.get("reminder_type")},
+                payload={
+                    "reminder_id": reminder.get("id"),
+                    "reminder_type": reminder.get("reminder_type"),
+                    **(reminder.get("payload") if isinstance(reminder.get("payload"), dict) else {}),
+                },
             )
         except Exception:
             logger.exception("Vacation reminder could not be written to MessagingService.")
@@ -1119,11 +1141,42 @@ class VacationService:
             return False
         return any(item.get("title") == title and item.get("message") == message for item in messages)
 
+    def _vacation_waste_message_exists(self, reminder: dict[str, Any]) -> bool:
+        if str(reminder.get("reminder_type") or "") != "waste":
+            return False
+        payload = reminder.get("payload") if isinstance(reminder.get("payload"), dict) else {}
+        period_id = payload.get("vacation_period_id")
+        waste_items = payload.get("waste_items") if isinstance(payload.get("waste_items"), list) else []
+        waste_keys = {
+            (str(item.get("waste_date") or ""), str(item.get("waste_type") or ""))
+            for item in waste_items
+            if isinstance(item, dict)
+        }
+        if not period_id or not waste_keys:
+            return False
+        try:
+            messages = MessagingService().get_messages_by_source("vacation", limit=100)
+        except Exception:
+            return False
+        for message in messages:
+            existing = message.get("payload") if isinstance(message.get("payload"), dict) else {}
+            if existing.get("category") != "waste" or existing.get("vacation_period_id") != period_id:
+                continue
+            existing_items = existing.get("waste_items") if isinstance(existing.get("waste_items"), list) else []
+            existing_keys = {
+                (str(item.get("waste_date") or ""), str(item.get("waste_type") or ""))
+                for item in existing_items
+                if isinstance(item, dict)
+            }
+            if existing_keys == waste_keys:
+                return True
+        return False
+
     def _reminder_candidates(self, states: list[dict[str, Any]], vacation_mode: bool, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
         windows: list[str] = []
         doors: list[str] = []
         batteries: list[str] = []
-        waste_items: list[tuple[str, str]] = []
+        waste_items: list[dict[str, str]] = []
         lights_on = False
         internet_problem = False
         safety_problem = False
@@ -1156,7 +1209,7 @@ class VacationService:
             if self._looks_like_waste_state(state) and period.get("start_date") and period.get("end_date"):
                 waste_date = self._date_only(state.get("state"))
                 if waste_date and self._date_in_range(waste_date, period.get("start_date"), period.get("end_date")):
-                    waste_items.append((self._waste_label(name), waste_date))
+                    waste_items.append({"waste_type": self._waste_label(name), "waste_date": waste_date})
 
         candidates: list[dict[str, Any]] = []
         if pre_departure:
@@ -1167,14 +1220,7 @@ class VacationService:
                 "severity": "info",
             })
         if waste_items:
-            label, due_at = sorted(waste_items, key=lambda item: item[1])[0]
-            candidates.append({
-                "reminder_type": "waste",
-                "title": "Müllabfuhr",
-                "message": f"{label} {self._relative_day_text(due_at)}. Vor Urlaub bitte bereitstellen oder Nachbarn informieren.",
-                "severity": "warning",
-                "due_at": due_at,
-            })
+            candidates.append(self._compact_waste_reminder(period, waste_items))
         if windows:
             candidates.append({
                 "reminder_type": "windows",
@@ -1234,7 +1280,8 @@ class VacationService:
         return candidates
 
     def _waste_reminders_from_service(self, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
-        if not pre_departure and not (period.get("start_date") and period.get("end_date")):
+        period_dates = self._vacation_period_dates(period)
+        if not period_dates:
             return []
         try:
             waste = WasteService().status()
@@ -1242,31 +1289,86 @@ class VacationService:
             return []
         if not waste.get("ok"):
             return []
-        reminders: list[dict[str, Any]] = []
+        relevant_items: list[dict[str, str]] = []
         seen_dates: set[tuple[str, str]] = set()
-        waste_items = list(waste.get("items", []))
+        source_items = list(waste.get("items", []))
         if pre_departure and isinstance(waste.get("next"), dict):
-            waste_items.insert(0, waste["next"])
-        for item in waste_items:
-            days_until = item.get("days_until")
+            source_items.insert(0, waste["next"])
+        for item in source_items:
             date_value = self._date_only(item.get("date"))
-            in_period = bool(date_value and period.get("start_date") and period.get("end_date") and self._date_in_range(date_value, period.get("start_date"), period.get("end_date")))
-            before_departure = isinstance(days_until, int) and 0 <= days_until <= max(1, self.config()["pre_departure_days"])
-            if not in_period and not before_departure and not pre_departure:
+            if not date_value or not self._date_in_range(date_value, period_dates[0], period_dates[1]):
                 continue
             waste_type = self._waste_label(str(item.get("type") or "Müll"))
-            key = (waste_type, date_value or "")
+            key = (waste_type, date_value)
             if key in seen_dates:
                 continue
             seen_dates.add(key)
-            reminders.append({
-                "reminder_type": "waste",
-                "title": "Müllabfuhr",
-                "message": f"{waste_type} {self._relative_day_text(date_value or '')}. Vor Urlaub bitte bereitstellen oder Nachbarn informieren.",
-                "severity": "warning",
-                "due_at": date_value,
-            })
-        return reminders
+            relevant_items.append({"waste_type": waste_type, "waste_date": date_value})
+        return [self._compact_waste_reminder(period, relevant_items)] if relevant_items else []
+
+    def _compact_waste_reminder(self, period: dict[str, Any], waste_items: list[dict[str, str]]) -> dict[str, Any]:
+        normalized_items = self._dedupe_waste_items(waste_items)
+        return {
+            "reminder_type": "waste",
+            "title": "Urlaubsvorbereitung",
+            "message": self._compact_waste_message(normalized_items),
+            "severity": "warning",
+            "due_at": normalized_items[0]["waste_date"] if normalized_items else None,
+            "payload": {
+                "source": "vacation",
+                "category": "waste",
+                "vacation_period_id": self._vacation_period_id(period),
+                "waste_items": normalized_items,
+            },
+        }
+
+    def _compact_waste_message(self, waste_items: list[dict[str, str]]) -> str:
+        lines = [
+            f"- {self._format_date_de(item['waste_date'])} {item['waste_type']}"
+            for item in self._dedupe_waste_items(waste_items)
+        ]
+        return (
+            "Während deiner Abwesenheit stehen folgende Müllabfuhr-Termine an:\n"
+            + "\n".join(lines)
+            + "\n\nBitte vor der Abreise bereitstellen oder Nachbarn informieren."
+        )
+
+    def _dedupe_waste_items(self, waste_items: list[dict[str, str]]) -> list[dict[str, str]]:
+        deduped: dict[tuple[str, str], dict[str, str]] = {}
+        for item in waste_items:
+            waste_date = self._date_only(item.get("waste_date"))
+            waste_type = self._waste_label(str(item.get("waste_type") or "Müll"))
+            if not waste_date:
+                continue
+            deduped[(waste_date, waste_type)] = {"waste_date": waste_date, "waste_type": waste_type}
+        return [deduped[key] for key in sorted(deduped)]
+
+    def _is_relevant_waste_reminder(self, reminder: dict[str, Any]) -> bool:
+        payload = reminder.get("payload") if isinstance(reminder.get("payload"), dict) else {}
+        waste_items = payload.get("waste_items") if isinstance(payload.get("waste_items"), list) else []
+        return payload.get("source") == "vacation" and payload.get("category") == "waste" and bool(waste_items)
+
+    def _vacation_period_dates(self, period: dict[str, Any]) -> tuple[str, str] | None:
+        start = self._date_only(period.get("start_date"))
+        end = self._date_only(period.get("end_date"))
+        if not start or not end:
+            return None
+        return start, end
+
+    def _vacation_period_id(self, period: dict[str, Any]) -> str:
+        explicit_id = period.get("id")
+        if explicit_id is not None:
+            return str(explicit_id)
+        start, end = self._vacation_period_dates(period) or ("unknown", "unknown")
+        source = str(period.get("source") or "unknown")
+        return f"{source}:{start}:{end}"
+
+    def _format_date_de(self, value: str) -> str:
+        try:
+            date_value = datetime.fromisoformat(value).date()
+        except ValueError:
+            return value
+        return date_value.strftime("%d.%m.")
 
     def _close_generated_reminders(self) -> None:
         generated_types = (
