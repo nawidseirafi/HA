@@ -9,7 +9,11 @@ from backend.agents.registry import discover_agent_manifests
 from backend.config import load_agent_section
 from backend.logging_config import configured_log_path
 from backend.paths import API_DIR, API_CONFIG_PATH, ENV_PATH, FRONTEND_DIST
-from backend.services.waste_service import MAILBOX_ENTITY_ID
+
+try:
+    from backend.services.waste_service import MAILBOX_ENTITY_ID
+except ModuleNotFoundError:
+    MAILBOX_ENTITY_ID = "input_boolean.post_im_briefkasten"
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

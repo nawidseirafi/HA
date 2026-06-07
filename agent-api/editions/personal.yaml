@@ -1,0 +1,24 @@
+name: personal
+description: Private RoboterSteve Edition
+enabled_agents:
+  - scheduler
+  - invoices
+  - market
+  - mywellness
+  - vacation
+enabled_core_services:
+  - auth
+  - settings
+  - messaging
+  - orchestrator
+  - homeassistant
+  - household
+  - infrastructure
+  - waste
+  - llm
+frontend_app: personal
+include_frontend: true
+include_data: false
+include_files: []
+exclude_files: []
+config_template: personal

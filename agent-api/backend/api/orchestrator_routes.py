@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.agents.registry import discover_agent_manifests, get_agent_control
+from backend.editions import active_edition, is_core_service_enabled
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.orchestrator_control_service import OrchestratorControlService
 
@@ -24,6 +25,7 @@ class ControlPayload(BaseModel):
 
 @router.get("/map")
 def orchestrator_map() -> dict[str, Any]:
+    edition = active_edition()
     agents = [_agent_node(manifest.public_dict()) for manifest in discover_agent_manifests()]
     agent_ids = {agent["id"] for agent in agents}
     services = _service_nodes()
@@ -103,6 +105,7 @@ def orchestrator_map() -> dict[str, Any]:
         })
     return {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "edition": edition.public_dict(),
         "summary": _summary(agents),
         "nodes": nodes,
         "edges": edges,
@@ -160,13 +163,14 @@ def _service_nodes() -> list[dict[str, Any]]:
         HomeAssistantService().get_states()
     except Exception:
         ha_status = "error"
-    return [
-        {"id": "messaging", "label": "Message Center", "subtitle": "Nachrichten & Hinweise", "kind": "platform", "status": "active", "icon": "Bell", "control": _read_only_control()},
-        {"id": "household", "label": "Household", "subtitle": "Haushaltsstatus & Checks", "kind": "platform", "status": "active", "icon": "Home", "control": _read_only_control()},
-        {"id": "openai", "label": "OpenAI", "subtitle": "Modelle & Verarbeitung", "kind": "service", "status": "active", "icon": "Sparkles", "control": _read_only_control()},
-        {"id": "database", "label": "Database", "subtitle": "Daten & Historie", "kind": "service", "status": "active", "icon": "Database", "control": _read_only_control()},
-        {"id": "homeassistant", "label": "Home Assistant", "subtitle": "Smart Home Bridge", "kind": "service", "status": ha_status, "icon": "HousePlug", "control": _read_only_control()},
+    candidates = [
+        ("messaging", {"id": "messaging", "label": "Message Center", "subtitle": "Nachrichten & Hinweise", "kind": "platform", "status": "active", "icon": "Bell", "control": _read_only_control()}),
+        ("household", {"id": "household", "label": "Household", "subtitle": "Haushaltsstatus & Checks", "kind": "platform", "status": "active", "icon": "Home", "control": _read_only_control()}),
+        ("llm", {"id": "openai", "label": "OpenAI", "subtitle": "Modelle & Verarbeitung", "kind": "service", "status": "active", "icon": "Sparkles", "control": _read_only_control()}),
+        ("database", {"id": "database", "label": "Database", "subtitle": "Daten & Historie", "kind": "service", "status": "active", "icon": "Database", "control": _read_only_control()}),
+        ("homeassistant", {"id": "homeassistant", "label": "Home Assistant", "subtitle": "Smart Home Bridge", "kind": "service", "status": ha_status, "icon": "HousePlug", "control": _read_only_control()}),
     ]
+    return [node for service_id, node in candidates if service_id == "database" or is_core_service_enabled(service_id)]
 
 
 def _primary_edges(agents: list[dict[str, Any]], services: list[dict[str, Any]], scheduler: dict[str, Any] | None) -> list[dict[str, Any]]:

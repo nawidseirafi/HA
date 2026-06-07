@@ -1,5 +1,5 @@
 scheduler:
-  enabled: false
+  enabled: true
   database_path: data/scheduler/scheduler.db
   poll_interval_seconds: 30
   default_tasks_enabled: true

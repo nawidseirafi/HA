@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from backend.config import load_agent_section, resolve_api_path
+from backend.editions import active_edition, is_core_service_enabled
 from backend.paths import AGENTS_DIR
 
 
@@ -404,9 +405,12 @@ class SchedulerStore:
 
     def _manifest_default_tasks(self) -> list[dict[str, Any]]:
         tasks: list[dict[str, Any]] = []
+        allowed_agents = set(active_edition().enabled_agents)
         for manifest_path in sorted(AGENTS_DIR.glob("*/manifest.yaml")):
             data = self._read_yaml(manifest_path)
             agent_id = str(data.get("id") or manifest_path.parent.name).strip()
+            if agent_id not in allowed_agents:
+                continue
             scheduler = data.get("scheduler") if isinstance(data.get("scheduler"), dict) else {}
             raw_tasks = scheduler.get("tasks") if isinstance(scheduler.get("tasks"), list) else []
             for index, raw_task in enumerate(raw_tasks):
@@ -429,7 +433,7 @@ class SchedulerStore:
         return tasks
 
     def _platform_default_tasks(self) -> list[dict[str, Any]]:
-        return [
+        tasks = [
             {
                 "name": "Infrastructure Health Check",
                 "description": "Prueft alle 5 Minuten Internet- und FritzBox-Status ueber Home Assistant.",
@@ -452,6 +456,11 @@ class SchedulerStore:
                 "source": "platform",
                 "default_key": "platform:household:window-check",
             },
+        ]
+        return [
+            task for task in tasks
+            if str(task.get("target_agent") or "") not in {"infrastructure", "household"}
+            or is_core_service_enabled(str(task.get("target_agent") or ""))
         ]
 
     def _read_yaml(self, path: Path) -> dict[str, Any]:

@@ -595,3 +595,92 @@ Diese Endpunkte ersetzen bestehende Agent-APIs nicht, sondern liegen als zentral
 - Steuerkategorien sind nur Datenfelder, keine Steuerberatung.
 - Secrets wie API-Keys gehören in `.env`, nicht ins Git-Repository.
 - Die KI-Extraktion für Belege nutzt die zentrale `llm`-Konfiguration und die API-Keys aus `.env`.
+
+## Edition-basierte Deployments
+
+RoboterSteve bleibt ein gemeinsames Entwicklungsrepo. Deployments werden ueber Edition-YAMLs in `agent-api/editions/` beschrieben.
+
+Aktive Runtime-Edition:
+
+```bash
+ROBOTERSTEVE_EDITION=personal
+ROBOTERSTEVE_EDITION=seniorcare
+```
+
+Fallback-Reihenfolge:
+
+1. `ROBOTERSTEVE_EDITION`
+2. `config.yaml -> edition.name`
+3. `personal`
+
+Die Agent Registry, Agent-Router, Runtime-Services, `/api/agents` und `/api/orchestrator/map` filtern anhand der aktiven Edition. Ohne explizite Edition entspricht `personal` dem bisherigen privaten RoboterSteve-System.
+
+Edition Builds:
+
+```bash
+cd agent-api
+../venv/bin/python tools/build_edition.py personal
+../venv/bin/python tools/build_edition.py seniorcare
+```
+
+Ergebnis je Edition:
+
+```text
+build/<edition>/
+├── backend/
+├── frontend/dist/
+├── config.example.yaml
+├── .env.example
+├── requirements.txt
+└── README_INSTALL.md
+```
+
+`personal` ist fuer normales Python/systemd-Deployment vorgesehen und enthaelt bewusst keine `docker-compose.yml`. `seniorcare` enthaelt zusaetzlich eine einfache `docker-compose.yml`.
+
+Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache__/`, `venv/`, `.venv/`, `node_modules/`, `.DS_Store`.
+
+## Frontend Multi-App-Struktur
+
+Das Frontend ist auf mehrere Produkt-Apps vorbereitet. Der gemeinsame Entry Point ist `frontend/src/main.tsx`; die aktive App wird ueber `VITE_ROBOTERSTEVE_EDITION` gewaehlt.
+
+```text
+frontend/src/
+├── main.tsx
+├── shared/
+│   ├── api/
+│   ├── auth/
+│   ├── components/
+│   ├── styles/
+│   ├── types/
+│   └── utils/
+└── apps/
+    ├── personal/
+    │   ├── main.tsx
+    │   ├── App.tsx
+    │   ├── pages/
+    │   ├── components/
+    │   └── routes/
+    └── seniorcare/
+        ├── main.tsx
+        ├── App.tsx
+        ├── pages/
+        ├── components/
+        ├── routes/
+        └── navigation/
+```
+
+Personal ist die bisherige Anwendung mit allen vorhandenen Dashboards, Agent-Ansichten, Wall-Dashboard und Orchestrator-Ansichten. SeniorCare ist eine eigene Placeholder-App mit Setup, Dashboard, Sensoren, Kontakten, Benachrichtigungen und Einstellungen.
+
+Frontend Builds:
+
+```bash
+cd agent-api/frontend
+npm run dev
+npm run build
+VITE_ROBOTERSTEVE_EDITION=personal npm run build
+VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
+```
+
+Neue Produkteditionen sollten als eigene App unter `src/apps/<edition>/` angelegt werden. Gemeinsame Bausteine gehoeren nach `src/shared/`; Edition-spezifische Navigation, Seiten und Produktlogik bleiben in der jeweiligen App.
+
+Edition-Builds enthalten `editions/edition.lock`. Dadurch ist ein Build auf genau die gebaute Edition festgelegt und faellt nicht still auf `personal` zurueck.

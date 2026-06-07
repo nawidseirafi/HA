@@ -100,3 +100,7 @@ Im Dashboard YAML kannst du die Emojis/Farben ändern:
 **Script funktioniert nicht?**
 - Prüfe die HA python_scripts Dokumentation
 - Verifiziere die Python-Version (3.7+)
+
+## RoboterSteve Edition-Hinweis
+
+Dieses Home-Assistant-Widget bleibt unabhaengig von RoboterSteve Edition-Builds. Die RoboterSteve Personal Edition kann Waste-Daten ueber `backend/services/waste_service.py`, Household und Wall Dashboard anzeigen. SeniorCare soll Waste nicht voraussetzen; falls Abfalltermine spaeter dort relevant werden, muessen sie als eigene SeniorCare-Funktion oder gemeinsamer Core-Service explizit in der Edition aktiviert werden.

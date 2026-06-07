@@ -1,0 +1,14 @@
+id: senior
+name: Senior-Agent
+description: SeniorCare Assistenz-Placeholder fuer Betreuung, Erinnerungen und sichere Tagesablaeufe.
+status: draft
+api:
+  prefix: /api/senior
+  route_module: backend.agents.senior.routes
+runtime:
+  service_object: senior_service
+ui:
+  icon: HeartHandshake
+  dashboard_route: seniorDashboard
+settings:
+  edition: seniorcare

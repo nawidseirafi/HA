@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -7,13 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.agents.registry import agent_runtime_services, include_agent_routers
 from backend.agents.routes import router as agents_router
-from backend.api.auth_routes import router as auth_router
-from backend.api.household_routes import router as household_router
-from backend.api.homeassistant_routes import router as homeassistant_router
-from backend.api.infrastructure_routes import router as infrastructure_router
-from backend.api.orchestrator_routes import router as orchestrator_router
-from backend.api.settings_routes import router as settings_router
-from backend.api.waste_routes import router as waste_router
+from backend.editions import is_core_service_enabled
 from backend.logging_config import configure_logging
 from backend.paths import FRONTEND_DIST
 from backend.services.auth_service import user_from_request
@@ -68,16 +64,25 @@ async def require_api_auth(request, call_next):
     return await call_next(request)
 
 
-app.include_router(auth_router)
-app.include_router(household_router)
-app.include_router(infrastructure_router)
-app.include_router(homeassistant_router)
-app.include_router(orchestrator_router)
-app.include_router(waste_router)
+def include_core_router(service_id: str, module_name: str) -> None:
+    if not is_core_service_enabled(service_id):
+        return
+    module = import_module(module_name)
+    router = getattr(module, "router", None)
+    if router is not None:
+        app.include_router(router)
+
+
+include_core_router("auth", "backend.api.auth_routes")
+include_core_router("household", "backend.api.household_routes")
+include_core_router("infrastructure", "backend.api.infrastructure_routes")
+include_core_router("homeassistant", "backend.api.homeassistant_routes")
+include_core_router("orchestrator", "backend.api.orchestrator_routes")
+include_core_router("waste", "backend.api.waste_routes")
 app.include_router(agents_router)
-app.include_router(messaging_router)
+include_core_router("messaging", "backend.services.messaging.routes")
 include_agent_routers(app)
-app.include_router(settings_router)
+include_core_router("settings", "backend.api.settings_routes")
 
 
 SECURITY_SCHEME_NAME = "BearerAuth"

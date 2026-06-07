@@ -1,23 +1,16 @@
 import json
 from datetime import datetime, timezone
+from importlib import import_module
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.agents.invoices.routes import invoice_service
-from backend.agents.market.report_service import MarketReportService
-from backend.agents.mywellness.routes import mywellness_service
-from backend.agents.vacation.routes import vacation_service
 from backend.services.homeassistant_service import HomeAssistantService
-from backend.services.household_service import HouseholdService
-from backend.services.waste_service import WasteService
 
 
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
-waste_service = WasteService(ha_service)
-household_service = HouseholdService(ha_service=ha_service, waste_service=waste_service, vacation_status_provider=vacation_service.status)
 LOW_BATTERY_THRESHOLD = 40
 
 
@@ -77,8 +70,8 @@ def wall_dashboard():
 
     agents = _agent_summary()
     climate_summary = _climate_summary()
-    household = household_service.summary()
-    waste = household.get("waste") or waste_service.status()
+    household = _household_summary()
+    waste = household.get("waste") or _waste_status()
     post = (household.get("post") or {}).get("entity") or post
 
     return {
@@ -130,6 +123,7 @@ def _agent_summary() -> dict[str, Any]:
     mywellness: dict[str, Any]
     vacation: dict[str, Any]
     try:
+        invoice_service = import_module("backend.agents.invoices.routes").invoice_service
         invoice_summary = invoice_service.summary()
         invoice_status = invoice_service.status()
         invoices = {
@@ -146,10 +140,12 @@ def _agent_summary() -> dict[str, Any]:
     except Exception as exc:
         invoices = {"status": "error", "error": str(exc)}
     try:
+        mywellness_service = import_module("backend.agents.mywellness.routes").mywellness_service
         mywellness = mywellness_service.status()
     except Exception as exc:
         mywellness = {"status": "error", "error": str(exc)}
     try:
+        MarketReportService = import_module("backend.agents.market.report_service").MarketReportService
         market_summary = MarketReportService().summary()
         market = {
             "status": "paused",
@@ -160,10 +156,38 @@ def _agent_summary() -> dict[str, Any]:
     except Exception as exc:
         market = {"status": "error", "error": str(exc)}
     try:
+        vacation_service = import_module("backend.agents.vacation.routes").vacation_service
         vacation = vacation_service.status()
     except Exception as exc:
         vacation = {"status": "error", "error": str(exc)}
     return {"invoices": invoices, "mywellness": mywellness, "market": market, "vacation": vacation}
+
+
+def _household_summary() -> dict[str, Any]:
+    try:
+        WasteService = import_module("backend.services.waste_service").WasteService
+        HouseholdService = import_module("backend.services.household_service").HouseholdService
+        waste_service = WasteService(ha_service)
+        vacation_status_provider = None
+        try:
+            vacation_status_provider = import_module("backend.agents.vacation.routes").vacation_service.status
+        except Exception:
+            vacation_status_provider = None
+        return HouseholdService(
+            ha_service=ha_service,
+            waste_service=waste_service,
+            vacation_status_provider=vacation_status_provider,
+        ).summary()
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _waste_status() -> dict[str, Any]:
+    try:
+        WasteService = import_module("backend.services.waste_service").WasteService
+        return WasteService(ha_service).status()
+    except Exception as exc:
+        return {"ok": False, "items": [], "reminders": [], "error": str(exc)}
 
 
 def _domain(state: dict[str, Any]) -> str:

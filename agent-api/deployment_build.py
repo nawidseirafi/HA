@@ -1,66 +1,31 @@
-from pathlib import Path
-import shutil
+#!/usr/bin/env python3
+"""Compatibility wrapper for edition-based deployment builds.
+
+Prefer calling `tools/build_edition.py` directly:
+
+    python tools/build_edition.py personal
+    python tools/build_edition.py seniorcare
+"""
+
+from __future__ import annotations
+
 import subprocess
+import sys
+from pathlib import Path
 
-ROOT = Path(__file__).parent.resolve()
 
-BUILD_DIR = ROOT / "build"
-TARGET_DIR = BUILD_DIR / "roboterSteve"
+ROOT = Path(__file__).resolve().parent
+DEFAULT_EDITION = "personal"
 
-print("Erstelle Deployment-Paket...")
 
-# Build-Verzeichnis löschen
-if BUILD_DIR.exists():
-    shutil.rmtree(BUILD_DIR)
+def main() -> int:
+    edition = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_EDITION
+    if len(sys.argv) > 2:
+        print("Usage: python deployment_build.py [personal|seniorcare]", file=sys.stderr)
+        return 2
+    print(f"deployment_build.py ist ein Compatibility Wrapper. Baue Edition: {edition}")
+    return subprocess.call([sys.executable, str(ROOT / "tools" / "build_edition.py"), edition], cwd=ROOT)
 
-TARGET_DIR.mkdir(parents=True)
 
-# Frontend bauen
-print("Frontend build...")
-
-subprocess.run(
-    ["npm", "run", "build"],
-    cwd=ROOT / "frontend",
-    check=True,
-)
-
-# Verzeichnisse kopieren
-COPY_DIRS = [
-    "backend",
-]
-
-for folder in COPY_DIRS:
-    src = ROOT / folder
-
-    if src.exists():
-        shutil.copytree(
-            src,
-            TARGET_DIR / folder,
-            dirs_exist_ok=True,
-        )
-
-# Frontend dist kopieren
-shutil.copytree(
-    ROOT / "frontend" / "dist",
-    TARGET_DIR / "frontend" / "dist",
-    dirs_exist_ok=True,
-)
-
-# Dateien kopieren
-COPY_FILES = [
-    "config.yaml",
-    "main.py",
-]
-
-for file_name in COPY_FILES:
-    src = ROOT / file_name
-
-    if src.exists():
-        shutil.copy2(
-            src,
-            TARGET_DIR / file_name,
-        )
-
-print()
-print("Deployment erstellt:")
-print(TARGET_DIR)
+if __name__ == "__main__":
+    raise SystemExit(main())

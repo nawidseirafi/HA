@@ -7,6 +7,7 @@ Der wichtigste Grundsatz: Die vorhandene Registry bleibt Discovery-Schicht. Der 
 # Leitlinien
 
 - Keine bestehenden Agenten verschieben.
+- Keine neuen Repos fuer Produkteditionen anlegen; Editionen bleiben YAML-gesteuerte Zuschnitte im gemeinsamen Repo.
 - Keine bestehenden Datenbanken ersetzen.
 - Keine bestehenden API-Endpunkte brechen.
 - Manifeste bleiben Quelle für Agent-Metadaten.
@@ -441,6 +442,7 @@ backend/
 - Agent-Statusmodell schriftlich festlegen: `active`, `running`, `paused`, `disabled`, `error`.
 - `/api/orchestrator/map` zur einzigen Quelle für Agent-Map-Status im Frontend machen.
 - Alle Agent-Metadaten im Frontend aus Manifesten beziehen.
+- Frontend-Produkteditionen als getrennte Apps unter `frontend/src/apps/<edition>/` fuehren, nicht ueber verstreute Edition-Abfragen in Komponenten.
 - MyWellness `enabled + nicht laufend` wird als `active` dargestellt.
 - Secrets aus `agent-api.service` entfernen und konsequent über Environment-Datei laden.
 - Dashboard-GETs read-only halten. Schreibende Datenimporte nur ueber explizite Aktionen oder Scheduler.
@@ -464,3 +466,27 @@ backend/
 - LLM-Factory bereinigen: Claude-Pfad entweder implementieren oder aus der Konfiguration entfernen.
 - Langfristig ältere und neue Home-Assistant-Clients konsolidieren.
 - Vacation Presence Simulation Engine als Version 2.0 separat entwerfen.
+
+
+# Editionen als Zielstandard
+
+Editionen sind der empfohlene Weg fuer unterschiedliche Deployments aus demselben Repository.
+
+Zielregeln:
+
+- Editionen werden in `agent-api/editions/*.yaml` beschrieben.
+- Runtime-Auswahl erfolgt ueber `ROBOTERSTEVE_EDITION`, danach `config.yaml -> edition.name`, danach `personal`.
+- Registry, Router, Runtime-Services, Scheduler-Manifest-Tasks und Orchestrator Map respektieren die aktive Edition.
+- `personal` bleibt die private Vollinstallation.
+- `seniorcare` bleibt eine Produktedition mit Core, Scheduler und Senior-Agent.
+- Neue Produkteditionen bekommen eigene Frontend-Apps unter `frontend/src/apps/<edition>/`.
+- Gemeinsame UI-/API-/Auth-/Style-Bausteine gehoeren nach `frontend/src/shared/`.
+- `tools/build_edition.py` ist der Standardpfad fuer saubere Deployment-Artefakte ohne private Daten.
+- Produkt-Builds muessen per `editions/edition.lock` strikt auf ihre Edition festgelegt sein; kein stiller Fallback von SeniorCare auf Personal.
+
+Nicht-Ziele:
+
+- Kein neues Repo pro Edition.
+- Keine Kopie der gesamten Personal-App fuer jedes Produkt.
+- Keine privaten Daten, Logs oder Secrets in Edition-Builds.
+- Keine UI-Logik, die ueberall `if edition === ...` verteilt.

@@ -14,3 +14,8 @@ RoboterSteve Wall Dashboard
 - FritzBox/Internet-Kachel soll Daten aus dem Infrastructure Service nutzen, nicht direkt aus FritzBox-APIs.
 - Vacation-Kachel steuert nur input_boolean.vacation_mode.
 - Keine Geräteautomatisierung durch Vacation oder Infrastructure Service.
+
+Edition-Hinweis
+- Das bestehende Wall Dashboard gehoert zur Personal App unter frontend/src/apps/personal.
+- Gemeinsame API/Auth/Styles liegen unter frontend/src/shared.
+- SeniorCare bekommt eine eigene App-Struktur und soll keine Personal-Wall-Komponenten direkt voraussetzen.

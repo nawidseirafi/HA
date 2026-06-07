@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from backend.agents.control import AgentControlAdapter, BaseAgentControl
 from backend.config import load_agent_section
+from backend.editions import active_edition, load_edition
 from backend.paths import BACKEND_DIR
 
 
@@ -43,11 +44,26 @@ class AgentManifest:
         }
 
 
-def discover_agent_manifests() -> list[AgentManifest]:
+def discover_agent_manifests(edition_filter: tuple[str, ...] | set[str] | list[str] | None = None) -> list[AgentManifest]:
+    if edition_filter is None:
+        edition_filter = active_edition().enabled_agents
+    return _discover_agent_manifests(edition_filter=edition_filter)
+
+
+def discover_all_agent_manifests() -> list[AgentManifest]:
+    return _discover_agent_manifests(edition_filter=None)
+
+
+def discover_agent_manifests_for_edition(edition_name: str) -> list[AgentManifest]:
+    return _discover_agent_manifests(edition_filter=load_edition(edition_name).enabled_agents)
+
+
+def _discover_agent_manifests(edition_filter: tuple[str, ...] | set[str] | list[str] | None = None) -> list[AgentManifest]:
+    allowed = set(edition_filter) if edition_filter is not None else None
     manifests = []
     for path in sorted(AGENTS_DIR.glob("*/manifest.yaml")):
         manifest = _load_manifest(path)
-        if manifest:
+        if manifest and (allowed is None or manifest.id in allowed):
             manifests.append(manifest)
     return manifests
 

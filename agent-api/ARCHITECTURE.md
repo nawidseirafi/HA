@@ -1,12 +1,12 @@
 # RoboterSteve Architektur README - Ist-Zustand
 
-Stand: 2026-06-02
+Stand: 2026-06-07
 
 Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Service V1, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness/Invoice-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
 
 # Systemuebersicht
 
-RoboterSteve besteht aktuell aus einer FastAPI-Backend-Anwendung und einem React/Vite-Frontend unter `agent-api/`.
+RoboterSteve besteht aktuell aus einer FastAPI-Backend-Anwendung und einem React/Vite-Frontend unter `agent-api/`. Das Projekt bleibt ein gemeinsames Entwicklungsrepo, kann aber ueber Editionen unterschiedliche Deployment-Zuschnitte bauen.
 
 Der Backend-Einstieg ist:
 
@@ -14,7 +14,7 @@ Der Backend-Einstieg ist:
 agent-api/backend/main.py
 ```
 
-Das Backend bindet zentrale Router ein:
+Das Backend bindet zentrale Router edition-aware ein:
 
 - Auth
 - Agents
@@ -27,11 +27,15 @@ Das Backend bindet zentrale Router ein:
 - Settings
 - dynamisch geladene Agent-Router aus Manifesten
 
+Die aktive Edition wird ueber `ROBOTERSTEVE_EDITION`, danach `config.yaml -> edition.name`, danach `personal` bestimmt. Ohne explizite Edition entspricht `personal` dem bisherigen privaten System.
+
 Das Frontend liegt unter:
 
 ```text
 agent-api/frontend/
 ```
+
+Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die bisherige Anwendung; `seniorcare` ist eine eigene Placeholder-App fuer die Produktedition.
 
 Wichtige UI-Bereiche:
 
@@ -65,6 +69,8 @@ agent-api/
 │   │   ├── invoices/
 │   │   ├── market/
 │   │   ├── mywellness/
+│   │   ├── scheduler/
+│   │   ├── senior/
 │   │   └── vacation/
 │   ├── api/
 │   │   ├── auth_routes.py
@@ -95,7 +101,18 @@ agent-api/
 │   ├── messaging/
 │   ├── mywellness/
 │   └── scheduler/
+├── editions/
+│   ├── personal.yaml
+│   └── seniorcare.yaml
+├── tools/
+│   └── build_edition.py
 ├── frontend/
+│   └── src/
+│       ├── main.tsx
+│       ├── shared/
+│       └── apps/
+│           ├── personal/
+│           └── seniorcare/
 └── config.yaml
 ```
 
@@ -122,19 +139,71 @@ agent-api/backend/agents/registry.py
 
 Aufgaben:
 
+- aktive Edition laden und erlaubte Agenten bestimmen
 - `backend/agents/*/manifest.yaml` entdecken
 - Manifestdaten in `AgentManifest` laden
 - sichere Metadaten per `public_dict()` bereitstellen
-- Agent-Router dynamisch einbinden
-- Runtime-Service-Objekte finden
+- Agent-Router dynamisch und edition-gefiltert einbinden
+- Runtime-Service-Objekte nur fuer erlaubte Agenten finden
 - Agent-Control-Adapter per `get_agent_control(agent_id)` bereitstellen
 
 Aktuell gilt:
 
-- Agent-Router werden eingebunden, wenn ein `route_module` vorhanden ist. Runtime-Disabled darf APIs nicht entfernen, weil sonst Enable/Status-Endpunkte nicht erreichbar waeren.
+- Agent-Router werden eingebunden, wenn ein `route_module` vorhanden ist und der Agent in der aktiven Edition erlaubt ist. Runtime-Disabled darf APIs innerhalb der Edition nicht entfernen, weil sonst Enable/Status-Endpunkte nicht erreichbar waeren.
 - `agent_runtime_services()` startet Scheduler/Runtime-Dienste nur fuer aktivierte Agenten.
 - `get_agent_control(agent_id)` kann ein Service-Objekt ueber `runtime.service_object` finden, wenn `route_module` importierbar ist.
 - Die Registry speichert keinen Runtime-State und nutzt keine eigene Datenbank.
+
+
+# Edition Runtime
+
+Editionen sind additive Deployment-Zuschnitte innerhalb desselben Repos.
+
+Dateien:
+
+```text
+agent-api/editions/personal.yaml
+agent-api/editions/seniorcare.yaml
+agent-api/backend/editions.py
+agent-api/tools/build_edition.py
+```
+
+Eine Edition beschreibt:
+
+- `name`
+- `description`
+- `enabled_agents`
+- `enabled_core_services`
+- `frontend_app`
+- `include_frontend`
+- `include_data`
+- `include_files`
+- `exclude_files`
+- `config_template`
+
+Runtime-Fallback:
+
+1. `ROBOTERSTEVE_EDITION`
+2. `config.yaml -> edition.name`
+3. `personal`
+
+Edition-Auswirkungen:
+
+- `discover_agent_manifests()` liefert nur Agenten der aktiven Edition.
+- `include_agent_routers(app)` bindet nur erlaubte Agent-Router ein.
+- `agent_runtime_services()` startet nur erlaubte Runtime-Services.
+- `/api/agents` und `/api/orchestrator/map` zeigen nur erlaubte Agenten.
+- Core-Router in `backend/main.py` werden anhand `enabled_core_services` lazy eingebunden.
+- Der Scheduler liest Manifest-Default-Tasks nur fuer Agenten der aktiven Edition.
+- Edition-Builds enthalten `editions/edition.lock`; in diesem Build-Kontext gibt es keinen stillen Fallback auf `personal`.
+
+Build-Ausgaben entstehen unter:
+
+```text
+agent-api/build/<edition>/
+```
+
+Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache__/`, `venv/`, `.venv/`, `node_modules/`, `.DS_Store`.
 
 # Agent-Control-Vertrag
 
@@ -913,6 +982,62 @@ Wichtige Agent Discovery:
 ```text
 GET /api/agents
 ```
+
+
+# Frontend Multi-App-Struktur
+
+Frontend-Technologie:
+
+- React
+- Vite
+- TypeScript
+- React Flow fuer Agent Map
+
+Struktur:
+
+```text
+frontend/src/
+├── main.tsx
+├── shared/
+│   ├── api/
+│   ├── auth/
+│   ├── components/
+│   ├── styles/
+│   ├── types/
+│   └── utils/
+└── apps/
+    ├── personal/
+    │   ├── main.tsx
+    │   ├── App.tsx
+    │   ├── pages/
+    │   ├── components/
+    │   └── routes/
+    └── seniorcare/
+        ├── main.tsx
+        ├── App.tsx
+        ├── pages/
+        ├── components/
+        ├── routes/
+        └── navigation/
+```
+
+`frontend/src/main.tsx` waehlt die App ueber `VITE_ROBOTERSTEVE_EDITION`:
+
+- `personal`: bisherige private App mit Agent Console, Invoice, Market, MyWellness, Vacation, Scheduler, Wall Dashboard und Settings.
+- `seniorcare`: eigene Produkt-App mit Placeholder-Seiten fuer Setup, Dashboard, Sensoren, Kontakte, Hinweise und Einstellungen.
+
+Gemeinsame Bausteine gehoeren nach `src/shared/`. Produktnavigation, Produktseiten und edition-spezifische UI bleiben in `src/apps/<edition>/`. Dadurch muessen spaetere Produkteditionen keine verstreuten Edition-Abfragen in Personal-Komponenten einbauen.
+
+Builds:
+
+```bash
+cd agent-api/frontend
+npm run build
+VITE_ROBOTERSTEVE_EDITION=personal npm run build
+VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
+```
+
+Der Edition Builder setzt `VITE_ROBOTERSTEVE_EDITION` automatisch anhand `frontend_app` der Edition.
 
 # Frontend
 

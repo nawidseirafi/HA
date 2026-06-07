@@ -1,5 +1,5 @@
 vacation:
-  enabled: false
+  enabled: true
   mode_entity: input_boolean.vacation_mode
   calendar_entity: auto
   calendar_keywords:

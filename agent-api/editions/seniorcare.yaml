@@ -1,0 +1,18 @@
+name: seniorcare
+description: SeniorCare Produktedition
+enabled_agents:
+  - scheduler
+  - senior
+enabled_core_services:
+  - auth
+  - settings
+  - messaging
+  - orchestrator
+  - homeassistant
+  - llm
+frontend_app: seniorcare
+include_frontend: true
+include_data: false
+include_files: []
+exclude_files: []
+config_template: seniorcare
