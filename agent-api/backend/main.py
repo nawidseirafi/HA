@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.agents.registry import agent_runtime_services, include_agent_routers
 from backend.agents.routes import router as agents_router
-from backend.editions import is_core_service_enabled
+from backend.editions import active_edition, is_core_service_enabled
 from backend.logging_config import configure_logging
 from backend.paths import FRONTEND_DIST
 from backend.services.auth_service import user_from_request
@@ -50,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_API_PATHS = {"/health", "/api/auth/login"}
+PUBLIC_API_PATHS = {"/health", "/api/auth/login", "/api/edition"}
 
 
 @app.middleware("http")
@@ -83,6 +83,11 @@ app.include_router(agents_router)
 include_core_router("messaging", "backend.services.messaging.routes")
 include_agent_routers(app)
 include_core_router("settings", "backend.api.settings_routes")
+
+
+@app.get("/api/edition")
+def edition_info() -> dict[str, object]:
+    return active_edition().public_dict()
 
 
 SECURITY_SCHEME_NAME = "BearerAuth"

@@ -641,7 +641,7 @@ Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache
 
 ## Frontend Multi-App-Struktur
 
-Das Frontend ist auf mehrere Produkt-Apps vorbereitet. Der gemeinsame Entry Point ist `frontend/src/main.tsx`; die aktive App wird ueber `VITE_ROBOTERSTEVE_EDITION` gewaehlt.
+Das Frontend ist auf mehrere Produkt-Apps vorbereitet. Der gemeinsame Entry Point ist `frontend/src/main.tsx`. Beim FastAPI-Serving liest dieser zuerst `/api/edition` und rendert dadurch die vom Backend aktive Edition. `VITE_ROBOTERSTEVE_EDITION` bleibt der Fallback fuer reinen Vite-Dev oder wenn kein Backend erreichbar ist.
 
 ```text
 frontend/src/
@@ -669,7 +669,7 @@ frontend/src/
         └── navigation/
 ```
 
-Personal ist die bisherige Anwendung mit allen vorhandenen Dashboards, Agent-Ansichten, Wall-Dashboard und Orchestrator-Ansichten. SeniorCare ist eine eigene Placeholder-App mit Setup, Dashboard, Sensoren, Kontakten, Benachrichtigungen und Einstellungen.
+Personal ist die bisherige Anwendung mit allen vorhandenen Dashboards, Agent-Ansichten, Wall-Dashboard und Orchestrator-Ansichten. SeniorCare ist eine eigene Produkt-App mit Dashboard, Senior-Status, Aktivitaeten, Benachrichtigungen, Vertrauenspersonen, Einstellungen und eigener Login-Seite. Technische Personal-Ansichten wie Agent Console, Agent Map, OpenAI, Database und Entwickleransichten werden in SeniorCare nicht geroutet.
 
 Frontend Builds:
 

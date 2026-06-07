@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Bell, HeartHandshake, LayoutDashboard, RadioTower, Settings, UserRoundCheck, Wand2 } from 'lucide-react';
-import { api, type AgentManifest } from '@shared/api/client';
 import { AuthProvider, useAuth } from '@shared/auth/AuthContext';
 import { LoginPage } from './pages/LoginPage';
-import { SetupWizardPage } from './pages/SetupWizardPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { SensorsPage } from './pages/SensorsPage';
+import { SeniorPage } from './pages/SeniorPage';
+import { ActivitiesPage } from './pages/ActivitiesPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -24,18 +23,12 @@ export function App() {
 function SeniorCareContent() {
   const { isAuthenticated, logout } = useAuth();
   const [route, setRoute] = useState<SeniorCareRoute>(parseSeniorCareRoute());
-  const [agents, setAgents] = useState<AgentManifest[]>([]);
 
   useEffect(() => {
     const onPop = () => setRoute(parseSeniorCareRoute());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    api.agents().then(setAgents).catch(() => setAgents([]));
-  }, [isAuthenticated]);
 
   const navigate = (next: SeniorCareRoute) => {
     window.history.pushState({}, '', seniorCareRouteToPath(next));
@@ -50,9 +43,9 @@ function SeniorCareContent() {
     <main className="seniorcare-shell">
       <section className="seniorcare-hero">
         <div>
-          <p className="eyebrow">RoboterSteve SeniorCare</p>
-          <h1>Betreuungsedition vorbereiten</h1>
-          <p>Eine eigenstaendige Produkt-App fuer Betreuung, Sensorik, Kontakte und Hinweise.</p>
+          <p className="eyebrow">SeniorCare</p>
+          <h1>Guten Abend</h1>
+          <p>Ruhiger Ueberblick fuer Alltag, Aktivitaeten, Hinweise und Vertrauenspersonen.</p>
         </div>
         <button type="button" onClick={logout}>Abmelden</button>
       </section>
@@ -74,9 +67,9 @@ function SeniorCareContent() {
         })}
       </nav>
 
-      {route.name === 'setup' && <SetupWizardPage agents={agents} />}
-      {route.name === 'dashboard' && <DashboardPage agents={agents} />}
-      {route.name === 'sensors' && <SensorsPage />}
+      {route.name === 'dashboard' && <DashboardPage />}
+      {route.name === 'senior' && <SeniorPage />}
+      {route.name === 'activities' && <ActivitiesPage />}
       {route.name === 'contacts' && <ContactsPage />}
       {route.name === 'notifications' && <NotificationsPage />}
       {route.name === 'settings' && <SettingsPage />}

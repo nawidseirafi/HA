@@ -4878,11 +4878,12 @@ button.market-insight-card:hover {
 
 .seniorcare-shell {
   min-height: 100vh;
-  padding: 48px;
+  padding: 34px;
   color: #153027;
   background:
-    radial-gradient(circle at 18% 12%, rgba(112, 176, 137, 0.28), transparent 34%),
-    linear-gradient(135deg, #f3efe4 0%, #dce9dd 58%, #b7d3c1 100%);
+    radial-gradient(circle at 12% 10%, rgba(112, 176, 137, 0.28), transparent 32%),
+    radial-gradient(circle at 86% 14%, rgba(238, 176, 118, 0.22), transparent 28%),
+    linear-gradient(135deg, #f6f0e3 0%, #dfeade 58%, #b8d5c1 100%);
 }
 
 .seniorcare-hero {
@@ -4891,7 +4892,7 @@ button.market-insight-card:hover {
   gap: 28px;
   align-items: flex-start;
   max-width: 1120px;
-  margin: 0 auto 28px;
+  margin: 0 auto 18px;
   padding: 36px;
   border: 1px solid rgba(21, 48, 39, 0.16);
   border-radius: 32px;
@@ -4902,8 +4903,8 @@ button.market-insight-card:hover {
 .seniorcare-hero h1 {
   max-width: 760px;
   margin: 0 0 14px;
-  font-size: clamp(2.4rem, 6vw, 5.6rem);
-  line-height: 0.92;
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  line-height: 0.95;
   letter-spacing: -0.07em;
 }
 
@@ -4922,12 +4923,53 @@ button.market-insight-card:hover {
   background: #153027;
 }
 
+.seniorcare-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 1120px;
+  margin: 0 auto 22px;
+}
+
+.seniorcare-nav button {
+  align-items: center;
+  border: 1px solid rgba(21, 48, 39, 0.13);
+  border-radius: 999px;
+  background: rgba(255, 252, 243, 0.58);
+  color: rgba(21, 48, 39, 0.74);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  padding: 11px 14px;
+}
+
+.seniorcare-nav button.active {
+  background: #153027;
+  border-color: #153027;
+  color: #fff8ec;
+}
+
+.seniorcare-page {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.seniorcare-page h2 {
+  font-size: clamp(1.8rem, 3.8vw, 3.4rem);
+  letter-spacing: -0.05em;
+  margin: 6px 0 8px;
+}
+
+.seniorcare-page-lead {
+  color: rgba(21, 48, 39, 0.68);
+  font-size: 1.05rem;
+  margin: 0 0 18px;
+}
+
 .seniorcare-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
-  max-width: 1120px;
-  margin: 0 auto;
 }
 
 .seniorcare-card {
@@ -4937,8 +4979,16 @@ button.market-insight-card:hover {
   border: 1px solid rgba(21, 48, 39, 0.14);
 }
 
+.seniorcare-card.prominent {
+  background: rgba(255, 252, 243, 0.86);
+  box-shadow: 0 18px 50px rgba(25, 64, 49, 0.14);
+}
+
 .seniorcare-card span,
 .seniorcare-shell .eyebrow {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.74rem;
@@ -4946,13 +4996,233 @@ button.market-insight-card:hover {
   color: #49765b;
 }
 
-.seniorcare-card h2 {
+.seniorcare-card h2,
+.seniorcare-card h3 {
   margin: 12px 0 8px;
 }
 
 .seniorcare-card p {
   margin: 0;
   color: rgba(21, 48, 39, 0.68);
+}
+
+.seniorcare-card button,
+.seniorcare-contact-panel button,
+.seniorcare-login-form button {
+  align-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #153027;
+  color: #fff8ec;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 15px;
+}
+
+.seniorcare-status-banner {
+  align-items: center;
+  border-radius: 30px;
+  display: flex;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 26px;
+}
+
+.seniorcare-status-banner.normal {
+  background: linear-gradient(135deg, rgba(40, 139, 86, 0.16), rgba(255, 252, 243, 0.74));
+  border: 1px solid rgba(40, 139, 86, 0.22);
+}
+
+.seniorcare-status-banner.attention {
+  background: linear-gradient(135deg, rgba(200, 89, 58, 0.16), rgba(255, 252, 243, 0.76));
+  border: 1px solid rgba(200, 89, 58, 0.24);
+}
+
+.seniorcare-status-banner > span,
+.seniorcare-metric-card > span,
+.seniorcare-notification > span {
+  align-items: center;
+  background: rgba(255, 252, 243, 0.8);
+  border-radius: 18px;
+  color: #49765b;
+  display: inline-flex;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.seniorcare-status-banner h2,
+.seniorcare-status-banner p {
+  margin: 0;
+}
+
+.seniorcare-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.seniorcare-metric-card,
+.seniorcare-panel,
+.seniorcare-notification {
+  border: 1px solid rgba(21, 48, 39, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 252, 243, 0.66);
+  padding: 20px;
+}
+
+.seniorcare-metric-card {
+  display: grid;
+  gap: 8px;
+}
+
+.seniorcare-metric-card small {
+  color: #49765b;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.seniorcare-metric-card strong {
+  font-size: 1.22rem;
+}
+
+.seniorcare-metric-card p,
+.seniorcare-panel p {
+  color: rgba(21, 48, 39, 0.68);
+  margin: 0;
+}
+
+.seniorcare-two-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 18px;
+}
+
+.seniorcare-timeline {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.seniorcare-timeline li {
+  align-items: center;
+  border-top: 1px solid rgba(21, 48, 39, 0.1);
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.seniorcare-timeline span {
+  color: #49765b;
+  font-weight: 800;
+}
+
+.seniorcare-notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.seniorcare-notification {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.seniorcare-notification strong,
+.seniorcare-notification p {
+  margin: 0;
+}
+
+.seniorcare-notification p {
+  color: rgba(21, 48, 39, 0.68);
+  margin-top: 4px;
+}
+
+.seniorcare-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #153027;
+  background:
+    radial-gradient(circle at 24% 16%, rgba(112, 176, 137, 0.3), transparent 34%),
+    linear-gradient(135deg, #f6f0e3, #cfe0d1);
+}
+
+.seniorcare-login-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1fr);
+  gap: 26px;
+  max-width: 860px;
+  width: 100%;
+  border: 1px solid rgba(21, 48, 39, 0.14);
+  border-radius: 34px;
+  background: rgba(255, 252, 243, 0.76);
+  box-shadow: 0 28px 90px rgba(25, 64, 49, 0.17);
+  padding: 30px;
+}
+
+.seniorcare-login-intro > span {
+  align-items: center;
+  background: #153027;
+  border-radius: 18px;
+  color: #fff8ec;
+  display: inline-flex;
+  height: 54px;
+  justify-content: center;
+  width: 54px;
+}
+
+.seniorcare-login-intro h1 {
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  letter-spacing: -0.06em;
+  line-height: 0.96;
+  margin: 18px 0 12px;
+}
+
+.seniorcare-login-intro p {
+  color: rgba(21, 48, 39, 0.68);
+}
+
+.seniorcare-login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.seniorcare-login-form label {
+  display: grid;
+  gap: 7px;
+  font-weight: 800;
+}
+
+.seniorcare-login-form input {
+  border: 1px solid rgba(21, 48, 39, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 252, 243, 0.86);
+  color: #153027;
+  font: inherit;
+  padding: 13px 14px;
+}
+
+.seniorcare-login-form .seniorcare-remember {
+  align-items: center;
+  display: flex;
+  font-weight: 600;
+}
+
+.seniorcare-login-error {
+  border: 1px solid rgba(200, 89, 58, 0.26);
+  border-radius: 16px;
+  color: #8f3426;
+  background: rgba(200, 89, 58, 0.1);
+  padding: 11px 12px;
 }
 
 @media (max-width: 760px) {
@@ -4965,5 +5235,10 @@ button.market-insight-card:hover {
   }
   .seniorcare-hero button {
     margin-top: 22px;
+  }
+  .seniorcare-overview-grid,
+  .seniorcare-two-column,
+  .seniorcare-login-card {
+    grid-template-columns: 1fr;
   }
 }

@@ -94,6 +94,21 @@ export type AgentsResponse = {
   agents: AgentManifest[];
 };
 
+export type EditionInfo = {
+  name: string;
+  description: string;
+  enabled_agents: string[];
+  enabled_core_services: string[];
+  frontend_app: string;
+};
+
+export type SeniorStatus = {
+  status: string;
+  enabled: boolean;
+  message: string;
+  updated_at: string;
+};
+
 export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard';
 
 export type MyWellnessHealthSettings = {
@@ -981,6 +996,7 @@ async function download(path: string): Promise<{ blob: Blob; filename: string }>
 }
 
 export const api = {
+  edition: () => request<EditionInfo>('/api/edition'),
   login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
@@ -1064,6 +1080,8 @@ export const api = {
     request<SchedulerTask>(`/api/scheduler/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   enableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/enable`, { method: 'POST' }),
   disableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/disable`, { method: 'POST' }),
+  seniorStatus: () => request<SeniorStatus>('/api/senior/status'),
+  runSeniorAgent: () => request<SeniorStatus & { action: string; dry_run: boolean }>('/api/senior/run', { method: 'POST' }),
   summary: () => request<Summary>('/api/invoices/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),
