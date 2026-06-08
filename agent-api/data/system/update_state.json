@@ -3,8 +3,41 @@
     "status": "idle",
     "steps": []
   },
-  "last_check": "2026-06-08T09:23:08+00:00",
-  "latest": null,
+  "last_check": "2026-06-08T13:11:14+00:00",
+  "latest": {
+    "latest_version": "0.1.2",
+    "download_url": "https://seirafi.de/robotersteve/personal/stable/releases/personal-0.1.2.zip",
+    "mandatory": false,
+    "release_notes": [
+      "personal 0.1.2 Release.",
+      "Application-Paket fuer Update Engine V1."
+    ],
+    "channel": "stable",
+    "layers": [
+      "application"
+    ],
+    "components": {
+      "application": {
+        "update": true
+      },
+      "homeassistant": {
+        "update": false
+      },
+      "ollama": {
+        "update": false
+      },
+      "system": {
+        "update": false
+      }
+    },
+    "artifacts": {},
+    "minimum_version": "0.1.0",
+    "sha256": "4a0def6292297d11119107bd4323595bfb4b38f0717e1abca1f5b922ddeb57ec",
+    "size_bytes": 678048,
+    "product": "personal",
+    "source": "manifest_url",
+    "manifest_url": "https://seirafi.de/robotersteve/personal/stable/releases/latest.json"
+  },
   "update_available": false,
-  "last_error": "Update-Manifest nicht erreichbar: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
+  "last_error": null
 }

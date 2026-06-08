@@ -1,28 +1,19 @@
-import { Bell, Home, ShieldCheck } from 'lucide-react';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
+import { InsightCard } from '../components/Cards';
 
 export function SettingsPage() {
   return (
-    <section className="seniorcare-page">
-      <p className="eyebrow">Einstellungen</p>
-      <h2>SeniorCare einrichten</h2>
-      <p className="seniorcare-page-lead">Nur produktrelevante Einstellungen fuer Betreuung und Alltagssignale.</p>
-      <div className="seniorcare-card-grid">
-        <article className="seniorcare-card">
-          <span><Home size={18} /> Zuhause</span>
-          <h3>Home Assistant</h3>
-          <p>Sensoren, Tueren und Aktivitaetssignale verbinden.</p>
-        </article>
-        <article className="seniorcare-card">
-          <span><Bell size={18} /> Hinweise</span>
-          <h3>Benachrichtigungen</h3>
-          <p>Regeln und Eskalationen fuer Vertrauenspersonen festlegen.</p>
-        </article>
-        <article className="seniorcare-card">
-          <span><ShieldCheck size={18} /> Sicherheit</span>
-          <h3>Zugang</h3>
-          <p>Benutzerzugang und sichere Anmeldung verwalten.</p>
-        </article>
+    <section className="sc-page">
+      <div className="sc-hero-copy">
+        <p className="sc-kicker">Einstellungen</p>
+        <h1>SeniorCare anpassen.</h1>
+        <p>Nur das, was fuer Familie, Zuhause und Vertrauen wichtig ist.</p>
+      </div>
+      <div className="sc-card-stack">
+        <InsightCard title="Senior Profil" text="Name, Tagesrhythmus und vertraute Routinen behutsam pflegen." />
+        <InsightCard title="Benachrichtigungen" text="Festlegen, welche Hinweise wirklich wichtig sind." />
+        <InsightCard title="Zuhause" text="Raeume und Gewohnheiten so beschreiben, wie Angehoerige sie verstehen." />
+        <InsightCard title="Datenschutz" text="Daten sparsam nutzen und transparent halten." />
       </div>
       <UpdatePanel variant="seniorcare" />
     </section>

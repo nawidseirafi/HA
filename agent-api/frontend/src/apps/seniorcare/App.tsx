@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Bell, HeartHandshake, LayoutDashboard, RadioTower, Settings, UserRoundCheck, Wand2 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@shared/auth/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { SeniorPage } from './pages/SeniorPage';
-import { ActivitiesPage } from './pages/ActivitiesPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { RoomsPage } from './pages/RoomsPage';
 import { ContactsPage } from './pages/ContactsPage';
-import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
-import type { SeniorCareRoute } from './routes/routes';
+import { SetupWizardPage } from './pages/SetupWizardPage';
+import { SeniorCareShell } from './components/SeniorCareShell';
+import type { SeniorCareRoute, SeniorCareRouteName } from './routes/routes';
 import { parseSeniorCareRoute, seniorCareRouteToPath } from './routes/routes';
-import { seniorCareNavigation } from './navigation/navigation';
+import './styles/seniorcare.css';
 
 export function App() {
   return (
@@ -30,7 +30,8 @@ function SeniorCareContent() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const navigate = (next: SeniorCareRoute) => {
+  const navigate = (name: SeniorCareRouteName) => {
+    const next = { name } as SeniorCareRoute;
     window.history.pushState({}, '', seniorCareRouteToPath(next));
     setRoute(next);
   };
@@ -40,49 +41,13 @@ function SeniorCareContent() {
   }
 
   return (
-    <main className="seniorcare-shell">
-      <section className="seniorcare-hero">
-        <div>
-          <p className="eyebrow">SeniorCare</p>
-          <h1>Guten Abend</h1>
-          <p>Ruhiger Ueberblick fuer Alltag, Aktivitaeten, Hinweise und Vertrauenspersonen.</p>
-        </div>
-        <button type="button" onClick={logout}>Abmelden</button>
-      </section>
-
-      <nav className="seniorcare-nav" aria-label="SeniorCare Navigation">
-        {seniorCareNavigation.map((item) => {
-          const Icon = iconMap[item.icon] ?? LayoutDashboard;
-          return (
-            <button
-              key={item.route}
-              className={route.name === item.route ? 'active' : ''}
-              type="button"
-              onClick={() => navigate({ name: item.route })}
-            >
-              <Icon size={18} />
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-
+    <SeniorCareShell route={route.name} onNavigate={navigate} onLogout={logout}>
+      {route.name === 'setup' && <SetupWizardPage onFinish={() => navigate('dashboard')} />}
       {route.name === 'dashboard' && <DashboardPage />}
-      {route.name === 'senior' && <SeniorPage />}
-      {route.name === 'activities' && <ActivitiesPage />}
+      {route.name === 'history' && <HistoryPage />}
+      {route.name === 'rooms' && <RoomsPage />}
       {route.name === 'contacts' && <ContactsPage />}
-      {route.name === 'notifications' && <NotificationsPage />}
       {route.name === 'settings' && <SettingsPage />}
-    </main>
+    </SeniorCareShell>
   );
 }
-
-const iconMap: Record<string, typeof LayoutDashboard> = {
-  Wand2,
-  LayoutDashboard,
-  RadioTower,
-  UserRoundCheck,
-  Bell,
-  Settings,
-  HeartHandshake,
-};
