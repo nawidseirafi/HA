@@ -106,7 +106,7 @@ UPDATE_MANIFEST_PUBLIC_KEY=/opt/seniorcare/keys/update-public.pem
 Der Builder kann signieren:
 
 ```bash
-UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --zip --base-url https://seirafi.de/robotersteve
+UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 ## ZIP-Inhalt
@@ -213,16 +213,22 @@ SeniorCare ZIP-Release bauen:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --zip --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Erzeugt:
 
 ```text
-build/seniorcare/
-dist/seniorcare/stable/latest.json
-dist/seniorcare/stable/releases/seniorcare-0.2.0.zip
+build/seniorcare/                              # normales installierbares Deployment-Paket
+build/updates/seniorcare/stable/latest.json             # Upload auf HTTPS-Update-Server
+build/updates/seniorcare/stable/deployment-manifest.json # Upload auf HTTPS-Update-Server
+build/updates/seniorcare/stable/releases/seniorcare-0.2.0.zip
 ```
+
+Der Edition Builder erzeugt standardmaessig beide Varianten unter `build/`.
+`build/<edition>/` ist das normale lokale Deployment-Paket.
+`build/updates/<edition>/stable/` ist der Upload-Ordner fuer den statischen Update-Server.
+`--zip` wird aus Kompatibilitaet weiter akzeptiert, ist aber nicht mehr notwendig.
 
 Diese Struktur kann direkt auf den HTTPS-Server hochgeladen werden:
 
@@ -238,7 +244,12 @@ robotersteve/
 Personal bleibt moeglich:
 
 ```bash
-../venv/bin/python tools/build_edition.py personal --version 0.2.0 --zip --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py personal --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Personal nutzt weiterhin `UPDATE_EXECUTION_MODE=local` und kein Docker.
+Wenn ausnahmsweise nur das lokale Deployment ohne Update-Paket gebaut werden soll:
+
+```bash
+../venv/bin/python tools/build_edition.py personal --no-update
+```

@@ -623,6 +623,9 @@ cd agent-api
 ../venv/bin/python tools/build_edition.py seniorcare
 ```
 
+Diese Standard-Builds erzeugen beide Varianten unter `build/`:
+das normale Deployment-Paket unter `build/<edition>/` und die Update-Server-Dateien unter `build/updates/<edition>/stable/`.
+
 Ergebnis je Edition:
 
 ```text
@@ -636,6 +639,20 @@ build/<edition>/
 ```
 
 `personal` ist fuer normales Python/systemd-Deployment vorgesehen und enthaelt bewusst keine `docker-compose.yml`. `seniorcare` enthaelt zusaetzlich eine einfache `docker-compose.yml`.
+
+Build mit expliziter Version und Update-Server-URL:
+
+```bash
+../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+```
+
+Ergebnis:
+
+```text
+build/seniorcare/                         # normales Installations-/Deployment-Paket
+build/updates/seniorcare/stable/latest.json        # Upload auf HTTPS-Update-Server
+build/updates/seniorcare/stable/releases/*.zip     # Upload auf HTTPS-Update-Server
+```
 
 Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache__/`, `venv/`, `.venv/`, `node_modules/`, `.DS_Store`.
 

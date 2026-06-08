@@ -114,16 +114,62 @@ class AgentControlAdapter:
         return status() if callable(status) else {}
 
     def _status_from_data(self, data: dict[str, Any]) -> str:
-        nested = data.get("data") if isinstance(data.get("data"), dict) else {}
-        raw = (
-            data.get("status")
-            or data.get("current_status")
-            or data.get("last_status")
-            or nested.get("status")
-        )
         if data.get("is_running") is True:
             return "running"
-        text = str(raw or "").lower()
+
+        for raw in self._status_candidates(data):
+            status = self._normalize_status(raw)
+            if status:
+                return status
+        return "active"
+
+    def _status_candidates(self, data: dict[str, Any]) -> list[Any]:
+        candidates: list[Any] = []
+
+        # A run result is authoritative for the just executed action. Some
+        # agents additionally return a full status snapshot that may contain
+        # stale last_error values from previous runs.
+        result = data.get("result")
+        if isinstance(result, dict):
+            candidates.extend((result.get("status"), result.get("current_status"), result.get("last_status")))
+            if "ok" in result:
+                candidates.append(result.get("ok"))
+
+        status = data.get("status")
+        candidates.extend((data.get("current_status"), data.get("last_status")))
+        if isinstance(status, dict):
+            candidates.extend((status.get("status"), status.get("current_status"), status.get("last_status")))
+            if status.get("is_running") is True:
+                candidates.append("running")
+        else:
+            candidates.append(status)
+
+        nested = data.get("data") if isinstance(data.get("data"), dict) else {}
+        if nested:
+            nested_status = nested.get("status")
+            candidates.extend((nested.get("current_status"), nested.get("last_status")))
+            if isinstance(nested_status, dict):
+                candidates.extend(
+                    (
+                        nested_status.get("status"),
+                        nested_status.get("current_status"),
+                        nested_status.get("last_status"),
+                    )
+                )
+            else:
+                candidates.append(nested_status)
+        return candidates
+
+    def _normalize_status(self, raw: Any) -> str:
+        if raw is None:
+            return ""
+        if isinstance(raw, bool):
+            return "active" if raw else "error"
+        text = str(raw or "").strip().lower()
+        if not text:
+            return ""
+        if text in {"unsupported"}:
+            return "unsupported"
         if "error" in text or "failed" in text:
             return "error"
         if "running" in text:
@@ -132,13 +178,16 @@ class AgentControlAdapter:
             return "disabled"
         if "pause" in text:
             return "paused"
-        if text in {"ok", "completed", "enabled", "active", "idle", "ready"}:
+        if text in {"ok", "completed", "success", "succeeded", "enabled", "active", "idle", "ready", "configured"}:
             return "active"
-        return text or "active"
+        return text
 
     def _message(self, action: AgentControlCapability, ok: bool, data: dict[str, Any]) -> str:
         if isinstance(data.get("message"), str):
             return str(data["message"])
+        result = data.get("result")
+        if isinstance(result, dict) and isinstance(result.get("message"), str):
+            return str(result["message"])
         if ok:
             return f"Agent {action} ausgefuehrt."
         return f"Agent {action} fehlgeschlagen."

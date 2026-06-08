@@ -18,6 +18,7 @@ import yaml
 
 API_DIR = Path(__file__).resolve().parents[1]
 BUILD_DIR = API_DIR / "build"
+UPDATE_BUILD_DIR = BUILD_DIR / "updates"
 BACKEND_DIR = API_DIR / "backend"
 FRONTEND_DIR = API_DIR / "frontend"
 EDITIONS_DIR = API_DIR / "editions"
@@ -79,8 +80,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build a RoboterSteve edition")
     parser.add_argument("edition")
     parser.add_argument("--version", dest="version", default="")
-    parser.add_argument("--zip", dest="zip_release", action="store_true")
+    parser.add_argument("--zip", dest="zip_release", action="store_true", help="Deprecated: update ZIP artifacts are created by default")
+    parser.add_argument("--no-update", dest="create_update", action="store_false", help="Only create build/<edition> without update-server artifacts")
     parser.add_argument("--base-url", dest="base_url", default=os.environ.get("UPDATE_RELEASE_BASE_URL", ""))
+    parser.set_defaults(create_update=True)
     args = parser.parse_args()
 
     edition_name = args.edition.strip()
@@ -90,6 +93,7 @@ def main() -> int:
 
     if target.exists():
         shutil.rmtree(target)
+    cleanup_legacy_release_dir(edition_name)
     target.mkdir(parents=True)
 
     copy_backend(edition, target)
@@ -103,9 +107,15 @@ def main() -> int:
     write_docker_compose(edition, target)
     write_dockerfile(edition, target)
     write_readme(edition, target)
-    create_release_artifacts(edition, target, version_override=version_override, base_url=args.base_url.strip())
+    write_deployment_manifest(edition, target, version_override=version_override)
+    if args.create_update:
+        create_release_artifacts(edition, target, version_override=version_override, base_url=args.base_url.strip())
 
     print(f"Built edition '{edition_name}' in {target}")
+    if args.create_update:
+        print(f"Update server files: {UPDATE_BUILD_DIR / edition_name / 'stable'}")
+    else:
+        print("No update ZIP generated because --no-update was used.")
     return 0
 
 
@@ -122,6 +132,21 @@ def load_edition(name: str) -> dict[str, Any]:
     data.setdefault("include_frontend", True)
     data.setdefault("include_data", False)
     return data
+
+
+def cleanup_legacy_release_dir(edition_name: str) -> None:
+    legacy_release_dir = BUILD_DIR / "releases" / edition_name
+    if legacy_release_dir.exists():
+        shutil.rmtree(legacy_release_dir)
+    parent = BUILD_DIR / "releases"
+    if parent.exists() and not any(parent.iterdir()):
+        parent.rmdir()
+    legacy_dist_dir = API_DIR / "dist" / edition_name
+    if legacy_dist_dir.exists():
+        shutil.rmtree(legacy_dist_dir)
+    legacy_dist_parent = API_DIR / "dist"
+    if legacy_dist_parent.exists() and not any(legacy_dist_parent.iterdir()):
+        legacy_dist_parent.rmdir()
 
 
 def copy_backend(edition: dict[str, Any], target: Path) -> None:
@@ -476,16 +501,31 @@ Der Update-Mechanismus lädt ein Release-ZIP, stoppt die Container, aktualisiert
     (target / "README.md").write_text(text, encoding="utf-8")
 
 
+def write_deployment_manifest(edition: dict[str, Any], target: Path, version_override: str = "") -> None:
+    name = str(edition.get("name") or target.name)
+    version = version_override or read_version_metadata().get("version", "0.1.0")
+    manifest = deployment_manifest(edition, target, version, f"{name}-{version}.zip", include_artifact=False)
+    (target / "deployment-manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def create_release_artifacts(edition: dict[str, Any], target: Path, version_override: str = "", base_url: str = "") -> None:
     name = str(edition.get("name") or target.name)
     version = version_override or read_version_metadata().get("version", "0.1.0")
-    release_dir = BUILD_DIR / "releases" / name
-    dist_release_dir = API_DIR / "dist" / name / "stable"
-    dist_zip_dir = dist_release_dir / "releases"
-    release_dir.mkdir(parents=True, exist_ok=True)
-    dist_zip_dir.mkdir(parents=True, exist_ok=True)
+    legacy_release_dir = BUILD_DIR / "releases" / name
+    update_release_dir = UPDATE_BUILD_DIR / name / "stable"
+    update_zip_dir = update_release_dir / "releases"
+
+    if legacy_release_dir.exists():
+        shutil.rmtree(legacy_release_dir)
+    legacy_dist_dir = API_DIR / "dist" / name
+    if legacy_dist_dir.exists():
+        shutil.rmtree(legacy_dist_dir)
+    if update_release_dir.exists():
+        shutil.rmtree(update_release_dir)
+    update_zip_dir.mkdir(parents=True, exist_ok=True)
+
     zip_name = f"{name}-{version}.zip"
-    zip_path = release_dir / zip_name
+    zip_path = update_zip_dir / zip_name
     embedded_manifest = deployment_manifest(edition, target, version, zip_name, include_artifact=False)
     (target / "deployment-manifest.json").write_text(json.dumps(embedded_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -506,15 +546,11 @@ def create_release_artifacts(edition: dict[str, Any], target: Path, version_over
         download_url=release_download_url(name, version, zip_name, base_url),
     )
     latest_manifest = update_latest_manifest(name, version, external_manifest)
-    (release_dir / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (release_dir / "latest.json").write_text(json.dumps(latest_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (target / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    shutil.copy2(zip_path, dist_zip_dir / zip_name)
-    (dist_release_dir / "latest.json").write_text(json.dumps(latest_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (dist_release_dir / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (update_release_dir / "latest.json").write_text(json.dumps(latest_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (update_release_dir / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Release ZIP: {zip_path}")
-    print(f"Update manifest: {release_dir / 'latest.json'}")
-    print(f"Static update server files: {dist_release_dir}")
+    print(f"Update manifest: {update_release_dir / 'latest.json'}")
 
 
 def read_version_metadata() -> dict[str, Any]:

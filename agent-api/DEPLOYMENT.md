@@ -47,6 +47,9 @@ sudo ufw allow 5353/udp
 
 Der aktuelle Standard ist ein Edition-Build. Dadurch wird nur der fuer die Edition erlaubte Backend-/Agent-Code plus das passende Frontend gebaut. Private Daten, Logs, `.env`, Datenbanken, `node_modules`, `venv` und `__pycache__` werden nicht kopiert.
 
+Der Edition Builder erzeugt beide Varianten unter `build/`:
+das normale Deployment-Paket unter `build/<edition>/` und die Update-Server-Dateien unter `build/updates/<edition>/stable/`.
+
 Auf dem Entwicklungsrechner:
 
 ```bash
@@ -279,6 +282,20 @@ Hinweis: `personal` enthaelt keine `docker-compose.yml`; `seniorcare` enthaelt e
 
 Diese Build-Verzeichnisse enthalten keine privaten Datenbanken, Logs, `.env`, `node_modules`, `venv` oder `__pycache__`.
 
+Update-Server-Artefakte werden parallel erzeugt:
+
+```bash
+../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+```
+
+Dann gilt:
+
+```text
+agent-api/build/seniorcare/                       # normales Deployment-Paket
+agent-api/build/updates/seniorcare/stable/latest.json      # Upload auf HTTPS-Server
+agent-api/build/updates/seniorcare/stable/releases/*.zip   # Upload auf HTTPS-Server
+```
+
 Deployment eines Edition-Builds:
 
 ```bash
@@ -475,15 +492,18 @@ Auf dem Entwicklungsrechner:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --zip --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Ergebnis fuer den HTTPS-Update-Server:
 
 ```text
-dist/seniorcare/stable/latest.json
-dist/seniorcare/stable/releases/seniorcare-0.2.0.zip
+build/updates/seniorcare/stable/latest.json
+build/updates/seniorcare/stable/deployment-manifest.json
+build/updates/seniorcare/stable/releases/seniorcare-0.2.0.zip
 ```
+
+`build/seniorcare/` ist parallel das normale installierbare Deployment-Verzeichnis. Es ist nicht der Upload-Ordner fuer den Update-Server.
 
 Upload-Struktur:
 
