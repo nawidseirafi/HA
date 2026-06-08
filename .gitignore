@@ -17,3 +17,4 @@ HA/secrets.yaml
 /agent-api/data/mywellness/
 /agent-api/data/vacation/
 /agent-api/build/
+/agent-api/data/

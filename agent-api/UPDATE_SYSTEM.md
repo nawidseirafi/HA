@@ -105,6 +105,36 @@ UPDATE_EXECUTION_MODE=local
 
 `sha256` ist fuer ZIP-Installation Pflicht. ZIP-Dateien ohne passende Pruefsumme werden nicht installiert.
 
+## Release Build
+
+Der Edition-Builder erzeugt neben `build/<edition>/` automatisch Release-Artefakte:
+
+```text
+build/
+├── personal/
+│   └── deployment-manifest.json
+└── releases/
+    └── personal/
+        ├── personal-0.1.0.zip
+        ├── latest.json
+        └── deployment-manifest.json
+```
+
+Aufruf:
+
+```bash
+python tools/build_edition.py personal
+python tools/build_edition.py seniorcare
+```
+
+`latest.json` ist direkt fuer den statischen Update-Server nutzbar. Die `download_url` wird standardmaessig als Beispiel-URL erzeugt. Fuer echte Releases kann der Basis-Pfad gesetzt werden:
+
+```bash
+UPDATE_RELEASE_BASE_URL=https://updates.example.com/seniorcare/stable/releases python tools/build_edition.py seniorcare
+```
+
+Das ZIP enthaelt ein `deployment-manifest.json`. Die externe `build/releases/<edition>/deployment-manifest.json` enthaelt zusaetzlich SHA256 und Groesse des ZIPs.
+
 Alternativ bleibt der dynamische Kompatibilitaets-Endpunkt moeglich. Wenn `UPDATE_SERVER_URL` gesetzt ist und nicht auf `.json` endet, fragt der Service:
 
 ```text

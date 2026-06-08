@@ -665,17 +665,19 @@ class UpdateService(UpdateConfigMixin):
         latest = technical.get("latest") if isinstance(technical.get("latest"), dict) else None
         install = technical.get("install") if isinstance(technical.get("install"), dict) else {}
         status = str(install.get("status") or technical.get("state") or "idle")
+        last_error = technical.get("last_error")
+        public_status = "check_failed" if status == "idle" and last_error else status
         return {
             "product": self.product_name(),
             "current_version": version.get("app_version") or version.get("version") or DEFAULT_VERSION,
             "latest_version": latest.get("latest_version") if latest else None,
             "update_available": bool(technical.get("update_available", False)),
             "last_checked": technical.get("last_check"),
-            "status": status,
-            "state": status,
+            "status": public_status,
+            "state": public_status,
             "progress": int(technical.get("progress", 0) or 0),
             "current_step": int(technical.get("current_step", 0) or 0),
-            "message": self._public_message(status, bool(technical.get("update_available", False))),
+            "message": self._public_message(public_status, bool(technical.get("update_available", False))),
             "release_notes": latest.get("release_notes", []) if latest else [],
             "steps": self._public_steps(install.get("steps") if isinstance(install.get("steps"), list) else None),
             "dev_mode": self.dev_mode_enabled(),
@@ -725,8 +727,8 @@ class UpdateService(UpdateConfigMixin):
             "latest_version": result.get("latest_version"),
             "update_available": bool(result.get("available")),
             "last_checked": result.get("checked_at"),
-            "status": "idle",
-            "message": self._public_message("idle", bool(result.get("available"))),
+            "status": "idle" if result.get("ok", False) else "check_failed",
+            "message": self._public_message("idle" if result.get("ok", False) else "check_failed", bool(result.get("available"))),
             "release_notes": result.get("release_notes", []),
         }
 
@@ -900,6 +902,8 @@ class UpdateService(UpdateConfigMixin):
             return f"{self.product_name()} wurde erfolgreich aktualisiert."
         if status in {"failed", "error"}:
             return "Das Update konnte nicht vollstaendig installiert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support."
+        if status == "check_failed":
+            return "Die Update-Pruefung konnte nicht abgeschlossen werden. Bitte versuchen Sie es spaeter erneut oder kontaktieren Sie den Support."
         if update_available:
             return f"Eine neue Version von {self.product_name()} ist verfuegbar."
         return "Ihre Installation ist auf dem neuesten Stand."

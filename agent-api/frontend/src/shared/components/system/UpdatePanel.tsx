@@ -194,6 +194,7 @@ function titleForState(state: string, updateAvailable: boolean) {
   if (state === 'running') return 'Update wird installiert';
   if (state === 'success' || state === 'completed') return 'Update erfolgreich';
   if (state === 'failed' || state === 'error') return 'Update fehlgeschlagen';
+  if (state === 'check_failed') return 'Update-Pruefung fehlgeschlagen';
   if (updateAvailable) return 'Update verfuegbar';
   return 'Applikation ist aktuell';
 }
@@ -202,6 +203,7 @@ function textForState(product: string, status: UpdateStatus | null, state: strin
   if (state === 'running') return `${product} wird aktualisiert. Bitte warten Sie, bis der Vorgang abgeschlossen ist.`;
   if (state === 'success' || state === 'completed') return `${product} wurde erfolgreich aktualisiert.`;
   if (state === 'failed' || state === 'error') return 'Das Update konnte nicht vollstaendig installiert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.';
+  if (state === 'check_failed') return status?.message || 'Die Update-Pruefung konnte nicht abgeschlossen werden. Bitte versuchen Sie es spaeter erneut.';
   if (updateAvailable) return `Eine neue Version von ${product} ist verfuegbar.`;
   return status?.message || 'Ihre Installation ist auf dem neuesten Stand.';
 }
@@ -210,6 +212,7 @@ function statusLabel(state: string, updateAvailable: boolean) {
   if (state === 'running') return 'Update laeuft';
   if (state === 'success' || state === 'completed') return 'Aktualisiert';
   if (state === 'failed' || state === 'error') return 'Fehlgeschlagen';
+  if (state === 'check_failed') return 'Pruefung fehlgeschlagen';
   return updateAvailable ? 'Update verfuegbar' : 'Aktuell';
 }
 

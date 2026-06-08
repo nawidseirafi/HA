@@ -3,61 +3,8 @@
     "status": "idle",
     "steps": []
   },
-  "last_check": "2026-06-08T06:43:44+00:00",
-  "latest": {
-    "latest_version": "0.1.0",
-    "download_url": "manifest://personal/stable/0.1.0",
-    "mandatory": false,
-    "release_notes": [
-      "Lokales Update-Manifest fuer Personal.",
-      "Kann spaeter 1:1 durch den Update-Server ersetzt werden."
-    ],
-    "channel": "stable",
-    "layers": [
-      "application",
-      "ai_runtime",
-      "homeassistant",
-      "system"
-    ],
-    "components": {
-      "application": {
-        "update": true
-      },
-      "ollama": {
-        "update": true
-      },
-      "homeassistant": {
-        "update": true
-      },
-      "system": {
-        "update": true
-      }
-    },
-    "artifacts": {
-      "application": {
-        "type": "docker-compose",
-        "compose_file": "docker-compose.yml",
-        "services": [
-          "robotersteve-api"
-        ]
-      },
-      "ai_runtime": {
-        "type": "ollama",
-        "models": []
-      },
-      "homeassistant": {
-        "type": "docker-compose-service",
-        "service": "homeassistant"
-      },
-      "system": {
-        "type": "debian-apt"
-      }
-    },
-    "minimum_version": "0.1.0",
-    "source": "manifest",
-    "manifest_path": "/Users/nawid/Projects/roboterSteve/agent-api/update-manifest.json",
-    "schema_version": 1
-  },
+  "last_check": "2026-06-08T09:23:08+00:00",
+  "latest": null,
   "update_available": false,
-  "last_error": null
+  "last_error": "Update-Manifest nicht erreichbar: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
 }
