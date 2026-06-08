@@ -18,3 +18,4 @@ HA/secrets.yaml
 /agent-api/data/vacation/
 /agent-api/build/
 /agent-api/data/
+/agent-api/dist/

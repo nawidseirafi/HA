@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import os
 import shutil
@@ -75,13 +76,17 @@ ALWAYS_BACKEND_FILES = [
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("Usage: python tools/build_edition.py <edition>", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description="Build a RoboterSteve edition")
+    parser.add_argument("edition")
+    parser.add_argument("--version", dest="version", default="")
+    parser.add_argument("--zip", dest="zip_release", action="store_true")
+    parser.add_argument("--base-url", dest="base_url", default=os.environ.get("UPDATE_RELEASE_BASE_URL", ""))
+    args = parser.parse_args()
 
-    edition_name = sys.argv[1].strip()
+    edition_name = args.edition.strip()
     edition = load_edition(edition_name)
     target = BUILD_DIR / edition_name
+    version_override = args.version.strip()
 
     if target.exists():
         shutil.rmtree(target)
@@ -89,7 +94,7 @@ def main() -> int:
 
     copy_backend(edition, target)
     copy_requirements(target)
-    copy_version_file(target)
+    copy_version_file(target, version_override)
     copy_update_manifest(target)
     copy_edition_files(edition_name, target)
     build_or_copy_frontend(edition, target)
@@ -98,7 +103,7 @@ def main() -> int:
     write_docker_compose(edition, target)
     write_dockerfile(edition, target)
     write_readme(edition, target)
-    create_release_artifacts(edition, target)
+    create_release_artifacts(edition, target, version_override=version_override, base_url=args.base_url.strip())
 
     print(f"Built edition '{edition_name}' in {target}")
     return 0
@@ -146,8 +151,15 @@ def copy_requirements(target: Path) -> None:
     copy_path(API_DIR / "UPDATE_SYSTEM.md", target / "UPDATE_SYSTEM.md")
 
 
-def copy_version_file(target: Path) -> None:
+def copy_version_file(target: Path, version_override: str = "") -> None:
     copy_path(API_DIR / "version.json", target / "version.json")
+    if version_override and (target / "version.json").exists():
+        data = read_version_metadata()
+        data["version"] = version_override
+        data["app_version"] = version_override
+        data["build"] = data.get("build") or datetime.now(timezone.utc).strftime("%Y.%m.%d")
+        data["commit"] = data.get("commit") or "development"
+        (target / "version.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def copy_update_manifest(target: Path) -> None:
@@ -214,7 +226,7 @@ def personal_config_example() -> dict[str, Any]:
             "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
             "execution_mode": "local",
-            "backup_dir": "/opt/roboterSteve/backups",
+            "backup_dir": "/opt/seniorcare/backups",
             "compose_project_dir": ".",
             "compose_file": "docker-compose.yml",
             "healthcheck_url": "http://127.0.0.1:8080/health",
@@ -255,9 +267,10 @@ def seniorcare_config_example() -> dict[str, Any]:
             "server_url": "UPDATE_SERVER_URL",
             "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
-            "execution_mode": "docker",
+            "execution_mode": "zip_docker",
             "backup_dir": "/opt/roboterSteve/backups",
-            "compose_project_dir": "/opt/roboterSteve",
+            "deployment_dir": "/opt/seniorcare",
+            "compose_project_dir": "/opt/seniorcare",
             "compose_file": "docker-compose.yml",
             "healthcheck_url": "http://127.0.0.1:8080/health",
             "services": {
@@ -279,7 +292,7 @@ def seniorcare_config_example() -> dict[str, Any]:
 
 def write_env_example(edition: dict[str, Any], target: Path) -> None:
     name = str(edition.get("name") or "personal")
-    execution_mode = "docker" if name == "seniorcare" else "local"
+    execution_mode = "zip_docker" if name == "seniorcare" else "local"
     lines = [
         f"ROBOTERSTEVE_EDITION={name}",
         "ROBOTERSTEVE_VERSION=0.1.0",
@@ -293,13 +306,14 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "OPENAI_API_KEY=",
         "GEMINI_API_KEY=",
         "UPDATE_SERVER_URL=",
+        "UPDATE_BASE_URL=",
         "UPDATE_MANIFEST_URL=",
         "UPDATE_MANIFEST_PATH=update-manifest.json",
         "UPDATE_CHANNEL=stable",
         f"UPDATE_EXECUTION_MODE={execution_mode}",
-        f"ROBOTERSTEVE_API_IMAGE=robotersteve/{name}-api:latest" if name == "seniorcare" else "ROBOTERSTEVE_API_IMAGE=",
-        "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
-        "UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve" if name == "seniorcare" else "UPDATE_COMPOSE_PROJECT_DIR=.",
+        "ROBOTERSTEVE_BACKUP_DIR=/opt/seniorcare/backups" if name == "seniorcare" else "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
+        "UPDATE_DEPLOYMENT_DIR=/opt/seniorcare" if name == "seniorcare" else "UPDATE_DEPLOYMENT_DIR=.",
+        "UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare" if name == "seniorcare" else "UPDATE_COMPOSE_PROJECT_DIR=.",
         "UPDATE_COMPOSE_FILE=docker-compose.yml",
         "UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health",
         "UPDATE_MANIFEST_PUBLIC_KEY=",
@@ -318,11 +332,11 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
 
     services: dict[str, Any] = {
         "robotersteve-api": {
-            "image": "${ROBOTERSTEVE_API_IMAGE:-robotersteve/seniorcare-api:latest}",
+            "build": ".",
             "restart": "unless-stopped",
             "working_dir": "/app",
             "volumes": [
-                ".:/opt/roboterSteve",
+                ".:/opt/seniorcare",
                 "./config.yaml:/app/config.yaml",
                 "./.env:/app/.env",
                 "./data:/app/data",
@@ -332,8 +346,9 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
             ],
             "env_file": [".env"],
             "environment": {
-                "UPDATE_EXECUTION_MODE": "docker",
-                "UPDATE_COMPOSE_PROJECT_DIR": "/opt/roboterSteve",
+                "UPDATE_EXECUTION_MODE": "zip_docker",
+                "UPDATE_DEPLOYMENT_DIR": "/opt/seniorcare",
+                "UPDATE_COMPOSE_PROJECT_DIR": "/opt/seniorcare",
                 "UPDATE_COMPOSE_FILE": "docker-compose.yml",
             },
             "ports": ["8080:8080"],
@@ -425,13 +440,9 @@ Diese Personal Edition ist fuer ein normales Python/systemd-Deployment vorgesehe
 1. Deployment-Verzeichnis auf dem Zielrechner vorbereiten, z. B. `/opt/roboterSteve`.
 2. `.env.example` nach `.env` kopieren und Werte setzen.
 3. `config.example.yaml` nach `config.yaml` kopieren und anpassen.
-4. API-Image bauen und in eine Registry pushen oder `ROBOTERSTEVE_API_IMAGE` auf ein vorhandenes Image setzen:
+4. Docker Compose lokal bauen und starten:
    ```bash
-   docker build -t robotersteve/seniorcare-api:latest .
-   ```
-5. Docker Compose starten:
-   ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
 
 ## Docker Compose
@@ -443,12 +454,13 @@ docker compose up -d
 Diese Edition ist fuer Docker-basierte Updates vorgesehen.
 
 ```env
-UPDATE_EXECUTION_MODE=docker
-UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve
+UPDATE_EXECUTION_MODE=zip_docker
+UPDATE_DEPLOYMENT_DIR=/opt/seniorcare
+UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare
 UPDATE_COMPOSE_FILE=docker-compose.yml
 ```
 
-Der Update-Mechanismus nutzt `docker compose pull`, `docker compose down` und `docker compose up -d`. Rollback ist nur in diesem Docker-Modus aktiviert.
+Der Update-Mechanismus lädt ein Release-ZIP, stoppt die Container, aktualisiert lokale Dateien und startet mit `docker compose up -d --build`.
 """
 
     text = f"""# RoboterSteve {name} Edition
@@ -461,13 +473,17 @@ Der Update-Mechanismus nutzt `docker compose pull`, `docker compose down` und `d
 {install_section}
 """
     (target / "README_INSTALL.md").write_text(text, encoding="utf-8")
+    (target / "README.md").write_text(text, encoding="utf-8")
 
 
-def create_release_artifacts(edition: dict[str, Any], target: Path) -> None:
+def create_release_artifacts(edition: dict[str, Any], target: Path, version_override: str = "", base_url: str = "") -> None:
     name = str(edition.get("name") or target.name)
-    version = read_version_metadata().get("version", "0.1.0")
+    version = version_override or read_version_metadata().get("version", "0.1.0")
     release_dir = BUILD_DIR / "releases" / name
+    dist_release_dir = API_DIR / "dist" / name / "stable"
+    dist_zip_dir = dist_release_dir / "releases"
     release_dir.mkdir(parents=True, exist_ok=True)
+    dist_zip_dir.mkdir(parents=True, exist_ok=True)
     zip_name = f"{name}-{version}.zip"
     zip_path = release_dir / zip_name
     embedded_manifest = deployment_manifest(edition, target, version, zip_name, include_artifact=False)
@@ -487,14 +503,18 @@ def create_release_artifacts(edition: dict[str, Any], target: Path) -> None:
         include_artifact=True,
         sha256=sha256,
         size_bytes=size_bytes,
-        download_url=release_download_url(name, version, zip_name),
+        download_url=release_download_url(name, version, zip_name, base_url),
     )
     latest_manifest = update_latest_manifest(name, version, external_manifest)
     (release_dir / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (release_dir / "latest.json").write_text(json.dumps(latest_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (target / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    shutil.copy2(zip_path, dist_zip_dir / zip_name)
+    (dist_release_dir / "latest.json").write_text(json.dumps(latest_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (dist_release_dir / "deployment-manifest.json").write_text(json.dumps(external_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Release ZIP: {zip_path}")
     print(f"Update manifest: {release_dir / 'latest.json'}")
+    print(f"Static update server files: {dist_release_dir}")
 
 
 def read_version_metadata() -> dict[str, Any]:
@@ -553,38 +573,28 @@ def deployment_manifest(
 
 def update_latest_manifest(edition_name: str, version: str, deployment: dict[str, Any]) -> dict[str, Any]:
     artifact = deployment["artifact"]
-    docker_based = edition_name == "seniorcare"
     manifest = {
         "schema_version": 1,
         "product": edition_name,
         "latest_version": version,
-        "download_url": "" if docker_based else artifact["download_url"],
+        "download_url": artifact["download_url"],
         "sha256": artifact["sha256"],
         "size_bytes": artifact["size_bytes"],
         "mandatory": False,
         "minimum_version": "0.1.0",
-        "update_strategy": "docker_compose" if docker_based else "zip",
+        "update_strategy": "zip_docker" if edition_name == "seniorcare" else "zip",
         "release_notes": [
             f"{edition_name} {version} Release.",
             "Application-Paket fuer Update Engine V1.",
         ],
         "components": {
             "application": {"update": True},
-            "homeassistant": {"update": docker_based},
-            "ollama": {"update": docker_based},
+            "homeassistant": {"update": False},
+            "ollama": {"update": False},
             "system": {"update": False},
         },
         "deployment_manifest": "deployment-manifest.json",
     }
-    if docker_based:
-        manifest["artifacts"] = {
-            "zip": {
-                "file": artifact["file"],
-                "download_url": artifact["download_url"],
-                "sha256": artifact["sha256"],
-                "size_bytes": artifact["size_bytes"],
-            }
-        }
     signature = sign_manifest_if_configured(manifest)
     if signature:
         manifest["signature"] = signature
@@ -609,10 +619,10 @@ def sign_manifest_if_configured(manifest: dict[str, Any]) -> str:
         return base64.b64encode(signature_path.read_bytes()).decode("ascii")
 
 
-def release_download_url(edition_name: str, version: str, zip_name: str) -> str:
-    base = os.environ.get("UPDATE_RELEASE_BASE_URL", "").strip()
+def release_download_url(edition_name: str, version: str, zip_name: str, base_url: str = "") -> str:
+    base = base_url or os.environ.get("UPDATE_RELEASE_BASE_URL", "").strip()
     if base:
-        return f"{base.rstrip('/')}/{zip_name}"
+        return f"{base.rstrip('/')}/{edition_name}/stable/releases/{zip_name}"
     return f"https://seirafi.de/robotersteve/{edition_name}/stable/releases/{zip_name}"
 
 

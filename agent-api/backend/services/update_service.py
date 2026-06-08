@@ -34,6 +34,36 @@ DEFAULT_VERSION = "0.1.0"
 DEFAULT_CHANNEL = "stable"
 UPDATE_LAYERS = ("application", "ai_runtime", "homeassistant", "system")
 VALID_CHANNELS = {"stable", "beta", "dev"}
+ZIP_DOCKER_COPY_NAMES = {
+    "backend",
+    "frontend",
+    "requirements.txt",
+    "Dockerfile",
+    "docker-compose.yml",
+    "version.json",
+    "update-manifest.json",
+    "README.md",
+    "README_INSTALL.md",
+}
+ZIP_DOCKER_REQUIRED_NAMES = {
+    "backend",
+    "requirements.txt",
+    "Dockerfile",
+    "docker-compose.yml",
+    "version.json",
+}
+NEVER_OVERWRITE_NAMES = {
+    ".env",
+    "config.yaml",
+    "data",
+    "logs",
+    "backups",
+    "tmp",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "node_modules",
+}
 STEP_PENDING = "pending"
 STEP_RUNNING = "running"
 STEP_SUCCESS = "success"
@@ -99,7 +129,11 @@ class UpdateConfigMixin:
     def execution_mode(self) -> str:
         update_config = self._update_config()
         mode = str(self._env("UPDATE_EXECUTION_MODE") or update_config.get("execution_mode") or "dry_run").strip().lower()
-        return mode if mode in {"docker", "local"} else "dry_run"
+        return mode if mode in {"dry_run", "local", "zip_docker"} else "dry_run"
+
+    def update_base_url(self) -> str:
+        update_config = self._update_config()
+        return str(self._env("UPDATE_BASE_URL") or update_config.get("base_url") or "").strip()
 
     def update_server_url(self) -> str:
         update_config = self._update_config()
@@ -123,6 +157,18 @@ class UpdateConfigMixin:
         if raw:
             path = Path(str(raw)).expanduser()
             return path if path.is_absolute() else self.paths.api_dir / path
+        if self.execution_mode() == "zip_docker":
+            return self.deployment_dir()
+        return self.paths.api_dir
+
+    def deployment_dir(self) -> Path:
+        update_config = self._update_config()
+        raw = self._env("UPDATE_DEPLOYMENT_DIR") or update_config.get("deployment_dir")
+        if raw:
+            path = Path(str(raw)).expanduser()
+            return path if path.is_absolute() else self.paths.api_dir / path
+        if self.execution_mode() == "zip_docker":
+            return Path("/opt") / active_edition().name
         return self.paths.api_dir
 
     def compose_file(self) -> Path:
@@ -149,6 +195,8 @@ class UpdateConfigMixin:
         raw = self._env("ROBOTERSTEVE_BACKUP_DIR") or update_config.get("backup_dir")
         if raw:
             return Path(str(raw)).expanduser()
+        if self.execution_mode() == "zip_docker":
+            return self.deployment_dir() / "backups"
         if self.paths.backup_dir is not None:
             return self.paths.backup_dir
         return DEFAULT_BACKUP_DIR
@@ -279,6 +327,13 @@ class UpdateCheckService(UpdateConfigMixin):
             latest = self._fetch_static_manifest(manifest_url, channel, current)
             latest["source"] = "manifest_url"
             latest["manifest_url"] = manifest_url
+            return latest
+        base_url = self.update_base_url()
+        if base_url:
+            url = f"{base_url.rstrip('/')}/{active_edition().name}/{channel}/latest.json"
+            latest = self._fetch_static_manifest(url, channel, current)
+            latest["source"] = "base_url"
+            latest["manifest_url"] = url
             return latest
         server_url = self.update_server_url()
         if not server_url:
@@ -487,13 +542,13 @@ class BackupEngine(UpdateConfigMixin):
         return backups[0] if backups else None
 
     def restore_latest_backup(self) -> dict[str, Any]:
-        if self.execution_mode() != "docker":
-            raise RuntimeError("Rollback ist nur fuer Docker-basierte Deployments aktiviert.")
+        if self.execution_mode() != "zip_docker":
+            raise RuntimeError("Rollback ist nur fuer ZIP-Docker-Deployments aktiviert.")
         backup = self.latest_backup()
         if backup is None:
             raise RuntimeError("Kein Backup fuer Rollback vorhanden.")
         with tarfile.open(backup, "r:gz") as archive:
-            self._safe_extract(archive, self.paths.api_dir)
+            self._safe_extract(archive, self.deployment_dir())
         return {"status": "restored", "backup": str(backup)}
 
     def _safe_extract(self, archive: tarfile.TarFile, target: Path) -> None:
@@ -505,6 +560,17 @@ class BackupEngine(UpdateConfigMixin):
         archive.extractall(target_root)
 
     def _backup_sources(self) -> list[Path]:
+        if self.execution_mode() == "zip_docker":
+            root = self.deployment_dir()
+            return [
+                root / "config.yaml",
+                root / ".env",
+                root / "data",
+                root / "settings",
+                root / "editions",
+                root / "version.json",
+                root / "docker-compose.yml",
+            ]
         return [
             self.paths.api_dir / "config",
             self.paths.config_path,
@@ -526,6 +592,10 @@ class BackupEngine(UpdateConfigMixin):
                 archive.add(child, arcname=self._arcname(child))
 
     def _arcname(self, path: Path) -> str:
+        try:
+            return str(path.relative_to(self.deployment_dir()))
+        except ValueError:
+            pass
         try:
             return str(path.relative_to(self.paths.api_dir))
         except ValueError:
@@ -643,6 +713,126 @@ class ApplicationZipInstaller(UpdateConfigMixin):
         return path.suffix in self.NEVER_OVERWRITE_SUFFIXES
 
 
+class ZipDockerInstaller(UpdateConfigMixin):
+    def install(self, latest: dict[str, Any]) -> dict[str, Any]:
+        if self.execution_mode() == "dry_run":
+            return {"status": "skipped", "reason": "dry_run", "download_url": latest.get("download_url")}
+        if self.execution_mode() != "zip_docker":
+            raise RuntimeError("ZIP-Docker-Update ist nur mit UPDATE_EXECUTION_MODE=zip_docker erlaubt.")
+
+        deployment_dir = self.deployment_dir()
+        deployment_dir.mkdir(parents=True, exist_ok=True)
+        version = str(latest.get("latest_version") or "unknown")
+        tmp_root = deployment_dir / "tmp" / f"update-{version}"
+        if tmp_root.exists():
+            shutil.rmtree(tmp_root)
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        zip_path = tmp_root / "release.zip"
+        extract_dir = tmp_root / "extract"
+        try:
+            self._download(str(latest.get("download_url") or ""), zip_path)
+            actual_sha256 = self._verify_sha256(zip_path, str(latest.get("sha256") or "").strip().lower())
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            ApplicationZipInstaller(self.paths)._safe_extract_zip(zip_path, extract_dir)
+            source_root = ApplicationZipInstaller(self.paths)._payload_root(extract_dir)
+            self._validate_payload(source_root)
+            compose = ComposeCommandResolver(self.paths).resolve()
+            stop = self._run_command(compose + ["down"])
+            copied = self._copy_payload(source_root, deployment_dir)
+            start = self._run_command(compose + ["up", "-d", "--build"])
+            health = self._healthcheck()
+            return {
+                "status": "installed",
+                "strategy": "zip_docker",
+                "download_url": latest.get("download_url"),
+                "sha256": actual_sha256,
+                "files_copied": copied,
+                "stop": stop,
+                "start": start,
+                "health": health,
+            }
+        except Exception:
+            self._attempt_restore()
+            raise
+        finally:
+            shutil.rmtree(tmp_root, ignore_errors=True)
+
+    def rollback(self) -> dict[str, Any]:
+        compose = ComposeCommandResolver(self.paths).resolve()
+        stop = self._run_command(compose + ["down"])
+        restore = BackupEngine(self.paths).restore_latest_backup()
+        start = self._run_command(compose + ["up", "-d", "--build"])
+        health = self._healthcheck(allow_failure=True)
+        return {"stop": stop, "restore": restore, "start": start, "health": health}
+
+    def _download(self, url: str, target: Path) -> None:
+        if not url:
+            raise RuntimeError("Update-Manifest enthaelt keine download_url.")
+        ApplicationZipInstaller(self.paths)._download(url, target)
+
+    def _verify_sha256(self, path: Path, expected_sha256: str) -> str:
+        actual_sha256 = ApplicationZipInstaller(self.paths)._sha256(path)
+        if not expected_sha256:
+            return actual_sha256
+        if actual_sha256 != expected_sha256:
+            raise RuntimeError("Release-ZIP Pruefsumme ist ungueltig.")
+        return actual_sha256
+
+    def _validate_payload(self, source_root: Path) -> None:
+        missing = sorted(name for name in ZIP_DOCKER_REQUIRED_NAMES if not (source_root / name).exists())
+        if missing:
+            raise RuntimeError(f"Release-ZIP ist unvollstaendig: {', '.join(missing)}")
+
+    def _copy_payload(self, source_root: Path, deployment_dir: Path) -> int:
+        copied = 0
+        for name in ZIP_DOCKER_COPY_NAMES:
+            source = source_root / name
+            if not source.exists() or name in NEVER_OVERWRITE_NAMES:
+                continue
+            destination = deployment_dir / name
+            if destination.exists():
+                if destination.is_dir():
+                    shutil.rmtree(destination)
+                else:
+                    destination.unlink()
+            if source.is_dir():
+                shutil.copytree(source, destination, ignore=_zip_docker_ignore)
+                copied += sum(1 for item in destination.rglob("*") if item.is_file())
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                copied += 1
+        return copied
+
+    def _run_command(self, command: list[str]) -> dict[str, Any]:
+        completed = subprocess.run(command, cwd=self.compose_project_dir(), text=True, capture_output=True, timeout=300, check=False)
+        result = {
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout": (completed.stdout or "")[-4000:],
+            "stderr": (completed.stderr or "")[-4000:],
+        }
+        if completed.returncode != 0:
+            raise RuntimeError(f"Update-Kommando fehlgeschlagen: {' '.join(command)}")
+        return result
+
+    def _healthcheck(self, allow_failure: bool = False) -> dict[str, Any]:
+        url = self.healthcheck_url()
+        try:
+            with urllib.request.urlopen(url, timeout=20) as response:
+                return {"ok": 200 <= int(response.status) < 300, "status": response.status, "url": url}
+        except Exception as exc:
+            if allow_failure:
+                return {"ok": False, "url": url, "error": str(exc)}
+            raise RuntimeError(f"Healthcheck fehlgeschlagen: {exc}") from exc
+
+    def _attempt_restore(self) -> None:
+        try:
+            self.rollback()
+        except Exception:
+            pass
+
+
 class ComposeCommandResolver:
     def __init__(self, paths: UpdatePaths) -> None:
         self.paths = paths
@@ -662,7 +852,7 @@ class ComposeCommandResolver:
 
 class DockerDeploymentGuard(UpdateConfigMixin):
     def validate(self) -> dict[str, Any]:
-        if self.execution_mode() != "docker":
+        if self.execution_mode() != "zip_docker":
             return {"ok": True, "mode": self.execution_mode()}
         compose_file = self.compose_file()
         if not compose_file.exists():
@@ -688,7 +878,7 @@ class UpdateExecutionService(UpdateConfigMixin):
         compose = ComposeCommandResolver(self.paths).resolve()
         services = self.service_names()
         if layer == "application":
-            return [compose + ["pull"], compose + ["down"], compose + ["up", "-d"]]
+            return [compose + ["down"], compose + ["up", "-d", "--build"]]
         if layer == "ai_runtime":
             commands = [compose + ["pull", services["ollama"]], compose + ["up", "-d", services["ollama"]]]
             commands.extend([["docker", "exec", services["ollama"], "ollama", "pull", model] for model in self.ollama_models()])
@@ -704,26 +894,15 @@ class UpdateExecutionService(UpdateConfigMixin):
 
     def rollback_commands(self) -> list[list[str]]:
         compose = ComposeCommandResolver(self.paths).resolve()
-        return [compose + ["down"], compose + ["up", "-d"]]
+        return [compose + ["down"], compose + ["up", "-d", "--build"]]
 
     def _run_commands(self, commands: list[list[str]]) -> list[dict[str, Any]]:
-        if self.execution_mode() == "docker":
-            text = " && ".join(" ".join(_shell_quote(part) for part in command) for command in commands)
-            process = subprocess.Popen(["sh", "-c", f"sleep 2; {text}"], cwd=self.compose_project_dir(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-            return [{"command": command, "status": "started_background", "pid": process.pid} for command in commands]
         return [{"command": command, "status": "skipped", "reason": "dry_run"} for command in commands]
 
 
 class RollbackService(UpdateConfigMixin):
     def rollback(self) -> dict[str, Any]:
-        DockerDeploymentGuard(self.paths).validate()
-        executor = UpdateExecutionService(self.paths)
-        backup = BackupEngine(self.paths)
-        commands = executor.rollback_commands()
-        stop_result = executor._run_commands([commands[0]])
-        restore_result = backup.restore_latest_backup()
-        start_result = executor._run_commands([commands[1]])
-        return {"stop": stop_result, "restore": restore_result, "start": start_result}
+        return ZipDockerInstaller(self.paths).rollback()
 
 
 class UpdateService(UpdateConfigMixin):
@@ -789,6 +968,7 @@ class UpdateService(UpdateConfigMixin):
                 "previous_version": state.get("previous_version"),
             },
             "last_error": state.get("last_error"),
+            "last_error_detail": state.get("last_error_detail"),
             "backup": state.get("backup"),
         }
         return status
@@ -855,17 +1035,27 @@ class UpdateService(UpdateConfigMixin):
             try:
                 self._set_step(state, steps, 0, STEP_SUCCESS, "Vorbereitung abgeschlossen.", 10, "Update wird vorbereitet.")
                 self._set_step(state, steps, 1, STEP_RUNNING, "Sicherung wird erstellt.", 20, "Sicherung wird erstellt.")
-                backup = BackupEngine(self.paths).create_backup(current)
+                if self.execution_mode() == "dry_run":
+                    backup = {"status": "skipped", "reason": "dry_run", "path": ""}
+                else:
+                    backup = BackupEngine(self.paths).create_backup(current)
                 self._set_step(state, steps, 1, STEP_SUCCESS, "Sicherung erstellt.", 35, "Sicherung erstellt.")
 
                 command_results: list[dict[str, Any]] = []
                 executor = UpdateExecutionService(self.paths)
                 self._set_step(state, steps, 2, STEP_RUNNING, "Installation laeuft.", 45, "Update wird installiert.")
-                for item in layers:
-                    if item == "application" and self._uses_application_zip(latest):
-                        command_results.append({"layer": item, **ApplicationZipInstaller(self.paths).install(latest)})
-                    else:
-                        command_results.extend(executor.run_layer(item))
+                if self.execution_mode() == "zip_docker":
+                    if "application" not in layers:
+                        raise RuntimeError("ZIP-Docker V1 unterstuetzt nur Application Updates.")
+                    command_results.append({"layer": "application", **ZipDockerInstaller(self.paths).install(latest)})
+                else:
+                    for item in layers:
+                        if item == "application" and self._uses_application_zip(latest):
+                            command_results.append({"layer": item, **ApplicationZipInstaller(self.paths).install(latest)})
+                        elif self.execution_mode() == "dry_run":
+                            command_results.extend(executor.run_layer(item))
+                        else:
+                            raise RuntimeError("Dieser Update-Modus unterstuetzt die angeforderte Komponente nicht.")
                 self._set_step(state, steps, 2, STEP_SUCCESS, "Installation abgeschlossen.", 70, "Update installiert.")
 
                 self._set_step(state, steps, 3, STEP_RUNNING, "Neustart wird vorbereitet.", 85, "Neustart laeuft.")
@@ -882,13 +1072,16 @@ class UpdateService(UpdateConfigMixin):
                     self._notify_reboot_hint()
                 return self.public_status()
             except Exception as exc:
-                self._mark_failed(state, steps, str(exc))
+                public_error = "Update fehlgeschlagen. Das vorherige System wurde wiederhergestellt." if self.execution_mode() == "zip_docker" else str(exc)
+                self._mark_failed(state, steps, public_error)
+                state["last_error_detail"] = str(exc)
+                self._write_state(state)
                 self._audit("install", username, str(current.get("app_version")), target_version, "failed", {"error": str(exc), "layers": layers})
                 raise
 
     def rollback(self, username: str = "admin") -> dict[str, Any]:
-        if self.execution_mode() != "docker":
-            raise RuntimeError("Rollback ist nur fuer Docker-basierte Deployments aktiviert.")
+        if self.execution_mode() != "zip_docker":
+            raise RuntimeError("Rollback ist nur fuer ZIP-Docker-Deployments aktiviert.")
         with self._lock:
             DockerDeploymentGuard(self.paths).validate()
             state = self._read_state()
@@ -993,7 +1186,7 @@ class UpdateService(UpdateConfigMixin):
         if status in {"success", "completed"}:
             return f"{self.product_name()} wurde erfolgreich aktualisiert."
         if status in {"failed", "error"}:
-            return "Das Update konnte nicht vollstaendig installiert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support."
+            return "Update fehlgeschlagen. Das vorherige System wurde wiederhergestellt."
         if status == "check_failed":
             return "Die Update-Pruefung konnte nicht abgeschlossen werden. Bitte versuchen Sie es spaeter erneut oder kontaktieren Sie den Support."
         if update_available:
@@ -1021,7 +1214,7 @@ class UpdateService(UpdateConfigMixin):
         self._write_state(state)
 
     def _commands_detail(self) -> str:
-        return "Kommandos im Hintergrund gestartet." if self.execution_mode() == "docker" else "Dry-Run: Kommandos nicht ausgefuehrt."
+        return "ZIP-Docker Update." if self.execution_mode() == "zip_docker" else "Dry-Run: Kommandos nicht ausgefuehrt."
 
     def _read_state(self) -> dict[str, Any]:
         return self._read_json(self.paths.state_file, {"install": {"status": "idle", "state": "idle", "steps": self._initial_steps("-"), "progress": 0, "current_step": 0}})
@@ -1032,6 +1225,10 @@ class UpdateService(UpdateConfigMixin):
     def _write_version(self, data: dict[str, Any]) -> None:
         self.paths.version_file.parent.mkdir(parents=True, exist_ok=True)
         self.paths.version_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        if self.execution_mode() == "zip_docker":
+            deployment_version = self.deployment_dir() / "version.json"
+            deployment_version.parent.mkdir(parents=True, exist_ok=True)
+            deployment_version.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _notify_update_available(self, latest: dict[str, Any]) -> None:
         from backend.services.messaging import MessagingService
@@ -1098,3 +1295,11 @@ def _human_size(size: int) -> str:
             return f"{value:.1f} {unit}"
         value /= 1024
     return f"{size} B"
+
+
+def _zip_docker_ignore(_dir: str, names: list[str]) -> set[str]:
+    ignored: set[str] = set()
+    for name in names:
+        if name in NEVER_OVERWRITE_NAMES:
+            ignored.add(name)
+    return ignored

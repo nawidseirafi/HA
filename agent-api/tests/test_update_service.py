@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.services.update_service import UpdatePaths, UpdateService, compare_versions
 
@@ -29,7 +30,7 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertEqual(result["latest_version"], "1.3.0")
             self.assertEqual(result["release_notes"], ["Test update"])
 
-    def test_install_update_dry_run_writes_state_and_backup(self):
+    def test_install_update_dry_run_writes_state_and_simulated_backup(self):
         with tempfile.TemporaryDirectory() as tmp:
             paths = self._paths(tmp)
             (paths.api_dir / "data" / "user").mkdir(parents=True)
@@ -47,8 +48,8 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertEqual(status["progress"], 100)
             self.assertEqual(status["current_version"], "1.3.0")
             admin_status = service.admin_status()
-            self.assertTrue(Path(admin_status["backup"]["path"]).exists())
-            self.assertTrue(admin_status["backup"]["path"].endswith(".tar.gz"))
+            self.assertEqual(admin_status["backup"]["status"], "skipped")
+            self.assertEqual(admin_status["backup"]["reason"], "dry_run")
             self.assertIn("dry_run", json.dumps(admin_status))
 
     def test_install_rejects_unknown_layer(self):
@@ -269,11 +270,11 @@ class UpdateServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Docker"):
                 service.rollback(username="admin")
 
-    def test_docker_manifest_does_not_use_zip_installer(self):
+    def test_zip_docker_manifest_does_not_use_local_zip_installer(self):
         with tempfile.TemporaryDirectory() as tmp:
             paths = self._paths(tmp)
             paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
-            paths.config_path.write_text("updates:\n  execution_mode: docker\n  manifest_path: update-manifest.json\n", encoding="utf-8")
+            paths.config_path.write_text("updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n", encoding="utf-8")
             paths.manifest_file.write_text(
                 json.dumps({
                     "product": "personal",
@@ -287,6 +288,72 @@ class UpdateServiceTests(unittest.TestCase):
             service = UpdateService(paths)
             service.check_for_updates()
             self.assertFalse(service._uses_application_zip(service.admin_status()["latest"]))
+
+    def test_zip_docker_update_copies_package_without_overwriting_local_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            root = Path(tmp)
+            deploy = root / "deploy"
+            deploy.mkdir()
+            (deploy / ".env").write_text("SECRET=keep", encoding="utf-8")
+            (deploy / "config.yaml").write_text("secret: keep", encoding="utf-8")
+            (deploy / "data").mkdir()
+            (deploy / "data" / "local.db").write_text("db", encoding="utf-8")
+            (deploy / "docker-compose.yml").write_text("old-compose", encoding="utf-8")
+            (deploy / "version.json").write_text(json.dumps({"version": "1.2.0"}), encoding="utf-8")
+            source_zip = paths.api_dir / "seniorcare.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("seniorcare-1.4.0/backend/main.py", "new")
+                archive.writestr("seniorcare-1.4.0/frontend/dist/index.html", "<html></html>")
+                archive.writestr("seniorcare-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("seniorcare-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("seniorcare-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("seniorcare-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+                archive.writestr("seniorcare-1.4.0/update-manifest.json", "{}")
+                archive.writestr("seniorcare-1.4.0/README.md", "readme")
+                archive.writestr("seniorcare-1.4.0/.env", "SECRET=replace")
+                archive.writestr("seniorcare-1.4.0/config.yaml", "secret: replace")
+                archive.writestr("seniorcare-1.4.0/data/local.db", "replace")
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            paths.config_path.write_text(
+                f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n  healthcheck_url: http://127.0.0.1:8080/health\n",
+                encoding="utf-8",
+            )
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "personal",
+                    "latest_version": "1.4.0",
+                    "download_url": source_zip.as_uri(),
+                    "sha256": "",
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+
+            class Response:
+                status = 200
+                def __enter__(self):
+                    return self
+                def __exit__(self, *_args):
+                    return False
+
+            def fake_run(*args, **kwargs):
+                return type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+            with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/docker"), \
+                 patch("backend.services.update_service.subprocess.run", side_effect=fake_run), \
+                 patch("backend.services.update_service.urllib.request.urlopen", return_value=Response()):
+                status = service.install_update(username="admin")
+
+            self.assertEqual(status["current_version"], "1.4.0")
+            self.assertEqual((deploy / ".env").read_text(encoding="utf-8"), "SECRET=keep")
+            self.assertEqual((deploy / "config.yaml").read_text(encoding="utf-8"), "secret: keep")
+            self.assertEqual((deploy / "data" / "local.db").read_text(encoding="utf-8"), "db")
+            self.assertEqual((deploy / "backend" / "main.py").read_text(encoding="utf-8"), "new")
+            self.assertEqual((deploy / "docker-compose.yml").read_text(encoding="utf-8"), "services: {}")
+            self.assertTrue((deploy / "backups").exists())
 
     def _paths(self, tmp: str) -> UpdatePaths:
         root = Path(tmp)

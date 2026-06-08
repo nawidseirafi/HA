@@ -464,3 +464,97 @@ ping robotersteve.local
 ```
 
 Falls es weiter nicht geht, pruefe Router, VLAN/Gastnetz und Firewall.
+
+## SeniorCare ZIP-Docker Deployment V1
+
+SeniorCare wird fuer Produkt-/Kundeninstallationen als Docker-Edition betrieben, aber ohne Docker Registry. Die Anwendung wird lokal aus dem ZIP-Paket gebaut.
+
+### Release bauen
+
+Auf dem Entwicklungsrechner:
+
+```bash
+cd /Users/nawid/Projects/roboterSteve/agent-api
+../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --zip --base-url https://seirafi.de/robotersteve
+```
+
+Ergebnis fuer den HTTPS-Update-Server:
+
+```text
+dist/seniorcare/stable/latest.json
+dist/seniorcare/stable/releases/seniorcare-0.2.0.zip
+```
+
+Upload-Struktur:
+
+```text
+robotersteve/
+└── seniorcare/
+    └── stable/
+        ├── latest.json
+        └── releases/
+            └── seniorcare-0.2.0.zip
+```
+
+### Erstinstallation auf Zielrechner
+
+Empfohlener Installationspfad:
+
+```text
+/opt/seniorcare/
+```
+
+Kopiere initial den Inhalt von `build/seniorcare/` auf den Zielrechner:
+
+```bash
+rsync -av --delete \
+  --exclude 'data' \
+  --exclude 'logs' \
+  --exclude 'backups' \
+  --exclude 'tmp' \
+  --exclude '.env' \
+  --exclude 'config.yaml' \
+  /Users/nawid/Projects/roboterSteve/agent-api/build/seniorcare/ \
+  user@zielrechner:/opt/seniorcare/
+```
+
+Auf dem Zielrechner:
+
+```bash
+cd /opt/seniorcare
+cp .env.example .env
+cp config.example.yaml config.yaml
+```
+
+Wichtige `.env`-Werte:
+
+```ini
+ROBOTERSTEVE_EDITION=seniorcare
+UPDATE_EXECUTION_MODE=zip_docker
+UPDATE_BASE_URL=https://seirafi.de/robotersteve
+UPDATE_DEPLOYMENT_DIR=/opt/seniorcare
+UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare
+UPDATE_COMPOSE_FILE=docker-compose.yml
+ROBOTERSTEVE_BACKUP_DIR=/opt/seniorcare/backups
+```
+
+Start:
+
+```bash
+docker compose up -d --build
+```
+
+### Updates
+
+Bei Klick auf `Update installieren` macht SeniorCare:
+
+1. `latest.json` laden
+2. ZIP herunterladen
+3. Backup unter `/opt/seniorcare/backups/` erstellen
+4. `docker compose down`
+5. neue Dateien aus ZIP kopieren
+6. `.env`, `config.yaml`, `data/`, `logs/`, `backups/` behalten
+7. `docker compose up -d --build`
+8. Healthcheck pruefen
+
+Es wird keine Docker Registry und kein Image-Server benoetigt.
