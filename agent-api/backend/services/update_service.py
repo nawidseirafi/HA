@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import os
 import platform
+import hashlib
 import shutil
 import subprocess
 import tarfile
+import tempfile
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
@@ -95,11 +98,15 @@ class UpdateConfigMixin:
     def execution_mode(self) -> str:
         update_config = self._update_config()
         mode = str(self._env("UPDATE_EXECUTION_MODE") or update_config.get("execution_mode") or "dry_run").strip().lower()
-        return "docker" if mode == "docker" else "dry_run"
+        return mode if mode in {"docker", "local"} else "dry_run"
 
     def update_server_url(self) -> str:
         update_config = self._update_config()
         return str(self._env("UPDATE_SERVER_URL") or update_config.get("server_url") or "").strip()
+
+    def update_manifest_url(self) -> str:
+        update_config = self._update_config()
+        return str(self._env("UPDATE_MANIFEST_URL") or update_config.get("manifest_url") or "").strip()
 
     def update_manifest_path(self) -> Path:
         update_config = self._update_config()
@@ -248,10 +255,21 @@ class UpdateCheckService(UpdateConfigMixin):
             }
 
     def _fetch_latest(self, channel: str, current: dict[str, Any]) -> dict[str, Any]:
+        manifest_url = self.update_manifest_url()
+        if manifest_url:
+            latest = self._fetch_static_manifest(manifest_url, channel, current)
+            latest["source"] = "manifest_url"
+            latest["manifest_url"] = manifest_url
+            return latest
         server_url = self.update_server_url()
         if not server_url:
             manifest_latest = self._local_manifest_latest(channel, current)
             return manifest_latest if manifest_latest is not None else self._mock_latest(channel, current)
+        if server_url.endswith(".json"):
+            latest = self._fetch_static_manifest(server_url, channel, current)
+            latest["source"] = "manifest_url"
+            latest["manifest_url"] = server_url
+            return latest
         query = urllib.parse.urlencode({"edition": active_edition().name, "channel": channel, "version": current["app_version"]})
         url = f"{server_url.rstrip('/')}/latest?{query}"
         request = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -263,6 +281,18 @@ class UpdateCheckService(UpdateConfigMixin):
         latest = self._normalize_latest(data, channel, current)
         latest["source"] = "server"
         return latest
+
+    def _fetch_static_manifest(self, url: str, channel: str, current: dict[str, Any]) -> dict[str, Any]:
+        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Update-Manifest nicht erreichbar: {exc}") from exc
+        selected = self._select_manifest_entry(data if isinstance(data, dict) else {}, channel)
+        if selected is None:
+            raise RuntimeError("Update-Manifest enthaelt keine passende Version.")
+        return self._normalize_latest(selected, channel, current)
 
     def _local_manifest_latest(self, channel: str, current: dict[str, Any]) -> dict[str, Any] | None:
         path = self.update_manifest_path()
@@ -335,6 +365,9 @@ class UpdateCheckService(UpdateConfigMixin):
             "components": components,
             "artifacts": data.get("artifacts") if isinstance(data.get("artifacts"), dict) else {},
             "minimum_version": str(data.get("minimum_version") or ""),
+            "sha256": str(data.get("sha256") or ""),
+            "size_bytes": int(data.get("size_bytes") or 0),
+            "product": str(data.get("product") or data.get("edition") or ""),
         }
 
     def _layers_from_components(self, components: dict[str, Any]) -> list[str]:
@@ -450,6 +483,106 @@ class BackupEngine(UpdateConfigMixin):
             return self.backup_dir() in path.parents
         except RuntimeError:
             return False
+
+
+class ApplicationZipInstaller(UpdateConfigMixin):
+    NEVER_OVERWRITE_NAMES = {
+        ".env",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "node_modules",
+        "logs",
+        "data",
+    }
+    NEVER_OVERWRITE_SUFFIXES = {".db", ".sqlite", ".sqlite3", ".pyc", ".pyo"}
+
+    def install(self, latest: dict[str, Any]) -> dict[str, Any]:
+        download_url = str(latest.get("download_url") or "").strip()
+        if not download_url:
+            raise RuntimeError("Application Update hat keine download_url.")
+        expected_sha256 = str(latest.get("sha256") or "").strip().lower()
+        if not expected_sha256:
+            raise RuntimeError("Application ZIP ohne sha256 wird aus Sicherheitsgruenden nicht installiert.")
+        if self.execution_mode() == "dry_run":
+            return {"status": "skipped", "reason": "dry_run", "download_url": download_url}
+
+        work_dir = Path(tempfile.mkdtemp(prefix="robotersteve-update-"))
+        zip_path = work_dir / "application.zip"
+        extract_dir = work_dir / "extract"
+        try:
+            self._download(download_url, zip_path)
+            actual_sha256 = self._sha256(zip_path)
+            if actual_sha256 != expected_sha256:
+                raise RuntimeError("Application ZIP Pruefsumme ist ungueltig.")
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            self._safe_extract_zip(zip_path, extract_dir)
+            source_root = self._payload_root(extract_dir)
+            copied = self._copy_payload(source_root, self.paths.api_dir)
+            return {
+                "status": "installed",
+                "download_url": download_url,
+                "sha256": actual_sha256,
+                "files_copied": copied,
+            }
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _download(self, url: str, target: Path) -> None:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme in {"", "file"}:
+            source = Path(urllib.request.url2pathname(parsed.path if parsed.scheme == "file" else url)).expanduser()
+            if not source.exists():
+                raise RuntimeError(f"Application ZIP nicht gefunden: {source}")
+            shutil.copy2(source, target)
+            return
+        if parsed.scheme != "https":
+            raise RuntimeError("Application ZIP muss ueber HTTPS bereitgestellt werden.")
+        request = urllib.request.Request(url, headers={"Accept": "application/zip, application/octet-stream"})
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response, target.open("wb") as handle:
+                shutil.copyfileobj(response, handle)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise RuntimeError(f"Application ZIP konnte nicht geladen werden: {exc}") from exc
+
+    def _sha256(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _safe_extract_zip(self, zip_path: Path, target: Path) -> None:
+        target_root = target.resolve()
+        with zipfile.ZipFile(zip_path) as archive:
+            for member in archive.infolist():
+                destination = (target_root / member.filename).resolve()
+                if target_root != destination and target_root not in destination.parents:
+                    raise RuntimeError(f"Unsicherer ZIP-Pfad erkannt: {member.filename}")
+            archive.extractall(target_root)
+
+    def _payload_root(self, extract_dir: Path) -> Path:
+        children = [child for child in extract_dir.iterdir() if child.name != "__MACOSX"]
+        if len(children) == 1 and children[0].is_dir():
+            return children[0]
+        return extract_dir
+
+    def _copy_payload(self, source: Path, target: Path) -> int:
+        copied = 0
+        for item in source.rglob("*"):
+            if not item.is_file() or self._skip(item):
+                continue
+            relative = item.relative_to(source)
+            destination = target / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, destination)
+            copied += 1
+        return copied
+
+    def _skip(self, path: Path) -> bool:
+        if any(part in self.NEVER_OVERWRITE_NAMES for part in path.parts):
+            return True
+        return path.suffix in self.NEVER_OVERWRITE_SUFFIXES
 
 
 class ComposeCommandResolver:
@@ -627,6 +760,7 @@ class UpdateService(UpdateConfigMixin):
                 raise RuntimeError("Keine Update-Komponenten fuer diese Version aktiviert.")
             current = self.current_version()
             target_version = str(latest.get("latest_version") or current["app_version"])
+            self._validate_latest_for_install(latest, str(current["app_version"]))
             steps = self._initial_steps(target_version)
             self._set_install_state(state, "running", steps, 0, 0, "Update wird vorbereitet.", target_version, layers)
             try:
@@ -639,7 +773,10 @@ class UpdateService(UpdateConfigMixin):
                 executor = UpdateExecutionService(self.paths)
                 self._set_step(state, steps, 2, STEP_RUNNING, "Installation laeuft.", 45, "Update wird installiert.")
                 for item in layers:
-                    command_results.extend(executor.run_layer(item))
+                    if item == "application" and self._uses_application_zip(latest):
+                        command_results.append({"layer": item, **ApplicationZipInstaller(self.paths).install(latest)})
+                    else:
+                        command_results.extend(executor.run_layer(item))
                 self._set_step(state, steps, 2, STEP_SUCCESS, "Installation abgeschlossen.", 70, "Update installiert.")
 
                 self._set_step(state, steps, 3, STEP_RUNNING, "Neustart wird vorbereitet.", 85, "Neustart laeuft.")
@@ -729,6 +866,21 @@ class UpdateService(UpdateConfigMixin):
         else:
             layers = [str(item) for item in latest.get("layers", []) if str(item) in UPDATE_LAYERS]
         return layers or ["application"]
+
+    def _uses_application_zip(self, latest: dict[str, Any]) -> bool:
+        download_url = str(latest.get("download_url") or "").strip()
+        if not download_url or download_url.startswith(("manifest://", "mock://")):
+            return False
+        scheme = urllib.parse.urlparse(download_url).scheme
+        return scheme in {"", "file", "https"}
+
+    def _validate_latest_for_install(self, latest: dict[str, Any], current_version: str) -> None:
+        product = str(latest.get("product") or "").strip().lower()
+        if product and product not in {active_edition().name.lower(), self.product_name().lower()}:
+            raise RuntimeError("Update-Manifest passt nicht zu dieser Installation.")
+        minimum_version = str(latest.get("minimum_version") or "").strip()
+        if minimum_version and compare_versions(current_version, minimum_version) < 0:
+            raise RuntimeError("Diese Installation ist fuer ein Direktupdate zu alt. Bitte kontaktieren Sie den Support.")
 
     def product_name(self) -> str:
         edition_name = active_edition().name

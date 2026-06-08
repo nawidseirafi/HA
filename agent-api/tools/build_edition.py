@@ -205,6 +205,7 @@ def personal_config_example() -> dict[str, Any]:
         "updates": {
             "channel": "stable",
             "server_url": "UPDATE_SERVER_URL",
+            "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
             "execution_mode": "dry_run",
             "backup_dir": "/opt/roboterSteve/backups",
@@ -243,6 +244,7 @@ def seniorcare_config_example() -> dict[str, Any]:
         "updates": {
             "channel": "stable",
             "server_url": "UPDATE_SERVER_URL",
+            "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
             "execution_mode": "dry_run",
             "backup_dir": "/opt/roboterSteve/backups",
@@ -277,6 +279,7 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "OPENAI_API_KEY=",
         "GEMINI_API_KEY=",
         "UPDATE_SERVER_URL=",
+        "UPDATE_MANIFEST_URL=",
         "UPDATE_MANIFEST_PATH=update-manifest.json",
         "UPDATE_CHANNEL=stable",
         "UPDATE_EXECUTION_MODE=dry_run",

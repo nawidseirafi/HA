@@ -52,6 +52,7 @@ ROBOTERSTEVE_VERSION=1.2.0
 ROBOTERSTEVE_BUILD=2026.06.08
 ROBOTERSTEVE_COMMIT=abcdef
 UPDATE_SERVER_URL=https://updates.robotersteve.ai
+UPDATE_MANIFEST_URL=https://updates.robotersteve.ai/seniorcare/stable/latest.json
 UPDATE_MANIFEST_PATH=update-manifest.json
 UPDATE_CHANNEL=stable
 UPDATE_EXECUTION_MODE=dry_run
@@ -59,32 +60,67 @@ UPDATE_EXECUTION_MODE=dry_run
 
 ## Update-Server
 
-Wenn `UPDATE_SERVER_URL` gesetzt ist, fragt der Service folgenden Endpoint ab:
+V1 unterstuetzt einen statischen HTTPS-Update-Server. Dafuer reicht:
 
 ```text
-GET <UPDATE_SERVER_URL>/latest?edition=<edition>&channel=<channel>&version=<version>
+https://updates.robotersteve.ai/
+└── seniorcare/
+    └── stable/
+        ├── latest.json
+        └── releases/
+            └── seniorcare-0.2.0.zip
 ```
 
-Erwartete Antwort:
+Empfohlen ist:
+
+```ini
+UPDATE_MANIFEST_URL=https://updates.robotersteve.ai/seniorcare/stable/latest.json
+UPDATE_EXECUTION_MODE=local
+```
+
+`latest.json`:
 
 ```json
 {
-  "latest_version": "1.3.0",
-  "download_url": "...",
+  "schema_version": 1,
+  "product": "seniorcare",
+  "latest_version": "0.2.0",
+  "download_url": "https://updates.robotersteve.ai/seniorcare/stable/releases/seniorcare-0.2.0.zip",
+  "sha256": "...",
+  "size_bytes": 12345678,
   "mandatory": false,
-  "release_notes": ["..."]
+  "minimum_version": "0.1.0",
+  "release_notes": [
+    "Stabilitaet verbessert",
+    "Benachrichtigungen optimiert"
+  ],
+  "components": {
+    "application": { "update": true },
+    "homeassistant": { "update": false },
+    "ollama": { "update": false },
+    "system": { "update": false }
+  }
 }
+```
+
+`sha256` ist fuer ZIP-Installation Pflicht. ZIP-Dateien ohne passende Pruefsumme werden nicht installiert.
+
+Alternativ bleibt der dynamische Kompatibilitaets-Endpunkt moeglich. Wenn `UPDATE_SERVER_URL` gesetzt ist und nicht auf `.json` endet, fragt der Service:
+
+```text
+GET <UPDATE_SERVER_URL>/latest?edition=<edition>&channel=stable&version=<version>
 ```
 
 ## Lokales Update-Manifest
 
-Ohne `UPDATE_SERVER_URL` wird zuerst `update-manifest.json` gelesen. Dadurch kann spaeter ein echter Update-Server angeschlossen werden, ohne die Engine umzubauen. Der Server muss dieselbe `latest`-Struktur liefern.
+Ohne `UPDATE_MANIFEST_URL` und ohne `UPDATE_SERVER_URL` wird zuerst `update-manifest.json` gelesen. Dadurch kann spaeter ein echter Update-Server angeschlossen werden, ohne die Engine umzubauen. Der Server muss dieselbe `latest`-Struktur liefern.
 
 Aufloesungsreihenfolge:
 
-1. `UPDATE_SERVER_URL`
-2. `UPDATE_MANIFEST_PATH` oder `updates.manifest_path`
-3. lokaler Mock aus `updates.mock_latest`
+1. `UPDATE_MANIFEST_URL` oder `updates.manifest_url`
+2. `UPDATE_SERVER_URL` oder `updates.server_url`
+3. `UPDATE_MANIFEST_PATH` oder `updates.manifest_path`
+4. lokaler Mock aus `updates.mock_latest`
 
 Minimalstruktur:
 
@@ -97,6 +133,8 @@ Minimalstruktur:
         "stable": {
           "latest_version": "0.2.0",
           "download_url": "...",
+          "sha256": "...",
+          "size_bytes": 12345678,
           "mandatory": false,
           "minimum_version": "0.1.0",
           "components": {
@@ -137,6 +175,21 @@ Standard ist sicherer Dry-Run:
 ```ini
 UPDATE_EXECUTION_MODE=dry_run
 ```
+
+Produktive ZIP-Deployments aktivieren:
+
+```ini
+UPDATE_EXECUTION_MODE=local
+```
+
+Dann wird das Application-ZIP geladen, per SHA256 geprueft und in das Deployment-Verzeichnis eingespielt. Nie ueberschrieben werden:
+
+- `.env`
+- `data/`
+- `logs/`
+- Datenbanken wie `*.db`, `*.sqlite`
+- `node_modules/`
+- virtuelle Umgebungen
 
 Produktive Docker-Deployments aktivieren:
 

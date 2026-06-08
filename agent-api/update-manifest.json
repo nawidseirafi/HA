@@ -2,20 +2,17 @@
   "schema_version": 1,
   "generated_at": "2026-06-08T00:00:00Z",
   "server_contract": {
-    "latest_endpoint": "/latest",
-    "query": [
-      "edition",
-      "channel",
-      "version"
-    ],
-    "compatible_response": true
+    "latest_endpoint": "latest.json",
+    "static_https_manifest": true,
+    "zip_artifact": true,
+    "requires_sha256": true
   },
   "editions": {
     "personal": {
       "channels": {
         "stable": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://personal/stable/0.1.0",
+          "download_url": "https://updates.example.com/personal/stable/releases/personal-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -55,11 +52,14 @@
             "system": {
               "update": true
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "personal"
         },
         "beta": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://personal/beta/0.1.0",
+          "download_url": "https://updates.example.com/personal/beta/releases/personal-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -79,11 +79,14 @@
             "system": {
               "update": false
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "personal"
         },
         "dev": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://personal/dev/0.1.0",
+          "download_url": "https://updates.example.com/personal/dev/releases/personal-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -103,7 +106,10 @@
             "system": {
               "update": false
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "personal"
         }
       }
     },
@@ -111,7 +117,7 @@
       "channels": {
         "stable": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://seniorcare/stable/0.1.0",
+          "download_url": "https://updates.example.com/seniorcare/stable/releases/seniorcare-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -153,11 +159,14 @@
             "system": {
               "update": true
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "seniorcare"
         },
         "beta": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://seniorcare/beta/0.1.0",
+          "download_url": "https://updates.example.com/seniorcare/beta/releases/seniorcare-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -177,11 +186,14 @@
             "system": {
               "update": false
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "seniorcare"
         },
         "dev": {
           "latest_version": "0.1.0",
-          "download_url": "manifest://seniorcare/dev/0.1.0",
+          "download_url": "https://updates.example.com/seniorcare/dev/releases/seniorcare-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
@@ -201,7 +213,10 @@
             "system": {
               "update": false
             }
-          }
+          },
+          "sha256": "",
+          "size_bytes": 0,
+          "product": "seniorcare"
         }
       }
     }
