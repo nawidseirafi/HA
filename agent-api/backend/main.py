@@ -74,6 +74,7 @@ def include_core_router(service_id: str, module_name: str) -> None:
 
 
 include_core_router("auth", "backend.api.auth_routes")
+include_core_router("system", "backend.api.system_routes")
 include_core_router("household", "backend.api.household_routes")
 include_core_router("infrastructure", "backend.api.infrastructure_routes")
 include_core_router("homeassistant", "backend.api.homeassistant_routes")

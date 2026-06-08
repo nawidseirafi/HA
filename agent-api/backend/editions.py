@@ -16,6 +16,7 @@ EDITION_LOCK_PATH = EDITIONS_DIR / "edition.lock"
 DEFAULT_PERSONAL_AGENTS = ("scheduler", "invoices", "market", "mywellness", "vacation")
 DEFAULT_PERSONAL_CORE_SERVICES = (
     "auth",
+    "system",
     "settings",
     "messaging",
     "orchestrator",

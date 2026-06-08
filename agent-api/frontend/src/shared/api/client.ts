@@ -109,6 +109,97 @@ export type SeniorStatus = {
   updated_at: string;
 };
 
+export type SystemVersion = {
+  edition: string;
+  app_version?: string;
+  version: string;
+  build: string;
+  commit: string;
+  docker_version?: string;
+  docker_compose_version?: string;
+  ollama_version?: string;
+  homeassistant_version?: string;
+  os_version?: string;
+  channel?: string;
+  previous_version?: string | null;
+  updated_at?: string | null;
+};
+
+export type UpdateLatest = {
+  latest_version: string;
+  download_url: string;
+  mandatory: boolean;
+  release_notes: string[] | string;
+  channel: string;
+  layers: string[];
+};
+
+export type UpdateStep = {
+  key: string;
+  label: string;
+  status: 'pending' | 'running' | 'success' | 'failed' | 'completed' | 'error' | string;
+  detail?: string;
+};
+
+export type UpdateStatus = {
+  product?: string;
+  current_version?: string;
+  latest_version?: string | null;
+  status?: string;
+  last_checked?: string | null;
+  release_notes?: string[] | string;
+  steps?: UpdateStep[];
+  dev_mode?: boolean;
+  state?: string;
+  current_step?: number;
+  progress?: number;
+  message?: string;
+  version?: SystemVersion;
+  channel?: 'stable' | 'beta' | 'dev' | string;
+  layers?: string[];
+  execution_mode?: string;
+  update_server_url?: string;
+  last_check?: string | null;
+  latest?: UpdateLatest | null;
+  update_available: boolean;
+  install: {
+    status: string;
+    layer?: string;
+    target_version?: string;
+    steps: UpdateStep[];
+    started_at?: string;
+    finished_at?: string;
+  };
+  rollback: {
+    status?: string;
+    available?: boolean;
+    previous_version?: string | null;
+    target_version?: string;
+    steps?: UpdateStep[];
+  };
+  last_error?: string | null;
+  backup?: { path: string; created_at: string } | null;
+};
+
+export type UpdateCheckResult = {
+  ok: boolean;
+  offline: boolean;
+  product?: string;
+  current?: SystemVersion;
+  current_version?: string;
+  channel?: string;
+  latest?: UpdateLatest | null;
+  available?: boolean;
+  update_available: boolean;
+  latest_version?: string;
+  release_notes?: string[] | string;
+  checked_at?: string;
+  last_checked?: string;
+  status?: string;
+  message: string;
+  error?: string;
+};
+
 export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard';
 
 export type MyWellnessHealthSettings = {
@@ -997,6 +1088,12 @@ async function download(path: string): Promise<{ blob: Blob; filename: string }>
 
 export const api = {
   edition: () => request<EditionInfo>('/api/edition'),
+  systemVersion: () => request<SystemVersion>('/api/system/version'),
+  updateStatus: () => request<UpdateStatus>('/api/system/update/status'),
+  adminUpdateStatus: () => request<UpdateStatus>('/api/system/update/admin/status'),
+  checkUpdates: () => request<UpdateCheckResult>('/api/system/update/check'),
+  installUpdate: () => request<UpdateStatus>('/api/system/update/install', { method: 'POST', body: JSON.stringify({}) }),
+  rollbackUpdate: () => request<UpdateStatus>('/api/system/update/rollback', { method: 'POST' }),
   login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),

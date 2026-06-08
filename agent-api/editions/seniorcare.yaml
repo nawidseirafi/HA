@@ -5,6 +5,7 @@ enabled_agents:
   - senior
 enabled_core_services:
   - auth
+  - system
   - settings
   - messaging
   - orchestrator

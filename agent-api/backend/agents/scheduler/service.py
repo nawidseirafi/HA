@@ -112,6 +112,11 @@ class SchedulerService:
     def execute_task(self, task: dict[str, Any]) -> dict[str, Any]:
         started_at = utc_now()
         try:
+            if self._should_skip_disabled_target(task):
+                message = f"Task {task.get('name')} uebersprungen, weil der Ziel-Agent deaktiviert ist."
+                run = self.store.record_run(task, "skipped", message, started_at, utc_now(), {"reason": "target_agent_disabled"})
+                updated_task = self.store.mark_task_run(task, "skipped")
+                return {**run, "task": updated_task}
             result = self._execute_action(task)
             message = f"Task {task.get('name')} erfolgreich ausgefuehrt."
             run = self.store.record_run(task, "completed", message, started_at, utc_now(), {"result": result})
@@ -199,6 +204,10 @@ class SchedulerService:
             from backend.services.household_service import HouseholdService
 
             return HouseholdService().summary()
+        if action_type == "update_check":
+            from backend.services.update_service import UpdateService
+
+            return UpdateService().check_for_updates(notify=True)
         if action_type in {"call_webhook", "http_request"}:
             return self._http_request(task.get("action_payload") or {})
         raise ValueError(f"Unbekannter Scheduler Action-Typ: {action_type}")
@@ -211,10 +220,33 @@ class SchedulerService:
             raise ValueError(f"Agent {agent_id} unterstuetzt keinen Control-Vertrag.")
         if action not in control.capabilities():
             raise ValueError(f"Agent {agent_id} unterstuetzt Aktion {action} nicht.")
+        if action == "run" and self._agent_is_disabled(agent_id):
+            raise RuntimeError(f"Agent {agent_id} ist deaktiviert. Scheduler startet keinen Run.")
         result = control.execute(action, payload)
         if not result.get("ok", False):
             raise RuntimeError(str(result.get("message") or f"Agent {agent_id} Aktion {action} fehlgeschlagen."))
         return dict(result)
+
+    def _should_skip_disabled_target(self, task: dict[str, Any]) -> bool:
+        action_type = str(task.get("action_type") or "")
+        target_agent = str(task.get("target_agent") or "").strip()
+        if not target_agent or action_type not in {"execute_action", "start_agent"}:
+            return False
+        target_action = str(task.get("target_action") or "run")
+        control_action = "run" if action_type == "execute_action" and target_action in {"run", "analyze"} else target_action
+        return control_action in {"run", "start"} and self._agent_is_disabled(target_agent)
+
+    def _agent_is_disabled(self, agent_id: str) -> bool:
+        from backend.agents.registry import get_agent_control
+
+        control = get_agent_control(agent_id)
+        if not control or "status" not in control.capabilities():
+            return False
+        status = control.execute("status", {})
+        data = status.get("data") if isinstance(status.get("data"), dict) else {}
+        enabled = data.get("enabled")
+        current_status = str(data.get("current_status") or data.get("status") or status.get("status") or "").lower()
+        return enabled is False or current_status in {"disabled", "stopped"}
 
     def _http_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = str(payload.get("url") or "").strip()
@@ -264,4 +296,3 @@ class SchedulerService:
         section.update(updates)
         data["scheduler"] = section
         Path(path).write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
-

@@ -229,7 +229,12 @@ class SchedulerStore:
             failure_count += 1
         else:
             failure_count = 0
-        task_status = "error" if status == "error" else "active" if enabled else "disabled"
+        if status == "error":
+            task_status = "error"
+        elif status == "skipped":
+            task_status = "paused"
+        else:
+            task_status = "active" if enabled else "disabled"
         with self.connect() as connection:
             connection.execute(
                 """
@@ -390,6 +395,7 @@ class SchedulerStore:
             if default_key:
                 row = connection.execute("SELECT id, default_key FROM scheduler_tasks WHERE default_key = ?", (default_key,)).fetchone()
             if row:
+                self._sync_platform_default_task(connection, int(row["id"]), item)
                 return True
             if name:
                 row = connection.execute("SELECT id, default_key FROM scheduler_tasks WHERE name = ?", (name,)).fetchone()
@@ -400,8 +406,37 @@ class SchedulerStore:
                         (default_key, str(item.get("source") or "manifest"), utc_now(), int(row["id"])),
                     )
                     connection.commit()
+                self._sync_platform_default_task(connection, int(row["id"]), item)
                 return True
         return False
+
+    def _sync_platform_default_task(self, connection: sqlite3.Connection, task_id: int, item: dict[str, Any]) -> None:
+        if str(item.get("source") or "") != "platform":
+            return
+        schedule_type = self._schedule_type(item.get("schedule_type"))
+        schedule = item.get("schedule") if isinstance(item.get("schedule"), dict) else {}
+        next_run = self.compute_next_run(schedule_type, schedule, datetime.now(timezone.utc))
+        connection.execute(
+            """
+            UPDATE scheduler_tasks
+            SET description = ?, schedule_type = ?, schedule = ?, next_run = ?,
+                target_agent = ?, target_action = ?, action_type = ?, source = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                str(item.get("description") or ""),
+                schedule_type,
+                json.dumps(schedule),
+                next_run,
+                str(item.get("target_agent") or ""),
+                str(item.get("target_action") or ""),
+                str(item.get("action_type") or "execute_action"),
+                str(item.get("source") or "platform"),
+                utc_now(),
+                task_id,
+            ),
+        )
+        connection.commit()
 
     def _manifest_default_tasks(self) -> list[dict[str, Any]]:
         tasks: list[dict[str, Any]] = []
@@ -456,10 +491,21 @@ class SchedulerStore:
                 "source": "platform",
                 "default_key": "platform:household:window-check",
             },
+            {
+                "name": "System Updatepruefung",
+                "description": "Prueft taeglich um 07:00 Uhr, ob ein RoboterSteve/SeniorCare Update verfuegbar ist.",
+                "schedule_type": "cron",
+                "schedule": {"cron": "0 7 * * *"},
+                "target_agent": "system",
+                "target_action": "update_check",
+                "action_type": "update_check",
+                "source": "platform",
+                "default_key": "platform:system:update-check",
+            },
         ]
         return [
             task for task in tasks
-            if str(task.get("target_agent") or "") not in {"infrastructure", "household"}
+            if str(task.get("target_agent") or "") not in {"infrastructure", "household", "system"}
             or is_core_service_enabled(str(task.get("target_agent") or ""))
         ]
 

@@ -5242,3 +5242,256 @@ button.market-insight-card:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.update-panel,
+.seniorcare-update-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.seniorcare-update-panel {
+  border: 1px solid rgba(21, 48, 39, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 252, 243, 0.66);
+  margin-top: 18px;
+  padding: 22px;
+}
+
+.update-panel-head {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.update-panel-head h2,
+.update-panel-head p {
+  margin: 0;
+}
+
+.update-panel-head p:not(.eyebrow) {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.seniorcare-update-panel .update-panel-head p:not(.eyebrow) {
+  color: rgba(21, 48, 39, 0.68);
+}
+
+.update-version-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.update-version-grid-simple {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.update-version-item {
+  border: 1px solid rgba(153, 168, 195, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.seniorcare-update-panel .update-version-item {
+  border-color: rgba(21, 48, 39, 0.12);
+  background: rgba(255, 252, 243, 0.58);
+}
+
+.update-version-item span,
+.update-release-card span,
+.update-release-card small,
+.update-step small,
+.update-controls span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.seniorcare-update-panel .update-version-item span,
+.seniorcare-update-panel .update-release-card span,
+.seniorcare-update-panel .update-release-card small,
+.seniorcare-update-panel .update-step small,
+.seniorcare-update-panel .update-controls span {
+  color: rgba(21, 48, 39, 0.64);
+}
+
+.update-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.update-controls label {
+  display: grid;
+  gap: 7px;
+}
+
+.update-controls select {
+  border: 1px solid rgba(153, 168, 195, 0.18);
+  border-radius: 12px;
+  background: rgba(10, 18, 32, 0.72);
+  color: var(--text);
+  padding: 11px 12px;
+}
+
+.seniorcare-update-panel .update-controls select {
+  border-color: rgba(21, 48, 39, 0.18);
+  background: rgba(255, 252, 243, 0.78);
+  color: #153027;
+}
+
+.update-release-card {
+  border: 1px solid rgba(153, 168, 195, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+}
+
+.seniorcare-update-panel .update-release-card {
+  border-color: rgba(21, 48, 39, 0.12);
+  background: rgba(255, 252, 243, 0.58);
+}
+
+.update-release-card h3,
+.update-release-card h4,
+.update-release-card p {
+  margin: 6px 0;
+}
+
+.update-release-card p {
+  line-height: 1.5;
+}
+
+.update-release-notes {
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+  margin: 8px 0 10px;
+  padding-left: 18px;
+}
+
+.update-release-notes span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.update-developer-details {
+  border-top: 1px solid rgba(153, 168, 195, 0.14);
+  padding-top: 12px;
+}
+
+.update-developer-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.update-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.update-wizard {
+  border-top: 1px solid rgba(153, 168, 195, 0.14);
+  display: grid;
+  gap: 9px;
+  padding-top: 14px;
+}
+
+.seniorcare-update-panel .update-wizard {
+  border-top-color: rgba(21, 48, 39, 0.12);
+}
+
+.update-wizard-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.update-step {
+  align-items: center;
+  border: 1px solid rgba(153, 168, 195, 0.14);
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.seniorcare-update-panel .update-step {
+  border-color: rgba(21, 48, 39, 0.12);
+}
+
+.update-step > span {
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(153, 168, 195, 0.14);
+  color: var(--muted);
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.update-step.completed > span,
+.update-step.success > span {
+  background: rgba(52, 211, 153, 0.18);
+  color: #9af0c9;
+}
+
+.update-step.error > span,
+.update-step.failed > span {
+  background: rgba(251, 113, 133, 0.18);
+  color: #ff9aaa;
+}
+
+.update-step strong,
+.update-step small {
+  display: block;
+}
+
+.update-alert {
+  align-items: center;
+  border-radius: 14px;
+  display: flex;
+  gap: 8px;
+  padding: 11px 12px;
+}
+
+.update-alert.error {
+  background: rgba(251, 113, 133, 0.1);
+  color: #ff9aaa;
+}
+
+.update-alert.success {
+  background: rgba(52, 211, 153, 0.1);
+  color: #9af0c9;
+}
+
+.seniorcare-update-panel .update-alert.error {
+  color: #8f3426;
+}
+
+.seniorcare-update-panel .update-alert.success {
+  color: #2c744d;
+}
+
+@media (max-width: 760px) {
+  .update-panel-head,
+  .update-action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .update-version-grid,
+  .update-controls {
+    grid-template-columns: 1fr;
+  }
+}

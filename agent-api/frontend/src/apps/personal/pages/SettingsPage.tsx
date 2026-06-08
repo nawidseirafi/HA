@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { api, type InfrastructureSummary, type PathSetting, type SettingsInfo } from '@shared/api/client';
+import { UpdatePanel } from '@shared/components/system/UpdatePanel';
 
 function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
   return <span className={`settings-badge ${ok ? 'ok' : 'warn'}`}>{label ?? (ok ? 'aktiv' : 'fehlt')}</span>;
@@ -96,6 +97,8 @@ export function SettingsPage() {
             <SettingRow label="Adresse" value={`${settings.api.host}:${settings.api.port}`} />
             <SettingRow label="Config" value={settings.api.config_file} />
           </article>
+
+          <UpdatePanel variant="personal" />
 
           <article className="panel settings-card">
             <div className="settings-card-head">

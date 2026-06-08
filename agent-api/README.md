@@ -684,3 +684,7 @@ VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
 Neue Produkteditionen sollten als eigene App unter `src/apps/<edition>/` angelegt werden. Gemeinsame Bausteine gehoeren nach `src/shared/`; Edition-spezifische Navigation, Seiten und Produktlogik bleiben in der jeweiligen App.
 
 Edition-Builds enthalten `editions/edition.lock`. Dadurch ist ein Build auf genau die gebaute Edition festgelegt und faellt nicht still auf `personal` zurueck.
+
+## Update-System
+
+RoboterSteve enthaelt einen edition-unabhaengigen Core-Service `system` fuer Versionen und Updates. Die wichtigsten Endpunkte sind `GET /api/system/version`, `GET /api/system/update/check`, `POST /api/system/update/install`, `GET /api/system/update/status` und `POST /api/system/update/rollback`. Details stehen in `UPDATE_SYSTEM.md`.

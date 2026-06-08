@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-08T00:00:00Z",
+  "server_contract": {
+    "latest_endpoint": "/latest",
+    "query": [
+      "edition",
+      "channel",
+      "version"
+    ],
+    "compatible_response": true
+  },
+  "editions": {
+    "personal": {
+      "channels": {
+        "stable": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://personal/stable/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "Lokales Update-Manifest fuer Personal.",
+            "Kann spaeter 1:1 durch den Update-Server ersetzt werden."
+          ],
+          "artifacts": {
+            "application": {
+              "type": "docker-compose",
+              "compose_file": "docker-compose.yml",
+              "services": [
+                "robotersteve-api"
+              ]
+            },
+            "ai_runtime": {
+              "type": "ollama",
+              "models": []
+            },
+            "homeassistant": {
+              "type": "docker-compose-service",
+              "service": "homeassistant"
+            },
+            "system": {
+              "type": "debian-apt"
+            }
+          },
+          "components": {
+            "application": {
+              "update": true
+            },
+            "ollama": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": true
+            },
+            "system": {
+              "update": true
+            }
+          }
+        },
+        "beta": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://personal/beta/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "Personal Beta-Kanal ist vorbereitet."
+          ],
+          "artifacts": {},
+          "components": {
+            "application": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": false
+            },
+            "ollama": {
+              "update": false
+            },
+            "system": {
+              "update": false
+            }
+          }
+        },
+        "dev": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://personal/dev/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "Personal Dev-Kanal ist vorbereitet."
+          ],
+          "artifacts": {},
+          "components": {
+            "application": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": false
+            },
+            "ollama": {
+              "update": false
+            },
+            "system": {
+              "update": false
+            }
+          }
+        }
+      }
+    },
+    "seniorcare": {
+      "channels": {
+        "stable": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://seniorcare/stable/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "Lokales Update-Manifest fuer SeniorCare.",
+            "Struktur ist kompatibel zum spaeteren Update-Server."
+          ],
+          "artifacts": {
+            "application": {
+              "type": "docker-compose",
+              "compose_file": "docker-compose.yml",
+              "services": [
+                "robotersteve-api"
+              ]
+            },
+            "ai_runtime": {
+              "type": "ollama",
+              "models": [
+                "qwen2.5:3b"
+              ]
+            },
+            "homeassistant": {
+              "type": "docker-compose-service",
+              "service": "homeassistant"
+            },
+            "system": {
+              "type": "debian-apt"
+            }
+          },
+          "components": {
+            "application": {
+              "update": true
+            },
+            "ollama": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": true
+            },
+            "system": {
+              "update": true
+            }
+          }
+        },
+        "beta": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://seniorcare/beta/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "SeniorCare Beta-Kanal ist vorbereitet."
+          ],
+          "artifacts": {},
+          "components": {
+            "application": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": false
+            },
+            "ollama": {
+              "update": false
+            },
+            "system": {
+              "update": false
+            }
+          }
+        },
+        "dev": {
+          "latest_version": "0.1.0",
+          "download_url": "manifest://seniorcare/dev/0.1.0",
+          "mandatory": false,
+          "minimum_version": "0.1.0",
+          "release_notes": [
+            "SeniorCare Dev-Kanal ist vorbereitet."
+          ],
+          "artifacts": {},
+          "components": {
+            "application": {
+              "update": true
+            },
+            "homeassistant": {
+              "update": false
+            },
+            "ollama": {
+              "update": false
+            },
+            "system": {
+              "update": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

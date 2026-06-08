@@ -32,6 +32,7 @@ NEVER_COPY_SUFFIXES = {".db", ".sqlite", ".sqlite3", ".pyc", ".pyo"}
 
 CORE_API_ROUTES = {
     "auth": ["backend/api/auth_routes.py"],
+    "system": ["backend/api/system_routes.py"],
     "settings": ["backend/api/settings_routes.py"],
     "orchestrator": ["backend/api/orchestrator_routes.py"],
     "homeassistant": ["backend/api/homeassistant_routes.py"],
@@ -42,6 +43,7 @@ CORE_API_ROUTES = {
 
 CORE_SERVICE_FILES = {
     "auth": ["backend/services/auth_service.py"],
+    "system": ["backend/services/update_service.py"],
     "settings": ["backend/services/settings_service.py"],
     "orchestrator": ["backend/services/orchestrator_control_service.py"],
     "homeassistant": ["backend/services/homeassistant_service.py", "backend/services/core"],
@@ -83,6 +85,8 @@ def main() -> int:
 
     copy_backend(edition, target)
     copy_requirements(target)
+    copy_version_file(target)
+    copy_update_manifest(target)
     copy_edition_files(edition_name, target)
     build_or_copy_frontend(edition, target)
     write_config_example(edition, target)
@@ -133,6 +137,15 @@ def copy_backend(edition: dict[str, Any], target: Path) -> None:
 
 def copy_requirements(target: Path) -> None:
     copy_path(API_DIR / "requirements.txt", target / "requirements.txt")
+    copy_path(API_DIR / "UPDATE_SYSTEM.md", target / "UPDATE_SYSTEM.md")
+
+
+def copy_version_file(target: Path) -> None:
+    copy_path(API_DIR / "version.json", target / "version.json")
+
+
+def copy_update_manifest(target: Path) -> None:
+    copy_path(API_DIR / "update-manifest.json", target / "update-manifest.json")
 
 
 def copy_edition_files(edition_name: str, target: Path) -> None:
@@ -189,6 +202,24 @@ def personal_config_example() -> dict[str, Any]:
             "llama": {"base_url": "http://ollama:11434", "model": "qwen2.5:3b"},
         },
         "messaging": {"enabled": True},
+        "updates": {
+            "channel": "stable",
+            "server_url": "UPDATE_SERVER_URL",
+            "manifest_path": "update-manifest.json",
+            "execution_mode": "dry_run",
+            "backup_dir": "/opt/roboterSteve/backups",
+            "services": {
+                "api": "robotersteve-api",
+                "ollama": "ollama",
+                "homeassistant": "homeassistant",
+            },
+            "ollama_models": [],
+            "mock_latest": {
+                "latest_version": "0.1.0",
+                "mandatory": False,
+                "release_notes": ["Lokaler Mock-Update-Server."],
+            },
+        },
         "infrastructure": {"enabled": True, "database_path": "data/infrastructure/infrastructure.db"},
     }
 
@@ -209,6 +240,24 @@ def seniorcare_config_example() -> dict[str, Any]:
             "llama": {"base_url": "http://ollama:11434", "model": "qwen2.5:3b"},
         },
         "messaging": {"enabled": True},
+        "updates": {
+            "channel": "stable",
+            "server_url": "UPDATE_SERVER_URL",
+            "manifest_path": "update-manifest.json",
+            "execution_mode": "dry_run",
+            "backup_dir": "/opt/roboterSteve/backups",
+            "services": {
+                "api": "robotersteve-api",
+                "ollama": "ollama",
+                "homeassistant": "homeassistant",
+            },
+            "ollama_models": ["qwen2.5:3b"],
+            "mock_latest": {
+                "latest_version": "0.1.0",
+                "mandatory": False,
+                "release_notes": ["Lokaler Mock-Update-Server."],
+            },
+        },
         "scheduler": {"enabled": True},
         "senior": {"enabled": True, "mode": "placeholder"},
     }
@@ -217,6 +266,9 @@ def seniorcare_config_example() -> dict[str, Any]:
 def write_env_example(edition: dict[str, Any], target: Path) -> None:
     lines = [
         f"ROBOTERSTEVE_EDITION={edition.get('name')}",
+        "ROBOTERSTEVE_VERSION=0.1.0",
+        "ROBOTERSTEVE_BUILD=2026.06.08",
+        "ROBOTERSTEVE_COMMIT=development",
         "AGENT_API_USERNAME=admin",
         "AGENT_API_PASSWORD=change-me",
         "AGENT_API_JWT_SECRET=change-me-long-random-secret",
@@ -224,6 +276,12 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "HA_TOKEN=replace-with-token",
         "OPENAI_API_KEY=",
         "GEMINI_API_KEY=",
+        "UPDATE_SERVER_URL=",
+        "UPDATE_MANIFEST_PATH=update-manifest.json",
+        "UPDATE_CHANNEL=stable",
+        "UPDATE_EXECUTION_MODE=dry_run",
+        "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
+        "OLLAMA_UPDATE_MODELS=",
     ]
     (target / ".env.example").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -240,9 +298,10 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
         "robotersteve-api": {
             "image": "python:3.12-slim",
             "working_dir": "/app",
-            "volumes": [".:/app"],
+            "volumes": [".:/app", "/var/run/docker.sock:/var/run/docker.sock"],
             "env_file": [".env"],
-            "command": "sh -c \"pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8080\"",
+            "environment": {"UPDATE_EXECUTION_MODE": "docker"},
+            "command": "sh -c \"apt-get update && apt-get install -y docker.io docker-compose && pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8080\"",
             "ports": ["8080:8080"],
         }
     }

@@ -1,4 +1,5 @@
 import { Bell, Home, ShieldCheck } from 'lucide-react';
+import { UpdatePanel } from '@shared/components/system/UpdatePanel';
 
 export function SettingsPage() {
   return (
@@ -23,6 +24,7 @@ export function SettingsPage() {
           <p>Benutzerzugang und sichere Anmeldung verwalten.</p>
         </article>
       </div>
+      <UpdatePanel variant="seniorcare" />
     </section>
   );
 }

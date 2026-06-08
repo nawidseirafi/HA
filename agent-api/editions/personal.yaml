@@ -8,6 +8,7 @@ enabled_agents:
   - vacation
 enabled_core_services:
   - auth
+  - system
   - settings
   - messaging
   - orchestrator
