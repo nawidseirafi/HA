@@ -5,6 +5,7 @@ import os
 import platform
 import base64
 import hashlib
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -129,7 +130,30 @@ class UpdateConfigMixin:
     def execution_mode(self) -> str:
         update_config = self._update_config()
         mode = str(self._env("UPDATE_EXECUTION_MODE") or update_config.get("execution_mode") or "dry_run").strip().lower()
-        return mode if mode in {"dry_run", "local", "zip_docker"} else "dry_run"
+        return mode if mode in {"dry_run", "local", "local_systemd", "zip_docker"} else "dry_run"
+
+    def systemd_service_name(self) -> str:
+        update_config = self._update_config()
+        return str(self._env("UPDATE_SYSTEMD_SERVICE") or update_config.get("systemd_service") or "agent-api").strip()
+
+    def systemd_restart_delay_seconds(self) -> int:
+        update_config = self._update_config()
+        raw = self._env("UPDATE_SYSTEMD_RESTART_DELAY_SECONDS") or update_config.get("systemd_restart_delay_seconds") or 2
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return 2
+
+    def systemd_restart_command(self) -> list[str]:
+        update_config = self._update_config()
+        raw = self._env("UPDATE_SYSTEMD_RESTART_COMMAND") or update_config.get("systemd_restart_command")
+        if raw:
+            return shlex.split(str(raw))
+        service_name = self.systemd_service_name()
+        delay = self.systemd_restart_delay_seconds()
+        if shutil.which("systemd-run"):
+            return ["sudo", "systemd-run", f"--on-active={delay}", "systemctl", "restart", service_name]
+        return ["sudo", "systemctl", "restart", service_name]
 
     def update_base_url(self) -> str:
         update_config = self._update_config()
@@ -873,6 +897,29 @@ class DockerDeploymentGuard(UpdateConfigMixin):
         }
 
 
+class LocalSystemdRestartService(UpdateConfigMixin):
+    def schedule_restart(self) -> dict[str, Any]:
+        if self.execution_mode() != "local_systemd":
+            return {"status": "skipped", "mode": self.execution_mode()}
+        command = self.systemd_restart_command()
+        try:
+            completed = subprocess.run(command, cwd=self.paths.api_dir, text=True, capture_output=True, timeout=15, check=False)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"Systemd-Neustart konnte nicht geplant werden: {exc}") from exc
+        result = {
+            "status": "scheduled" if completed.returncode == 0 else "failed",
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout": (completed.stdout or "")[-2000:],
+            "stderr": (completed.stderr or "")[-2000:],
+            "service": self.systemd_service_name(),
+            "delay_seconds": self.systemd_restart_delay_seconds(),
+        }
+        if completed.returncode != 0:
+            raise RuntimeError("Systemd-Neustart konnte nicht geplant werden.")
+        return result
+
+
 class UpdateExecutionService(UpdateConfigMixin):
     def commands_for_layer(self, layer: str) -> list[list[str]]:
         compose = ComposeCommandResolver(self.paths).resolve()
@@ -1059,13 +1106,16 @@ class UpdateService(UpdateConfigMixin):
                 self._set_step(state, steps, 2, STEP_SUCCESS, "Installation abgeschlossen.", 70, "Update installiert.")
 
                 self._set_step(state, steps, 3, STEP_RUNNING, "Neustart wird vorbereitet.", 85, "Neustart laeuft.")
+                restart_result: dict[str, Any] | None = None
+                if self.execution_mode() == "local_systemd":
+                    restart_result = LocalSystemdRestartService(self.paths).schedule_restart()
                 self._set_step(state, steps, 3, STEP_SUCCESS, "Neustart abgeschlossen.", 92, "Neustart abgeschlossen.")
                 self._set_step(state, steps, 4, STEP_SUCCESS, f"{self.product_name()} wurde aktualisiert.", 100, "Update erfolgreich.")
 
                 previous_version = str(current["app_version"])
                 self._write_version({**current, "version": target_version, "app_version": target_version, "previous_version": previous_version, "updated_at": utc_now()})
                 state.update({"previous_version": previous_version, "installed_version": target_version, "updated_at": utc_now(), "update_available": False, "backup": backup})
-                state["install"] = {**state["install"], "status": "success", "state": "success", "finished_at": utc_now(), "command_results": command_results, "docker": docker_guard_result}
+                state["install"] = {**state["install"], "status": "success", "state": "success", "finished_at": utc_now(), "command_results": command_results, "restart": restart_result, "docker": docker_guard_result}
                 self._write_state(state)
                 self._audit("install", username, previous_version, target_version, "success", {"layers": layers, "backup": backup, "execution_mode": self.execution_mode()})
                 if "system" in layers:
@@ -1153,7 +1203,7 @@ class UpdateService(UpdateConfigMixin):
         return layers or ["application"]
 
     def _uses_application_zip(self, latest: dict[str, Any]) -> bool:
-        if self.execution_mode() != "local":
+        if self.execution_mode() not in {"local", "local_systemd"}:
             return False
         download_url = str(latest.get("download_url") or "").strip()
         if not download_url or download_url.startswith(("manifest://", "mock://")):

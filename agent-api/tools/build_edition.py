@@ -250,8 +250,10 @@ def personal_config_example() -> dict[str, Any]:
             "server_url": "UPDATE_SERVER_URL",
             "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
-            "execution_mode": "local",
-            "backup_dir": "/opt/seniorcare/backups",
+            "execution_mode": "local_systemd",
+            "systemd_service": "agent-api",
+            "systemd_restart_delay_seconds": 2,
+            "backup_dir": "/opt/roboterSteve/backups",
             "compose_project_dir": ".",
             "compose_file": "docker-compose.yml",
             "healthcheck_url": "http://127.0.0.1:8080/health",
@@ -317,7 +319,7 @@ def seniorcare_config_example() -> dict[str, Any]:
 
 def write_env_example(edition: dict[str, Any], target: Path) -> None:
     name = str(edition.get("name") or "personal")
-    execution_mode = "zip_docker" if name == "seniorcare" else "local"
+    execution_mode = "zip_docker" if name == "seniorcare" else "local_systemd"
     lines = [
         f"ROBOTERSTEVE_EDITION={name}",
         "ROBOTERSTEVE_VERSION=0.1.0",
@@ -344,6 +346,12 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "UPDATE_MANIFEST_PUBLIC_KEY=",
         "OLLAMA_UPDATE_MODELS=",
     ]
+    if name == "personal":
+        lines.extend([
+            "UPDATE_SYSTEMD_SERVICE=agent-api",
+            "UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2",
+            "UPDATE_SYSTEMD_RESTART_COMMAND=",
+        ])
     (target / ".env.example").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

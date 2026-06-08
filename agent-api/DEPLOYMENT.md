@@ -306,6 +306,9 @@ Auf dem Zielsystem muss die Environment-Datei zur Edition passen:
 
 ```ini
 ROBOTERSTEVE_EDITION=personal
+UPDATE_EXECUTION_MODE=local_systemd
+UPDATE_SYSTEMD_SERVICE=agent-api
+UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
 Oder fuer SeniorCare:
@@ -313,6 +316,18 @@ Oder fuer SeniorCare:
 ```ini
 ROBOTERSTEVE_EDITION=seniorcare
 ```
+
+Fuer Personal-Updates ueber die UI muss der systemd-Restart ohne Passwort erlaubt sein. Empfohlen ist eine eng begrenzte sudoers-Regel fuer den Service-User:
+
+```bash
+sudo visudo -f /etc/sudoers.d/robotersteve-update
+```
+
+```text
+robotersteve ALL=NOPASSWD: /usr/bin/systemd-run --on-active=2 systemctl restart agent-api, /bin/systemctl restart agent-api, /usr/bin/systemctl restart agent-api
+```
+
+Der Update-Service plant den Restart verzoegert, damit die API dem Frontend noch den Erfolg melden kann.
 
 ## systemd-Service
 

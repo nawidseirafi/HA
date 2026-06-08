@@ -10,7 +10,9 @@ Personal bleibt ein normales Deployment ohne Docker:
 
 ```ini
 ROBOTERSTEVE_EDITION=personal
-UPDATE_EXECUTION_MODE=local
+UPDATE_EXECUTION_MODE=local_systemd
+UPDATE_SYSTEMD_SERVICE=agent-api
+UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
 SeniorCare ist eine Docker-Edition, wird aber per ZIP aktualisiert:
@@ -26,8 +28,15 @@ UPDATE_COMPOSE_FILE=docker-compose.yml
 Unterstuetzte Modi:
 
 - `dry_run`: Manifest laden, Update simulieren, keine Dateien aendern
-- `local`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, fuer Personal
+- `local`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, ohne automatischen Neustart
+- `local_systemd`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen und danach den systemd-Service neu starten, fuer Personal
 - `zip_docker`: ZIP-Datei in eine Docker-Edition einspielen und lokal per Compose neu bauen, fuer SeniorCare
+
+V1-Regel:
+
+- `local_systemd`: ZIP + systemd-Restart
+- `zip_docker`: ZIP + `docker compose up -d --build`
+- Kein `docker restart` als Standard, weil dabei kein neues Image gebaut wird und neue Dependencies, Frontend-Builds oder Dockerfile-Aenderungen nicht sicher uebernommen werden.
 
 Der alte Docker-Image/Registry-Modus wird in V1 nicht verwendet.
 
@@ -247,7 +256,19 @@ Personal bleibt moeglich:
 ../venv/bin/python tools/build_edition.py personal --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
-Personal nutzt weiterhin `UPDATE_EXECUTION_MODE=local` und kein Docker.
+Personal nutzt `UPDATE_EXECUTION_MODE=local_systemd` und kein Docker.
+Der Restart wird standardmaessig verzoegert geplant:
+
+```bash
+sudo systemd-run --on-active=2 systemctl restart agent-api
+```
+
+Der Service-User braucht dafuer eine eng begrenzte sudo-Regel, z. B.:
+
+```text
+robotersteve ALL=NOPASSWD: /usr/bin/systemd-run --on-active=2 systemctl restart agent-api, /bin/systemctl restart agent-api, /usr/bin/systemctl restart agent-api
+```
+
 Wenn ausnahmsweise nur das lokale Deployment ohne Update-Paket gebaut werden soll:
 
 ```bash

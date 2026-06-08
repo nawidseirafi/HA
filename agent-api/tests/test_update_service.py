@@ -186,6 +186,49 @@ class UpdateServiceTests(unittest.TestCase):
             command_results = service.admin_status()["install"]["command_results"]
             self.assertEqual(command_results[0]["status"], "installed")
 
+    def test_local_systemd_update_installs_zip_and_schedules_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            (paths.api_dir / ".env").write_text("SECRET=keep", encoding="utf-8")
+            (paths.api_dir / "data").mkdir(parents=True)
+            (paths.api_dir / "data" / "private.db").write_text("db", encoding="utf-8")
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            source_zip = paths.api_dir / "release.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("release/backend/new_feature.txt", "installed")
+                archive.writestr("release/.env", "SECRET=replace")
+                archive.writestr("release/data/private.db", "replace")
+            sha256 = hashlib.sha256(source_zip.read_bytes()).hexdigest()
+            paths.config_path.write_text(
+                "updates:\n"
+                "  execution_mode: local_systemd\n"
+                "  manifest_path: update-manifest.json\n"
+                "  systemd_service: agent-api\n"
+                "  systemd_restart_command: /bin/echo restart-agent-api\n",
+                encoding="utf-8",
+            )
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "personal",
+                    "latest_version": "1.4.0",
+                    "download_url": source_zip.as_uri(),
+                    "sha256": sha256,
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+            status = service.install_update(username="admin")
+
+            self.assertEqual(status["current_version"], "1.4.0")
+            self.assertEqual((paths.api_dir / "backend" / "new_feature.txt").read_text(encoding="utf-8"), "installed")
+            self.assertEqual((paths.api_dir / ".env").read_text(encoding="utf-8"), "SECRET=keep")
+            self.assertEqual((paths.api_dir / "data" / "private.db").read_text(encoding="utf-8"), "db")
+            restart = service.admin_status()["install"]["restart"]
+            self.assertEqual(restart["status"], "scheduled")
+            self.assertEqual(restart["command"], ["/bin/echo", "restart-agent-api"])
+
     def test_application_zip_rejects_wrong_product(self):
         with tempfile.TemporaryDirectory() as tmp:
             paths = self._paths(tmp)
@@ -339,7 +382,12 @@ class UpdateServiceTests(unittest.TestCase):
                 def __exit__(self, *_args):
                     return False
 
+            commands: list[list[str]] = []
+
             def fake_run(*args, **kwargs):
+                command = args[0] if args else kwargs.get("args")
+                if isinstance(command, list):
+                    commands.append(command)
                 return type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
             with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/docker"), \
@@ -354,6 +402,9 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertEqual((deploy / "backend" / "main.py").read_text(encoding="utf-8"), "new")
             self.assertEqual((deploy / "docker-compose.yml").read_text(encoding="utf-8"), "services: {}")
             self.assertTrue((deploy / "backups").exists())
+            self.assertIn(["docker", "compose", "up", "-d", "--build"], commands)
+            self.assertNotIn(["docker", "restart", "robotersteve-api"], commands)
+            self.assertFalse(any(command[-1:] == ["restart"] or "restart" in command for command in commands))
 
     def _paths(self, tmp: str) -> UpdatePaths:
         root = Path(tmp)
