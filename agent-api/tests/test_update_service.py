@@ -260,6 +260,34 @@ class UpdateServiceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 service.install_update(username="admin")
 
+    def test_rollback_is_rejected_for_local_deployments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            paths.config_path.write_text("updates:\n  execution_mode: local\n", encoding="utf-8")
+            service = UpdateService(paths)
+            with self.assertRaisesRegex(RuntimeError, "Docker"):
+                service.rollback(username="admin")
+
+    def test_docker_manifest_does_not_use_zip_installer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            paths.config_path.write_text("updates:\n  execution_mode: docker\n  manifest_path: update-manifest.json\n", encoding="utf-8")
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "personal",
+                    "latest_version": "1.4.0",
+                    "download_url": "file:///tmp/app.zip",
+                    "sha256": "0" * 64,
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+            self.assertFalse(service._uses_application_zip(service.admin_status()["latest"]))
+
     def _paths(self, tmp: str) -> UpdatePaths:
         root = Path(tmp)
         return UpdatePaths(

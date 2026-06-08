@@ -96,6 +96,7 @@ def main() -> int:
     write_config_example(edition, target)
     write_env_example(edition, target)
     write_docker_compose(edition, target)
+    write_dockerfile(edition, target)
     write_readme(edition, target)
     create_release_artifacts(edition, target)
 
@@ -212,8 +213,11 @@ def personal_config_example() -> dict[str, Any]:
             "server_url": "UPDATE_SERVER_URL",
             "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
-            "execution_mode": "dry_run",
+            "execution_mode": "local",
             "backup_dir": "/opt/roboterSteve/backups",
+            "compose_project_dir": ".",
+            "compose_file": "docker-compose.yml",
+            "healthcheck_url": "http://127.0.0.1:8080/health",
             "services": {
                 "api": "robotersteve-api",
                 "ollama": "ollama",
@@ -251,8 +255,11 @@ def seniorcare_config_example() -> dict[str, Any]:
             "server_url": "UPDATE_SERVER_URL",
             "manifest_url": "UPDATE_MANIFEST_URL",
             "manifest_path": "update-manifest.json",
-            "execution_mode": "dry_run",
+            "execution_mode": "docker",
             "backup_dir": "/opt/roboterSteve/backups",
+            "compose_project_dir": "/opt/roboterSteve",
+            "compose_file": "docker-compose.yml",
+            "healthcheck_url": "http://127.0.0.1:8080/health",
             "services": {
                 "api": "robotersteve-api",
                 "ollama": "ollama",
@@ -271,8 +278,10 @@ def seniorcare_config_example() -> dict[str, Any]:
 
 
 def write_env_example(edition: dict[str, Any], target: Path) -> None:
+    name = str(edition.get("name") or "personal")
+    execution_mode = "docker" if name == "seniorcare" else "local"
     lines = [
-        f"ROBOTERSTEVE_EDITION={edition.get('name')}",
+        f"ROBOTERSTEVE_EDITION={name}",
         "ROBOTERSTEVE_VERSION=0.1.0",
         "ROBOTERSTEVE_BUILD=2026.06.08",
         "ROBOTERSTEVE_COMMIT=development",
@@ -287,8 +296,13 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "UPDATE_MANIFEST_URL=",
         "UPDATE_MANIFEST_PATH=update-manifest.json",
         "UPDATE_CHANNEL=stable",
-        "UPDATE_EXECUTION_MODE=dry_run",
+        f"UPDATE_EXECUTION_MODE={execution_mode}",
+        f"ROBOTERSTEVE_API_IMAGE=robotersteve/{name}-api:latest" if name == "seniorcare" else "ROBOTERSTEVE_API_IMAGE=",
         "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
+        "UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve" if name == "seniorcare" else "UPDATE_COMPOSE_PROJECT_DIR=.",
+        "UPDATE_COMPOSE_FILE=docker-compose.yml",
+        "UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health",
+        "UPDATE_MANIFEST_PUBLIC_KEY=",
         "OLLAMA_UPDATE_MODELS=",
     ]
     (target / ".env.example").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -304,13 +318,31 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
 
     services: dict[str, Any] = {
         "robotersteve-api": {
-            "image": "python:3.12-slim",
+            "image": "${ROBOTERSTEVE_API_IMAGE:-robotersteve/seniorcare-api:latest}",
+            "restart": "unless-stopped",
             "working_dir": "/app",
-            "volumes": [".:/app", "/var/run/docker.sock:/var/run/docker.sock"],
+            "volumes": [
+                ".:/opt/roboterSteve",
+                "./config.yaml:/app/config.yaml",
+                "./.env:/app/.env",
+                "./data:/app/data",
+                "./logs:/app/logs",
+                "./editions:/app/editions:ro",
+                "/var/run/docker.sock:/var/run/docker.sock",
+            ],
             "env_file": [".env"],
-            "environment": {"UPDATE_EXECUTION_MODE": "docker"},
-            "command": "sh -c \"apt-get update && apt-get install -y docker.io docker-compose && pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8080\"",
+            "environment": {
+                "UPDATE_EXECUTION_MODE": "docker",
+                "UPDATE_COMPOSE_PROJECT_DIR": "/opt/roboterSteve",
+                "UPDATE_COMPOSE_FILE": "docker-compose.yml",
+            },
             "ports": ["8080:8080"],
+            "healthcheck": {
+                "test": ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"],
+                "interval": "30s",
+                "timeout": "5s",
+                "retries": 5,
+            },
         }
     }
     if name == "seniorcare":
@@ -323,6 +355,35 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
     if name == "seniorcare":
         compose["volumes"] = {"ollama": None}
     (target / "docker-compose.yml").write_text(yaml.safe_dump(compose, sort_keys=False), encoding="utf-8")
+
+
+def write_dockerfile(edition: dict[str, Any], target: Path) -> None:
+    name = str(edition.get("name") or "personal")
+    if name == "personal":
+        return
+    dockerfile = """FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \\
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update \\
+    && apt-get install -y --no-install-recommends docker.io docker-compose ca-certificates curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY backend /app/backend
+COPY frontend/dist /app/frontend/dist
+COPY editions /app/editions
+COPY version.json update-manifest.json /app/
+
+EXPOSE 8080
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
+"""
+    (target / "Dockerfile").write_text(dockerfile, encoding="utf-8")
 
 
 def write_readme(edition: dict[str, Any], target: Path) -> None:
@@ -361,15 +422,33 @@ Diese Personal Edition ist fuer ein normales Python/systemd-Deployment vorgesehe
 """
     else:
         install_section = """## Installation
-1. `.env.example` nach `.env` kopieren und Werte setzen.
-2. `config.example.yaml` nach `config.yaml` kopieren und anpassen.
-3. `pip install -r requirements.txt`
-4. `uvicorn backend.main:app --host 0.0.0.0 --port 8080`
+1. Deployment-Verzeichnis auf dem Zielrechner vorbereiten, z. B. `/opt/roboterSteve`.
+2. `.env.example` nach `.env` kopieren und Werte setzen.
+3. `config.example.yaml` nach `config.yaml` kopieren und anpassen.
+4. API-Image bauen und in eine Registry pushen oder `ROBOTERSTEVE_API_IMAGE` auf ein vorhandenes Image setzen:
+   ```bash
+   docker build -t robotersteve/seniorcare-api:latest .
+   ```
+5. Docker Compose starten:
+   ```bash
+   docker compose up -d
+   ```
 
 ## Docker Compose
 ```bash
-docker compose up
+docker compose up -d
 ```
+
+## Updates
+Diese Edition ist fuer Docker-basierte Updates vorgesehen.
+
+```env
+UPDATE_EXECUTION_MODE=docker
+UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve
+UPDATE_COMPOSE_FILE=docker-compose.yml
+```
+
+Der Update-Mechanismus nutzt `docker compose pull`, `docker compose down` und `docker compose up -d`. Rollback ist nur in diesem Docker-Modus aktiviert.
 """
 
     text = f"""# RoboterSteve {name} Edition
@@ -474,27 +553,60 @@ def deployment_manifest(
 
 def update_latest_manifest(edition_name: str, version: str, deployment: dict[str, Any]) -> dict[str, Any]:
     artifact = deployment["artifact"]
-    return {
+    docker_based = edition_name == "seniorcare"
+    manifest = {
         "schema_version": 1,
         "product": edition_name,
         "latest_version": version,
-        "download_url": artifact["download_url"],
+        "download_url": "" if docker_based else artifact["download_url"],
         "sha256": artifact["sha256"],
         "size_bytes": artifact["size_bytes"],
         "mandatory": False,
         "minimum_version": "0.1.0",
+        "update_strategy": "docker_compose" if docker_based else "zip",
         "release_notes": [
             f"{edition_name} {version} Release.",
             "Application-Paket fuer Update Engine V1.",
         ],
         "components": {
             "application": {"update": True},
-            "homeassistant": {"update": False},
-            "ollama": {"update": False},
+            "homeassistant": {"update": docker_based},
+            "ollama": {"update": docker_based},
             "system": {"update": False},
         },
         "deployment_manifest": "deployment-manifest.json",
     }
+    if docker_based:
+        manifest["artifacts"] = {
+            "zip": {
+                "file": artifact["file"],
+                "download_url": artifact["download_url"],
+                "sha256": artifact["sha256"],
+                "size_bytes": artifact["size_bytes"],
+            }
+        }
+    signature = sign_manifest_if_configured(manifest)
+    if signature:
+        manifest["signature"] = signature
+    return manifest
+
+
+def sign_manifest_if_configured(manifest: dict[str, Any]) -> str:
+    key = os.environ.get("UPDATE_MANIFEST_SIGNING_KEY", "").strip()
+    if not key:
+        return ""
+    key_path = Path(key).expanduser()
+    if not key_path.exists():
+        raise SystemExit(f"UPDATE_MANIFEST_SIGNING_KEY not found: {key_path}")
+    import base64
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="robotersteve-manifest-sign-") as tmp:
+        tmp_dir = Path(tmp)
+        payload_path = tmp_dir / "manifest.json"
+        signature_path = tmp_dir / "manifest.sig"
+        payload_path.write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+        subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(key_path), "-out", str(signature_path), str(payload_path)], check=True)
+        return base64.b64encode(signature_path.read_bytes()).decode("ascii")
 
 
 def release_download_url(edition_name: str, version: str, zip_name: str) -> str:

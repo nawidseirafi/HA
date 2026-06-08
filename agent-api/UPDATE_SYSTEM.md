@@ -56,6 +56,10 @@ UPDATE_MANIFEST_URL=https://updates.robotersteve.ai/seniorcare/stable/latest.jso
 UPDATE_MANIFEST_PATH=update-manifest.json
 UPDATE_CHANNEL=stable
 UPDATE_EXECUTION_MODE=dry_run
+UPDATE_COMPOSE_PROJECT_DIR=.
+UPDATE_COMPOSE_FILE=docker-compose.yml
+UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health
+UPDATE_MANIFEST_PUBLIC_KEY=
 ```
 
 ## Update-Server
@@ -104,6 +108,18 @@ UPDATE_EXECUTION_MODE=local
 ```
 
 `sha256` ist fuer ZIP-Installation Pflicht. ZIP-Dateien ohne passende Pruefsumme werden nicht installiert.
+
+Optional kann das Manifest signiert werden. Dann wird im Zielsystem gesetzt:
+
+```ini
+UPDATE_MANIFEST_PUBLIC_KEY=/opt/roboterSteve/keys/update-public.pem
+```
+
+Das Manifest muss dann ein Feld `signature` enthalten. Die Signatur ist base64-kodiert und wird ueber die kanonische JSON-Struktur ohne `signature` mit `openssl dgst -sha256 -verify` geprueft. Der Edition-Builder kann Manifeste signieren:
+
+```bash
+UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem python tools/build_edition.py seniorcare
+```
 
 ## Release Build
 
@@ -212,7 +228,9 @@ Produktive ZIP-Deployments aktivieren:
 UPDATE_EXECUTION_MODE=local
 ```
 
-Dann wird das Application-ZIP geladen, per SHA256 geprueft und in das Deployment-Verzeichnis eingespielt. Nie ueberschrieben werden:
+Dann wird das Application-ZIP geladen, per SHA256 geprueft und in das Deployment-Verzeichnis eingespielt. Dieser Modus ist fuer normale Personal-/Python-Deployments vorgesehen. Rollback ueber die UI ist in diesem Modus bewusst deaktiviert, weil Dateikopie-Rollbacks ohne Datenbankmigrationen und Service-Orchestrierung fuer Kundenbetrieb riskant sind.
+
+Nie ueberschrieben werden:
 
 - `.env`
 - `data/`
@@ -225,6 +243,9 @@ Produktive Docker-Deployments aktivieren:
 
 ```ini
 UPDATE_EXECUTION_MODE=docker
+UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve
+UPDATE_COMPOSE_FILE=docker-compose.yml
+UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health
 ```
 
 Dann startet das Update im Hintergrund:
@@ -236,6 +257,24 @@ docker compose up -d
 ```
 
 Der Hintergrundmodus ist notwendig, weil `docker compose down` die laufende API beendet.
+
+Docker-Modus ist der Produktmodus fuer SeniorCare. Vor Installation und Rollback wird geprueft:
+
+- `docker` ist verfuegbar
+- `docker compose` oder `docker-compose` ist verfuegbar
+- `UPDATE_COMPOSE_FILE` existiert
+
+Application-ZIP-Dateien werden im Docker-Modus nicht in das laufende Deployment kopiert. Das Manifest steuert nur, welche Komponenten aktualisiert werden. Die eigentliche Aktualisierung erfolgt ueber Compose/Image-Pull.
+
+Wichtig fuer vermarktete SeniorCare-Installationen: Der API-Service muss in `docker-compose.yml` ein echtes Produkt-Image verwenden, z. B.
+
+```yaml
+services:
+  robotersteve-api:
+    image: robotersteve/seniorcare-api:latest
+```
+
+Ein Compose-Setup, das nur `python:3.12-slim` startet und den lokalen Quellcode per Volume einbindet, ist nicht updatefaehig ueber `docker compose pull`. Der Edition-Builder erzeugt fuer Docker-Editionen deshalb ein `Dockerfile` und eine Compose-Datei mit `ROBOTERSTEVE_API_IMAGE`.
 
 Weitere Ebenen:
 
@@ -259,6 +298,55 @@ Vor Installation wird ein `tar.gz`-Backup erstellt unter:
 ```text
 /opt/roboterSteve/backups/
 ```
+
+Gesichert werden:
+
+- `config.yaml`
+- `.env`
+- `data/`
+- `editions/`
+- `settings/`
+- Agent-Konfigurationen
+
+## Rollback
+
+Rollback ist nur fuer Docker-basierte Deployments aktiviert:
+
+```ini
+UPDATE_EXECUTION_MODE=docker
+```
+
+Ablauf:
+
+1. `docker compose down`
+2. letztes Backup wiederherstellen
+3. `docker compose up -d`
+4. Version/Status/Audit-Log aktualisieren
+
+Bei `UPDATE_EXECUTION_MODE=local` oder `dry_run` lehnt die API Rollback ab. Das ist Absicht. Lokale Dateikopie-Deployments sollten fuer Produktkunden nicht per Ein-Klick-Rollback zurueckgesetzt werden, solange Datenbankmigrationen nicht transaktional versioniert sind.
+
+## Empfohlene Produktaufteilung
+
+Personal, normales Deployment:
+
+```ini
+ROBOTERSTEVE_EDITION=personal
+UPDATE_EXECUTION_MODE=local
+UPDATE_MANIFEST_URL=https://updates.example.com/personal/stable/latest.json
+```
+
+SeniorCare, Docker-Deployment:
+
+```ini
+ROBOTERSTEVE_EDITION=seniorcare
+UPDATE_EXECUTION_MODE=docker
+UPDATE_MANIFEST_URL=https://updates.example.com/seniorcare/stable/latest.json
+UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve
+UPDATE_COMPOSE_FILE=docker-compose.yml
+UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health
+```
+
+Fuer vermarktete SeniorCare-Installationen sollte `UPDATE_MANIFEST_PUBLIC_KEY` gesetzt werden, damit nur signierte Update-Manifeste akzeptiert werden.
 
 Gesichert werden:
 

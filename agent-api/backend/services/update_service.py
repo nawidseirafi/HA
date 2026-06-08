@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import base64
 import hashlib
 import shutil
 import subprocess
@@ -115,6 +116,24 @@ class UpdateConfigMixin:
             path = Path(str(raw)).expanduser()
             return path if path.is_absolute() else self.paths.api_dir / path
         return self.paths.manifest_file
+
+    def compose_project_dir(self) -> Path:
+        update_config = self._update_config()
+        raw = self._env("UPDATE_COMPOSE_PROJECT_DIR") or update_config.get("compose_project_dir")
+        if raw:
+            path = Path(str(raw)).expanduser()
+            return path if path.is_absolute() else self.paths.api_dir / path
+        return self.paths.api_dir
+
+    def compose_file(self) -> Path:
+        update_config = self._update_config()
+        raw = self._env("UPDATE_COMPOSE_FILE") or update_config.get("compose_file") or "docker-compose.yml"
+        path = Path(str(raw)).expanduser()
+        return path if path.is_absolute() else self.compose_project_dir() / path
+
+    def healthcheck_url(self) -> str:
+        update_config = self._update_config()
+        return str(self._env("UPDATE_HEALTHCHECK_URL") or update_config.get("healthcheck_url") or "http://127.0.0.1:8080/health").strip()
 
     def service_names(self) -> dict[str, str]:
         update_config = self._update_config()
@@ -286,9 +305,11 @@ class UpdateCheckService(UpdateConfigMixin):
         request = urllib.request.Request(url, headers={"Accept": "application/json"})
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                raw = response.read().decode("utf-8")
+                data = json.loads(raw)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"Update-Manifest nicht erreichbar: {exc}") from exc
+        self._verify_manifest_signature(data if isinstance(data, dict) else {})
         selected = self._select_manifest_entry(data if isinstance(data, dict) else {}, channel)
         if selected is None:
             raise RuntimeError("Update-Manifest enthaelt keine passende Version.")
@@ -299,6 +320,7 @@ class UpdateCheckService(UpdateConfigMixin):
         if not path.exists():
             return None
         manifest = self._read_json(path, {})
+        self._verify_manifest_signature(manifest)
         selected = self._select_manifest_entry(manifest, channel)
         if selected is None:
             return None
@@ -392,6 +414,37 @@ class UpdateCheckService(UpdateConfigMixin):
         value = str(channel or DEFAULT_CHANNEL).strip().lower()
         return value if value in VALID_CHANNELS else DEFAULT_CHANNEL
 
+    def _verify_manifest_signature(self, manifest: dict[str, Any]) -> None:
+        public_key = str(self._env("UPDATE_MANIFEST_PUBLIC_KEY") or "").strip()
+        if not public_key:
+            return
+        signature = str(manifest.get("signature") or "").strip()
+        if not signature:
+            raise RuntimeError("Update-Manifest ist nicht signiert.")
+        key_path = Path(public_key).expanduser()
+        if not key_path.exists():
+            raise RuntimeError("Update-Manifest Public Key wurde nicht gefunden.")
+        with tempfile.TemporaryDirectory(prefix="robotersteve-manifest-verify-") as tmp:
+            tmp_dir = Path(tmp)
+            payload = dict(manifest)
+            payload.pop("signature", None)
+            payload_path = tmp_dir / "manifest.json"
+            signature_path = tmp_dir / "manifest.sig"
+            payload_path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+            try:
+                signature_path.write_bytes(base64.b64decode(signature, validate=True))
+            except Exception as exc:
+                raise RuntimeError("Update-Manifest Signatur ist nicht gueltig base64-kodiert.") from exc
+            completed = subprocess.run(
+                ["openssl", "dgst", "-sha256", "-verify", str(key_path), "-signature", str(signature_path), str(payload_path)],
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError("Update-Manifest Signatur ist ungueltig.")
+
 
 class BackupEngine(UpdateConfigMixin):
     def create_backup(self, version: dict[str, Any]) -> dict[str, Any]:
@@ -404,7 +457,12 @@ class BackupEngine(UpdateConfigMixin):
             backup_dir = fallback
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         target = backup_dir / f"backup-{stamp}.tar.gz"
-        metadata = {"version": version.get("app_version") or version.get("version"), "created": utc_now(), "edition": active_edition().name}
+        metadata = {
+            "version": version.get("app_version") or version.get("version"),
+            "created": utc_now(),
+            "edition": active_edition().name,
+            "execution_mode": self.execution_mode(),
+        }
         include_paths = self._backup_sources()
         with tarfile.open(target, "w:gz") as archive:
             metadata_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
@@ -429,11 +487,11 @@ class BackupEngine(UpdateConfigMixin):
         return backups[0] if backups else None
 
     def restore_latest_backup(self) -> dict[str, Any]:
+        if self.execution_mode() != "docker":
+            raise RuntimeError("Rollback ist nur fuer Docker-basierte Deployments aktiviert.")
         backup = self.latest_backup()
         if backup is None:
             raise RuntimeError("Kein Backup fuer Rollback vorhanden.")
-        if self.execution_mode() != "docker":
-            return {"status": "skipped", "reason": "dry_run", "backup": str(backup)}
         with tarfile.open(backup, "r:gz") as archive:
             self._safe_extract(archive, self.paths.api_dir)
         return {"status": "restored", "backup": str(backup)}
@@ -602,6 +660,29 @@ class ComposeCommandResolver:
         return ["docker", "compose"]
 
 
+class DockerDeploymentGuard(UpdateConfigMixin):
+    def validate(self) -> dict[str, Any]:
+        if self.execution_mode() != "docker":
+            return {"ok": True, "mode": self.execution_mode()}
+        compose_file = self.compose_file()
+        if not compose_file.exists():
+            raise RuntimeError(f"Docker Compose Datei nicht gefunden: {compose_file}")
+        if not shutil.which("docker"):
+            raise RuntimeError("Docker wurde nicht gefunden.")
+        compose = ComposeCommandResolver(self.paths).resolve()
+        completed = subprocess.run(compose + ["version"], cwd=self.compose_project_dir(), text=True, capture_output=True, timeout=10, check=False)
+        if completed.returncode != 0:
+            raise RuntimeError("Docker Compose ist nicht verfuegbar.")
+        return {
+            "ok": True,
+            "mode": "docker",
+            "compose_command": compose,
+            "compose_project_dir": str(self.compose_project_dir()),
+            "compose_file": str(compose_file),
+            "healthcheck_url": self.healthcheck_url(),
+        }
+
+
 class UpdateExecutionService(UpdateConfigMixin):
     def commands_for_layer(self, layer: str) -> list[list[str]]:
         compose = ComposeCommandResolver(self.paths).resolve()
@@ -628,13 +709,14 @@ class UpdateExecutionService(UpdateConfigMixin):
     def _run_commands(self, commands: list[list[str]]) -> list[dict[str, Any]]:
         if self.execution_mode() == "docker":
             text = " && ".join(" ".join(_shell_quote(part) for part in command) for command in commands)
-            process = subprocess.Popen(["sh", "-c", f"sleep 2; {text}"], cwd=self.paths.api_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            process = subprocess.Popen(["sh", "-c", f"sleep 2; {text}"], cwd=self.compose_project_dir(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             return [{"command": command, "status": "started_background", "pid": process.pid} for command in commands]
         return [{"command": command, "status": "skipped", "reason": "dry_run"} for command in commands]
 
 
 class RollbackService(UpdateConfigMixin):
     def rollback(self) -> dict[str, Any]:
+        DockerDeploymentGuard(self.paths).validate()
         executor = UpdateExecutionService(self.paths)
         backup = BackupEngine(self.paths)
         commands = executor.rollback_commands()
@@ -701,7 +783,11 @@ class UpdateService(UpdateConfigMixin):
             "latest": latest,
             "update_available": bool(state.get("update_available", False)),
             "install": install,
-            "rollback": state.get("rollback") or {"available": bool(BackupEngine(self.paths).latest_backup()), "previous_version": state.get("previous_version")},
+            "rollback": state.get("rollback") or {
+                "available": self.execution_mode() == "docker" and bool(BackupEngine(self.paths).latest_backup()),
+                "docker_only": True,
+                "previous_version": state.get("previous_version"),
+            },
             "last_error": state.get("last_error"),
             "backup": state.get("backup"),
         }
@@ -763,6 +849,7 @@ class UpdateService(UpdateConfigMixin):
             current = self.current_version()
             target_version = str(latest.get("latest_version") or current["app_version"])
             self._validate_latest_for_install(latest, str(current["app_version"]))
+            docker_guard_result = DockerDeploymentGuard(self.paths).validate()
             steps = self._initial_steps(target_version)
             self._set_install_state(state, "running", steps, 0, 0, "Update wird vorbereitet.", target_version, layers)
             try:
@@ -788,7 +875,7 @@ class UpdateService(UpdateConfigMixin):
                 previous_version = str(current["app_version"])
                 self._write_version({**current, "version": target_version, "app_version": target_version, "previous_version": previous_version, "updated_at": utc_now()})
                 state.update({"previous_version": previous_version, "installed_version": target_version, "updated_at": utc_now(), "update_available": False, "backup": backup})
-                state["install"] = {**state["install"], "status": "success", "state": "success", "finished_at": utc_now(), "command_results": command_results}
+                state["install"] = {**state["install"], "status": "success", "state": "success", "finished_at": utc_now(), "command_results": command_results, "docker": docker_guard_result}
                 self._write_state(state)
                 self._audit("install", username, previous_version, target_version, "success", {"layers": layers, "backup": backup, "execution_mode": self.execution_mode()})
                 if "system" in layers:
@@ -800,7 +887,10 @@ class UpdateService(UpdateConfigMixin):
                 raise
 
     def rollback(self, username: str = "admin") -> dict[str, Any]:
+        if self.execution_mode() != "docker":
+            raise RuntimeError("Rollback ist nur fuer Docker-basierte Deployments aktiviert.")
         with self._lock:
+            DockerDeploymentGuard(self.paths).validate()
             state = self._read_state()
             current = self.current_version()
             previous_version = str(state.get("previous_version") or "").strip()
@@ -870,6 +960,8 @@ class UpdateService(UpdateConfigMixin):
         return layers or ["application"]
 
     def _uses_application_zip(self, latest: dict[str, Any]) -> bool:
+        if self.execution_mode() != "local":
+            return False
         download_url = str(latest.get("download_url") or "").strip()
         if not download_url or download_url.startswith(("manifest://", "mock://")):
             return False
