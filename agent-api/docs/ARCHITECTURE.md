@@ -1,6 +1,6 @@
 # RoboterSteve Architektur README - Ist-Zustand
 
-Stand: 2026-06-07
+Stand: 2026-06-09
 
 Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Service V1, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness/Invoice-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
 
@@ -35,7 +35,7 @@ Das Frontend liegt unter:
 agent-api/frontend/
 ```
 
-Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die bisherige Anwendung; `seniorcare` ist eine eigene Placeholder-App fuer die Produktedition.
+Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber die Backend-Editionserkennung und als Fallback ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die private RoboterSteve-Anwendung; `seniorcare` ist eine eigene mobile-first Produktoberflaeche mit Onboarding, Dashboard, Verlauf, Raeumen, Kontakten und Einstellungen.
 
 Wichtige UI-Bereiche:
 
@@ -281,8 +281,8 @@ Unterstuetzte Actions:
 
 Standard-Tasks:
 
-- Market Analyse um 06:00, 12:00 und 18:00
-- Infrastructure Health Check alle 5 Minuten
+- Market Analyse um 18:00
+- Infrastructure Health Check taeglich um 07:00
 - Vacation Statuspruefung taeglich
 - Household Fensterpruefung um 22:00
 - Invoice Agent Lauf um 22:00
@@ -1024,7 +1024,7 @@ frontend/src/
 `frontend/src/main.tsx` waehlt die App ueber `VITE_ROBOTERSTEVE_EDITION`:
 
 - `personal`: bisherige private App mit Agent Console, Invoice, Market, MyWellness, Vacation, Scheduler, Wall Dashboard und Settings.
-- `seniorcare`: eigene Produkt-App mit Placeholder-Seiten fuer Setup, Dashboard, Sensoren, Kontakte, Hinweise und Einstellungen.
+- `seniorcare`: eigene Produkt-App mit Premium-/mobile-first UI fuer Setup, Dashboard, Verlauf, Raeume, Kontakte und Einstellungen.
 
 Gemeinsame Bausteine gehoeren nach `src/shared/`. Produktnavigation, Produktseiten und edition-spezifische UI bleiben in `src/apps/<edition>/`. Dadurch muessen spaetere Produkteditionen keine verstreuten Edition-Abfragen in Personal-Komponenten einbauen.
 
@@ -1131,7 +1131,7 @@ Relevante Dateien:
 
 ```text
 agent-api/agent-api.service
-agent-api/DEPLOYMENT.md
+agent-api/docs/DEPLOYMENT.md
 agent-api/frontend/dist/
 ```
 
@@ -1227,7 +1227,6 @@ Vacation Dashboard
 - keine Event-Historie fuer Agent-Control
 - keine zentralen Start-All/Stop-All-Endpunkte
 - keine Control-Buttons im Wall-Dashboard
-- keine Persistenz fuer Infrastructure-Verlauf
 - keine automatische Anwesenheitssimulation
 - keine automatische Lampen-/Jalousie-/Geraetesteuerung durch Vacation
 - keine globale automatische Push-Auslieferung ueber Messaging Targets

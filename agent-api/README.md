@@ -704,4 +704,4 @@ Edition-Builds enthalten `editions/edition.lock`. Dadurch ist ein Build auf gena
 
 ## Update-System
 
-RoboterSteve enthaelt einen edition-unabhaengigen Core-Service `system` fuer Versionen und Updates. Die wichtigsten Endpunkte sind `GET /api/system/version`, `GET /api/system/update/check`, `POST /api/system/update/install`, `GET /api/system/update/status` und `POST /api/system/update/rollback`. Details stehen in `UPDATE_SYSTEM.md`.
+RoboterSteve enthaelt einen edition-unabhaengigen Core-Service `system` fuer Versionen und Updates. Die wichtigsten Endpunkte sind `GET /api/system/version`, `GET /api/system/update/check`, `POST /api/system/update/install`, `GET /api/system/update/status` und `POST /api/system/update/rollback`. Details stehen in `docs/UPDATE_SYSTEM.md`.

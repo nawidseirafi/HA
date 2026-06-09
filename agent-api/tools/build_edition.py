@@ -173,7 +173,8 @@ def copy_backend(edition: dict[str, Any], target: Path) -> None:
 
 def copy_requirements(target: Path) -> None:
     copy_path(API_DIR / "requirements.txt", target / "requirements.txt")
-    copy_path(API_DIR / "UPDATE_SYSTEM.md", target / "UPDATE_SYSTEM.md")
+    copy_path(API_DIR / "docs" / "DEPLOYMENT.md", target / "docs" / "DEPLOYMENT.md")
+    copy_path(API_DIR / "docs" / "UPDATE_SYSTEM.md", target / "docs" / "UPDATE_SYSTEM.md")
 
 
 def copy_version_file(target: Path, version_override: str = "") -> None:
