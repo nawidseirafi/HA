@@ -130,7 +130,7 @@ class UpdateConfigMixin:
     def execution_mode(self) -> str:
         update_config = self._update_config()
         mode = str(self._env("UPDATE_EXECUTION_MODE") or update_config.get("execution_mode") or "dry_run").strip().lower()
-        return mode if mode in {"dry_run", "local", "local_systemd", "zip_docker"} else "dry_run"
+        return mode if mode in {"dry_run", "local", "local_systemd", "local_no_restart", "zip_docker"} else "dry_run"
 
     def systemd_service_name(self) -> str:
         update_config = self._update_config()
@@ -899,7 +899,7 @@ class DockerDeploymentGuard(UpdateConfigMixin):
 
 class LocalSystemdRestartService(UpdateConfigMixin):
     def schedule_restart(self) -> dict[str, Any]:
-        if self.execution_mode() != "local_systemd":
+        if self.execution_mode() not in {"local", "local_systemd"}:
             return {"status": "skipped", "mode": self.execution_mode()}
         command = self.systemd_restart_command()
         try:
@@ -1107,7 +1107,7 @@ class UpdateService(UpdateConfigMixin):
 
                 self._set_step(state, steps, 3, STEP_RUNNING, "Neustart wird vorbereitet.", 85, "Neustart laeuft.")
                 restart_result: dict[str, Any] | None = None
-                if self.execution_mode() == "local_systemd":
+                if self.execution_mode() in {"local", "local_systemd"}:
                     restart_result = LocalSystemdRestartService(self.paths).schedule_restart()
                 self._set_step(state, steps, 3, STEP_SUCCESS, "Neustart abgeschlossen.", 92, "Neustart abgeschlossen.")
                 self._set_step(state, steps, 4, STEP_SUCCESS, f"{self.product_name()} wurde aktualisiert.", 100, "Update erfolgreich.")
@@ -1203,7 +1203,7 @@ class UpdateService(UpdateConfigMixin):
         return layers or ["application"]
 
     def _uses_application_zip(self, latest: dict[str, Any]) -> bool:
-        if self.execution_mode() not in {"local", "local_systemd"}:
+        if self.execution_mode() not in {"local", "local_systemd", "local_no_restart"}:
             return False
         download_url = str(latest.get("download_url") or "").strip()
         if not download_url or download_url.startswith(("manifest://", "mock://")):

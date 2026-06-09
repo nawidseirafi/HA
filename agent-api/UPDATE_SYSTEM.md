@@ -28,13 +28,15 @@ UPDATE_COMPOSE_FILE=docker-compose.yml
 Unterstuetzte Modi:
 
 - `dry_run`: Manifest laden, Update simulieren, keine Dateien aendern
-- `local`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, ohne automatischen Neustart
+- `local`: Legacy-Alias fuer `local_systemd`, ZIP-Datei einspielen und danach den systemd-Service neu starten
 - `local_systemd`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen und danach den systemd-Service neu starten, fuer Personal
+- `local_no_restart`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, ohne automatischen Neustart
 - `zip_docker`: ZIP-Datei in eine Docker-Edition einspielen und lokal per Compose neu bauen, fuer SeniorCare
 
 V1-Regel:
 
 - `local_systemd`: ZIP + systemd-Restart
+- `local`: ZIP + systemd-Restart, aus Kompatibilitaet mit alten Personal-Installationen
 - `zip_docker`: ZIP + `docker compose up -d --build`
 - Kein `docker restart` als Standard, weil dabei kein neues Image gebaut wird und neue Dependencies, Frontend-Builds oder Dockerfile-Aenderungen nicht sicher uebernommen werden.
 

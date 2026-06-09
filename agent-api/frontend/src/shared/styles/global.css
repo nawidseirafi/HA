@@ -725,6 +725,10 @@ p { color: var(--muted); line-height: 1.65; }
 .market-report-head > div {
   min-width: 0;
 }
+.page-actions {
+  display: flex;
+  gap: 10px;
+}
 
 .page-header p, .dashboard-hero p { margin-top: 10px; }
 

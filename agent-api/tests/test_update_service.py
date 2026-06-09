@@ -158,7 +158,7 @@ class UpdateServiceTests(unittest.TestCase):
                 archive.writestr("release/data/private.db", "must-not-copy")
             sha256 = hashlib.sha256(source_zip.read_bytes()).hexdigest()
             paths.config_path.write_text(
-                "updates:\n  execution_mode: local\n  manifest_path: update-manifest.json\n",
+                "updates:\n  execution_mode: local_no_restart\n  manifest_path: update-manifest.json\n",
                 encoding="utf-8",
             )
             paths.manifest_file.write_text(
@@ -185,6 +185,38 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertFalse((paths.api_dir / "data" / "private.db").exists())
             command_results = service.admin_status()["install"]["command_results"]
             self.assertEqual(command_results[0]["status"], "installed")
+
+    def test_legacy_local_update_schedules_systemd_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            source_zip = paths.api_dir / "release.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("release/backend/new_feature.txt", "installed")
+            sha256 = hashlib.sha256(source_zip.read_bytes()).hexdigest()
+            paths.config_path.write_text(
+                "updates:\n"
+                "  execution_mode: local\n"
+                "  manifest_path: update-manifest.json\n"
+                "  systemd_restart_command: /bin/echo restart-agent-api\n",
+                encoding="utf-8",
+            )
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "personal",
+                    "latest_version": "1.4.0",
+                    "download_url": source_zip.as_uri(),
+                    "sha256": sha256,
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+            service.install_update(username="admin")
+            restart = service.admin_status()["install"]["restart"]
+            self.assertEqual(restart["status"], "scheduled")
+            self.assertEqual(restart["command"], ["/bin/echo", "restart-agent-api"])
 
     def test_local_systemd_update_installs_zip_and_schedules_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
