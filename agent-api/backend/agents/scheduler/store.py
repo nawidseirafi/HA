@@ -83,7 +83,9 @@ class SchedulerStore:
             connection.commit()
 
     def ensure_default_tasks(self) -> None:
-        for item in [*self._manifest_default_tasks(), *self._platform_default_tasks()]:
+        default_tasks = [*self._manifest_default_tasks(), *self._platform_default_tasks()]
+        self._remove_obsolete_default_tasks(default_tasks)
+        for item in default_tasks:
             if self._default_task_exists(item):
                 continue
             self.create_task(item)
@@ -438,6 +440,31 @@ class SchedulerStore:
         )
         connection.commit()
 
+    def _remove_obsolete_default_tasks(self, default_tasks: list[dict[str, Any]]) -> None:
+        desired_by_source: dict[str, set[str]] = {}
+        for item in default_tasks:
+            source = str(item.get("source") or "").strip()
+            default_key = str(item.get("default_key") or "").strip()
+            if source and default_key and source != "manual":
+                desired_by_source.setdefault(source, set()).add(default_key)
+        if not desired_by_source:
+            return
+        with self.connect() as connection:
+            for source, desired_keys in desired_by_source.items():
+                rows = connection.execute(
+                    "SELECT id, default_key FROM scheduler_tasks WHERE source = ? AND default_key IS NOT NULL",
+                    (source,),
+                ).fetchall()
+                obsolete_ids = [
+                    int(row["id"])
+                    for row in rows
+                    if str(row["default_key"] or "").strip() not in desired_keys
+                ]
+                if obsolete_ids:
+                    placeholders = ",".join("?" for _ in obsolete_ids)
+                    connection.execute(f"DELETE FROM scheduler_tasks WHERE id IN ({placeholders})", obsolete_ids)
+            connection.commit()
+
     def _manifest_default_tasks(self) -> list[dict[str, Any]]:
         tasks: list[dict[str, Any]] = []
         allowed_agents = set(active_edition().enabled_agents)
@@ -471,7 +498,7 @@ class SchedulerStore:
         tasks = [
             {
                 "name": "Infrastructure Health Check",
-                "description": "Prueft alle 5 Minuten Internet- und FritzBox-Status ueber Home Assistant.",
+                "description": "Prueft Internet- und FritzBox-Status ueber Home Assistant.",
                 "schedule_type": "cron",
                 "schedule": {"cron": "*/5 * * * *"},
                 "target_agent": "infrastructure",
@@ -493,7 +520,7 @@ class SchedulerStore:
             },
             {
                 "name": "System Updatepruefung",
-                "description": "Prueft taeglich um 07:00 Uhr, ob ein RoboterSteve/SeniorCare Update verfuegbar ist.",
+                "description": "Prueft, ob ein RoboterSteve/SeniorCare Update verfuegbar ist.",
                 "schedule_type": "cron",
                 "schedule": {"cron": "0 7 * * *"},
                 "target_agent": "system",

@@ -165,7 +165,7 @@ export function SchedulerDashboardPage() {
 
       <section className="scheduler-summary-grid">
         <SummaryCard icon={<CalendarClock size={22} />} label="Aktive Tasks" value={String(summary?.active_tasks ?? 0)} detail={`${summary?.total_tasks ?? 0} gesamt`} tone="info" />
-        <SummaryCard icon={<Clock3 size={22} />} label="Naechster Lauf" value={formatDateTime(summary?.next_run)} detail={nextTask?.name ?? 'Keine Planung'} tone="success" />
+        <SummaryCard icon={<Clock3 size={22} />} label="Naechster Lauf" value={formatDateTime(summary?.next_run)} detail={nextTask ? displayTaskName(nextTask) : 'Keine Planung'} tone="success" />
         <SummaryCard icon={<TimerReset size={22} />} label="Heute ausgefuehrt" value={String(summary?.today_executed ?? 0)} detail={formatDateTime(status?.last_successful_run)} tone="neutral" />
         <SummaryCard icon={<AlertTriangle size={22} />} label="Fehler" value={String(summary?.errors ?? 0)} detail={status?.last_error ?? 'Keine Fehler'} tone={summary?.errors ? 'warning' : 'success'} />
       </section>
@@ -210,7 +210,7 @@ export function SchedulerDashboardPage() {
                   <div>
                     <span>Naechster Lauf</span>
                     <strong>{formatDateTime(group.nextTask?.next_run)}</strong>
-                    <small>{group.nextTask?.name ?? 'Keine Planung'}</small>
+                    <small>{group.nextTask ? displayTaskName(group.nextTask) : 'Keine Planung'}</small>
                   </div>
                   <div>
                     <span>Letzter Lauf</span>
@@ -236,12 +236,12 @@ export function SchedulerDashboardPage() {
                       <div className="scheduler-task-row-main">
                         <TaskStatusIcon task={task} />
                         <div>
-                          <strong>{task.name}</strong>
-                          <span>{task.description || targetLabel(task)}</span>
+                          <strong>{displayTaskName(task)}</strong>
+                          <span>{taskDescription(task)}</span>
                         </div>
                       </div>
                       <div className="scheduler-task-row-meta">
-                        <span>{scheduleTypeLabel(task.schedule_type)}</span>
+                        <span>{scheduleLabel(task)}</span>
                         <strong>{formatDateTime(task.next_run)}</strong>
                         <span>{formatDateTime(task.last_run)}</span>
                         <em>{task.status}</em>
@@ -311,7 +311,7 @@ function SchedulerEditDialog({
         <header>
           <div>
             <span className="eyebrow">Scheduler</span>
-            <h2>{task.name}</h2>
+            <h2>{displayTaskName(task)}</h2>
             <p>Diese Änderung wird im Scheduler gespeichert. Manifest-Defaults überschreiben sie nicht.</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Schließen">×</button>
@@ -322,7 +322,7 @@ function SchedulerEditDialog({
               <span><Clock3 size={18} /></span>
               <div>
                 <h3>{scheduleTypeLabel(task.schedule_type)}</h3>
-                <p>{task.target_agent || task.action_type} / {task.target_action || task.action_type}</p>
+                <p>{scheduleLabel(task)} · {task.target_agent || task.action_type} / {task.target_action || task.action_type}</p>
               </div>
             </div>
             {isRecurring && (
@@ -518,6 +518,63 @@ function taskRunLabel(task: SchedulerTask) {
   if (task.last_error) return 'Fehler';
   if (task.last_run) return 'Erfolgreich';
   return task.status;
+}
+
+function taskDescription(task: SchedulerTask) {
+  const base = task.description || targetLabel(task);
+  return `${base} Zeitplan: ${scheduleLabel(task)}.`;
+}
+
+function displayTaskName(task: SchedulerTask) {
+  return task.name.replace(/\s+\d{1,2}:\d{2}\s*$/, '');
+}
+
+function scheduleLabel(task: SchedulerTask) {
+  if (task.schedule_type === 'cron') return cronLabel(String(task.schedule?.cron || ''));
+  if (task.schedule_type === 'recurring' || task.schedule_type === 'condition') {
+    const time = normalizeTime(String(task.schedule?.time || ''));
+    return time ? `Täglich um ${time}` : 'Wiederkehrend';
+  }
+  if (task.schedule_type === 'once') {
+    const runAt = formatDateTime(String(task.schedule?.run_at || task.next_run || ''));
+    return runAt === 'Nicht geplant' ? 'Einmalig' : `Einmalig am ${runAt}`;
+  }
+  return scheduleTypeLabel(task.schedule_type);
+}
+
+function cronLabel(expression: string) {
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) return expression || 'Cron';
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  if (hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const minuteStep = parseStep(minute);
+    if (minuteStep) return `Alle ${minuteStep} Minuten`;
+    if (minute === '*') return 'Jede Minute';
+  }
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const normalized = normalizeTime(`${hour}:${minute}`);
+    if (normalized) return `Täglich um ${normalized}`;
+  }
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek !== '*') {
+    const normalized = normalizeTime(`${hour}:${minute}`);
+    if (normalized) return `Wöchentlich um ${normalized}`;
+  }
+  return `Cron ${expression}`;
+}
+
+function parseStep(value: string) {
+  if (!value.startsWith('*/')) return 0;
+  const parsed = Number(value.slice(2));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function normalizeTime(value: string) {
+  const match = value.trim().match(/^(\d{1,2}):(\d{1,2})/);
+  if (!match) return '';
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return '';
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 function scheduleTypeLabel(type: SchedulerTask['schedule_type']) {

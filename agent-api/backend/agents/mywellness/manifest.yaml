@@ -18,7 +18,7 @@ settings:
 scheduler:
   tasks:
     - default_key: mywellness:prepare:1700
-      name: MyWellness Kurse vorbereiten 17:00
+      name: MyWellness Kurse vorbereiten
       description: Prueft kommende MyWellness Kurse und bereitet Buchungen vor.
       schedule_type: recurring
       schedule:
@@ -27,7 +27,7 @@ scheduler:
       action_payload:
         mode: prepare
     - default_key: mywellness:book:2059
-      name: MyWellness Buchung 20:59
+      name: MyWellness Buchung
       description: Fuehrt den geplanten MyWellness Buchungslauf aus.
       schedule_type: recurring
       schedule:

@@ -17,8 +17,8 @@ settings:
 scheduler:
   tasks:
     - default_key: invoices:run:2200
-      name: Invoice Agent Lauf 22:00
-      description: Scannt und verarbeitet neue Rechnungen am Abend.
+      name: Invoice Agent Lauf
+      description: Scannt und verarbeitet neue Rechnungen.
       schedule_type: recurring
       schedule:
         time: "22:00"

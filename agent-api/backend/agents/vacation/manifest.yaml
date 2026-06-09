@@ -17,7 +17,7 @@ scheduler:
   tasks:
     - default_key: vacation:status-check:0800
       name: Vacation Statuspruefung
-      description: Aktualisiert Vacation Status, Kalendererkennung, Reminder und Historie taeglich.
+      description: Aktualisiert Vacation Status, Kalendererkennung, Reminder und Historie.
       schedule_type: recurring
       schedule:
         time: "08:00"

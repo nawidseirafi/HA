@@ -112,9 +112,10 @@ class SchedulerService:
     def execute_task(self, task: dict[str, Any]) -> dict[str, Any]:
         started_at = utc_now()
         try:
-            if self._should_skip_disabled_target(task):
-                message = f"Task {task.get('name')} uebersprungen, weil der Ziel-Agent deaktiviert ist."
-                run = self.store.record_run(task, "skipped", message, started_at, utc_now(), {"reason": "target_agent_disabled"})
+            skip_reason = self._target_agent_skip_reason(task)
+            if skip_reason:
+                message = f"Task {task.get('name')} uebersprungen: {skip_reason}."
+                run = self.store.record_run(task, "skipped", message, started_at, utc_now(), {"reason": skip_reason})
                 updated_task = self.store.mark_task_run(task, "skipped")
                 return {**run, "task": updated_task}
             result = self._execute_action(task)
@@ -227,14 +228,23 @@ class SchedulerService:
             raise RuntimeError(str(result.get("message") or f"Agent {agent_id} Aktion {action} fehlgeschlagen."))
         return dict(result)
 
-    def _should_skip_disabled_target(self, task: dict[str, Any]) -> bool:
+    def _target_agent_skip_reason(self, task: dict[str, Any]) -> str:
         action_type = str(task.get("action_type") or "")
         target_agent = str(task.get("target_agent") or "").strip()
         if not target_agent or action_type not in {"execute_action", "start_agent"}:
-            return False
+            return ""
         target_action = str(task.get("target_action") or "run")
         control_action = "run" if action_type == "execute_action" and target_action in {"run", "analyze"} else target_action
-        return control_action in {"run", "start"} and self._agent_is_disabled(target_agent)
+        if control_action not in {"run", "start"}:
+            return ""
+        from backend.agents.registry import get_agent_control
+
+        control = get_agent_control(target_agent)
+        if not control:
+            return "Ziel-Agent ist in der aktiven Edition nicht verfuegbar"
+        if "status" in control.capabilities() and self._agent_is_disabled(target_agent):
+            return "Ziel-Agent ist deaktiviert"
+        return ""
 
     def _agent_is_disabled(self, agent_id: str) -> bool:
         from backend.agents.registry import get_agent_control
