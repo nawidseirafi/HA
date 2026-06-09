@@ -1,8 +1,10 @@
 import json
+import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
@@ -324,10 +326,11 @@ class SchedulerStore:
         if schedule_type in {"recurring", "condition"}:
             return self._daily_time_next(schedule, after)
         if schedule_type == "cron":
-            return self._cron_next(str(schedule.get("cron") or ""), after)
+            return self._cron_next(str(schedule.get("cron") or ""), after, schedule)
         return None
 
     def _once_next(self, schedule: dict[str, Any], after: datetime) -> str | None:
+        after = self._as_utc(after)
         raw = str(schedule.get("run_at") or schedule.get("datetime") or "").strip()
         if not raw:
             return None
@@ -340,6 +343,8 @@ class SchedulerStore:
         return value.astimezone(timezone.utc).isoformat() if value > after else None
 
     def _daily_time_next(self, schedule: dict[str, Any], after: datetime) -> str | None:
+        local_tz = self._schedule_timezone(schedule)
+        after_local = self._as_utc(after).astimezone(local_tz)
         raw = str(schedule.get("time") or "08:00").strip()
         try:
             hour_text, minute_text = raw.split(":", 1)
@@ -347,22 +352,38 @@ class SchedulerStore:
             minute = max(0, min(59, int(minute_text[:2])))
         except (ValueError, TypeError):
             hour, minute = 8, 0
-        candidate = after.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if candidate <= after:
+        candidate = after_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if candidate <= after_local:
             candidate += timedelta(days=1)
-        return candidate.isoformat()
+        return candidate.astimezone(timezone.utc).isoformat()
 
-    def _cron_next(self, expression: str, after: datetime) -> str | None:
+    def _cron_next(self, expression: str, after: datetime, schedule: dict[str, Any] | None = None) -> str | None:
         parts = expression.split()
         if len(parts) != 5:
             return None
         minute_expr, hour_expr, *_ = parts
-        candidate = after.replace(second=0, microsecond=0) + timedelta(minutes=1)
+        local_tz = self._schedule_timezone(schedule or {})
+        candidate = self._as_utc(after).astimezone(local_tz).replace(second=0, microsecond=0) + timedelta(minutes=1)
         for _ in range(0, 60 * 24 * 7):
             if self._cron_matches(candidate.minute, minute_expr, 0, 59) and self._cron_matches(candidate.hour, hour_expr, 0, 23):
-                return candidate.isoformat()
+                return candidate.astimezone(timezone.utc).isoformat()
             candidate += timedelta(minutes=1)
         return None
+
+    def _as_utc(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _schedule_timezone(self, schedule: dict[str, Any]) -> timezone | ZoneInfo:
+        config = load_agent_section("scheduler")
+        raw = str(schedule.get("timezone") or config.get("timezone") or os.getenv("TZ") or "").strip()
+        if raw:
+            try:
+                return ZoneInfo(raw)
+            except ZoneInfoNotFoundError:
+                pass
+        return datetime.now().astimezone().tzinfo or timezone.utc
 
     def _cron_matches(self, value: int, expression: str, min_value: int, max_value: int) -> bool:
         expression = expression.strip()
@@ -500,7 +521,7 @@ class SchedulerStore:
                 "name": "Infrastructure Health Check",
                 "description": "Prueft Internet- und FritzBox-Status ueber Home Assistant.",
                 "schedule_type": "cron",
-                "schedule": {"cron": "*/5 * * * *"},
+                "schedule": {"cron": "0 7 * * *", "timezone": "Europe/Berlin"},
                 "target_agent": "infrastructure",
                 "target_action": "check",
                 "action_type": "infrastructure_check",
@@ -522,7 +543,7 @@ class SchedulerStore:
                 "name": "System Updatepruefung",
                 "description": "Prueft, ob ein RoboterSteve/SeniorCare Update verfuegbar ist.",
                 "schedule_type": "cron",
-                "schedule": {"cron": "0 7 * * *"},
+                "schedule": {"cron": "0 7 * * *", "timezone": "Europe/Berlin"},
                 "target_agent": "system",
                 "target_action": "update_check",
                 "action_type": "update_check",

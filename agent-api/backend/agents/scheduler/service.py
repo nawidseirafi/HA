@@ -122,7 +122,8 @@ class SchedulerService:
             message = f"Task {task.get('name')} erfolgreich ausgefuehrt."
             run = self.store.record_run(task, "completed", message, started_at, utc_now(), {"result": result})
             updated_task = self.store.mark_task_run(task, "completed")
-            self._notify_success(updated_task)
+            if self._should_notify_success(updated_task):
+                self._notify_success(updated_task)
             return {**run, "task": updated_task}
         except Exception as exc:
             error = str(exc)
@@ -284,6 +285,15 @@ class SchedulerService:
             message=f"{task['name']} wurde erfolgreich ausgefuehrt.",
             payload={"task_id": task["id"], "target_agent": task.get("target_agent")},
         )
+
+    def _should_notify_success(self, task: dict[str, Any]) -> bool:
+        if str(task.get("source") or "") == "platform" and str(task.get("action_type") or "") in {
+            "infrastructure_check",
+            "household_check",
+            "update_check",
+        }:
+            return False
+        return True
 
     def _notify_failure(self, task: dict[str, Any], error: str) -> None:
         repeated = int(task.get("failure_count") or 0) >= 3
