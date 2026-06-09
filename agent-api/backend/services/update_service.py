@@ -152,8 +152,12 @@ class UpdateConfigMixin:
         service_name = self.systemd_service_name()
         delay = self.systemd_restart_delay_seconds()
         if shutil.which("systemd-run"):
-            return ["sudo", "systemd-run", f"--on-active={delay}", "systemctl", "restart", service_name]
-        return ["sudo", "systemctl", "restart", service_name]
+            command = ["systemd-run", f"--on-active={delay}", "systemctl", "restart", service_name]
+        else:
+            command = ["systemctl", "restart", service_name]
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            return command
+        return ["sudo", *command]
 
     def update_base_url(self) -> str:
         update_config = self._update_config()

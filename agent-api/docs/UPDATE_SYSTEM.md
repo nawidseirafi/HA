@@ -172,7 +172,7 @@ Die RoboterSteve/SeniorCare-Anwendung wird lokal aus dem ZIP gebaut. Es gibt kei
 ```yaml
 services:
   robotersteve-api:
-    build: .
+    build: ..
     ports:
       - "8080:8080"
 ```
@@ -262,10 +262,11 @@ Personal nutzt `UPDATE_EXECUTION_MODE=local_systemd` und kein Docker.
 Der Restart wird standardmaessig verzoegert geplant:
 
 ```bash
-sudo systemd-run --on-active=2 systemctl restart agent-api
+systemd-run --on-active=2 systemctl restart agent-api
 ```
 
-Der Service-User braucht dafuer eine eng begrenzte sudo-Regel, z. B.:
+Wenn die Anwendung als `root` laeuft, ist keine sudoers-Regel notwendig.
+Wenn die Anwendung als eigener Service-User laeuft, setzt der Update-Service automatisch `sudo` vor den Befehl. Dann braucht dieser User eine eng begrenzte sudo-Regel, z. B.:
 
 ```text
 robotersteve ALL=NOPASSWD: /usr/bin/systemd-run --on-active=2 systemctl restart agent-api, /bin/systemctl restart agent-api, /usr/bin/systemctl restart agent-api

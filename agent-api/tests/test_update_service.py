@@ -10,6 +10,26 @@ from backend.services.update_service import UpdatePaths, UpdateService, compare_
 
 
 class UpdateServiceTests(unittest.TestCase):
+    def test_systemd_restart_command_omits_sudo_for_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = UpdateService(self._paths(tmp))
+            with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/systemd-run"), \
+                 patch("backend.services.update_service.os.geteuid", return_value=0):
+                self.assertEqual(
+                    service.systemd_restart_command(),
+                    ["systemd-run", "--on-active=2", "systemctl", "restart", "agent-api"],
+                )
+
+    def test_systemd_restart_command_uses_sudo_for_non_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = UpdateService(self._paths(tmp))
+            with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/systemd-run"), \
+                 patch("backend.services.update_service.os.geteuid", return_value=1000):
+                self.assertEqual(
+                    service.systemd_restart_command(),
+                    ["sudo", "systemd-run", "--on-active=2", "systemctl", "restart", "agent-api"],
+                )
+
     def test_compare_versions(self):
         self.assertGreater(compare_versions("1.3.0", "1.2.9"), 0)
         self.assertEqual(compare_versions("1.2", "1.2.0"), 0)

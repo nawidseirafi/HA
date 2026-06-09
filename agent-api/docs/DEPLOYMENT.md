@@ -317,7 +317,9 @@ Oder fuer SeniorCare:
 ROBOTERSTEVE_EDITION=seniorcare
 ```
 
-Fuer Personal-Updates ueber die UI muss der systemd-Restart ohne Passwort erlaubt sein. Empfohlen ist eine eng begrenzte sudoers-Regel fuer den Service-User:
+Fuer Personal-Updates ueber die UI muss der systemd-Restart moeglich sein.
+Wenn die Anwendung als `root` laeuft, ist keine sudoers-Regel notwendig.
+Wenn sie als eigener Service-User laeuft, ist eine eng begrenzte sudoers-Regel fuer diesen User notwendig:
 
 ```bash
 sudo visudo -f /etc/sudoers.d/robotersteve-update
