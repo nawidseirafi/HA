@@ -89,6 +89,28 @@ SUMMARY_HEADERS = ("Steuerkategorie", "Anzahl", "Summe EUR", "Anteil %")
 REVIEW_HEADERS = DETAIL_HEADERS
 VENDOR_HEADERS = ("Anbieter", "Steuerkategorie (haeufigste)", "Anzahl", "Summe EUR")
 QUARTER_HEADERS = ("Quartal", "Steuerkategorie", "Anzahl", "Summe EUR")
+ACCOUNTING_RELEVANT_WHERE = """
+is_invoice = 1
+and lower(trim(coalesce(category, ''))) not in ('nicht relevant', 'nicht-relevant', 'irrelevant')
+and lower(coalesce(document_type, 'invoice')) not in (
+    'offer',
+    'advertisement',
+    'information',
+    'document',
+    'unknown'
+)
+"""
+ACCOUNTING_AMOUNT_SQL = """
+case
+    when lower(coalesce(document_type, '')) = 'assessment' then
+        coalesce(
+            nullif(abs(coalesce(open_amount, 0)), 0),
+            nullif(abs(coalesce(paid_amount, 0)), 0),
+            abs(coalesce(gross_amount, amount, 0))
+        )
+    else abs(coalesce(gross_amount, amount, 0))
+end
+"""
 
 
 @dataclass
@@ -158,11 +180,13 @@ def _load_invoice_rows(database_path: Path, year: int) -> list[sqlite3.Row]:
     con.row_factory = sqlite3.Row
     try:
         return con.execute(
-            """
-            select invoice_date, vendor, amount, currency, invoice_number, status,
-                   source_path, archive_path, category, reason
+            f"""
+            select invoice_date, vendor, {ACCOUNTING_AMOUNT_SQL} as amount,
+                   currency, invoice_number, status, source_path, archive_path,
+                   category, reason, coalesce(transaction_type, 'expense') as transaction_type
             from invoices
-            where substr(invoice_date, 1, 4) = ?
+            where {ACCOUNTING_RELEVANT_WHERE}
+              and substr(invoice_date, 1, 4) = ?
             order by invoice_date, vendor
             """,
             (str(year),),
@@ -202,6 +226,9 @@ def _categorize(row: sqlite3.Row, rules: dict[str, str]) -> dict:
         tax_category = "Review"
         notes.append("Betrag fehlt")
 
+    if row["transaction_type"] == "income":
+        notes.append("Einnahme/Erstattung")
+
     review_matches = [kw for kw in REVIEW_KEYWORDS if kw in text]
     if review_matches:
         tax_category = "Review"
@@ -210,7 +237,7 @@ def _categorize(row: sqlite3.Row, rules: dict[str, str]) -> dict:
     return {
         "invoice_date": row["invoice_date"],
         "vendor": row["vendor"],
-        "amount": row["amount"],
+        "amount": -abs(row["amount"]) if row["transaction_type"] == "income" and row["amount"] is not None else row["amount"],
         "currency": row["currency"],
         "invoice_number": row["invoice_number"] or "",
         "status": row["status"],

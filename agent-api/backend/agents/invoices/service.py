@@ -22,6 +22,28 @@ from backend.paths import API_DIR, PROJECT_DIR
 logger = logging.getLogger(__name__)
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
+ACCOUNTING_RELEVANT_WHERE = """
+is_invoice = 1
+and lower(trim(coalesce(category, ''))) not in ('nicht relevant', 'nicht-relevant', 'irrelevant')
+and lower(coalesce(document_type, 'invoice')) not in (
+    'offer',
+    'advertisement',
+    'information',
+    'document',
+    'unknown'
+)
+"""
+ACCOUNTING_AMOUNT_SQL = """
+case
+    when lower(coalesce(document_type, '')) = 'assessment' then
+        coalesce(
+            nullif(abs(coalesce(open_amount, 0)), 0),
+            nullif(abs(coalesce(paid_amount, 0)), 0),
+            abs(coalesce(gross_amount, amount, 0))
+        )
+    else abs(coalesce(gross_amount, amount, 0))
+end
+"""
 
 
 EXTRA_COLUMNS: dict[str, str] = {
@@ -401,36 +423,41 @@ class InvoiceService:
     def summary(self) -> dict[str, Any]:
         today = date.today()
         with self.connect() as connection:
-            total = self._scalar(connection, "select count(*) from invoices")
+            total = self._scalar(connection, f"select count(*) from invoices where {ACCOUNTING_RELEVANT_WHERE}")
             month_total = self._scalar(
                 connection,
-                """
-                select coalesce(sum(coalesce(gross_amount, amount, 0)), 0)
+                f"""
+                select coalesce(sum({ACCOUNTING_AMOUNT_SQL}), 0)
                 from invoices
-                where year = ? and month = ? and coalesce(transaction_type, 'expense') = 'expense'
+                where {ACCOUNTING_RELEVANT_WHERE}
+                  and year = ?
+                  and month = ?
+                  and coalesce(transaction_type, 'expense') = 'expense'
                 """,
                 (today.year, today.month),
             )
             year_total = self._scalar(
                 connection,
-                """
-                select coalesce(sum(coalesce(gross_amount, amount, 0)), 0)
+                f"""
+                select coalesce(sum({ACCOUNTING_AMOUNT_SQL}), 0)
                 from invoices
-                where year = ? and coalesce(transaction_type, 'expense') = 'expense'
+                where {ACCOUNTING_RELEVANT_WHERE}
+                  and year = ?
+                  and coalesce(transaction_type, 'expense') = 'expense'
                 """,
                 (today.year,),
             )
             needs_review = self._scalar(
                 connection,
-                "select count(*) from invoices where coalesce(review_status, status) in ('new', 'needs_review', 'review')",
+                f"select count(*) from invoices where {ACCOUNTING_RELEVANT_WHERE} and coalesce(review_status, status) in ('new', 'needs_review', 'review')",
             )
             errors = self._scalar(
                 connection,
-                "select count(*) from invoices where coalesce(review_status, status) = 'error'",
+                f"select count(*) from invoices where {ACCOUNTING_RELEVANT_WHERE} and coalesce(review_status, status) = 'error'",
             )
             latest = self._fetch_all(
                 connection,
-                "select * from invoices order by coalesce(created_at, updated_at) desc limit 8",
+                f"select * from invoices where {ACCOUNTING_RELEVANT_WHERE} order by coalesce(created_at, updated_at) desc limit 8",
             )
         return {
             "total_invoices": total,
@@ -444,15 +471,16 @@ class InvoiceService:
     def years(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 select year,
-                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then coalesce(gross_amount, amount, 0) else 0 end), 0) as income_total,
-                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'expense' then coalesce(gross_amount, amount, 0) else 0 end), 0) as expense_total,
-                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then coalesce(gross_amount, amount, 0) else -coalesce(gross_amount, amount, 0) end), 0) as total,
+                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then {ACCOUNTING_AMOUNT_SQL} else 0 end), 0) as income_total,
+                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'expense' then {ACCOUNTING_AMOUNT_SQL} else 0 end), 0) as expense_total,
+                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then {ACCOUNTING_AMOUNT_SQL} else -{ACCOUNTING_AMOUNT_SQL} end), 0) as total,
                        count(*) as invoice_count,
                        sum(case when coalesce(review_status, status) in ('new', 'needs_review', 'review') then 1 else 0 end) as needs_review_count
                 from invoices
-                where year is not null
+                where {ACCOUNTING_RELEVANT_WHERE}
+                  and year is not null
                 group by year
                 order by year desc
                 """
@@ -462,14 +490,15 @@ class InvoiceService:
     def year(self, year: int) -> dict[str, Any]:
         with self.connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 select month,
-                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then coalesce(gross_amount, amount, 0) else 0 end), 0) as income_total,
-                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'expense' then coalesce(gross_amount, amount, 0) else 0 end), 0) as expense_total,
+                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'income' then {ACCOUNTING_AMOUNT_SQL} else 0 end), 0) as income_total,
+                       coalesce(sum(case when coalesce(transaction_type, 'expense') = 'expense' then {ACCOUNTING_AMOUNT_SQL} else 0 end), 0) as expense_total,
                        count(*) as invoice_count,
                        sum(case when coalesce(review_status, status) in ('new', 'needs_review', 'review') then 1 else 0 end) as needs_review_count
                 from invoices
-                where year = ?
+                where {ACCOUNTING_RELEVANT_WHERE}
+                  and year = ?
                 group by month
                 """,
                 (year,),
@@ -489,7 +518,7 @@ class InvoiceService:
         return {"year": year, "months": months}
 
     def month(self, year: int, month: int, filters: dict[str, Any]) -> dict[str, Any]:
-        where = ["year = ?", "month = ?"]
+        where = [ACCOUNTING_RELEVANT_WHERE, "year = ?", "month = ?"]
         params: list[Any] = [year, month]
         for key, column in (("category", "category"), ("status", "coalesce(review_status, status)"), ("vendor", "vendor")):
             value = filters.get(key)
@@ -540,6 +569,7 @@ class InvoiceService:
             "review_status",
             "notes",
             "document_type",
+            "is_invoice",
         }
         updates = {key: payload[key] for key in allowed if key in payload}
         if "invoice_date" in updates and updates["invoice_date"]:
@@ -553,6 +583,8 @@ class InvoiceService:
             updates["status"] = self._status_from_review(updates["review_status"])
         if updates.get("transaction_type") not in (None, "income", "expense"):
             raise HTTPException(status_code=422, detail="transaction_type must be income or expense")
+        if "is_invoice" in updates:
+            updates["is_invoice"] = int(bool(updates["is_invoice"]))
         updates["updated_at"] = utc_now()
         if not updates:
             return self.get(invoice_id)
@@ -598,6 +630,7 @@ class InvoiceService:
             "transaction_type": metadata.transaction_type,
             "is_business": metadata.is_business,
             "is_tax_relevant": metadata.is_tax_relevant,
+            "is_invoice": metadata.is_invoice,
         }
         self.update(invoice_id, payload)
         with self.connect() as connection:
@@ -954,12 +987,12 @@ class InvoiceService:
         with self.connect() as connection:
             if month is None:
                 rows = connection.execute(
-                    "select * from invoices where year = ? order by invoice_date, vendor",
+                    f"select * from invoices where {ACCOUNTING_RELEVANT_WHERE} and year = ? order by invoice_date, vendor",
                     (year,),
                 ).fetchall()
             else:
                 rows = connection.execute(
-                    "select * from invoices where year = ? and month = ? order by invoice_date, vendor",
+                    f"select * from invoices where {ACCOUNTING_RELEVANT_WHERE} and year = ? and month = ? order by invoice_date, vendor",
                     (year, month),
                 ).fetchall()
         return [self._row_to_invoice(row) for row in rows]

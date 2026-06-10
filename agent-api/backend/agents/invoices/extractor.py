@@ -22,9 +22,23 @@ INVOICE_KEYWORDS = (
     "gutschrift",
 )
 
+NON_ACCOUNTING_KEYWORDS = (
+    "angebot",
+    "kostenvoranschlag",
+    "prospekt",
+    "flyer",
+    "werbung",
+    "infoblatt",
+    "information",
+    "newsletter",
+    "preisliste",
+)
+
 REVIEW_KEYWORDS = (
     "lohnsteuerbescheinigung",
     "meldebescheinigung",
+    "steuerbescheid",
+    "einkommensteuerbescheid",
 )
 
 KNOWN_INVOICE_VENDORS = (
@@ -160,6 +174,7 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
     content_text = body_text_normalized if _has_meaningful_text(body_text_normalized) else ""
 
     keyword_hits = _keyword_hits(INVOICE_KEYWORDS, combined)
+    non_accounting_hits = _keyword_hits(NON_ACCOUNTING_KEYWORDS, combined)
     vendor_hits = _keyword_hits(KNOWN_INVOICE_VENDORS, combined)
     review_hits = _keyword_hits(REVIEW_KEYWORDS, combined)
     invoice_date = _find_best_date(path, combined)
@@ -194,13 +209,30 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
 
     confidence = min(confidence, 1.0)
     is_invoice = confidence >= 0.5
-    if review_hits:
-        confidence = min(confidence, 0.3)
+    document_type = "invoice" if is_invoice else "document"
+    transaction_type = "expense"
+    category = category or default_category
+
+    if non_accounting_hits:
+        confidence = min(confidence, 0.25)
         is_invoice = False
+        document_type = _document_type_for_non_accounting_hits(non_accounting_hits)
+        reasons.append("non_accounting_keyword:" + ",".join(non_accounting_hits[:3]))
+
+    if review_hits:
+        confidence = min(confidence, 0.75)
+        is_invoice = True
+        if any("steuerbescheid" in hit for hit in review_hits):
+            document_type = "assessment"
+            category = "Steuer"
+            transaction_type = _tax_assessment_transaction_type(combined)
+        else:
+            document_type = "certificate"
         reasons.append("review_keyword:" + ",".join(review_hits[:3]))
     if not content_text and _looks_like_upload_filename(filename_text):
         confidence = min(confidence, 0.3)
         is_invoice = False
+        document_type = "unknown"
         reasons.append("no_readable_text")
 
     return InvoiceMetadata(
@@ -215,8 +247,8 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
         invoice_number=invoice_number,
         category=category,
         reason="; ".join(reasons) if reasons else "no invoice signals found",
-        document_type="invoice" if is_invoice else "document",
-        transaction_type="expense",
+        document_type=document_type,
+        transaction_type=transaction_type,
         gross_amount=amount,
         review_status="needs_review",
     )
@@ -533,3 +565,39 @@ def _find_category(vendor_hits: Optional[list], default_category: str) -> str:
         if category:
             return category
     return default_category
+
+
+def _document_type_for_non_accounting_hits(hits: list[str]) -> str:
+    hit_text = " ".join(hits)
+    if any(word in hit_text for word in ("werbung", "prospekt", "flyer", "newsletter")):
+        return "advertisement"
+    if any(word in hit_text for word in ("angebot", "kostenvoranschlag", "preisliste")):
+        return "offer"
+    return "information"
+
+
+def _tax_assessment_transaction_type(text: str) -> str:
+    refund_words = (
+        "erstattung",
+        "erstattungsbetrag",
+        "guthaben",
+        "wird erstattet",
+        "werden erstattet",
+        "auszahlung",
+        "rückzahlung",
+        "rueckzahlung",
+    )
+    payment_words = (
+        "nachzahlung",
+        "nachzuzahlen",
+        "zu zahlen",
+        "zahlbetrag",
+        "forderung",
+        "faellig",
+        "fällig",
+    )
+    if any(word in text for word in refund_words):
+        return "income"
+    if any(word in text for word in payment_words):
+        return "expense"
+    return "expense"

@@ -95,6 +95,13 @@ def refine_metadata_with_ai(
         data.get("transaction_type")
     )
 
+    category = _category_for_document_type(document_type, category)
+    transaction_type = _transaction_type_for_document(
+        document_type=document_type,
+        transaction_type=transaction_type,
+        data=data,
+    )
+
     is_invoice = document_type in {
         "invoice",
         "receipt",
@@ -157,12 +164,18 @@ def refine_metadata_with_ai(
     if paid_amount is None:
         paid_amount = metadata.paid_amount
 
-    review_status = (
-        "needs_review"
-        if confidence < 0.9
-        or document_type in {"document", "unknown"}
-        else "reviewed"
-    )
+    if gross_amount is not None:
+        gross_amount = abs(gross_amount)
+    if net_amount is not None:
+        net_amount = abs(net_amount)
+    if tax_amount is not None:
+        tax_amount = abs(tax_amount)
+    if open_amount is not None:
+        open_amount = abs(open_amount)
+    if paid_amount is not None:
+        paid_amount = abs(paid_amount)
+
+    review_status = _review_status_for_document(document_type, confidence)
 
     return replace(
         metadata,
@@ -216,10 +229,10 @@ def _build_prompt(
     return f"""
 Analysiere dieses Dokument fuer Buchhaltung und Steuer-Vorsortierung.
 
-Das Dokument kann eine Rechnung, ein Kassenbeleg, eine Quittung, ein Bescheid, eine Lohn-/Gehaltsabrechnung, eine Lohnsteuerbescheinigung, eine Gutschrift, ein Konto-/Versicherungs-/Steuerdokument oder ein sonstiger Nachweis sein.
+Das Dokument kann eine Rechnung, ein Kassenbeleg, eine Quittung, ein Steuerbescheid, eine Lohn-/Gehaltsabrechnung, eine Lohnsteuerbescheinigung, eine Gutschrift, ein Konto-/Versicherungs-/Steuerdokument, ein Angebot, Werbung, ein Infoblatt oder ein sonstiger Nachweis sein.
 
 Extrahiere:
-- document_type: einer von invoice, receipt, assessment, payroll, certificate, credit_note, statement, contract, document, unknown
+- document_type: einer von invoice, receipt, assessment, payroll, certificate, credit_note, statement, contract, offer, advertisement, information, document, unknown
 - is_invoice: boolean
 - transaction_type: income oder expense
 - vendor
@@ -278,6 +291,36 @@ Finanzbuchhaltung oder Buchhaltung:
 - category = Steuer
 - transaction_type = expense
 - document_type = invoice
+
+Bei Steuerbescheid, Einkommensteuerbescheid, Finanzamt-Bescheid:
+- document_type = assessment
+- category = Steuer
+- is_tax_relevant = true
+- is_invoice = true, weil das Dokument steuerlich relevant abgelegt werden soll
+- transaction_type = income, wenn eine Erstattung, ein Guthaben, eine Rueckzahlung oder eine Auszahlung genannt wird
+- transaction_type = expense, wenn eine Nachzahlung, Forderung oder ein zu zahlender Betrag genannt wird
+- gross_amount = nur der tatsaechliche Erstattungsbetrag oder Nachzahlungsbetrag
+- open_amount = derselbe Erstattungs-/Nachzahlungsbetrag, wenn eindeutig genannt
+- NICHT als gross_amount verwenden: zu versteuerndes Einkommen, festgesetzte Einkommensteuer, Solidaritaetszuschlag, Kirchensteuer, Bemessungsgrundlagen, bereits gezahlte Lohnsteuer
+- confidence nur hoch setzen, wenn Betrag und Richtung eindeutig sind
+
+NICHT ALS RECHNUNG UEBERNEHMEN:
+- Angebot
+- Kostenvoranschlag
+- Prospekt
+- Flyer
+- Werbung
+- Newsletter
+- Infoblatt
+- allgemeine Produktinformation
+- Preisliste ohne konkrete Zahlungspflicht
+
+Dann:
+- is_invoice = false
+- document_type = offer, advertisement oder information
+- transaction_type = expense nur als technischer Default
+- category = Nicht relevant
+- confidence = 0.9, wenn der Ausschluss klar ist
 
 BETRAGSPRIORITAET:
 1. Rechnungsbetrag
@@ -432,6 +475,11 @@ def _normalize_transaction_type(value: Any) -> str:
         "credit",
         "erstattung",
         "gutschrift",
+        "refund",
+        "tax_refund",
+        "steuererstattung",
+        "rueckerstattung",
+        "rückerstattung",
     }:
         return "income"
 
@@ -459,6 +507,15 @@ def _normalize_document_type(
         "gutschrift": "credit_note",
         "kontoauszug": "statement",
         "vertrag": "contract",
+        "angebot": "offer",
+        "kostenvoranschlag": "offer",
+        "werbung": "advertisement",
+        "flyer": "advertisement",
+        "prospekt": "advertisement",
+        "newsletter": "advertisement",
+        "infoblatt": "information",
+        "information": "information",
+        "produktinformation": "information",
         "dokument": "document",
     }
 
@@ -471,6 +528,9 @@ def _normalize_document_type(
         "credit_note",
         "statement",
         "contract",
+        "offer",
+        "advertisement",
+        "information",
         "document",
         "unknown",
     }
@@ -485,6 +545,57 @@ def _normalize_document_type(
         return "unknown"
 
     return "invoice"
+
+
+def _category_for_document_type(document_type: str, category: str) -> str:
+    if document_type == "assessment":
+        return "Steuer"
+    if document_type in {"offer", "advertisement", "information"}:
+        return "Nicht relevant"
+    return category
+
+
+def _transaction_type_for_document(
+    document_type: str,
+    transaction_type: str,
+    data: dict[str, Any],
+) -> str:
+    if document_type != "assessment":
+        return transaction_type
+
+    text = " ".join(str(value or "") for value in data.values()).lower()
+    refund_words = (
+        "erstattung",
+        "erstattungsbetrag",
+        "guthaben",
+        "wird erstattet",
+        "werden erstattet",
+        "auszahlung",
+        "rueckzahlung",
+        "rückzahlung",
+    )
+    payment_words = (
+        "nachzahlung",
+        "nachzuzahlen",
+        "zu zahlen",
+        "zahlbetrag",
+        "forderung",
+        "faellig",
+        "fällig",
+    )
+    if any(word in text for word in refund_words):
+        return "income"
+    if any(word in text for word in payment_words):
+        return "expense"
+    return transaction_type
+
+
+def _review_status_for_document(document_type: str, confidence: float) -> str:
+    if confidence < 0.9:
+        return "needs_review"
+    if document_type in {"document", "unknown", "offer", "advertisement", "information", "assessment", "certificate", "statement", "contract"}:
+        return "needs_review"
+    return "reviewed"
 
 
 def _parse_bool(value: Any, default: bool) -> bool:

@@ -17,6 +17,27 @@ from .portals import PortalConfig, fetch_portal_documents
 
 SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv", ".eml"}
 AI_EXTRACTABLE_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+ACCOUNTING_DOCUMENT_TYPES = {
+    "invoice",
+    "receipt",
+    "credit_note",
+    "payroll",
+    "assessment",
+    "certificate",
+    "statement",
+}
+AUTO_ARCHIVE_DOCUMENT_TYPES = {
+    "invoice",
+    "receipt",
+    "credit_note",
+}
+IGNORED_DOCUMENT_TYPES = {
+    "offer",
+    "advertisement",
+    "information",
+    "document",
+    "unknown",
+}
 
 
 @dataclass
@@ -72,6 +93,7 @@ class ScanResult:
     review: int = 0
     duplicates: int = 0
     skipped: int = 0
+    ignored: int = 0
     cleanup_unreferenced: int = 0
     cleanup_missing: int = 0
     cleanup_moved: int = 0
@@ -135,6 +157,19 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
                     except Exception as exc:
                         logging.warning("KI-Belegextraktion fehlgeschlagen, lokale Metadaten werden genutzt: %s", exc)
             metadata = apply_category_rules(metadata, config.category_rules, config.default_category)
+            if _should_ignore_document(metadata):
+                review_path = copy_to_review(path, metadata, config.review_dir)
+                _mark_email_file_processed(path, email_message_keys_by_file, catalog)
+                result.ignored += 1
+                logging.info(
+                    "Nicht als Rechnung uebernommen: %s -> %s (%s, confidence=%.2f, reason=%s)",
+                    path,
+                    review_path,
+                    metadata.document_type,
+                    metadata.confidence,
+                    metadata.reason,
+                )
+                continue
             if catalog.has_metadata_duplicate(metadata) and not config.reprocess_existing:
                 result.duplicates += 1
                 logging.info(
@@ -180,9 +215,19 @@ def scan_once(config: InvoiceAgentConfig) -> ScanResult:
 def _should_archive(config: InvoiceAgentConfig, metadata) -> bool:
     if not metadata.is_invoice or metadata.confidence < config.confidence_threshold:
         return False
+    if metadata.document_type not in AUTO_ARCHIVE_DOCUMENT_TYPES:
+        return False
     if config.require_amount_for_archive and metadata.amount is None:
         return False
     return True
+
+
+def _should_ignore_document(metadata) -> bool:
+    if metadata.is_invoice and metadata.document_type in ACCOUNTING_DOCUMENT_TYPES:
+        return False
+    if metadata.document_type in IGNORED_DOCUMENT_TYPES:
+        return True
+    return not metadata.is_invoice
 
 
 def _should_use_ai_extraction(config: InvoiceAgentConfig, metadata, path: Path) -> bool:
@@ -345,6 +390,7 @@ def _notify_home_assistant(config: InvoiceAgentConfig, result: ScanResult) -> No
         f"Scan abgeschlossen.\n\n"
         f"Archiviert: {result.archived}\n"
         f"Zur Pruefung: {result.review}\n"
+        f"Aussortiert: {result.ignored}\n"
         f"Duplikate: {result.duplicates}\n"
         f"Gescannt: {result.scanned}"
     )
