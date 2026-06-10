@@ -305,7 +305,7 @@ class PrivateConsumerReceiptTests(unittest.TestCase):
         self.assertFalse(metadata.is_business)
         self.assertFalse(metadata.is_tax_relevant)
 
-    def test_month_view_excludes_private_not_tax_relevant_receipt(self):
+    def test_month_view_includes_private_not_tax_relevant_receipt(self):
         import tempfile
         from backend.agents.invoices.service import InvoiceService
 
@@ -342,8 +342,48 @@ class PrivateConsumerReceiptTests(unittest.TestCase):
             month = service.month(2026, 6, {})
             year = service.year(2026)
 
-        self.assertEqual(month["invoices"], [])
-        self.assertEqual(year["months"][5]["expense_total"], 0)
+        self.assertEqual(len(month["invoices"]), 1)
+        self.assertEqual(month["invoices"][0]["vendor"], "REWE")
+        self.assertEqual(year["months"][5]["expense_total"], 23.45)
+
+    def test_tax_export_excludes_private_not_tax_relevant_receipt(self):
+        import tempfile
+        from backend.agents.invoices.tax_export import _load_invoice_rows
+        from backend.agents.invoices.service import InvoiceService
+
+        with tempfile.TemporaryDirectory() as tmp:
+            service = InvoiceService.__new__(InvoiceService)
+            root = Path(tmp)
+            service.database_path = root / "invoices.db"
+            service.inbox_dir = root / "inbox"
+            service.archive_dir = root / "archive"
+            service.review_dir = root / "review"
+            service.export_dir = root / "exports"
+            service.archive_cleanup_backup_dir = root / "backup"
+            service._ensure_schema()
+
+            with service.connect() as connection:
+                connection.execute(
+                    """
+                    insert into invoices (
+                        file_hash, source_path, archive_path, is_invoice, confidence, vendor,
+                        invoice_date, amount, currency, invoice_number, category, status,
+                        reason, document_type, transaction_type, year, month, gross_amount,
+                        is_business, is_tax_relevant, review_status, created_at, updated_at
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "rewe", "rewe.txt", "archive/rewe.txt", 1, 0.95, "REWE",
+                        "2026-06-10", 23.45, "EUR", "", "Lebensmittel", "archived",
+                        "private receipt", "receipt", "expense", 2026, 6, 23.45,
+                        0, 0, "reviewed", "2026-06-10T00:00:00+00:00", "2026-06-10T00:00:00+00:00",
+                    ),
+                )
+                connection.commit()
+
+            rows = _load_invoice_rows(service.database_path, 2026)
+
+        self.assertEqual(rows, [])
 
 if __name__ == "__main__":
     unittest.main()
