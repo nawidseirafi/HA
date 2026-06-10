@@ -91,6 +91,7 @@ VENDOR_HEADERS = ("Anbieter", "Steuerkategorie (haeufigste)", "Anzahl", "Summe E
 QUARTER_HEADERS = ("Quartal", "Steuerkategorie", "Anzahl", "Summe EUR")
 ACCOUNTING_RELEVANT_WHERE = """
 is_invoice = 1
+and coalesce(is_tax_relevant, 1) = 1
 and lower(trim(coalesce(category, ''))) not in ('nicht relevant', 'nicht-relevant', 'irrelevant')
 and lower(coalesce(document_type, 'invoice')) not in (
     'offer',

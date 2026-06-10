@@ -25,6 +25,7 @@ DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
 MAX_EBON_CONTENT_BYTES = 256 * 1024
 ACCOUNTING_RELEVANT_WHERE = """
 is_invoice = 1
+and coalesce(is_tax_relevant, 1) = 1
 and lower(trim(coalesce(category, ''))) not in ('nicht relevant', 'nicht-relevant', 'irrelevant')
 and lower(coalesce(document_type, 'invoice')) not in (
     'offer',

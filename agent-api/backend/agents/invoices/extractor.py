@@ -44,12 +44,15 @@ REVIEW_KEYWORDS = (
 KNOWN_INVOICE_VENDORS = (
     "all-inkl",
     "all inkl",
+    "aldi",
     "amazon",
     "amazon eu",
     "apotheke",
     "autoversicherung",
     "carwash",
     "congstar",
+    "dm",
+    "edeka",
     "aral",
     "avia",
     "esso",
@@ -62,13 +65,20 @@ KNOWN_INVOICE_VENDORS = (
     "huk24",
     "iphone",
     "jet",
+    "kaufland",
     "kfz",
+    "lidl",
     "lkh",
+    "netto",
+    "penny",
     "porsche",
     "porsche zentrum",
+    "real",
+    "rewe",
     "restaurant",
     "rechtschutz",
     "rechtsschutz",
+    "rossmann",
     "strato",
     "strom",
     "shell",
@@ -85,14 +95,24 @@ KNOWN_INVOICE_VENDORS = (
 )
 
 KNOWN_VENDOR_CATEGORIES = {
+    "aldi": "Lebensmittel",
     "aral": "KFZ",
     "avia": "KFZ",
+    "dm": "Drogerie",
+    "edeka": "Lebensmittel",
     "esso": "KFZ",
     "hem": "KFZ",
     "jet": "KFZ",
+    "kaufland": "Lebensmittel",
     "kraftstoff": "KFZ",
+    "lidl": "Lebensmittel",
+    "netto": "Lebensmittel",
+    "penny": "Lebensmittel",
     "porsche": "KFZ",
     "porsche zentrum": "KFZ",
+    "real": "Lebensmittel",
+    "rewe": "Lebensmittel",
+    "rossmann": "Drogerie",
     "shell": "KFZ",
     "star": "KFZ",
     "tankbeleg": "KFZ",
@@ -184,6 +204,7 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
     invoice_number = _find_invoice_number(combined)
     vendor = _find_vendor(path.stem, invoice_date, vendor_hits)
     category = _find_category(vendor_hits, default_category)
+    private_consumer_receipt = _looks_like_private_consumer_receipt(combined, vendor_hits)
 
     confidence = 0.0
     reasons = []
@@ -250,6 +271,8 @@ def extract_metadata(path: Path, default_category: str = "Unsortiert") -> Invoic
         document_type=document_type,
         transaction_type=transaction_type,
         gross_amount=amount,
+        is_business=not private_consumer_receipt,
+        is_tax_relevant=not private_consumer_receipt,
         review_status="needs_review",
     )
 
@@ -565,6 +588,25 @@ def _find_category(vendor_hits: Optional[list], default_category: str) -> str:
         if category:
             return category
     return default_category
+
+
+def _looks_like_private_consumer_receipt(text: str, vendor_hits: Optional[list] = None) -> bool:
+    vendors = {str(item or "").lower() for item in (vendor_hits or [])}
+    consumer_vendors = {
+        "aldi",
+        "dm",
+        "edeka",
+        "kaufland",
+        "lidl",
+        "netto",
+        "penny",
+        "real",
+        "rewe",
+        "rossmann",
+    }
+    if vendors.intersection(consumer_vendors):
+        return True
+    return bool(re.search(r"\b(?:lebensmittel|supermarkt|drogerie|pfandbon|kassenbon)\b", text))
 
 
 def _document_type_for_non_accounting_hits(hits: list[str]) -> str:

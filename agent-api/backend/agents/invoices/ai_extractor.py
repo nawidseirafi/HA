@@ -122,6 +122,12 @@ def refine_metadata_with_ai(
         metadata.is_tax_relevant,
     )
 
+    if _looks_like_private_consumer_receipt(vendor, category, data, path):
+        is_business = False
+        is_tax_relevant = False
+        if category in {"", default_category, "Unsortiert"}:
+            category = "Lebensmittel"
+
     reason = (
         _clean_text(data.get("reason"))
         or "KI-Belegextraktion"
@@ -291,6 +297,15 @@ Finanzbuchhaltung oder Buchhaltung:
 - category = Steuer
 - transaction_type = expense
 - document_type = invoice
+
+Bei privaten Supermarkt-/Drogerie-/Lebensmittel-Kassenbons:
+- Beispiele: REWE, EDEKA, Aldi, Lidl, Kaufland, Netto, Penny, dm, Rossmann
+- document_type = receipt
+- category = Lebensmittel oder Drogerie
+- is_business = false
+- is_tax_relevant = false
+- transaction_type = expense
+- Nur wenn der Beleg explizit geschaeftliche Bewirtung, Wareneinkauf fuer Firma, Betriebsausgaben oder eine Firmenanschrift nennt, darf is_business/is_tax_relevant true sein.
 
 Bei Steuerbescheid, Einkommensteuerbescheid, Finanzamt-Bescheid:
 - document_type = assessment
@@ -596,6 +611,47 @@ def _review_status_for_document(document_type: str, confidence: float) -> str:
     if document_type in {"document", "unknown", "offer", "advertisement", "information", "assessment", "certificate", "statement", "contract"}:
         return "needs_review"
     return "reviewed"
+
+
+def _looks_like_private_consumer_receipt(vendor: str, category: str, data: dict[str, Any], path: Path) -> bool:
+    text = " ".join(
+        [
+            vendor,
+            category,
+            path.name,
+            *(str(value or "") for value in data.values()),
+        ]
+    ).lower()
+    consumer_terms = (
+        "rewe",
+        "edeka",
+        "aldi",
+        "lidl",
+        "kaufland",
+        "netto",
+        "penny",
+        "real",
+        "dm-drogerie",
+        "dm drogerie",
+        "rossmann",
+        "supermarkt",
+        "lebensmittel",
+        "drogerie",
+        "pfandbon",
+        "kassenbon",
+    )
+    business_terms = (
+        "bewirtung",
+        "geschäftlich",
+        "geschaeftlich",
+        "firma",
+        "betriebsausgabe",
+        "wareneinkauf",
+        "kundenbewirtung",
+        "ust-id",
+        "ust id",
+    )
+    return any(term in text for term in consumer_terms) and not any(term in text for term in business_terms)
 
 
 def _parse_bool(value: Any, default: bool) -> bool:

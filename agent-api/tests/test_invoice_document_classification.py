@@ -245,6 +245,106 @@ class InvoiceEbonUploadTest(unittest.TestCase):
             path.write_text("merchant=Baeckerei\ntotal=4,20 EUR", encoding="utf-8")
             self.assertTrue(_should_use_ai_extraction(config, metadata, path))
 
+class PrivateConsumerReceiptTests(unittest.TestCase):
+    def test_rewe_receipt_is_private_and_not_tax_relevant_even_if_ai_claims_business(self):
+        metadata = InvoiceMetadata(
+            source_path="rewe-bon.txt",
+            file_hash="hash",
+            is_invoice=True,
+            confidence=0.6,
+            vendor="REWE",
+            invoice_date=__import__("datetime").date(2026, 6, 10),
+            amount=23.45,
+            currency="EUR",
+            invoice_number="",
+            category="Unsortiert",
+            reason="test",
+            document_type="receipt",
+            transaction_type="expense",
+            gross_amount=23.45,
+            is_business=True,
+            is_tax_relevant=True,
+        )
+
+        refined = refine_metadata_with_ai(
+            path=Path("rewe-bon.txt"),
+            metadata=metadata,
+            llm_client=FakeLlmClient({
+                "document_type": "receipt",
+                "is_invoice": True,
+                "transaction_type": "expense",
+                "vendor": "REWE Markt GmbH",
+                "invoice_date": "2026-06-10",
+                "gross_amount": "23,45",
+                "currency": "EUR",
+                "category": "Lebensmittel",
+                "is_business": True,
+                "is_tax_relevant": True,
+                "confidence": 0.95,
+                "reason": "Kassenbon REWE",
+            }),
+            default_category="Unsortiert",
+        )
+
+        self.assertTrue(refined.is_invoice)
+        self.assertEqual(refined.document_type, "receipt")
+        self.assertFalse(refined.is_business)
+        self.assertFalse(refined.is_tax_relevant)
+        self.assertEqual(refined.category, "Lebensmittel")
+
+    def test_local_rewe_receipt_is_private_and_not_tax_relevant(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rewe_kassenbon.txt"
+            path.write_text("REWE Markt Kassenbon\nGesamtbetrag 23,45 EUR\nVielen Dank", encoding="utf-8")
+            metadata = extract_metadata(path)
+
+        self.assertTrue(metadata.is_invoice)
+        self.assertEqual(metadata.category, "Lebensmittel")
+        self.assertFalse(metadata.is_business)
+        self.assertFalse(metadata.is_tax_relevant)
+
+    def test_month_view_excludes_private_not_tax_relevant_receipt(self):
+        import tempfile
+        from backend.agents.invoices.service import InvoiceService
+
+        with tempfile.TemporaryDirectory() as tmp:
+            service = InvoiceService.__new__(InvoiceService)
+            root = Path(tmp)
+            service.database_path = root / "invoices.db"
+            service.inbox_dir = root / "inbox"
+            service.archive_dir = root / "archive"
+            service.review_dir = root / "review"
+            service.export_dir = root / "exports"
+            service.archive_cleanup_backup_dir = root / "backup"
+            service._ensure_schema()
+
+            with service.connect() as connection:
+                connection.execute(
+                    """
+                    insert into invoices (
+                        file_hash, source_path, archive_path, is_invoice, confidence, vendor,
+                        invoice_date, amount, currency, invoice_number, category, status,
+                        reason, document_type, transaction_type, year, month, gross_amount,
+                        is_business, is_tax_relevant, review_status, created_at, updated_at
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "rewe", "rewe.txt", "archive/rewe.txt", 1, 0.95, "REWE",
+                        "2026-06-10", 23.45, "EUR", "", "Lebensmittel", "archived",
+                        "private receipt", "receipt", "expense", 2026, 6, 23.45,
+                        0, 0, "reviewed", "2026-06-10T00:00:00+00:00", "2026-06-10T00:00:00+00:00",
+                    ),
+                )
+                connection.commit()
+
+            month = service.month(2026, 6, {})
+            year = service.year(2026)
+
+        self.assertEqual(month["invoices"], [])
+        self.assertEqual(year["months"][5]["expense_total"], 0)
+
 if __name__ == "__main__":
     unittest.main()
 
