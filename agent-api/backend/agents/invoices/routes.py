@@ -20,6 +20,12 @@ class InvoiceAgentSettingsPayload(BaseModel):
     schedule: Optional[list[str]] = None
 
 
+class EBonUploadPayload(BaseModel):
+    content: str
+    filename: Optional[str] = None
+    source: Optional[str] = None
+
+
 @router.get("/summary")
 def invoice_summary():
     return invoice_service.summary()
@@ -155,6 +161,15 @@ def delete_invoice(invoice_id: int):
 @router.post("/upload")
 def upload_invoice(file: UploadFile = File(...)):
     return invoice_service.upload(file)
+
+
+@router.post("/upload/ebon")
+def upload_ebon(payload: EBonUploadPayload):
+    return invoice_service.upload_ebon_content(
+        content=payload.content,
+        filename=payload.filename,
+        source=payload.source,
+    )
 
 
 @router.post("/run")

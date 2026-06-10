@@ -1270,6 +1270,11 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  uploadEbonContent: (payload: { content: string; filename?: string; source?: string }) =>
+    request<{ status: string; type: string; filename: string; stored_filename: string; path: string }>('/api/invoices/upload/ebon', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   fileUrl: (id: number) => apiUrl(`/api/invoices/${id}/file`),
   exportUrl: (scope: 'year' | 'month', year: number, month: number | null, type: 'excel' | 'pdf' | 'zip') =>
     scope === 'year'

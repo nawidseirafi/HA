@@ -16,7 +16,7 @@ from .portals import PortalConfig, fetch_portal_documents
 
 
 SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv", ".eml"}
-AI_EXTRACTABLE_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+AI_EXTRACTABLE_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".txt", ".csv"}
 ACCOUNTING_DOCUMENT_TYPES = {
     "invoice",
     "receipt",

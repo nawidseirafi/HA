@@ -22,6 +22,7 @@ from backend.paths import API_DIR, PROJECT_DIR
 logger = logging.getLogger(__name__)
 DEFAULT_AGENT_TIMEOUT_SECONDS = 1800
 DEFAULT_INVOICE_SCHEDULE = ["22:00:00"]
+MAX_EBON_CONTENT_BYTES = 256 * 1024
 ACCOUNTING_RELEVANT_WHERE = """
 is_invoice = 1
 and lower(trim(coalesce(category, ''))) not in ('nicht relevant', 'nicht-relevant', 'irrelevant')
@@ -667,6 +668,49 @@ class InvoiceService:
                 title="Rechnung verarbeitet",
                 message=f"Beleg {safe_name} wurde hochgeladen.",
                 payload={"filename": safe_name, "stored_filename": stored_name},
+            )
+        except Exception:
+            pass
+        return result
+
+    def upload_ebon_content(self, content: str, filename: str | None = None, source: str | None = None) -> dict[str, Any]:
+        normalized = (content or "").strip()
+        if not normalized:
+            raise HTTPException(status_code=422, detail="E-Bon Inhalt darf nicht leer sein.")
+        encoded = normalized.encode("utf-8")
+        if len(encoded) > MAX_EBON_CONTENT_BYTES:
+            raise HTTPException(status_code=413, detail="E-Bon Inhalt ist zu gross.")
+
+        self.inbox_dir.mkdir(parents=True, exist_ok=True)
+        base_name = secure_filename(filename or "e-bon-qr.txt")
+        if Path(base_name).suffix.lower() not in {".txt", ".csv"}:
+            base_name = f"{Path(base_name).stem or 'e-bon-qr'}.txt"
+        stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex}-{base_name}"
+        destination = self.inbox_dir / stored_name
+
+        header = [
+            "# E-Bon / QR-Code Upload",
+            f"source: {source or 'manual_qr'}",
+            f"received_at: {utc_now()}",
+            "",
+        ]
+        destination.write_text("\n".join(header) + normalized + "\n", encoding="utf-8")
+
+        result = {
+            "status": "uploaded",
+            "type": "ebon_qr",
+            "filename": base_name,
+            "stored_filename": stored_name,
+            "path": str(destination),
+        }
+        try:
+            MessagingService().create_message(
+                source="invoice",
+                category="invoice",
+                severity="info",
+                title="E-Bon hochgeladen",
+                message=f"E-Bon/QR-Inhalt {base_name} wurde hochgeladen.",
+                payload={"filename": base_name, "stored_filename": stored_name, "source": source or "manual_qr"},
             )
         except Exception:
             pass

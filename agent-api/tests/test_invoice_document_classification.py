@@ -187,6 +187,64 @@ class InvoiceServiceAccountingViewTest(unittest.TestCase):
         self.assertEqual(years[0]["income_total"], 320.0)
         self.assertEqual(years[0]["expense_total"], 0)
 
+class InvoiceEbonUploadTest(unittest.TestCase):
+    def test_ebon_upload_writes_text_file_to_inbox(self):
+        import tempfile
+        from backend.agents.invoices.service import InvoiceService
+
+        with tempfile.TemporaryDirectory() as tmp:
+            service = InvoiceService.__new__(InvoiceService)
+            root = Path(tmp)
+            service.inbox_dir = root / "inbox"
+            result = service.upload_ebon_content(
+                content='{"merchant":"Baeckerei","total":"4,20 EUR"}',
+                filename="baeckerei-bon.qr",
+                source="test_qr",
+            )
+            stored = Path(result["path"])
+            text = stored.read_text(encoding="utf-8")
+
+        self.assertEqual(result["type"], "ebon_qr")
+        self.assertEqual(stored.suffix, ".txt")
+        self.assertIn("source: test_qr", text)
+        self.assertIn('"merchant":"Baeckerei"', text)
+
+    def test_txt_ebon_is_ai_extractable_when_configured(self):
+        from backend.agents.invoices.extractor import InvoiceMetadata
+        from backend.agents.invoices.scanner import AIExtractionConfig, InvoiceAgentConfig, _should_use_ai_extraction
+        from datetime import date
+
+        metadata = InvoiceMetadata(
+            source_path="e-bon.txt",
+            file_hash="hash",
+            is_invoice=False,
+            confidence=0.2,
+            vendor="Unbekannt",
+            invoice_date=date(2026, 6, 10),
+            amount=None,
+            currency="EUR",
+            invoice_number="",
+            category="Unsortiert",
+            reason="test",
+            document_type="document",
+        )
+        config = InvoiceAgentConfig(
+            inbox_dir=Path("inbox"),
+            archive_dir=Path("archive"),
+            review_dir=Path("review"),
+            database_path=Path("db.sqlite"),
+            email_attachment_dir=Path("inbox"),
+            archive_cleanup_backup_dir=Path("backup"),
+            poll_interval_seconds=600,
+            ai_extraction=AIExtractionConfig(enabled=True, always_for_documents=True),
+        )
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "e-bon.txt"
+            path.write_text("merchant=Baeckerei\ntotal=4,20 EUR", encoding="utf-8")
+            self.assertTrue(_should_use_ai_extraction(config, metadata, path))
+
 if __name__ == "__main__":
     unittest.main()
 

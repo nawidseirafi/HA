@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, AlertTriangle, BrainCircuit, CalendarClock, CheckCircle2, Database, Euro, FileText, Play, Power, Save, Server, Settings, Upload, WalletCards, X } from 'lucide-react';
+import { Activity, AlertTriangle, BrainCircuit, CalendarClock, CheckCircle2, Database, Euro, FileText, Play, Power, QrCode, Save, Server, Settings, Upload, WalletCards, X } from 'lucide-react';
 import { api } from '@shared/api/client';
 import type { AgentStatus } from '@shared/api/client';
 import type { Route } from '../../App';
@@ -17,6 +17,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const [agentStatus, setAgentStatus] = useState('');
   const [agentError, setAgentError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [ebonOpen, setEbonOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -99,6 +100,21 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       await load();
     } catch (err) {
       setAgentError(err instanceof Error ? err.message : 'Upload fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadEbon = async (payload: { content: string; filename?: string }) => {
+    setBusy(true);
+    setAgentError('');
+    try {
+      await api.uploadEbonContent({ ...payload, source: 'manual_qr' });
+      setEbonOpen(false);
+      setAgentStatus('E-Bon/QR-Inhalt wurde hochgeladen. Starte den Invoice Agent, um ihn zu verarbeiten.');
+      await load();
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : 'E-Bon konnte nicht hochgeladen werden.');
     } finally {
       setBusy(false);
     }
@@ -217,6 +233,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             </div>
             <div className="quick-actions">
               <button className="button primary" onClick={() => fileRef.current?.click()} disabled={busy}><Upload size={16} /> Beleg hochladen</button>
+              <button className="button secondary" onClick={() => setEbonOpen(true)} disabled={busy}><QrCode size={16} /> E-Bon / QR einfügen</button>
               <button className="button secondary" onClick={run} disabled={busy}>
                 {busy ? <Activity size={16} /> : <Play size={16} />}
                 {busy ? 'Agent läuft...' : 'Invoice Agent starten'}
@@ -257,6 +274,89 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           navigate({ name: 'schedulerDashboard' });
         }}
       />
+      <EbonUploadDrawer
+        open={ebonOpen}
+        loading={busy}
+        onClose={() => setEbonOpen(false)}
+        onSave={uploadEbon}
+      />
+    </div>
+  );
+}
+
+function EbonUploadDrawer({
+  open,
+  loading,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  loading: boolean;
+  onClose: () => void;
+  onSave: (payload: { content: string; filename?: string }) => void;
+}) {
+  const [content, setContent] = useState('');
+  const [filename, setFilename] = useState('e-bon-qr.txt');
+
+  useEffect(() => {
+    if (!open) return;
+    setContent('');
+    setFilename('e-bon-qr.txt');
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="wellness-drawer-layer">
+      <button className="wellness-drawer-backdrop" type="button" onClick={onClose} aria-label="E-Bon Upload schließen" />
+      <aside className="wellness-settings-drawer" role="dialog" aria-modal="true" aria-label="E-Bon QR Inhalt hochladen">
+        <header>
+          <div>
+            <span className="eyebrow">E-Bon</span>
+            <h2>QR-Inhalt einfügen</h2>
+            <p>Füge den ausgelesenen QR-Code- oder E-Bon-Text ein. Der Inhalt wird wie ein Beleg in die Inbox gelegt.</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Schließen"><X size={18} /></button>
+        </header>
+        <div className="panel wellness-settings-panel invoice-settings-panel">
+          <form
+            className="wellness-settings-form invoice-settings-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSave({ content, filename });
+            }}
+          >
+            <section className="wellness-settings-section invoice-settings-section">
+              <div className="wellness-settings-section-head invoice-settings-head">
+                <span><QrCode size={18} /></span>
+                <div>
+                  <h3>QR-/E-Bon-Daten</h3>
+                  <p>Geeignet für Text, JSON, CSV oder den rohen QR-Code-Inhalt.</p>
+                </div>
+              </div>
+              <label className="wide">
+                Dateiname
+                <input value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="e-bon-qr.txt" />
+              </label>
+              <label className="wide">
+                Inhalt
+                <textarea
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  rows={10}
+                  placeholder="QR-Code-Inhalt oder E-Bon-Text hier einfügen..."
+                />
+              </label>
+            </section>
+            <div className="wellness-settings-actions invoice-settings-actions">
+              <button className="button ghost" type="button" onClick={onClose}>Abbrechen</button>
+              <button className="button primary" type="submit" disabled={loading || !content.trim()}>
+                <Save size={16} /> E-Bon hochladen
+              </button>
+            </div>
+          </form>
+        </div>
+      </aside>
     </div>
   );
 }
