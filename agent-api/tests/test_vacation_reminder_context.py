@@ -1,0 +1,60 @@
+import unittest
+
+from backend.agents.vacation.service import VacationService
+
+
+class VacationReminderContextTests(unittest.TestCase):
+    def setUp(self):
+        self.service = VacationService.__new__(VacationService)
+
+    def test_internet_unknown_does_not_create_vacation_reminder_without_vacation_context(self):
+        reminders = self.service._reminder_candidates(
+            [
+                {
+                    "entity_id": "sensor.fritzbox_wan_status",
+                    "state": "unknown",
+                    "attributes": {"friendly_name": "FritzBox WAN Status"},
+                }
+            ],
+            vacation_mode=False,
+            period={},
+            pre_departure=False,
+        )
+
+        self.assertEqual(reminders, [])
+
+    def test_internet_unknown_creates_vacation_reminder_in_pre_departure_context(self):
+        reminders = self.service._reminder_candidates(
+            [
+                {
+                    "entity_id": "sensor.fritzbox_wan_status",
+                    "state": "unknown",
+                    "attributes": {"friendly_name": "FritzBox WAN Status"},
+                }
+            ],
+            vacation_mode=False,
+            period={"start_date": "2026-06-11", "end_date": "2026-06-14"},
+            pre_departure=True,
+        )
+
+        self.assertTrue(any(item.get("reminder_type") == "internet" for item in reminders))
+
+    def test_low_battery_does_not_create_vacation_reminder_without_vacation_context(self):
+        reminders = self.service._reminder_candidates(
+            [
+                {
+                    "entity_id": "sensor.door_sensor_battery",
+                    "state": "10",
+                    "attributes": {"friendly_name": "Türsensor Batterie", "device_class": "battery"},
+                }
+            ],
+            vacation_mode=False,
+            period={},
+            pre_departure=False,
+        )
+
+        self.assertEqual(reminders, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

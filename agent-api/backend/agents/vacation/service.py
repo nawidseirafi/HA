@@ -527,11 +527,16 @@ class VacationService:
         return self._decode_period(dict(row))
 
     def refresh_reminders(self, vacation_mode: bool | None = None, period: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        period = period or {}
+        pre_departure = self._is_pre_departure_window(period)
+        has_vacation_context = bool(vacation_mode) or pre_departure
         try:
             states = self._ha().get_states()
         except Exception as exc:
             self._last_error = str(exc)
             self._close_generated_reminders()
+            if not has_vacation_context:
+                return []
             reminders = [
                 self._save_reminder(
                     reminder_type="internet",
@@ -544,8 +549,6 @@ class VacationService:
                 self._message_from_reminder(reminder)
             return reminders
         self._close_generated_reminders()
-        period = period or {}
-        pre_departure = self._is_pre_departure_window(period)
         candidates = self._reminder_candidates(states, vacation_mode=bool(vacation_mode), period=period, pre_departure=pre_departure)
         candidates.extend(self._waste_reminders_from_service(period, pre_departure=pre_departure))
         reminders = [self._save_reminder_candidate(candidate) for candidate in candidates]
@@ -1173,6 +1176,7 @@ class VacationService:
         return False
 
     def _reminder_candidates(self, states: list[dict[str, Any]], vacation_mode: bool, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
+        has_vacation_context = bool(vacation_mode) or bool(pre_departure)
         windows: list[str] = []
         doors: list[str] = []
         batteries: list[str] = []
@@ -1198,13 +1202,13 @@ class VacationService:
                     doors.append(self._entity_label(state))
                 else:
                     windows.append(self._entity_label(state))
-            if value in {"unavailable", "unknown"} and not entity_id.startswith(("weather.", "calendar.")):
+            if has_vacation_context and value in {"unavailable", "unknown"} and not entity_id.startswith(("weather.", "calendar.")):
                 if self._looks_like_internet_state(state):
                     internet_problem = True
                 else:
                     safety_problem = True
             battery_value = self._battery_value(state)
-            if battery_value is not None and battery_value <= 20:
+            if has_vacation_context and battery_value is not None and battery_value <= 20:
                 batteries.append(name)
             if self._looks_like_waste_state(state) and period.get("start_date") and period.get("end_date"):
                 waste_date = self._date_only(state.get("state"))
