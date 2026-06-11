@@ -10,6 +10,7 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
   const [draft, setDraft] = useState<Partial<Contract>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const load = async () => {
     const data = await api.contract(id);
@@ -21,10 +22,12 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
   const save = async () => {
     setBusy(true);
     setError('');
+    setNotice('');
     try {
-      const updated = await api.updateContract(id, draft);
+      const updated = await api.updateContract(id, editableContractPayload(draft));
       setContract(updated);
       setDraft(updated);
+      setNotice('Vertrag gespeichert.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
     } finally {
@@ -56,6 +59,7 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
       </header>
 
       {error && <section className="panel error-panel"><div className="agent-run-status"><AlertTriangle size={18} /><span>{error}</span></div></section>}
+      {notice && <section className="panel success-panel"><span>{notice}</span></section>}
 
       <section className="kpi-grid contract-detail-kpis">
         <Kpi label="Monatlich" value={currency(contract.monthly_cost)} />
@@ -96,15 +100,15 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
             </label>
             <label className="contract-field">
               <span>Startdatum</span>
-              <input type="date" value={draft.start_date || ''} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+              <input type="date" value={dateInputValue(draft.start_date)} onChange={(e) => setDraft({ ...draft, start_date: e.target.value || null })} />
             </label>
             <label className="contract-field">
               <span>Enddatum</span>
-              <input type="date" value={draft.end_date || ''} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+              <input type="date" value={dateInputValue(draft.end_date)} onChange={(e) => setDraft({ ...draft, end_date: e.target.value || null })} />
             </label>
             <label className="contract-field">
               <span>Verlängerungsdatum</span>
-              <input type="date" value={draft.renewal_date || ''} onChange={(e) => setDraft({ ...draft, renewal_date: e.target.value })} />
+              <input type="date" value={dateInputValue(draft.renewal_date)} onChange={(e) => setDraft({ ...draft, renewal_date: e.target.value || null })} />
             </label>
           </div>
           <label className="contract-field contract-notes-field">
@@ -133,4 +137,27 @@ function Kpi({ label, value }: { label: string; value: string }) {
 
 function StatusRow({ icon: Icon, label, value }: { icon: typeof BrainCircuit; label: string; value: string }) {
   return <div className="status-row"><Icon size={17} /><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function dateInputValue(value: unknown) {
+  return typeof value === 'string' ? value.slice(0, 10) : '';
+}
+
+function editableContractPayload(draft: Partial<Contract>): Partial<Contract> {
+  return {
+    name: draft.name,
+    provider: draft.provider,
+    category: draft.category,
+    subcategory: draft.subcategory,
+    monthly_cost: draft.monthly_cost,
+    annual_cost: draft.annual_cost,
+    start_date: dateInputValue(draft.start_date) || null,
+    end_date: dateInputValue(draft.end_date) || null,
+    renewal_date: dateInputValue(draft.renewal_date) || null,
+    cancellation_period: draft.cancellation_period,
+    auto_renew: draft.auto_renew,
+    status: draft.status,
+    notes: draft.notes,
+    document_id: draft.document_id,
+  };
 }

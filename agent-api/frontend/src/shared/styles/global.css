@@ -5667,9 +5667,54 @@ button.market-insight-card:hover {
   text-align: left;
   cursor: pointer;
 }
-.mini-contract-row span,
-.analysis-card span { color: var(--muted); }
+.analysis-card {
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+}
+.analysis-card > svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+.analysis-card-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.analysis-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.analysis-card-title strong {
+  font-size: 1.04rem;
+}
+.analysis-card-title span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.analysis-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.mini-contract-row span { color: var(--muted); }
 .mini-contract-row strong { margin-left: auto; }
+.mini-contract-row span small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 3px;
+  opacity: 0.8;
+}
+.due-row { align-items: center; }
+.section-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
 .analysis-card.high { border-color: rgba(255, 99, 132, 0.38); background: rgba(255, 99, 132, 0.08); }
 .analysis-card.medium { border-color: rgba(255, 190, 80, 0.35); background: rgba(255, 190, 80, 0.08); }
 .analysis-card.low { border-color: rgba(79, 209, 197, 0.28); }

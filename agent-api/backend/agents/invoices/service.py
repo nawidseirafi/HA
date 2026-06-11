@@ -1306,7 +1306,7 @@ class InvoiceService:
     def _upsert_contract_from_invoice(self, invoice: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
         provider = str(raw.get("contract_provider") or invoice.get("vendor") or "").strip()
         name = str(raw.get("contract_name") or provider or invoice.get("original_filename") or "Vertrag").strip()
-        payload = {
+        payload: dict[str, Any] = {
             "name": name,
             "provider": provider,
             "category": raw.get("contract_category") or invoice.get("category") or "other",
@@ -1323,10 +1323,36 @@ class InvoiceService:
             "document_id": invoice["id"],
         }
         with self.connect() as connection:
-            existing = connection.execute("select id from contracts where document_id = ?", (invoice["id"],)).fetchone()
+            existing = connection.execute("select * from contracts where document_id = ?", (invoice["id"],)).fetchone()
         if existing:
+            existing_data = self._row_to_contract(existing)
+            payload = self._preserve_existing_contract_values(existing_data, payload)
             return self.update_contract(int(existing["id"]), payload)
         return self.create_contract(payload)
+
+    @staticmethod
+    def _preserve_existing_contract_values(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+        protected_fields = {
+            "name",
+            "provider",
+            "category",
+            "subcategory",
+            "monthly_cost",
+            "annual_cost",
+            "start_date",
+            "end_date",
+            "renewal_date",
+            "cancellation_period",
+            "auto_renew",
+            "status",
+            "notes",
+        }
+        merged = dict(incoming)
+        for field in protected_fields:
+            current = existing.get(field)
+            if current not in (None, ""):
+                merged[field] = current
+        return merged
 
     def _insert_metadata_document(self, path: Path, metadata: Any, original_filename: str) -> int:
         from backend.agents.invoices.extractor import file_sha256

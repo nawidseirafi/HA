@@ -337,25 +337,26 @@ class InvoiceCatalog:
             monthly_cost = round(annual_cost / 12, 2)
         if annual_cost is None and monthly_cost is not None:
             annual_cost = round(monthly_cost * 12, 2)
-        existing = self.connection.execute("select id from contracts where document_id = ?", (document_id,)).fetchone()
-        payload = (
-            name,
-            provider,
-            category,
-            _text_or_none(raw.get("contract_subcategory")),
-            monthly_cost,
-            annual_cost,
-            _date_or_none(raw.get("start_date")),
-            _date_or_none(raw.get("end_date")),
-            _date_or_none(raw.get("renewal_date")),
-            _text_or_none(raw.get("cancellation_period")),
-            1 if bool(raw.get("auto_renew")) else 0,
-            "needs_review",
-            metadata.reason,
-            document_id,
-            updated_at,
-        )
+        existing = self.connection.execute("select * from contracts where document_id = ?", (document_id,)).fetchone()
+        incoming = {
+            "name": name,
+            "provider": provider,
+            "category": category,
+            "subcategory": _text_or_none(raw.get("contract_subcategory")),
+            "monthly_cost": monthly_cost,
+            "annual_cost": annual_cost,
+            "start_date": _date_or_none(raw.get("start_date")),
+            "end_date": _date_or_none(raw.get("end_date")),
+            "renewal_date": _date_or_none(raw.get("renewal_date")),
+            "cancellation_period": _text_or_none(raw.get("cancellation_period")),
+            "auto_renew": 1 if bool(raw.get("auto_renew")) else 0,
+            "status": "needs_review",
+            "notes": metadata.reason,
+            "document_id": document_id,
+            "updated_at": updated_at,
+        }
         if existing:
+            payload_data = _preserve_existing_contract_values(dict(existing), incoming)
             self.connection.execute(
                 """
                 update contracts
@@ -365,7 +366,24 @@ class InvoiceCatalog:
                     document_id = ?, updated_at = ?
                 where id = ?
                 """,
-                (*payload, existing["id"]),
+                (
+                    payload_data["name"],
+                    payload_data["provider"],
+                    payload_data["category"],
+                    payload_data["subcategory"],
+                    payload_data["monthly_cost"],
+                    payload_data["annual_cost"],
+                    payload_data["start_date"],
+                    payload_data["end_date"],
+                    payload_data["renewal_date"],
+                    payload_data["cancellation_period"],
+                    payload_data["auto_renew"],
+                    payload_data["status"],
+                    payload_data["notes"],
+                    payload_data["document_id"],
+                    payload_data["updated_at"],
+                    existing["id"],
+                ),
             )
         else:
             self.connection.execute(
@@ -376,7 +394,24 @@ class InvoiceCatalog:
                     status, notes, document_id, created_at, updated_at
                 ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (*payload, updated_at),
+                (
+                    incoming["name"],
+                    incoming["provider"],
+                    incoming["category"],
+                    incoming["subcategory"],
+                    incoming["monthly_cost"],
+                    incoming["annual_cost"],
+                    incoming["start_date"],
+                    incoming["end_date"],
+                    incoming["renewal_date"],
+                    incoming["cancellation_period"],
+                    incoming["auto_renew"],
+                    incoming["status"],
+                    incoming["notes"],
+                    incoming["document_id"],
+                    updated_at,
+                    incoming["updated_at"],
+                ),
             )
 
 
@@ -510,6 +545,30 @@ def _date_or_none(value: object) -> str | None:
 def _text_or_none(value: object) -> str | None:
     text = str(value or "").strip()
     return text or None
+
+
+def _preserve_existing_contract_values(existing: dict, incoming: dict) -> dict:
+    protected_fields = {
+        "name",
+        "provider",
+        "category",
+        "subcategory",
+        "monthly_cost",
+        "annual_cost",
+        "start_date",
+        "end_date",
+        "renewal_date",
+        "cancellation_period",
+        "auto_renew",
+        "status",
+        "notes",
+    }
+    merged = dict(incoming)
+    for field in protected_fields:
+        current = existing.get(field)
+        if current not in (None, ""):
+            merged[field] = current
+    return merged
 
 
 def _content_types_xml() -> str:
