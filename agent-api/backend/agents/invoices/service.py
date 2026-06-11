@@ -239,6 +239,26 @@ class InvoiceService:
             )
             connection.execute(
                 """
+                update contracts
+                set
+                    start_date = case when start_date = (select invoice_date from invoices where invoices.id = contracts.document_id) then null else start_date end,
+                    end_date = case when end_date = (select invoice_date from invoices where invoices.id = contracts.document_id) then null else end_date end,
+                    renewal_date = case when renewal_date = (select invoice_date from invoices where invoices.id = contracts.document_id) then null else renewal_date end
+                where document_id is not null
+                  and exists (
+                    select 1
+                    from invoices
+                    where invoices.id = contracts.document_id
+                      and (
+                        contracts.start_date = invoices.invoice_date
+                        or contracts.end_date = invoices.invoice_date
+                        or contracts.renewal_date = invoices.invoice_date
+                      )
+                  )
+                """
+            )
+            connection.execute(
+                """
                 insert or ignore into invoice_agent_settings
                     (id, enabled, schedule_json, updated_at)
                 values (?, ?, ?, ?)
@@ -1137,14 +1157,28 @@ class InvoiceService:
             params.extend([needle, needle, needle])
         with self.connect() as connection:
             rows = connection.execute(
-                f"select * from contracts where {' and '.join(where)} order by coalesce(renewal_date, end_date, updated_at) asc, provider",
+                f"""
+                select contracts.*, invoices.invoice_date as document_date
+                from contracts
+                left join invoices on invoices.id = contracts.document_id
+                where {' and '.join(where)}
+                order by coalesce(contracts.renewal_date, contracts.end_date, contracts.updated_at) asc, contracts.provider
+                """,
                 params,
             ).fetchall()
         return [self._row_to_contract(row) for row in rows]
 
     def get_contract(self, contract_id: int) -> dict[str, Any]:
         with self.connect() as connection:
-            row = connection.execute("select * from contracts where id = ?", (contract_id,)).fetchone()
+            row = connection.execute(
+                """
+                select contracts.*, invoices.invoice_date as document_date
+                from contracts
+                left join invoices on invoices.id = contracts.document_id
+                where contracts.id = ?
+                """,
+                (contract_id,),
+            ).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Contract not found")
         return self._row_to_contract(row)
@@ -1290,9 +1324,11 @@ class InvoiceService:
         for key in ("monthly_cost", "annual_cost"):
             if key in data:
                 data[key] = self._number(data[key])
+        monthly_was_provided = "monthly_cost" in data
+        annual_was_provided = "annual_cost" in data
         if data.get("monthly_cost") is None and data.get("annual_cost") is not None:
             data["monthly_cost"] = round(float(data["annual_cost"]) / 12, 2)
-        if data.get("annual_cost") is None and data.get("monthly_cost") is not None:
+        if (data.get("annual_cost") is None or (monthly_was_provided and not annual_was_provided)) and data.get("monthly_cost") is not None:
             data["annual_cost"] = round(float(data["monthly_cost"]) * 12, 2)
         for key in ("start_date", "end_date", "renewal_date"):
             if key in data:
@@ -1322,13 +1358,24 @@ class InvoiceService:
             "notes": invoice.get("reason") or raw.get("reason"),
             "document_id": invoice["id"],
         }
+        self._drop_document_date_defaults(invoice, payload)
         with self.connect() as connection:
             existing = connection.execute("select * from contracts where document_id = ?", (invoice["id"],)).fetchone()
         if existing:
             existing_data = self._row_to_contract(existing)
+            self._drop_document_date_defaults(invoice, existing_data)
             payload = self._preserve_existing_contract_values(existing_data, payload)
             return self.update_contract(int(existing["id"]), payload)
         return self.create_contract(payload)
+
+    @staticmethod
+    def _drop_document_date_defaults(invoice: dict[str, Any], payload: dict[str, Any]) -> None:
+        document_date = str(invoice.get("invoice_date") or "")[:10]
+        if not document_date:
+            return
+        for field in ("start_date", "end_date", "renewal_date"):
+            if str(payload.get(field) or "")[:10] == document_date:
+                payload[field] = None
 
     @staticmethod
     def _preserve_existing_contract_values(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
@@ -1562,6 +1609,11 @@ class InvoiceService:
     @staticmethod
     def _row_to_contract(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
+        document_date = str(data.pop("document_date", "") or "")[:10]
+        if document_date:
+            for field in ("start_date", "end_date", "renewal_date"):
+                if str(data.get(field) or "")[:10] == document_date:
+                    data[field] = None
         data["auto_renew"] = bool(data.get("auto_renew"))
         data["monthly_cost"] = data.get("monthly_cost")
         data["annual_cost"] = data.get("annual_cost")

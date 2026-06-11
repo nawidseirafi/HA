@@ -100,17 +100,24 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
             </label>
             <label className="contract-field">
               <span>Startdatum</span>
-              <input type="date" value={dateInputValue(draft.start_date)} onChange={(e) => setDraft({ ...draft, start_date: e.target.value || null })} />
+              <div className="contract-date-input">
+                <input type="date" value={dateInputValue(draft.start_date)} onChange={(e) => setDraft({ ...draft, start_date: e.target.value || null })} />
+              </div>
             </label>
             <label className="contract-field">
               <span>Enddatum</span>
-              <input type="date" value={dateInputValue(draft.end_date)} onChange={(e) => setDraft({ ...draft, end_date: e.target.value || null })} />
+              <div className="contract-date-input">
+                <input type="date" value={dateInputValue(draft.end_date)} onChange={(e) => setDraft({ ...draft, end_date: e.target.value || null })} />
+              </div>
             </label>
             <label className="contract-field">
               <span>Verlängerungsdatum</span>
-              <input type="date" value={dateInputValue(draft.renewal_date)} onChange={(e) => setDraft({ ...draft, renewal_date: e.target.value || null })} />
+              <div className="contract-date-input">
+                <input type="date" value={dateInputValue(draft.renewal_date)} onChange={(e) => setDraft({ ...draft, renewal_date: e.target.value || null })} />
+              </div>
             </label>
           </div>
+          <p className="contract-form-help">Datumsfelder leer lassen, wenn Laufzeit oder Verlängerung nicht bekannt sind. Der Agent setzt diese Felder nicht automatisch auf heute.</p>
           <label className="contract-field contract-notes-field">
             <span>Notizen / KI-Bewertung</span>
             <textarea className="contract-notes" placeholder="Zusammenfassung, offene Punkte oder KI-Hinweise" value={draft.notes || ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
@@ -150,7 +157,6 @@ function editableContractPayload(draft: Partial<Contract>): Partial<Contract> {
     category: draft.category,
     subcategory: draft.subcategory,
     monthly_cost: draft.monthly_cost,
-    annual_cost: draft.annual_cost,
     start_date: dateInputValue(draft.start_date) || null,
     end_date: dateInputValue(draft.end_date) || null,
     renewal_date: dateInputValue(draft.renewal_date) || null,

@@ -355,8 +355,11 @@ class InvoiceCatalog:
             "document_id": document_id,
             "updated_at": updated_at,
         }
+        _drop_document_date_defaults(metadata.invoice_date.isoformat(), incoming)
         if existing:
-            payload_data = _preserve_existing_contract_values(dict(existing), incoming)
+            existing_data = dict(existing)
+            _drop_document_date_defaults(metadata.invoice_date.isoformat(), existing_data)
+            payload_data = _preserve_existing_contract_values(existing_data, incoming)
             self.connection.execute(
                 """
                 update contracts
@@ -569,6 +572,15 @@ def _preserve_existing_contract_values(existing: dict, incoming: dict) -> dict:
         if current not in (None, ""):
             merged[field] = current
     return merged
+
+
+def _drop_document_date_defaults(document_date: str, payload: dict) -> None:
+    normalized = str(document_date or "")[:10]
+    if not normalized:
+        return
+    for field in ("start_date", "end_date", "renewal_date"):
+        if str(payload.get(field) or "")[:10] == normalized:
+            payload[field] = None
 
 
 def _content_types_xml() -> str:
