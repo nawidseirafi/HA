@@ -1,6 +1,6 @@
 # RoboterSteve - AI Agent System
 
-Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Rechnungsverarbeitung, MyWellness, Vacation, Boersenanalyse und zentrale Zeitsteuerung. Zentrale Querschnittsdienste liefern Messaging, Household-Status und Infrastructure/FritzBox-Status ueber Home Assistant.
+Lokales AI-Agent-System mit FastAPI-Backend, React-Frontend und integrierten Agenten fuer Home Assistant, Finance & Contracts, MyWellness, Vacation, Boersenanalyse und zentrale Zeitsteuerung. Zentrale Querschnittsdienste liefern Messaging, Household-Status und Infrastructure/FritzBox-Status ueber Home Assistant.
 
 ## Projektstruktur
 
@@ -15,7 +15,7 @@ roboterSteve/
 │   │   └── agents/
 │   │       ├── control.py        # Einheitlicher Agent-Control-Vertrag
 │   │       ├── registry.py       # Manifest Discovery und Runtime-Service Lookup
-│   │       ├── invoices/         # InvoiceAgent API, Service, Exporte, CLI
+│   │       ├── invoices/         # Finance & Contracts API, Rechnungen, Verträge, Exporte, CLI
 │   │       ├── market/           # MarketAgent API, Analyse-/Datenservices, CLI
 │   │       ├── mywellness/       # MyWellness API, Agent, Scheduler-/Health-Services, CLI
 │   │       ├── scheduler/        # Scheduler Agent V1, zentrale Task-Zeitsteuerung
@@ -153,8 +153,9 @@ POST /api/auth/login
 GET  /api/auth/me
 ```
 
-**Invoice:**
+**Finance & Contracts:**
 ```text
+GET    /api/invoices/finance/summary
 GET    /api/invoices/summary
 GET    /api/invoices/years
 GET    /api/invoices/years/{year}
@@ -164,9 +165,18 @@ GET    /api/invoices/{invoice_id}/file
 PUT    /api/invoices/{invoice_id}
 POST   /api/invoices/{invoice_id}/reanalyze
 POST   /api/invoices/{invoice_id}/mark-reviewed
+POST   /api/invoices/{invoice_id}/create-contract
 DELETE /api/invoices/{invoice_id}
 POST   /api/invoices/upload
+POST   /api/invoices/upload/contract
 POST   /api/invoices/run
+GET    /api/invoices/contracts
+POST   /api/invoices/contracts
+GET    /api/invoices/contracts/{contract_id}
+PUT    /api/invoices/contracts/{contract_id}
+DELETE /api/invoices/contracts/{contract_id}
+GET    /api/invoices/contracts/analysis
+GET    /api/invoices/contracts/reminders
 ```
 
 **Export:**
@@ -296,7 +306,7 @@ POST /agents/vacation/run
 
 Die CLI-Agenten sind in `backend/agents/` integriert und können direkt gestartet werden:
 
-### Rechnungs-Agent
+### Finance & Contracts Agent
 
 **Einmaliger Lauf:**
 ```bash
@@ -359,7 +369,9 @@ Market Agent V1:
 - Dashboard zeigt kompakte Signale, Discovery-Ideen und Watchlist-Signale; lange Marktberichte bleiben im Backend/Archiv.
 - Signalwechsel werden ueber den Messaging Service gemeldet.
 
-## Konfiguration - Rechnungs-Agent
+## Konfiguration - Finance & Contracts Agent
+
+Der Agent verarbeitet weiterhin Rechnungen und Belege. Zusätzlich erkennt und verwaltet er Vertragsdokumente fuer Versicherungen, Energie, Telekommunikation, Abonnements, Mitgliedschaften und sonstige Verpflichtungen. Vertragsdaten werden in derselben SQLite-Datenbank in der Tabelle `contracts` gespeichert und koennen ueber die Finance-Oberflaeche manuell gepflegt oder aus Dokumenten erzeugt werden.
 
 ```yaml
 invoice_agent:
@@ -409,7 +421,7 @@ invoice_agent:
   home_assistant_notifications:
     enabled: true
     only_on_changes: true
-    title: "Rechnungs-Agent"
+    title: "Finance & Contracts Agent"
     notification_id: "invoice_agent"
     notify_service: "notify.mobile_app_system_error_404"
     persistent: true
@@ -484,7 +496,7 @@ Beispiel für `/etc/systemd/system/invoice-agent.service`:
 
 ```ini
 [Unit]
-Description=Invoice AI Agent
+Description=Finance & Contracts Agent
 After=network-online.target
 Wants=network-online.target
 

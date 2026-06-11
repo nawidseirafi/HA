@@ -4,6 +4,9 @@ import { YearsPage } from './pages/finance/YearsPage';
 import { YearPage } from './pages/finance/YearPage';
 import { MonthPage } from './pages/finance/MonthPage';
 import { InvoiceDetailPage } from './pages/finance/InvoiceDetailPage';
+import { ContractsPage } from './pages/finance/ContractsPage';
+import { ContractDetailPage } from './pages/finance/ContractDetailPage';
+import { AnalysisPage } from './pages/finance/AnalysisPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
@@ -32,6 +35,13 @@ function parseRoute(): Route {
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2] && parts[3] === 'months' && parts[4]) {
     return { name: 'month', year: Number(parts[2]), month: Number(parts[4]) };
   }
+  if (parts[0] === 'finance' && parts[1] === 'contracts' && parts[2] && /^\d+$/.test(parts[2])) return { name: 'contract', id: Number(parts[2]) };
+  if (parts[0] === 'finance' && parts[1] === 'contracts') return { name: 'contracts', category: parts[2] };
+  if (parts[0] === 'finance' && parts[1] === 'insurance') return { name: 'contracts', category: 'insurance' };
+  if (parts[0] === 'finance' && parts[1] === 'subscriptions') return { name: 'contracts', category: 'subscription' };
+  if (parts[0] === 'finance' && parts[1] === 'analysis') return { name: 'contractAnalysis' };
+  if (parts[0] === 'finance' && parts[1] === 'invoices') return { name: 'years' };
+  if (parts[0] === 'finance') return { name: 'invoiceDashboard' };
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2]) return { name: 'year', year: Number(parts[2]) };
   if (parts[0] === 'invoices' && parts[1] === 'years') return { name: 'years' };
   if (parts[0] === 'invoices' && parts[1] && parts[1] !== 'years') return { name: 'invoice', id: Number(parts[1]) };
@@ -111,6 +121,9 @@ function AppContent() {
     if (route.name === 'year') return <YearPage year={route.year} navigate={navigate} />;
     if (route.name === 'month') return <MonthPage year={route.year} month={route.month} navigate={navigate} />;
     if (route.name === 'invoice') return <InvoiceDetailPage id={route.id} navigate={navigate} />;
+    if (route.name === 'contracts') return <ContractsPage navigate={navigate} category={route.category} />;
+    if (route.name === 'contract') return <ContractDetailPage id={route.id} navigate={navigate} />;
+    if (route.name === 'contractAnalysis') return <AnalysisPage navigate={navigate} />;
     if (route.name === 'settings') return <SettingsPage />;
     return <DashboardPage navigate={navigate} />;
   }, [route]);
@@ -147,7 +160,10 @@ function routeToPath(route: Route) {
   if (route.name === 'marketSymbol') return `/market/${encodeURIComponent(route.symbol)}`;
   if (route.name === 'vacationDashboard') return '/vacationDashboard';
   if (route.name === 'schedulerDashboard') return '/scheduler';
-  if (route.name === 'invoiceDashboard') return '/invoices';
+  if (route.name === 'invoiceDashboard') return '/finance';
+  if (route.name === 'contracts') return route.category ? `/finance/contracts/${route.category}` : '/finance/contracts';
+  if (route.name === 'contract') return `/finance/contracts/${route.id}`;
+  if (route.name === 'contractAnalysis') return '/finance/analysis';
   if (route.name === 'years') return '/invoices/years';
   if (route.name === 'year') return `/invoices/years/${route.year}`;
   if (route.name === 'month') return `/invoices/years/${route.year}/months/${route.month}`;

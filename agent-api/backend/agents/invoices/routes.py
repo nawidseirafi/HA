@@ -26,9 +26,31 @@ class EBonUploadPayload(BaseModel):
     source: Optional[str] = None
 
 
+class ContractPayload(BaseModel):
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    monthly_cost: Optional[float] = None
+    annual_cost: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    renewal_date: Optional[str] = None
+    cancellation_period: Optional[str] = None
+    auto_renew: Optional[bool] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    document_id: Optional[int] = None
+
+
 @router.get("/summary")
 def invoice_summary():
     return invoice_service.summary()
+
+
+@router.get("/finance/summary")
+def finance_summary():
+    return invoice_service.finance_summary()
 
 
 @router.get("/agent/status")
@@ -128,6 +150,52 @@ def export_month_zip(year: int, month: int) -> FileResponse:
     return FileResponse(path, filename=path.name)
 
 
+@router.get("/contracts")
+def list_contracts(
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    return {"contracts": invoice_service.contracts({"category": category, "status": status, "search": search})}
+
+
+@router.post("/contracts")
+def create_contract(payload: ContractPayload):
+    data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    return invoice_service.create_contract(data)
+
+
+@router.get("/contracts/analysis")
+def contract_analysis():
+    return invoice_service.contract_analysis()
+
+
+@router.get("/contracts/reminders")
+def contract_reminders():
+    return {"reminders": invoice_service.contract_reminders()}
+
+
+@router.get("/contracts/{contract_id}")
+def contract_detail(contract_id: int):
+    return invoice_service.get_contract(contract_id)
+
+
+@router.put("/contracts/{contract_id}")
+def update_contract(contract_id: int, payload: ContractPayload):
+    data = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    return invoice_service.update_contract(contract_id, data)
+
+
+@router.delete("/contracts/{contract_id}")
+def delete_contract(contract_id: int):
+    return invoice_service.delete_contract(contract_id)
+
+
+@router.post("/{invoice_id}/create-contract")
+def create_contract_from_invoice(invoice_id: int):
+    return invoice_service.analyze_invoice_as_contract(invoice_id)
+
+
 @router.get("/{invoice_id}")
 def invoice_detail(invoice_id: int):
     return invoice_service.get(invoice_id)
@@ -161,6 +229,11 @@ def delete_invoice(invoice_id: int):
 @router.post("/upload")
 def upload_invoice(file: UploadFile = File(...)):
     return invoice_service.upload(file)
+
+
+@router.post("/upload/contract")
+def upload_contract_document(file: UploadFile = File(...)):
+    return invoice_service.upload_contract_document(file)
 
 
 @router.post("/upload/ebon")

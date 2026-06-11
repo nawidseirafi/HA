@@ -1,5 +1,6 @@
 import sqlite3
 import zipfile
+import json
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -207,6 +208,10 @@ class InvoiceCatalog:
                 updated_at,
             ),
         )
+        if document_type == "contract":
+            row = self.connection.execute("select id from invoices where file_hash = ?", (data["file_hash"],)).fetchone()
+            if row is not None:
+                self._upsert_contract_from_metadata(metadata, row["id"], updated_at)
         self.connection.commit()
 
     def export_monthly_indexes(self, archive_dir: Path) -> list[Path]:
@@ -265,6 +270,30 @@ class InvoiceCatalog:
             )
             """
         )
+        self.connection.execute(
+            """
+            create table if not exists contracts (
+                id integer primary key autoincrement,
+                name text not null,
+                provider text not null default '',
+                category text not null default 'other',
+                subcategory text,
+                monthly_cost real,
+                annual_cost real,
+                start_date text,
+                end_date text,
+                renewal_date text,
+                cancellation_period text,
+                auto_renew integer not null default 0,
+                status text not null default 'needs_review',
+                notes text,
+                document_id integer,
+                created_at text not null,
+                updated_at text not null,
+                foreign key(document_id) references invoices(id) on delete set null
+            )
+            """
+        )
         existing = {row["name"] for row in self.connection.execute("pragma table_info(invoices)").fetchall()}
         for column, definition in EXTRA_COLUMNS.items():
             if column not in existing:
@@ -296,6 +325,59 @@ class InvoiceCatalog:
             """
         )
         self.connection.commit()
+
+    def _upsert_contract_from_metadata(self, metadata: InvoiceMetadata, document_id: int, updated_at: str) -> None:
+        raw = _parse_raw_json(metadata.ai_raw_json)
+        provider = str(raw.get("contract_provider") or metadata.vendor or "").strip()
+        name = str(raw.get("contract_name") or provider or Path(metadata.source_path).stem or "Vertrag").strip()
+        category = _normalize_contract_category(raw.get("contract_category") or metadata.category)
+        monthly_cost = _number(raw.get("monthly_cost"))
+        annual_cost = _number(raw.get("annual_cost"))
+        if monthly_cost is None and annual_cost is not None:
+            monthly_cost = round(annual_cost / 12, 2)
+        if annual_cost is None and monthly_cost is not None:
+            annual_cost = round(monthly_cost * 12, 2)
+        existing = self.connection.execute("select id from contracts where document_id = ?", (document_id,)).fetchone()
+        payload = (
+            name,
+            provider,
+            category,
+            _text_or_none(raw.get("contract_subcategory")),
+            monthly_cost,
+            annual_cost,
+            _date_or_none(raw.get("start_date")),
+            _date_or_none(raw.get("end_date")),
+            _date_or_none(raw.get("renewal_date")),
+            _text_or_none(raw.get("cancellation_period")),
+            1 if bool(raw.get("auto_renew")) else 0,
+            "needs_review",
+            metadata.reason,
+            document_id,
+            updated_at,
+        )
+        if existing:
+            self.connection.execute(
+                """
+                update contracts
+                set name = ?, provider = ?, category = ?, subcategory = ?, monthly_cost = ?,
+                    annual_cost = ?, start_date = ?, end_date = ?, renewal_date = ?,
+                    cancellation_period = ?, auto_renew = ?, status = ?, notes = ?,
+                    document_id = ?, updated_at = ?
+                where id = ?
+                """,
+                (*payload, existing["id"]),
+            )
+        else:
+            self.connection.execute(
+                """
+                insert into contracts (
+                    name, provider, category, subcategory, monthly_cost, annual_cost,
+                    start_date, end_date, renewal_date, cancellation_period, auto_renew,
+                    status, notes, document_id, created_at, updated_at
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (*payload, updated_at),
+            )
 
 
 def _rows_for_export(rows: Iterable[sqlite3.Row]) -> list[list[object]]:
@@ -365,6 +447,69 @@ def _normalize_transaction_type(value: object) -> str:
     if text in {"income", "einnahme", "revenue", "credit", "erstattung", "gutschrift"}:
         return "income"
     return "expense"
+
+
+def _parse_raw_json(value: object) -> dict:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _normalize_contract_category(value: object) -> str:
+    text = str(value or "").strip().lower()
+    mapping = {
+        "versicherung": "insurance",
+        "versicherungen": "insurance",
+        "insurance": "insurance",
+        "energie": "energy",
+        "energy": "energy",
+        "telekommunikation": "telecommunication",
+        "telecommunication": "telecommunication",
+        "telecom": "telecommunication",
+        "abo": "subscription",
+        "abonnement": "subscription",
+        "subscription": "subscription",
+        "mitgliedschaft": "membership",
+        "membership": "membership",
+        "finanzverpflichtung": "financial_obligation",
+        "financial_obligation": "financial_obligation",
+    }
+    return mapping.get(text, "other")
+
+
+def _number(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        return round(float(value), 2)
+    text = str(value).strip().replace("€", "").replace("EUR", "").replace(" ", "")
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    else:
+        text = text.replace(",", ".")
+    try:
+        return round(float(text), 2)
+    except ValueError:
+        return None
+
+
+def _date_or_none(value: object) -> str | None:
+    if not value:
+        return None
+    text = str(value).strip()[:10]
+    try:
+        return datetime.fromisoformat(text).date().isoformat()
+    except ValueError:
+        return None
+
+
+def _text_or_none(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _content_types_xml() -> str:

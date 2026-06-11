@@ -1,4 +1,4 @@
-import type { Invoice, MonthSummary, Summary, YearSummary } from '@shared/types/invoice';
+import type { Contract, ContractAnalysis, ContractReminder, FinanceSummary, Invoice, MonthSummary, Summary, YearSummary } from '@shared/types/invoice';
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const API_BASE = normalizeApiBase(RAW_API_BASE);
@@ -1180,6 +1180,7 @@ export const api = {
   seniorStatus: () => request<SeniorStatus>('/api/senior/status'),
   runSeniorAgent: () => request<SeniorStatus & { action: string; dry_run: boolean }>('/api/senior/run', { method: 'POST' }),
   summary: () => request<Summary>('/api/invoices/summary'),
+  financeSummary: () => request<FinanceSummary>('/api/invoices/finance/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),
   month: (year: number, month: number, params: URLSearchParams) =>
@@ -1189,7 +1190,18 @@ export const api = {
     request<Invoice>(`/api/invoices/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   markReviewed: (id: number) => request<Invoice>(`/api/invoices/${id}/mark-reviewed`, { method: 'POST' }),
   reanalyze: (id: number) => request(`/api/invoices/${id}/reanalyze`, { method: 'POST' }),
+  createContractFromInvoice: (id: number) => request<{ status: string; contract: Contract; invoice: Invoice }>(`/api/invoices/${id}/create-contract`, { method: 'POST' }),
   deleteInvoice: (id: number) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
+  contracts: (params = new URLSearchParams()) =>
+    request<{ contracts: Contract[] }>(`/api/invoices/contracts${params.toString() ? `?${params}` : ''}`),
+  contract: (id: number) => request<Contract>(`/api/invoices/contracts/${id}`),
+  createContract: (payload: Partial<Contract>) =>
+    request<Contract>('/api/invoices/contracts', { method: 'POST', body: JSON.stringify(payload) }),
+  updateContract: (id: number, payload: Partial<Contract>) =>
+    request<Contract>(`/api/invoices/contracts/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteContract: (id: number) => request<{ deleted: boolean; contract: Contract }>(`/api/invoices/contracts/${id}`, { method: 'DELETE' }),
+  contractAnalysis: () => request<ContractAnalysis>('/api/invoices/contracts/analysis'),
+  contractReminders: () => request<{ reminders: ContractReminder[] }>('/api/invoices/contracts/reminders'),
   runAgent: () => request<{ status: string; command: string; cwd: string; stdout: string; stderr: string }>('/api/invoices/run', { method: 'POST' }),
   invoiceAgentStatus: () => request<AgentStatus>('/api/invoices/agent/status'),
   enableInvoiceAgent: () => request<AgentStatus>('/api/invoices/agent/enable', { method: 'POST' }),
@@ -1269,6 +1281,19 @@ export const api = {
     handleUnauthorizedResponse(response);
     if (!response.ok) throw new Error(await response.text());
     return response.json();
+  },
+  uploadContractDocument: async (file: File) => {
+    const data = new FormData();
+    data.append('file', file);
+    const token = getAuthToken();
+    const response = await fetch(apiUrl('/api/invoices/upload/contract'), {
+      method: 'POST',
+      body: data,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    handleUnauthorizedResponse(response);
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{ status: string; message: string; contract: Contract; invoice: Invoice }>;
   },
   uploadEbonContent: (payload: { content: string; filename?: string; source?: string }) =>
     request<{ status: string; type: string; filename: string; stored_filename: string; path: string }>('/api/invoices/upload/ebon', {

@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import json
 import logging
 import threading
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
@@ -69,6 +70,18 @@ EXTRA_COLUMNS: dict[str, str] = {
     "notes": "text",
     "created_at": "text",
 }
+
+CONTRACT_CATEGORIES = {
+    "insurance": "Versicherungen",
+    "energy": "Energie",
+    "telecommunication": "Telekommunikation",
+    "subscription": "Abonnements",
+    "membership": "Mitgliedschaften",
+    "financial_obligation": "Finanzverpflichtungen",
+    "other": "Sonstige",
+}
+CONTRACT_REMINDER_DAYS = [90, 60, 30, 7]
+ACTIVE_CONTRACT_STATUSES = {"active", "needs_review"}
 
 
 def utc_now() -> str:
@@ -197,6 +210,30 @@ class InvoiceService:
                     last_error text,
                     last_output text,
                     updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists contracts (
+                    id integer primary key autoincrement,
+                    name text not null,
+                    provider text not null default '',
+                    category text not null default 'other',
+                    subcategory text,
+                    monthly_cost real,
+                    annual_cost real,
+                    start_date text,
+                    end_date text,
+                    renewal_date text,
+                    cancellation_period text,
+                    auto_renew integer not null default 0,
+                    status text not null default 'needs_review',
+                    notes text,
+                    document_id integer,
+                    created_at text not null,
+                    updated_at text not null,
+                    foreign key(document_id) references invoices(id) on delete set null
                 )
                 """
             )
@@ -673,6 +710,34 @@ class InvoiceService:
             pass
         return result
 
+    def upload_contract_document(self, file: UploadFile) -> dict[str, Any]:
+        upload_result = self.upload(file)
+        path = Path(upload_result["path"])
+        try:
+            metadata = self._reanalyze_with_ai(path)
+        except Exception as exc:
+            logger.warning("KI-Vertragsanalyse fehlgeschlagen, Contract-Entwurf wird minimal angelegt: %s", exc)
+            invoice_id = self._insert_contract_document_stub(path, upload_result["filename"], f"KI-Vertragsanalyse fehlgeschlagen: {exc}")
+            invoice = self.get(invoice_id)
+            contract = self._upsert_contract_from_invoice(invoice, {})
+            return {
+                "status": "needs_review",
+                "message": "Dokument wurde hochgeladen. KI-Analyse war nicht verfuegbar; Contract-Entwurf wurde minimal angelegt.",
+                "invoice": invoice,
+                "contract": contract,
+            }
+
+        invoice_id = self._insert_metadata_document(path, metadata, upload_result["filename"])
+        invoice = self.get(invoice_id)
+        raw = self._parse_raw_json(invoice.get("ai_raw_json"))
+        contract = self._upsert_contract_from_invoice(invoice, raw)
+        return {
+            "status": "needs_review",
+            "message": "Vertragsdokument wurde analysiert und als Contract-Entwurf angelegt.",
+            "invoice": invoice,
+            "contract": contract,
+        }
+
     def upload_ebon_content(self, content: str, filename: str | None = None, source: str | None = None) -> dict[str, Any]:
         normalized = (content or "").strip()
         if not normalized:
@@ -1027,6 +1092,402 @@ class InvoiceService:
                     time.sleep(2 * (attempt + 1))
         raise last_error
 
+    def finance_summary(self) -> dict[str, Any]:
+        invoice_summary = self.summary()
+        contracts = self.contracts()
+        active = [item for item in contracts if item["status"] in ACTIVE_CONTRACT_STATUSES]
+        monthly_total = round(sum(float(item.get("monthly_cost") or 0) for item in active), 2)
+        annual_total = round(sum(float(item.get("annual_cost") or 0) for item in active), 2)
+        by_category: dict[str, dict[str, Any]] = {}
+        for item in active:
+            key = item.get("category") or "other"
+            bucket = by_category.setdefault(
+                key,
+                {"category": key, "label": CONTRACT_CATEGORIES.get(key, "Sonstige"), "monthly_cost": 0.0, "annual_cost": 0.0, "count": 0},
+            )
+            bucket["monthly_cost"] = round(bucket["monthly_cost"] + float(item.get("monthly_cost") or 0), 2)
+            bucket["annual_cost"] = round(bucket["annual_cost"] + float(item.get("annual_cost") or 0), 2)
+            bucket["count"] += 1
+        next_deadline = self._next_contract_deadline(active)
+        return {
+            "invoices": invoice_summary,
+            "monthly_obligations": monthly_total,
+            "annual_obligations": annual_total,
+            "active_contracts": len(active),
+            "active_insurances": sum(1 for item in active if item.get("category") == "insurance"),
+            "active_subscriptions": sum(1 for item in active if item.get("category") == "subscription"),
+            "next_cancellation_deadline": next_deadline,
+            "costs_by_category": sorted(by_category.values(), key=lambda row: row["monthly_cost"], reverse=True),
+            "reminders": self.contract_reminders(),
+            "optimization_hints": self.contract_analysis()["hints"],
+            "latest_contracts": active[:6],
+        }
+
+    def contracts(self, filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        filters = filters or {}
+        where = ["1 = 1"]
+        params: list[Any] = []
+        for key in ("category", "status"):
+            if filters.get(key):
+                where.append(f"lower({key}) = ?")
+                params.append(str(filters[key]).lower())
+        if filters.get("search"):
+            needle = f"%{str(filters['search']).lower()}%"
+            where.append("(lower(name) like ? or lower(provider) like ? or lower(coalesce(subcategory, '')) like ?)")
+            params.extend([needle, needle, needle])
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"select * from contracts where {' and '.join(where)} order by coalesce(renewal_date, end_date, updated_at) asc, provider",
+                params,
+            ).fetchall()
+        return [self._row_to_contract(row) for row in rows]
+
+    def get_contract(self, contract_id: int) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute("select * from contracts where id = ?", (contract_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        return self._row_to_contract(row)
+
+    def create_contract(self, payload: dict[str, Any]) -> dict[str, Any]:
+        normalized = self._normalize_contract_payload(payload, creating=True)
+        now = utc_now()
+        normalized["created_at"] = now
+        normalized["updated_at"] = now
+        columns = ", ".join(normalized.keys())
+        placeholders = ", ".join("?" for _ in normalized)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"insert into contracts ({columns}) values ({placeholders})",
+                list(normalized.values()),
+            )
+            connection.commit()
+            contract_id = int(cursor.lastrowid)
+        return self.get_contract(contract_id)
+
+    def update_contract(self, contract_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        self.get_contract(contract_id)
+        updates = self._normalize_contract_payload(payload, creating=False)
+        updates["updated_at"] = utc_now()
+        columns = ", ".join(f"{key} = ?" for key in updates)
+        with self.connect() as connection:
+            connection.execute(f"update contracts set {columns} where id = ?", [*updates.values(), contract_id])
+            connection.commit()
+        return self.get_contract(contract_id)
+
+    def delete_contract(self, contract_id: int) -> dict[str, Any]:
+        contract = self.get_contract(contract_id)
+        with self.connect() as connection:
+            connection.execute("delete from contracts where id = ?", (contract_id,))
+            connection.commit()
+        return {"deleted": True, "contract": contract}
+
+    def analyze_invoice_as_contract(self, invoice_id: int) -> dict[str, Any]:
+        invoice = self.get(invoice_id)
+        raw = self._parse_raw_json(invoice.get("ai_raw_json"))
+        if str(invoice.get("document_type") or "").lower() != "contract" or not raw:
+            path = self._resolve_document_path(invoice.get("stored_path") or invoice.get("archive_path") or invoice.get("source_path"))
+            metadata = self._reanalyze_with_ai(path)
+            self.update(invoice_id, {
+                "vendor": metadata.vendor,
+                "invoice_date": metadata.invoice_date.isoformat(),
+                "category": metadata.category,
+                "gross_amount": metadata.gross_amount if metadata.gross_amount is not None else metadata.amount,
+                "currency": metadata.currency,
+                "review_status": "needs_review",
+                "document_type": metadata.document_type,
+                "is_invoice": metadata.is_invoice,
+            })
+            with self.connect() as connection:
+                connection.execute(
+                    "update invoices set reason = ?, ai_raw_json = ?, ai_confidence = ? where id = ?",
+                    (metadata.reason, metadata.ai_raw_json or metadata.reason, metadata.confidence, invoice_id),
+                )
+                connection.commit()
+            invoice = self.get(invoice_id)
+            raw = self._parse_raw_json(invoice.get("ai_raw_json"))
+        contract = self._upsert_contract_from_invoice(invoice, raw)
+        return {"status": "created", "contract": contract, "invoice": invoice}
+
+    def contract_reminders(self) -> list[dict[str, Any]]:
+        today = date.today()
+        reminders = []
+        for contract in self.contracts({"status": "active"}):
+            deadline = self._contract_deadline_date(contract)
+            if deadline is None:
+                continue
+            days_left = (deadline - today).days
+            for threshold in CONTRACT_REMINDER_DAYS:
+                if 0 <= days_left <= threshold:
+                    reminders.append({
+                        "contract_id": contract["id"],
+                        "name": contract["name"],
+                        "provider": contract["provider"],
+                        "deadline": deadline.isoformat(),
+                        "days_left": days_left,
+                        "threshold_days": threshold,
+                        "message": f"Kuendigungsfrist fuer {contract['name']} endet in {days_left} Tagen.",
+                    })
+                    break
+        return sorted(reminders, key=lambda item: item["days_left"])
+
+    def contract_analysis(self) -> dict[str, Any]:
+        contracts = [item for item in self.contracts() if item["status"] in ACTIVE_CONTRACT_STATUSES]
+        hints = []
+        today = date.today()
+        for contract in contracts:
+            monthly = float(contract.get("monthly_cost") or 0)
+            deadline = self._contract_deadline_date(contract)
+            if deadline is not None:
+                days_left = (deadline - today).days
+                if 0 <= days_left <= 30:
+                    hints.append(self._hint(contract, "deadline", "high", f"Die Kuendigungsfrist endet in {days_left} Tagen."))
+            start = self._parse_date(contract.get("start_date"))
+            if start and (today - start).days > 5 * 365:
+                hints.append(self._hint(contract, "age", "medium", "Dieser Vertrag laeuft seit mehr als 5 Jahren und sollte geprueft werden."))
+            if monthly >= 75:
+                hints.append(self._hint(contract, "cost", "medium", "Die monatlichen Kosten sind hoch. Pruefung auf Einsparpotenzial sinnvoll."))
+            if contract.get("category") == "insurance":
+                same = [item for item in contracts if item["id"] != contract["id"] and item.get("category") == "insurance" and item.get("subcategory") == contract.get("subcategory")]
+                if same:
+                    hints.append(self._hint(contract, "overlap", "medium", "Moegliche Ueberschneidung mit einer weiteren Versicherung gleicher Unterkategorie."))
+            if contract.get("category") == "subscription" and not contract.get("notes"):
+                hints.append(self._hint(contract, "usage", "low", "Nutzung unbekannt. Abo bei Gelegenheit auf Bedarf pruefen."))
+        expensive = sorted(contracts, key=lambda item: float(item.get("monthly_cost") or 0), reverse=True)[:5]
+        upcoming = []
+        for contract in contracts:
+            target = self._parse_date(contract.get("end_date") or contract.get("renewal_date"))
+            if target and 0 <= (target - today).days <= 183:
+                upcoming.append(contract)
+        return {
+            "hints": hints[:30],
+            "most_expensive": expensive,
+            "ending_next_6_months": sorted(upcoming, key=lambda item: item.get("end_date") or item.get("renewal_date") or ""),
+            "generated_at": utc_now(),
+            "disclaimer": "Hinweise sind Empfehlungen. Es werden keine automatischen Entscheidungen getroffen.",
+        }
+
+    def _normalize_contract_payload(self, payload: dict[str, Any], creating: bool) -> dict[str, Any]:
+        allowed = {
+            "name", "provider", "category", "subcategory", "monthly_cost", "annual_cost",
+            "start_date", "end_date", "renewal_date", "cancellation_period", "auto_renew",
+            "status", "notes", "document_id",
+        }
+        data = {key: payload[key] for key in allowed if key in payload}
+        if creating and not str(data.get("name") or "").strip():
+            raise HTTPException(status_code=422, detail="name is required")
+        for key in ("name", "provider", "subcategory", "cancellation_period", "status", "notes"):
+            if key in data:
+                data[key] = str(data[key] or "").strip()
+        if "category" in data:
+            data["category"] = self._normalize_contract_category(data["category"])
+        elif creating:
+            data["category"] = "other"
+        if "status" in data:
+            data["status"] = data["status"] or "needs_review"
+        elif creating:
+            data["status"] = "needs_review"
+        for key in ("monthly_cost", "annual_cost"):
+            if key in data:
+                data[key] = self._number(data[key])
+        if data.get("monthly_cost") is None and data.get("annual_cost") is not None:
+            data["monthly_cost"] = round(float(data["annual_cost"]) / 12, 2)
+        if data.get("annual_cost") is None and data.get("monthly_cost") is not None:
+            data["annual_cost"] = round(float(data["monthly_cost"]) * 12, 2)
+        for key in ("start_date", "end_date", "renewal_date"):
+            if key in data:
+                data[key] = self._date_or_none(data[key])
+        if "auto_renew" in data:
+            data["auto_renew"] = 1 if bool(data["auto_renew"]) else 0
+        if "document_id" in data and data["document_id"] in ("", None):
+            data["document_id"] = None
+        return data
+
+    def _upsert_contract_from_invoice(self, invoice: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
+        provider = str(raw.get("contract_provider") or invoice.get("vendor") or "").strip()
+        name = str(raw.get("contract_name") or provider or invoice.get("original_filename") or "Vertrag").strip()
+        payload = {
+            "name": name,
+            "provider": provider,
+            "category": raw.get("contract_category") or invoice.get("category") or "other",
+            "subcategory": raw.get("contract_subcategory"),
+            "monthly_cost": raw.get("monthly_cost"),
+            "annual_cost": raw.get("annual_cost"),
+            "start_date": raw.get("start_date"),
+            "end_date": raw.get("end_date"),
+            "renewal_date": raw.get("renewal_date"),
+            "cancellation_period": raw.get("cancellation_period"),
+            "auto_renew": raw.get("auto_renew") or False,
+            "status": "needs_review",
+            "notes": invoice.get("reason") or raw.get("reason"),
+            "document_id": invoice["id"],
+        }
+        with self.connect() as connection:
+            existing = connection.execute("select id from contracts where document_id = ?", (invoice["id"],)).fetchone()
+        if existing:
+            return self.update_contract(int(existing["id"]), payload)
+        return self.create_contract(payload)
+
+    def _insert_metadata_document(self, path: Path, metadata: Any, original_filename: str) -> int:
+        from backend.agents.invoices.extractor import file_sha256
+
+        gross_amount = metadata.gross_amount if metadata.gross_amount is not None else metadata.amount
+        invoice_date = metadata.invoice_date
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                insert into invoices (
+                    file_hash, source_path, archive_path, is_invoice, confidence, vendor,
+                    invoice_date, amount, currency, invoice_number, category, status,
+                    reason, updated_at, source, original_filename, stored_path,
+                    document_type, transaction_type, year, month, net_amount, tax_amount,
+                    gross_amount, open_amount, paid_amount, is_business, is_tax_relevant,
+                    review_status, ai_confidence, ai_raw_json, created_at
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict(file_hash) do update set
+                    vendor = excluded.vendor,
+                    invoice_date = excluded.invoice_date,
+                    amount = excluded.amount,
+                    category = excluded.category,
+                    status = excluded.status,
+                    reason = excluded.reason,
+                    updated_at = excluded.updated_at,
+                    stored_path = excluded.stored_path,
+                    document_type = excluded.document_type,
+                    review_status = excluded.review_status,
+                    ai_confidence = excluded.ai_confidence,
+                    ai_raw_json = excluded.ai_raw_json
+                """,
+                (
+                    file_sha256(path),
+                    str(path),
+                    str(path),
+                    int(bool(metadata.is_invoice)),
+                    metadata.confidence,
+                    metadata.vendor,
+                    invoice_date.isoformat(),
+                    gross_amount,
+                    metadata.currency,
+                    metadata.invoice_number,
+                    metadata.category,
+                    "review",
+                    metadata.reason,
+                    now,
+                    "contract_upload",
+                    original_filename,
+                    str(path),
+                    metadata.document_type if metadata.document_type == "contract" else "contract",
+                    metadata.transaction_type,
+                    invoice_date.year,
+                    invoice_date.month,
+                    metadata.net_amount,
+                    metadata.tax_amount,
+                    gross_amount,
+                    metadata.open_amount,
+                    metadata.paid_amount,
+                    int(bool(metadata.is_business)),
+                    int(bool(metadata.is_tax_relevant)),
+                    "needs_review",
+                    metadata.confidence,
+                    metadata.ai_raw_json or "",
+                    now,
+                ),
+            )
+            row = connection.execute("select id from invoices where file_hash = ?", (file_sha256(path),)).fetchone()
+            connection.commit()
+        return int(row["id"])
+
+    def _insert_contract_document_stub(self, path: Path, original_filename: str, reason: str) -> int:
+        from backend.agents.invoices.extractor import file_sha256
+
+        now = utc_now()
+        today = date.today()
+        file_hash = file_sha256(path)
+        name = Path(original_filename).stem or "Vertrag"
+        with self.connect() as connection:
+            connection.execute(
+                """
+                insert into invoices (
+                    file_hash, source_path, archive_path, is_invoice, confidence, vendor,
+                    invoice_date, amount, currency, invoice_number, category, status,
+                    reason, updated_at, source, original_filename, stored_path,
+                    document_type, transaction_type, year, month, gross_amount,
+                    review_status, ai_confidence, ai_raw_json, created_at
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict(file_hash) do update set
+                    reason = excluded.reason,
+                    updated_at = excluded.updated_at,
+                    stored_path = excluded.stored_path,
+                    document_type = excluded.document_type,
+                    review_status = excluded.review_status
+                """,
+                (
+                    file_hash,
+                    str(path),
+                    str(path),
+                    0,
+                    0.2,
+                    name,
+                    today.isoformat(),
+                    None,
+                    "EUR",
+                    "",
+                    "Vertrag",
+                    "review",
+                    reason,
+                    now,
+                    "contract_upload",
+                    original_filename,
+                    str(path),
+                    "contract",
+                    "expense",
+                    today.year,
+                    today.month,
+                    None,
+                    "needs_review",
+                    0.2,
+                    "{}",
+                    now,
+                ),
+            )
+            row = connection.execute("select id from invoices where file_hash = ?", (file_hash,)).fetchone()
+            connection.commit()
+        return int(row["id"])
+
+    def _next_contract_deadline(self, contracts: list[dict[str, Any]]) -> Optional[str]:
+        deadlines = [deadline for deadline in (self._contract_deadline_date(contract) for contract in contracts) if deadline is not None and deadline >= date.today()]
+        return min(deadlines).isoformat() if deadlines else None
+
+    def _contract_deadline_date(self, contract: dict[str, Any]) -> Optional[date]:
+        renewal = self._parse_date(contract.get("renewal_date") or contract.get("end_date"))
+        if renewal is None:
+            return None
+        period = str(contract.get("cancellation_period") or "").lower()
+        days = 0
+        match = re.search(r"(\d+)\s*(tag|tage|day|days|monat|monate|month|months|woche|wochen|week|weeks)", period)
+        if match:
+            amount = int(match.group(1))
+            unit = match.group(2)
+            if unit.startswith(("monat", "month")):
+                days = amount * 30
+            elif unit.startswith(("woche", "week")):
+                days = amount * 7
+            else:
+                days = amount
+        return renewal - timedelta(days=days)
+
+    def _hint(self, contract: dict[str, Any], kind: str, severity: str, message: str) -> dict[str, Any]:
+        return {
+            "contract_id": contract["id"],
+            "name": contract["name"],
+            "provider": contract["provider"],
+            "category": contract["category"],
+            "type": kind,
+            "severity": severity,
+            "message": message,
+        }
+
     def rows_for_period(self, year: int, month: Optional[int] = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
             if month is None:
@@ -1071,3 +1532,80 @@ class InvoiceService:
         data["is_business"] = bool(data.get("is_business", 1))
         data["is_tax_relevant"] = bool(data.get("is_tax_relevant", 1))
         return data
+
+    @staticmethod
+    def _row_to_contract(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["auto_renew"] = bool(data.get("auto_renew"))
+        data["monthly_cost"] = data.get("monthly_cost")
+        data["annual_cost"] = data.get("annual_cost")
+        data["category_label"] = CONTRACT_CATEGORIES.get(data.get("category") or "other", "Sonstige")
+        return data
+
+    @staticmethod
+    def _parse_raw_json(value: object) -> dict[str, Any]:
+        if not value:
+            return {}
+        try:
+            parsed = json.loads(str(value))
+        except (TypeError, json.JSONDecodeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    @staticmethod
+    def _normalize_contract_category(value: object) -> str:
+        text = str(value or "").strip().lower()
+        mapping = {
+            "versicherung": "insurance",
+            "versicherungen": "insurance",
+            "insurance": "insurance",
+            "energie": "energy",
+            "energy": "energy",
+            "strom": "energy",
+            "gas": "energy",
+            "telekommunikation": "telecommunication",
+            "telecommunication": "telecommunication",
+            "telecom": "telecommunication",
+            "internet": "telecommunication",
+            "mobilfunk": "telecommunication",
+            "abo": "subscription",
+            "abonnement": "subscription",
+            "subscription": "subscription",
+            "mitgliedschaft": "membership",
+            "membership": "membership",
+            "finanzverpflichtung": "financial_obligation",
+            "financial_obligation": "financial_obligation",
+            "kredit": "financial_obligation",
+        }
+        return mapping.get(text, text if text in CONTRACT_CATEGORIES else "other")
+
+    @staticmethod
+    def _number(value: object) -> float | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, (int, float)):
+            return round(float(value), 2)
+        text = str(value).strip().replace("€", "").replace("EUR", "").replace(" ", "")
+        if "," in text and "." in text:
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", ".")
+        try:
+            return round(float(text), 2)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _date_or_none(value: object) -> str | None:
+        parsed = InvoiceService._parse_date(value)
+        return parsed.isoformat() if parsed else None
+
+    @staticmethod
+    def _parse_date(value: object) -> Optional[date]:
+        if not value:
+            return None
+        text = str(value).strip()[:10]
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            return None

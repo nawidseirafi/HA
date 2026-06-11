@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, BarChart3, Bell, BellRing, Bot, CalendarDays, Dumbbell, Gauge, GitBranch, HeartPulse, LineChart, ListChecks, LogOut, Plane, Play, Settings, Upload, X } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Bell, BellRing, Bot, BrainCircuit, CalendarDays, Dumbbell, FileText, Gauge, GitBranch, HeartPulse, LineChart, ListChecks, LogOut, Plane, Play, Settings, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '@shared/api/client';
@@ -62,7 +62,13 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
                   <Gauge size={18} /> Übersicht
                 </button>
                 <button className={route.name === 'years' || route.name === 'year' || route.name === 'month' ? 'active' : ''} onClick={() => navigate({ name: 'years' })}>
-                  <CalendarDays size={18} /> Jahre
+                  <FileText size={18} /> Rechnungen
+                </button>
+                <button className={route.name === 'contracts' || route.name === 'contract' ? 'active' : ''} onClick={() => navigate({ name: 'contracts' })}>
+                  <CalendarDays size={18} /> Verträge
+                </button>
+                <button className={route.name === 'contractAnalysis' ? 'active' : ''} onClick={() => navigate({ name: 'contractAnalysis' })}>
+                  <BrainCircuit size={18} /> Analysen
                 </button>
                 <button onClick={() => fileRef.current?.click()} disabled={busy}>
                   <Upload size={18} /> Belege hochladen
@@ -154,8 +160,8 @@ type AgentContext = {
 };
 
 function getAgentContext(route: Route): AgentContext | null {
-  if (route.name === 'invoiceDashboard' || route.name === 'years' || route.name === 'year' || route.name === 'month' || route.name === 'invoice') {
-    return { kind: 'invoice', label: 'Invoice Agent', subtitle: 'Invoice Manager' };
+  if (route.name === 'invoiceDashboard' || route.name === 'years' || route.name === 'year' || route.name === 'month' || route.name === 'invoice' || route.name === 'contracts' || route.name === 'contract' || route.name === 'contractAnalysis') {
+    return { kind: 'invoice', label: 'Finance', subtitle: 'Finance & Contracts' };
   }
   if (route.name === 'marketDashboard' || route.name === 'marketWatchlist' || route.name === 'marketReports' || route.name === 'marketSymbol') {
     return { kind: 'market', label: 'Market Agent', subtitle: 'Market Intelligence' };

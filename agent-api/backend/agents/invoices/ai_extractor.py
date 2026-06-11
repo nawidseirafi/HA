@@ -266,6 +266,20 @@ Extrahiere:
 - confidence
 - reason
 
+Wenn document_type = contract ist, extrahiere zusaetzlich optionale Vertragsdaten:
+- contract_name
+- contract_provider
+- contract_category: insurance, energy, telecommunication, subscription, membership, financial_obligation oder other
+- contract_subcategory: z.B. Haftpflicht, Hausrat, Kfz, Strom, Gas, Internet, Mobilfunk, Netflix, Software, Fitnessstudio
+- monthly_cost
+- annual_cost
+- start_date
+- end_date
+- renewal_date
+- cancellation_period
+- auto_renew
+- payment_interval: monthly, quarterly, yearly, one_time oder unknown
+
 WICHTIGE REGELN:
 
 - Rechnungsbetrag != offener Zahlbetrag
@@ -392,7 +406,19 @@ JSON-Schema:
   "is_business": true,
   "is_tax_relevant": true,
   "confidence": 0.95,
-  "reason": "Rechnung mit verrechneten Vorschuessen"
+  "reason": "Rechnung mit verrechneten Vorschuessen",
+  "contract_name": null,
+  "contract_provider": null,
+  "contract_category": null,
+  "contract_subcategory": null,
+  "monthly_cost": null,
+  "annual_cost": null,
+  "start_date": null,
+  "end_date": null,
+  "renewal_date": null,
+  "cancellation_period": null,
+  "auto_renew": null,
+  "payment_interval": null
 }}
 """.strip()
 

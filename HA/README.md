@@ -20,4 +20,4 @@ MEROSS_KEY=<in Home Assistant / Secrets verwalten>
 
 ## Editionen
 
-Home Assistant bleibt ein Core-Baustein und kann je nach aktiver RoboterSteve Edition eingebunden werden. `personal` nutzt Home Assistant fuer Wall Dashboard, Waste, Household, Infrastructure, MyWellness Health und Vacation. `seniorcare` nutzt Home Assistant als spaetere Sensorik- und Statusquelle, ohne private Agenten wie Invoice, Market, MyWellness oder Vacation vorauszusetzen.
+Home Assistant bleibt ein Core-Baustein und kann je nach aktiver RoboterSteve Edition eingebunden werden. `personal` nutzt Home Assistant fuer Wall Dashboard, Waste, Household, Infrastructure, MyWellness Health und Vacation. `seniorcare` nutzt Home Assistant als spaetere Sensorik- und Statusquelle, ohne private Agenten wie Finance & Contracts, Market, MyWellness oder Vacation vorauszusetzen.

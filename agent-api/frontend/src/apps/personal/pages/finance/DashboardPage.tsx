@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, AlertTriangle, BrainCircuit, CalendarClock, CheckCircle2, Database, Euro, FileText, Play, Power, QrCode, Save, Server, Settings, Upload, WalletCards, X } from 'lucide-react';
+import { Activity, AlertTriangle, BrainCircuit, CalendarClock, CheckCircle2, Database, Euro, FileText, Play, Power, QrCode, Save, Server, Settings, ShieldCheck, Upload, WalletCards, X } from 'lucide-react';
 import { api } from '@shared/api/client';
 import type { AgentStatus } from '@shared/api/client';
 import type { Route } from '../../App';
-import type { Invoice, MonthSummary, Summary } from '@shared/types/invoice';
+import type { FinanceSummary, Invoice, MonthSummary, Summary } from '@shared/types/invoice';
 import { currency, monthNames, shortDate } from '@shared/utils/format';
 import { InvoiceTable } from '../../components/finance/InvoiceTable';
 import { ExportButtons } from '../../components/finance/ExportButtons';
 
 export function DashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [finance, setFinance] = useState<FinanceSummary | null>(null);
   const [months, setMonths] = useState<MonthSummary[]>([]);
   const [yearInvoices, setYearInvoices] = useState<Invoice[]>([]);
   const [invoiceAgent, setInvoiceAgent] = useState<AgentStatus | null>(null);
@@ -24,8 +25,9 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const greeting = getGreeting();
 
   const load = async () => {
-    const [summaryData, yearData, monthResults, nextAgentStatus] = await Promise.all([
+    const [summaryData, financeData, yearData, monthResults, nextAgentStatus] = await Promise.all([
       api.summary(),
+      api.financeSummary().catch(() => null),
       api.year(currentYear).catch(() => ({ year: currentYear, months: [] })),
       Promise.all(
         Array.from({ length: 12 }, (_, index) =>
@@ -35,6 +37,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       api.invoiceAgentStatus().catch(() => null),
     ]);
     setSummary(summaryData);
+    setFinance(financeData);
     setMonths(yearData.months);
     setYearInvoices(monthResults.flatMap((result) => result.invoices));
     setInvoiceAgent(nextAgentStatus);
@@ -154,9 +157,9 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     <div className="page-stack">
       <header className="dashboard-hero">
         <div>
-          <span className="eyebrow">Invoice Manager</span>
+          <span className="eyebrow">Finance</span>
           <h1>{greeting}, Nawid</h1>
-          <p>Hier ist die Übersicht deiner Finanzen und Belege.</p>
+          <p>Rechnungen, Verträge, Versicherungen, Abos und laufende Verpflichtungen an einem Ort.</p>
         </div>
         <div className="invoice-hero-actions">
           <button className="icon-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen öffnen">
@@ -166,11 +169,11 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       </header>
 
       <section className="kpi-grid">
+        <Kpi icon={WalletCards} label="Monatliche Verpflichtungen" value={currency(finance?.monthly_obligations)} note={`${finance?.active_contracts ?? 0} aktive Verträge`} tone="blue" />
+        <Kpi icon={ShieldCheck} label="Versicherungen" value={finance?.active_insurances ?? 0} note={`${finance?.active_subscriptions ?? 0} aktive Abos`} tone="green" />
         <Kpi icon={Euro} label="Ausgaben aktueller Monat" value={currency(summary?.current_month_total)} note={`${monthNames[currentMonth - 1]} ${currentYear}`} tone="blue" />
         <Kpi icon={WalletCards} label="Ausgaben aktuelles Jahr" value={currency(summary?.current_year_total)} note={`${currentYear} laufend`} tone="violet" />
-        <Kpi icon={FileText} label="Belege gesamt" value={summary?.total_invoices ?? 0} note="Archivierte Dokumente" tone="green" />
-        <Kpi icon={AlertTriangle} label="Offene Prüfungen" value={summary?.needs_review_count ?? 0} note="Manuelle Kontrolle" tone="yellow" />
-        <Kpi icon={BrainCircuit} label="KI-Erkennungsrate" value={`${confidence}%`} note={`${summary?.ai_error_count ?? 0} KI-Fehler`} tone="blue" />
+        <Kpi icon={AlertTriangle} label="Nächste Frist" value={finance?.next_cancellation_deadline ? shortDate(finance.next_cancellation_deadline) : 'keine'} note="Kündigung/Verlängerung" tone="yellow" />
       </section>
 
       {(agentStatus || agentError) && (
@@ -223,6 +226,26 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           />
         </div>
 
+        <div className="panel finance-obligations-panel">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">Laufende Verpflichtungen</span>
+              <h2>Kosten nach Bereich</h2>
+            </div>
+            <button className="button ghost" onClick={() => navigate({ name: 'contracts' })}>Verträge</button>
+          </div>
+          <div className="finance-cost-list">
+            {(finance?.costs_by_category ?? []).map((row) => (
+              <button key={row.category} className="mini-contract-row" onClick={() => navigate({ name: 'contracts', category: row.category })}>
+                <WalletCards size={16} />
+                <span>{row.label}</span>
+                <strong>{currency(row.monthly_cost)}</strong>
+              </button>
+            ))}
+            {!finance?.costs_by_category?.length && <p className="muted-text">Noch keine laufenden Verträge erfasst.</p>}
+          </div>
+        </div>
+
         <aside className="quick-stack">
           <div className="panel">
             <div className="section-title">
@@ -233,6 +256,8 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             </div>
             <div className="quick-actions">
               <button className="button primary" onClick={() => fileRef.current?.click()} disabled={busy}><Upload size={16} /> Beleg hochladen</button>
+              <button className="button secondary" onClick={() => navigate({ name: 'contracts' })} disabled={busy}><WalletCards size={16} /> Verträge verwalten</button>
+              <button className="button secondary" onClick={() => navigate({ name: 'contractAnalysis' })} disabled={busy}><BrainCircuit size={16} /> Analysen öffnen</button>
               <button className="button secondary" onClick={() => setEbonOpen(true)} disabled={busy}><QrCode size={16} /> E-Bon / QR einfügen</button>
               <button className="button secondary" onClick={run} disabled={busy}>
                 {busy ? <Activity size={16} /> : <Play size={16} />}

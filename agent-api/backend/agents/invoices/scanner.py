@@ -223,6 +223,8 @@ def _should_archive(config: InvoiceAgentConfig, metadata) -> bool:
 
 
 def _should_ignore_document(metadata) -> bool:
+    if metadata.document_type == "contract":
+        return False
     if metadata.is_invoice and metadata.document_type in ACCOUNTING_DOCUMENT_TYPES:
         return False
     if metadata.document_type in IGNORED_DOCUMENT_TYPES:

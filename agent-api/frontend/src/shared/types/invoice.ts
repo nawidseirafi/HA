@@ -46,6 +46,84 @@ export interface Summary {
   latest_uploads: Invoice[];
 }
 
+export type ContractCategory =
+  | 'insurance'
+  | 'energy'
+  | 'telecommunication'
+  | 'subscription'
+  | 'membership'
+  | 'financial_obligation'
+  | 'other';
+
+export interface Contract {
+  id: number;
+  name: string;
+  provider: string;
+  category: ContractCategory;
+  category_label?: string;
+  subcategory?: string | null;
+  monthly_cost?: number | null;
+  annual_cost?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  renewal_date?: string | null;
+  cancellation_period?: string | null;
+  auto_renew: boolean;
+  status: 'active' | 'needs_review' | 'cancelled' | 'expired' | 'paused' | string;
+  notes?: string | null;
+  document_id?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractReminder {
+  contract_id: number;
+  name: string;
+  provider: string;
+  deadline: string;
+  days_left: number;
+  threshold_days: number;
+  message: string;
+}
+
+export interface OptimizationHint {
+  contract_id: number;
+  name: string;
+  provider: string;
+  category: ContractCategory;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | string;
+  message: string;
+}
+
+export interface FinanceSummary {
+  invoices: Summary;
+  monthly_obligations: number;
+  annual_obligations: number;
+  active_contracts: number;
+  active_insurances: number;
+  active_subscriptions: number;
+  next_cancellation_deadline?: string | null;
+  costs_by_category: Array<{
+    category: ContractCategory;
+    label: string;
+    monthly_cost: number;
+    annual_cost: number;
+    count: number;
+  }>;
+  reminders: ContractReminder[];
+  optimization_hints: OptimizationHint[];
+  latest_contracts: Contract[];
+}
+
+export interface ContractAnalysis {
+  hints: OptimizationHint[];
+  most_expensive: Contract[];
+  ending_next_6_months: Contract[];
+  generated_at: string;
+  disclaimer: string;
+}
+
 export interface YearSummary {
   year: number;
   total: number;

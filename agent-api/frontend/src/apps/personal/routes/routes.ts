@@ -16,6 +16,9 @@ export type Route =
   | { name: 'vacationDashboard' }
   | { name: 'schedulerDashboard' }
   | { name: 'invoiceDashboard' }
+  | { name: 'contracts'; category?: string }
+  | { name: 'contract'; id: number }
+  | { name: 'contractAnalysis' }
   | { name: 'years' }
   | { name: 'year'; year: number }
   | { name: 'month'; year: number; month: number }

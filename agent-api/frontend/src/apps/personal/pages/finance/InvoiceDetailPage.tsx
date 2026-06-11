@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, WalletCards } from 'lucide-react';
 import { api } from '@shared/api/client';
 import { InvoiceDetailPanel } from '../../components/finance/InvoiceDetailPanel';
 import { PdfPreview } from '../../components/finance/PdfPreview';
@@ -26,7 +26,20 @@ export function InvoiceDetailPage({ id, navigate }: { id: number; navigate: (rou
           <span className="eyebrow">Detail</span>
           <h1>{invoice.vendor}</h1>
         </div>
-        <button className="button ghost" onClick={() => navigate({ name: 'month', year: invoice.year, month: invoice.month })}><ArrowLeft size={16} /> Zurück zum Monat</button>
+        <div className="button-row">
+          <button className="button secondary" onClick={async () => {
+            setError('');
+            setNotice('Vertragsdaten werden aus dem Dokument ermittelt...');
+            try {
+              const result = await api.createContractFromInvoice(id);
+              navigate({ name: 'contract', id: result.contract.id });
+            } catch (exc) {
+              setNotice('');
+              setError(exc instanceof Error ? exc.message : String(exc));
+            }
+          }}><WalletCards size={16} /> Als Vertrag übernehmen</button>
+          <button className="button ghost" onClick={() => navigate({ name: 'month', year: invoice.year, month: invoice.month })}><ArrowLeft size={16} /> Zurück zum Monat</button>
+        </div>
       </header>
       <div className="detail-layout">
         <PdfPreview invoice={invoice} />
