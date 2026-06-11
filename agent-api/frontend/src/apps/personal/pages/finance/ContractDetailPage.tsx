@@ -41,6 +41,16 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
     navigate({ name: 'contracts' });
   };
 
+  const updateCancellationPeriod = (value: string) => {
+    const suggestedDate = suggestedDateFromPeriod(value);
+    setDraft((current) => {
+      if (!suggestedDate || dateInputValue(current.end_date) || dateInputValue(current.renewal_date)) {
+        return { ...current, cancellation_period: value };
+      }
+      return { ...current, cancellation_period: value, renewal_date: suggestedDate };
+    });
+  };
+
   if (!contract) return <div className="page-stack"><section className="panel">Vertrag wird geladen...</section></div>;
 
   return (
@@ -96,28 +106,31 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
             </label>
             <label className="contract-field">
               <span>Kündigungsfrist</span>
-              <input value={draft.cancellation_period || ''} onChange={(e) => setDraft({ ...draft, cancellation_period: e.target.value })} placeholder="z.B. 3 Monate" />
+              <input value={draft.cancellation_period || ''} onChange={(e) => updateCancellationPeriod(e.target.value)} placeholder="z.B. 1 Monat, 30 Tage" />
             </label>
             <label className="contract-field">
               <span>Startdatum</span>
               <div className="contract-date-input">
                 <input type="date" value={dateInputValue(draft.start_date)} onChange={(e) => setDraft({ ...draft, start_date: e.target.value || null })} />
+                <button type="button" onClick={() => setDraft({ ...draft, start_date: null })}>Leeren</button>
               </div>
             </label>
             <label className="contract-field">
               <span>Enddatum</span>
               <div className="contract-date-input">
                 <input type="date" value={dateInputValue(draft.end_date)} onChange={(e) => setDraft({ ...draft, end_date: e.target.value || null })} />
+                <button type="button" onClick={() => setDraft({ ...draft, end_date: null })}>Leeren</button>
               </div>
             </label>
             <label className="contract-field">
               <span>Verlängerungsdatum</span>
               <div className="contract-date-input">
                 <input type="date" value={dateInputValue(draft.renewal_date)} onChange={(e) => setDraft({ ...draft, renewal_date: e.target.value || null })} />
+              <button type="button" onClick={() => setDraft({ ...draft, renewal_date: null })}>Leeren</button>
               </div>
             </label>
           </div>
-          <p className="contract-form-help">Datumsfelder leer lassen, wenn Laufzeit oder Verlängerung nicht bekannt sind. Der Agent setzt diese Felder nicht automatisch auf heute.</p>
+          <p className="contract-form-help">Wenn Enddatum und Verlängerungsdatum leer sind, setzt der Agent aus der Kündigungsfrist automatisch ein Vorschlagsdatum. Beispiel: 1 Monat ab heute ergibt ein Verlängerungsdatum in einem Monat.</p>
           <label className="contract-field contract-notes-field">
             <span>Notizen / KI-Bewertung</span>
             <textarea className="contract-notes" placeholder="Zusammenfassung, offene Punkte oder KI-Hinweise" value={draft.notes || ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
@@ -166,4 +179,29 @@ function editableContractPayload(draft: Partial<Contract>): Partial<Contract> {
     notes: draft.notes,
     document_id: draft.document_id,
   };
+}
+
+function suggestedDateFromPeriod(value: string) {
+  const period = parsePeriod(value);
+  if (!period) return '';
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  if (period.unit === 'days') today.setDate(today.getDate() + period.amount);
+  if (period.unit === 'weeks') today.setDate(today.getDate() + period.amount * 7);
+  if (period.unit === 'months') today.setMonth(today.getMonth() + period.amount);
+  if (period.unit === 'years') today.setFullYear(today.getFullYear() + period.amount);
+  return today.toISOString().slice(0, 10);
+}
+
+function parsePeriod(value: string): { amount: number; unit: 'days' | 'weeks' | 'months' | 'years' } | null {
+  const match = value.toLowerCase().match(/(\d+)\.?\s*(tag|tage|day|days|woche|wochen|week|weeks|monat|monate|month|months|jahr|jahre|year|years)/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = match[2];
+  if (unit.startsWith('tag') || unit.startsWith('day')) return { amount, unit: 'days' };
+  if (unit.startsWith('woch') || unit.startsWith('week')) return { amount, unit: 'weeks' };
+  if (unit.startsWith('monat') || unit.startsWith('month')) return { amount, unit: 'months' };
+  if (unit.startsWith('jahr') || unit.startsWith('year')) return { amount, unit: 'years' };
+  return null;
 }

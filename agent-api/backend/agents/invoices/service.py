@@ -1333,6 +1333,12 @@ class InvoiceService:
         for key in ("start_date", "end_date", "renewal_date"):
             if key in data:
                 data[key] = self._date_or_none(data[key])
+        if (
+            data.get("cancellation_period")
+            and not data.get("end_date")
+            and not data.get("renewal_date")
+        ):
+            data["renewal_date"] = self._date_from_period(data["cancellation_period"])
         if "auto_renew" in data:
             data["auto_renew"] = 1 if bool(data["auto_renew"]) else 0
         if "document_id" in data and data["document_id"] in ("", None):
@@ -1376,6 +1382,39 @@ class InvoiceService:
         for field in ("start_date", "end_date", "renewal_date"):
             if str(payload.get(field) or "")[:10] == document_date:
                 payload[field] = None
+
+    @staticmethod
+    def _date_from_period(value: object) -> str | None:
+        match = re.search(
+            r"(\d+)\.?\s*(tag|tage|day|days|woche|wochen|week|weeks|monat|monate|month|months|jahr|jahre|year|years)",
+            str(value or "").lower(),
+        )
+        if not match:
+            return None
+        amount = int(match.group(1))
+        unit = match.group(2)
+        target = date.today()
+        if unit.startswith(("tag", "day")):
+            target = target + timedelta(days=amount)
+        elif unit.startswith(("woche", "week")):
+            target = target + timedelta(days=amount * 7)
+        elif unit.startswith(("monat", "month")):
+            target = InvoiceService._add_months(target, amount)
+        elif unit.startswith(("jahr", "year")):
+            target = InvoiceService._add_months(target, amount * 12)
+        else:
+            return None
+        return target.isoformat()
+
+    @staticmethod
+    def _add_months(value: date, months: int) -> date:
+        import calendar
+
+        month_index = value.month - 1 + months
+        year = value.year + month_index // 12
+        month = month_index % 12 + 1
+        day = min(value.day, calendar.monthrange(year, month)[1])
+        return date(year, month, day)
 
     @staticmethod
     def _preserve_existing_contract_values(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
