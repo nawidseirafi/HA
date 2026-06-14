@@ -1454,6 +1454,99 @@ button:disabled {
   padding: 0 14px;
 }
 
+.seniorcare-update-panel {
+  background: #fffefa;
+  border: 1px solid #dce9e3;
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(31, 78, 70, 0.07);
+  color: var(--sc-text);
+  padding: 18px;
+}
+
+.seniorcare-update-panel .update-panel-head {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.seniorcare-update-panel .eyebrow {
+  color: var(--sc-green);
+  font-size: 0.84rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.seniorcare-update-panel .update-panel-head h2 {
+  color: var(--sc-text);
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+  line-height: 1.15;
+}
+
+.seniorcare-update-panel .update-panel-head p:not(.eyebrow) {
+  color: var(--sc-muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.seniorcare-update-panel .button {
+  align-items: center;
+  border: 0;
+  border-radius: 14px;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.seniorcare-update-panel .button.secondary {
+  background: #e8f5ef;
+  color: #23664d;
+}
+
+.seniorcare-update-panel .button.secondary:hover {
+  background: #d9efe5;
+}
+
+.seniorcare-update-panel .button.primary {
+  background: var(--sc-green);
+  color: white;
+}
+
+.seniorcare-update-panel .update-version-item {
+  background: #f8fcfa;
+  border-color: #dce9e3;
+}
+
+.seniorcare-update-panel .update-version-item strong,
+.seniorcare-update-panel .update-release-card h3,
+.seniorcare-update-panel .update-release-card h4,
+.seniorcare-update-panel .update-step strong {
+  color: var(--sc-text);
+}
+
+.seniorcare-update-panel .update-version-item span,
+.seniorcare-update-panel .update-release-card span,
+.seniorcare-update-panel .update-release-card small,
+.seniorcare-update-panel .update-step small {
+  color: var(--sc-muted);
+}
+
+.seniorcare-update-panel .update-release-card,
+.seniorcare-update-panel .update-wizard {
+  background: #f8fcfa;
+  border-color: #dce9e3;
+}
+
+@media (max-width: 760px) {
+  .seniorcare-update-panel .button {
+    width: 100%;
+  }
+}
+
 .sc-mobile-nav {
   display: none;
 }
