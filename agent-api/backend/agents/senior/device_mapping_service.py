@@ -57,10 +57,12 @@ class DeviceMappingService:
             return {'connected': False, 'sensor_ready': False, 'system_ready': False}
         return {'connected': True, 'sensor_ready': isinstance(states, list), 'system_ready': True}
 
-    def roles(self, dev: bool = False) -> list[dict[str, Any]]:
+    def roles(self, dev: bool = False, include_state: bool = False) -> list[dict[str, Any]]:
         with self.connect() as con:
             rows = con.execute('select * from sensor_roles where active = 1 order by room, role').fetchall()
         valid_rows = [dict(row) for row in rows if role_candidate_matches(str(row['role'] or ''), dict(row), allow_missing_device_class=True)]
+        if include_state:
+            valid_rows = self._attach_state(valid_rows)
         return valid_rows if dev else [public_role(row) for row in valid_rows]
 
     def get_entity_for_role(self, role: str) -> str | None:
@@ -259,6 +261,30 @@ class DeviceMappingService:
             con.commit()
         return {'deleted': True, 'role': role}
 
+    def _attach_state(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        try:
+            states = self.ha.get_states()
+        except Exception:
+            logger.exception("SeniorCare sensor state refresh failed. ha_url=%s", getattr(self.ha, 'base_url', ''))
+            return [{**row, 'reachable': False, 'state': None, 'last_changed': None, 'last_updated': None, 'battery_level': None} for row in rows]
+        by_entity = {str(item.get('entity_id') or ''): item for item in states}
+        result = []
+        for row in rows:
+            entity_id = str(row.get('entity_id') or '')
+            state = by_entity.get(entity_id)
+            attrs = state.get('attributes') if state else {}
+            value = state.get('state') if state else None
+            reachable = bool(state and value not in {None, '', 'unknown', 'unavailable'})
+            result.append({
+                **row,
+                'state': value,
+                'reachable': reachable,
+                'last_changed': state.get('last_changed') if state else None,
+                'last_updated': state.get('last_updated') if state else None,
+                'battery_level': find_battery_level(row, states, attrs or {}),
+            })
+        return result
+
     def snapshot(self) -> list[dict[str, Any]]:
         states = self.ha.get_states()
         result = []
@@ -425,4 +451,58 @@ def candidate_public(item: dict[str, Any] | None, dev: bool) -> dict[str, Any] |
 
 
 def public_role(data: dict[str, Any]) -> dict[str, Any]:
-    return {'role': data.get('role'), 'room': data.get('room'), 'label': data.get('friendly_name') or data.get('role'), 'configured': bool(data.get('active')), 'updated_at': data.get('updated_at')}
+    return {
+        'role': data.get('role'),
+        'room': data.get('room'),
+        'label': data.get('friendly_name') or data.get('role'),
+        'configured': bool(data.get('active')),
+        'updated_at': data.get('updated_at'),
+        'state': data.get('state'),
+        'reachable': data.get('reachable'),
+        'last_changed': data.get('last_changed'),
+        'last_updated': data.get('last_updated'),
+        'battery_level': data.get('battery_level'),
+        'device_class': data.get('device_class'),
+        'domain': data.get('domain'),
+    }
+
+
+def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]], attrs: dict[str, Any]) -> int | None:
+    direct = parse_battery(attrs.get('battery_level') or attrs.get('battery') or attrs.get('battery_percentage'))
+    if direct is not None:
+        return direct
+    device_id = str(role.get('device_id') or '').strip()
+    friendly = normalize(str(role.get('friendly_name') or role.get('role') or ''))
+    role_entity = str(role.get('entity_id') or '')
+    role_prefix = role_entity.rsplit('_', 1)[0] if '_' in role_entity else role_entity
+    for state in states:
+        entity_id = str(state.get('entity_id') or '')
+        state_attrs = state.get('attributes') or {}
+        if state_attrs.get('device_class') != 'battery' and not entity_id.startswith('sensor.'):
+            continue
+        if device_id and state_attrs.get('device_id') == device_id:
+            parsed = parse_battery(state.get('state'))
+            if parsed is not None:
+                return parsed
+        haystack = normalize(f"{entity_id} {state_attrs.get('friendly_name') or ''}")
+        if friendly and friendly in haystack:
+            parsed = parse_battery(state.get('state'))
+            if parsed is not None:
+                return parsed
+        if role_prefix and entity_id.startswith(role_prefix):
+            parsed = parse_battery(state.get('state'))
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def parse_battery(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        number = float(str(value).replace('%', '').strip())
+    except ValueError:
+        return None
+    if number < 0 or number > 100:
+        return None
+    return int(round(number))

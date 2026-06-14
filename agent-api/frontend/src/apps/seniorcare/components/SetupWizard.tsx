@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, HeartHandshake, Loader2, Plus, Search, ShieldCheck, Trash2, Upload, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, HeartHandshake, Loader2, Plus, Search, ShieldCheck, Trash2, UserRound } from 'lucide-react';
 import { api, type SeniorCandidate, type SeniorCandidates } from '@shared/api/client';
 
 type Profile = {
-  firstName: string;
-  lastName: string;
+  name: string;
   birthDate: string;
-  language: string;
-  photo?: string;
+  age: string;
 };
 
 type Contact = {
@@ -51,16 +49,16 @@ const roomOptions = [
   { id: 'garden', label: 'Balkon/Garten', icon: '🌿', door: false },
 ];
 
-const roomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, room.label]));
+const baseRoomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, room.label]));
 
 export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [step, setStep] = useState(0);
-  const [profile, setProfile] = useState<Profile>({ firstName: 'Hildegard', lastName: 'Müller', birthDate: '1948-03-18', language: 'Deutsch' });
-  const [selectedRooms, setSelectedRooms] = useState<string[]>(['living_room', 'kitchen', 'bathroom', 'bedroom', 'hallway']);
+  const [profile, setProfile] = useState<Profile>({ name: '', birthDate: '', age: '' });
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const [customRooms, setCustomRooms] = useState<Record<string, string>>({});
+  const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
   const [customRoom, setCustomRoom] = useState('');
-  const [contacts, setContacts] = useState<Contact[]>([
-    { id: 'maria', name: 'Maria Schneider', relation: 'Tochter', phone: '+49 151 23456789', email: 'maria.schneider@example.de', channels: ['WhatsApp', 'SMS'] },
-  ]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
   const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
   const [confirmed, setConfirmed] = useState(false);
@@ -71,12 +69,34 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const devMode = new URLSearchParams(window.location.search).get('dev') === '1';
 
   useEffect(() => {
-    setSensorBindings((current) => buildBindings(selectedRooms, current));
-  }, [selectedRooms]);
+    setSensorBindings((current) => buildBindings(selectedRooms, sensorPlan, customRooms, current));
+  }, [selectedRooms, sensorPlan, customRooms]);
 
-  useEffect(() => () => Object.values(timers.current).forEach((timer) => window.clearTimeout(timer)), []);
+  useEffect(() => {
+    void api.seniorSetupStatus().then((status) => {
+      if (status.selected_rooms.length) setSelectedRooms(status.selected_rooms);
+      if (status.profile?.name) {
+        setProfile((value) => ({
+          ...value,
+          name: status.profile?.name || '',
+          age: status.profile?.age ? String(status.profile.age) : '',
+        }));
+      }
+      if (status.trusted_contacts?.length) {
+        setContacts(status.trusted_contacts.map((contact) => ({
+          id: String(contact.id),
+          name: contact.name,
+          relation: contact.relationship || '',
+          phone: '',
+          email: contact.email || '',
+          channels: ['E-Mail'],
+        })));
+      }
+    }).catch(() => undefined);
+    return () => Object.values(timers.current).forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
-  const age = useMemo(() => {
+  const calculatedAge = useMemo(() => {
     if (!profile.birthDate) return '';
     const birth = new Date(profile.birthDate);
     const today = new Date();
@@ -85,6 +105,8 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     if (beforeBirthday) years -= 1;
     return `${years} Jahre`;
   }, [profile.birthDate]);
+
+  const displayAge = profile.age || (calculatedAge ? calculatedAge.replace(/\D+/g, '') : '');
 
   const connectedSensors = sensorBindings.filter((sensor) => sensor.status === 'connected').length;
   const progress = Math.round(((step + 1) / steps.length) * 100);
@@ -98,7 +120,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       await safeBackend(() => api.startSeniorSetup());
     }
     if (step === 1) {
-      await safeBackend(() => api.saveSeniorProfile({ name: `${profile.firstName} ${profile.lastName}`.trim(), age: age ? Number.parseInt(age, 10) : null, notes: profile.language }));
+      await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), age: displayAge ? Number.parseInt(displayAge, 10) : null, notes: '' }));
     }
     if (step === 2) {
       await safeBackend(() => api.saveSeniorSetupRooms(selectedRooms));
@@ -123,7 +145,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   }
 
   function validateStep() {
-    if (step === 1 && !profile.firstName.trim()) return ['Bitte geben Sie den Vornamen ein.'];
+    if (step === 1 && !profile.name.trim()) return ['Bitte geben Sie den Namen ein.'];
     if (step === 2 && selectedRooms.length === 0) return ['Bitte wählen Sie mindestens einen Raum aus.'];
     if (step === 4 && contacts.length === 0) return ['Bitte fügen Sie mindestens eine vertraute Person hinzu.'];
     if (step === 6 && !confirmed) return ['Bitte bestätigen Sie die Zusammenfassung.'];
@@ -139,16 +161,34 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   }
 
   function toggleRoom(roomId: string) {
-    setSelectedRooms((current) => current.includes(roomId) ? current.filter((id) => id !== roomId) : [...current, roomId]);
+    setSelectedRooms((current) => {
+      if (current.includes(roomId)) return current.filter((id) => id !== roomId);
+      setSensorPlan((plans) => ({ ...plans, [roomId]: plans[roomId] || defaultSensorPlan(roomId) }));
+      return [...current, roomId];
+    });
   }
 
   function addCustomRoom() {
     const label = customRoom.trim();
     if (!label) return;
     const id = `custom_${label.toLowerCase().replace(/\s+/g, '_')}`;
-    roomLabel[id] = label;
+    setCustomRooms((current) => ({ ...current, [id]: label }));
     setSelectedRooms((current) => current.includes(id) ? current : [...current, id]);
+    setSensorPlan((current) => ({ ...current, [id]: current[id] || { motion: true, door: false } }));
     setCustomRoom('');
+  }
+
+  function roomLabel(roomId: string) {
+    return customRooms[roomId] || baseRoomLabel[roomId] || roomId;
+  }
+
+  function toggleSensorType(roomId: string, type: 'motion' | 'door') {
+    setSensorPlan((current) => {
+      const fallback = defaultSensorPlan(roomId);
+      const next = { ...(current[roomId] || fallback), [type]: !(current[roomId] || fallback)[type] };
+      if (!next.motion && !next.door) next[type] = true;
+      return { ...current, [roomId]: next };
+    });
   }
 
   function updateSensor(id: string, patch: Partial<SensorBinding>) {
@@ -190,7 +230,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     const timedOut = result.status === 'no_signal_detected' || result.remaining_seconds === 0;
     setDiscovery((current) => ({ ...current, [sensorId]: { candidate: result.candidate, candidates: result.candidates, remainingSeconds: result.remaining_seconds } }));
     if (found && result.candidate) {
-      updateSensor(sensorId, { status: 'connected', sessionId, score, entityId: result.candidate.entity_id, name: result.candidate.label || roomLabel[sensorId] || 'Sensor' });
+      updateSensor(sensorId, { status: 'connected', sessionId, score, entityId: result.candidate.entity_id, name: result.candidate.label || 'Sensor' });
       void api.confirmSeniorDiscovery(sessionId, result.candidate.entity_id).catch(() => undefined);
       return true;
     }
@@ -221,12 +261,12 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       {errors.length > 0 && <div className="sc-form-errors" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}
       <div className="sc-wizard-card">
         {step === 0 && <WelcomeStep />}
-        {step === 1 && <ProfileStep profile={profile} age={age} onChange={setProfile} />}
-        {step === 2 && <RoomsStep selected={selectedRooms} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} />}
+        {step === 1 && <ProfileStep profile={profile} calculatedAge={calculatedAge} onChange={setProfile} />}
+        {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
         {step === 3 && <SensorsStep sensors={sensorBindings} discovery={discovery} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
         {step === 4 && <ContactsStep contacts={contacts} form={contactForm} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
         {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
-        {step === 6 && <SummaryStep profile={profile} age={age} rooms={selectedRooms} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
+        {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
       </div>
       <footer className="sc-wizard-actions">
         <button type="button" onClick={back} disabled={step === 0}><ArrowLeft size={20} /> Zurück</button>
@@ -265,30 +305,49 @@ function WelcomeStep() {
   );
 }
 
-function ProfileStep({ profile, age, onChange }: { profile: Profile; age: string; onChange: (profile: Profile) => void }) {
+function ProfileStep({ profile, calculatedAge, onChange }: { profile: Profile; calculatedAge: string; onChange: (profile: Profile) => void }) {
   return (
     <section className="sc-form-grid">
-      <label>Vorname<input required value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label>
-      <label>Nachname<input value={profile.lastName} onChange={(event) => onChange({ ...profile, lastName: event.target.value })} /></label>
+      <label>Name<input required value={profile.name} onChange={(event) => onChange({ ...profile, name: event.target.value })} /></label>
       <label>Geburtsdatum<input type="date" value={profile.birthDate} onChange={(event) => onChange({ ...profile, birthDate: event.target.value })} /></label>
-      <label>Alter<input readOnly value={age} aria-label="Berechnetes Alter" /></label>
-      <label>Sprache/Region<select value={profile.language} onChange={(event) => onChange({ ...profile, language: event.target.value })}><option>Deutsch</option><option>Deutsch - Schweiz</option><option>Deutsch - Österreich</option></select></label>
-      <label className="sc-upload-box"><Upload size={24} /> Foto hochladen<input type="file" accept="image/*" onChange={(event) => onChange({ ...profile, photo: event.target.files?.[0]?.name })} /></label>
+      <label>Alter<input inputMode="numeric" value={profile.age || calculatedAge.replace(/\D+/g, '')} onChange={(event) => onChange({ ...profile, age: event.target.value })} aria-label="Alter" /></label>
     </section>
   );
 }
 
-function RoomsStep({ selected, customRoom, onToggle, onCustomChange, onCustomAdd }: { selected: string[]; customRoom: string; onToggle: (id: string) => void; onCustomChange: (value: string) => void; onCustomAdd: () => void }) {
+function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, onCustomChange, onCustomAdd, onToggleSensorType }: {
+  selected: string[];
+  customRooms: Record<string, string>;
+  sensorPlan: Record<string, { motion: boolean; door: boolean }>;
+  customRoom: string;
+  onToggle: (id: string) => void;
+  onCustomChange: (value: string) => void;
+  onCustomAdd: () => void;
+  onToggleSensorType: (roomId: string, type: 'motion' | 'door') => void;
+}) {
+  const visibleRooms = [...roomOptions, ...Object.entries(customRooms).map(([id, label]) => ({ id, label, icon: '', door: false }))];
   return (
     <section className="sc-room-select">
       <p>Wählen Sie die Räume in der Wohnung.</p>
       <div className="sc-room-choice-grid">
-        {roomOptions.map((room) => (
-          <button key={room.id} className={selected.includes(room.id) ? 'active' : ''} type="button" onClick={() => onToggle(room.id)}>
-            <span aria-hidden="true">{room.icon}</span>
-            <strong>{room.label}</strong>
-          </button>
-        ))}
+        {visibleRooms.map((room) => {
+          const active = selected.includes(room.id);
+          const plan = sensorPlan[room.id] || defaultSensorPlan(room.id);
+          return (
+            <div key={room.id} className={`sc-room-choice-card ${active ? 'active' : ''}`}>
+              <button type="button" onClick={() => onToggle(room.id)}>
+                {room.icon && <span aria-hidden="true">{room.icon}</span>}
+                <strong>{room.label}</strong>
+              </button>
+              {active && (
+                <div className="sc-room-sensor-toggles">
+                  <label><input type="checkbox" checked={plan.motion} onChange={() => onToggleSensorType(room.id, 'motion')} /> Präsenzsensor</label>
+                  <label><input type="checkbox" checked={plan.door} onChange={() => onToggleSensorType(room.id, 'door')} /> Türsensor</label>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="sc-inline-add">
         <input value={customRoom} onChange={(event) => onCustomChange(event.target.value)} placeholder="Eigenen Raum hinzufügen" />
@@ -309,7 +368,7 @@ function SensorsStep({ sensors, discovery, devMode, connected, total, onChange, 
       <p>{connected} von {total} Sensoren verbunden</p>
       {Object.entries(grouped).map(([roomId, items]) => (
         <article key={roomId} className="sc-sensor-room">
-          <h3>{roomLabel[roomId] || roomId}</h3>
+          <h3>{baseRoomLabel[roomId] || roomId}</h3>
           {items.map((sensor) => (
             <div key={sensor.id} className="sc-sensor-row">
               <div>
@@ -376,14 +435,14 @@ function NotificationStep({ value, onChange }: { value: { from: string; to: stri
   );
 }
 
-function SummaryStep({ profile, age, rooms, contacts, sensors, totalSensors, notification, confirmed, onConfirm }: { profile: Profile; age: string; rooms: string[]; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void }) {
+function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalSensors, notification, confirmed, onConfirm }: { profile: Profile; age: string; rooms: string[]; roomLabel: (room: string) => string; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void }) {
   return (
     <section className="sc-summary-step">
       <div className="sc-summary-card">
-        <UserRound size={28} /><strong>{profile.firstName} {profile.lastName}</strong><span>{age}</span>
+        <UserRound size={28} /><strong>{profile.name}</strong><span>{age ? `${age} Jahre` : 'Alter offen'}</span>
       </div>
       <div className="sc-summary-grid">
-        <p><strong>Räume</strong>{rooms.map((room) => roomLabel[room] || room).join(', ')}</p>
+        <p><strong>Räume</strong>{rooms.map((room) => roomLabel(room)).join(', ')}</p>
         <p><strong>Sensoren</strong>{sensors} von {totalSensors} verbunden</p>
         <p><strong>Kontakte</strong>{contacts.map((contact) => `${contact.name} (${contact.relation})`).join(', ')}</p>
         <p><strong>Benachrichtigungen</strong>{notification.from} - {notification.to}, Stufe {notification.sensitivity}</p>
@@ -393,18 +452,25 @@ function SummaryStep({ profile, age, rooms, contacts, sensors, totalSensors, not
   );
 }
 
-function buildBindings(roomIds: string[], current: SensorBinding[]) {
+function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: boolean; door: boolean }>, customRooms: Record<string, string>, current: SensorBinding[]) {
   const byId = Object.fromEntries(current.map((sensor) => [sensor.id, sensor]));
   return roomIds.flatMap((roomId) => {
-    const option = roomOptions.find((room) => room.id === roomId);
-    const motionId = `${roomId}_motion`;
-    const bindings: SensorBinding[] = [
-      byId[motionId] || { id: motionId, roomId, type: 'motion', sensorId: '', name: `${roomLabel[roomId] || roomId} Präsenz`, status: 'idle' },
-    ];
-    if (option?.door !== false) {
+    const label = customRooms[roomId] || baseRoomLabel[roomId] || roomId;
+    const plan = sensorPlan[roomId] || defaultSensorPlan(roomId);
+    const bindings: SensorBinding[] = [];
+    if (plan.motion) {
+      const motionId = `${roomId}_motion`;
+      bindings.push(byId[motionId] || { id: motionId, roomId, type: 'motion', sensorId: '', name: `${label} Präsenz`, status: 'idle' });
+    }
+    if (plan.door) {
       const doorId = `${roomId}_door`;
-      bindings.push(byId[doorId] || { id: doorId, roomId, type: 'door', sensorId: '', name: `${roomLabel[roomId] || roomId} Türkontakt`, status: 'idle' });
+      bindings.push(byId[doorId] || { id: doorId, roomId, type: 'door', sensorId: '', name: `${label} Türkontakt`, status: 'idle' });
     }
     return bindings;
   });
+}
+
+function defaultSensorPlan(roomId: string) {
+  const option = roomOptions.find((room) => room.id === roomId);
+  return { motion: true, door: option?.door !== false };
 }

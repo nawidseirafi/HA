@@ -14,8 +14,25 @@ class SeniorSetupService:
         with self.mapping.connect() as con:
             row = con.execute('select * from setup_state where id = 1').fetchone()
             profile = con.execute('select * from senior_profile where id = 1').fetchone()
-            contacts = con.execute('select count(*) from trusted_contacts where active = 1').fetchone()[0]
-        return {'current_step': row['current_step'], 'completed_steps': json.loads(row['completed_steps'] or '[]'), 'selected_rooms': json.loads(row['selected_rooms_json'] or '[]'), 'is_complete': bool(row['is_complete']), 'home': self.mapping.home_status(), 'has_profile': bool(profile), 'trusted_contacts_count': contacts, 'sensor_roles': self.mapping.roles(), 'updated_at': row['updated_at']}
+            contacts = con.execute('select * from trusted_contacts where active = 1 order by id').fetchall()
+            notifications = con.execute('select * from notification_preferences where id = 1').fetchone()
+        profile_data = dict(profile) if profile else None
+        contact_data = [dict(contact) for contact in contacts]
+        notification_data = dict(notifications) if notifications else None
+        return {
+            'current_step': row['current_step'],
+            'completed_steps': json.loads(row['completed_steps'] or '[]'),
+            'selected_rooms': json.loads(row['selected_rooms_json'] or '[]'),
+            'is_complete': bool(row['is_complete']),
+            'home': self.mapping.home_status(),
+            'has_profile': bool(profile),
+            'profile': profile_data,
+            'trusted_contacts_count': len(contact_data),
+            'trusted_contacts': contact_data,
+            'notifications': notification_data,
+            'sensor_roles': self.mapping.roles(include_state=True),
+            'updated_at': row['updated_at'],
+        }
 
     def set_step(self, current_step: str, completed_step: str | None = None, complete: bool | None = None) -> dict[str, Any]:
         with self.mapping.connect() as con:
@@ -35,7 +52,11 @@ class SeniorSetupService:
         return self.set_step('prepare_home', 'profile')
 
     def rooms(self, rooms: list[str]) -> dict[str, Any]:
-        clean_rooms = [str(room) for room in rooms if str(room) in ROOMS]
+        clean_rooms = []
+        for room in rooms:
+            value = str(room or '').strip()
+            if value and value not in clean_rooms:
+                clean_rooms.append(value[:80])
         with self.mapping.connect() as con:
             con.execute('update setup_state set selected_rooms_json = ?, updated_at = ? where id = 1', (json.dumps(clean_rooms), now()))
             con.commit()
@@ -50,6 +71,12 @@ class SeniorSetupService:
             con.execute('insert into trusted_contacts (name, relationship, email, active, created_at, updated_at) values (?, ?, ?, 1, ?, ?)', (payload.get('name'), payload.get('relationship'), payload.get('email'), timestamp, timestamp))
             con.commit()
         return self.set_step('notifications', 'contacts')
+
+    def delete_contact(self, contact_id: int) -> dict[str, Any]:
+        with self.mapping.connect() as con:
+            con.execute('update trusted_contacts set active = 0, updated_at = ? where id = ?', (now(), contact_id))
+            con.commit()
+        return self.status()
 
     def notifications(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self.mapping.connect() as con:

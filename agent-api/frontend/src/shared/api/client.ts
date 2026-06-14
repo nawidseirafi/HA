@@ -116,6 +116,33 @@ export type SeniorSensorRole = {
   label: string;
   configured: boolean;
   updated_at?: string | null;
+  state?: string | null;
+  reachable?: boolean | null;
+  last_changed?: string | null;
+  last_updated?: string | null;
+  battery_level?: number | null;
+  device_class?: string | null;
+  domain?: string | null;
+};
+
+export type SeniorProfileData = {
+  name?: string | null;
+  age?: number | null;
+  notes?: string | null;
+};
+
+export type SeniorTrustedContact = {
+  id: number;
+  name: string;
+  relationship?: string | null;
+  email?: string | null;
+  active?: number;
+};
+
+export type SeniorNotifications = {
+  anomalies: number | boolean;
+  critical: number | boolean;
+  daily_summary: number | boolean;
 };
 
 export type SeniorSetupStatus = {
@@ -125,7 +152,10 @@ export type SeniorSetupStatus = {
   is_complete: boolean;
   home: { connected: boolean; sensor_ready: boolean; system_ready: boolean };
   has_profile: boolean;
+  profile?: SeniorProfileData | null;
   trusted_contacts_count: number;
+  trusted_contacts?: SeniorTrustedContact[];
+  notifications?: SeniorNotifications | null;
   sensor_roles: SeniorSensorRole[];
   updated_at: string;
 };
@@ -1383,10 +1413,14 @@ export const api = {
   saveSeniorSetupSensors: () => request<SeniorSetupStatus>('/api/senior/setup/sensors', { method: 'POST' }),
   saveSeniorContact: (payload: { name: string; relationship?: string; email?: string }) =>
     request<SeniorSetupStatus>('/api/senior/setup/contact', { method: 'POST', body: JSON.stringify(payload) }),
+  deleteSeniorContact: (contactId: number) =>
+    request<SeniorSetupStatus>(`/api/senior/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'DELETE' }),
   saveSeniorNotifications: (payload: { anomalies: boolean; critical: boolean; daily_summary: boolean }) =>
     request<SeniorSetupStatus>('/api/senior/setup/notifications', { method: 'POST', body: JSON.stringify(payload) }),
   completeSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/complete', { method: 'POST' }),
-  seniorSensorRoles: () => request<{ sensor_roles: SeniorSensorRole[] }>('/api/senior/sensor-roles'),
+  seniorSensorRoles: (includeState = false) => request<{ sensor_roles: SeniorSensorRole[] }>(`/api/senior/sensor-roles${includeState ? '?include_state=true' : ''}`),
+  deleteSeniorSensorRole: (role: string) =>
+    request<{ deleted: boolean; role: string }>(`/api/senior/sensor-roles/${encodeURIComponent(role)}`, { method: 'DELETE' }),
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);

@@ -205,6 +205,11 @@ def setup_contact(payload: ContactPayload):
     return setup_service.contact(model_data(payload))
 
 
+@router.delete("/setup/contact/{contact_id}")
+def setup_contact_delete(contact_id: int):
+    return setup_service.delete_contact(contact_id)
+
+
 @router.post("/setup/notifications")
 def setup_notifications(payload: NotificationPayload):
     return setup_service.notifications(model_data(payload))
@@ -216,8 +221,8 @@ def setup_complete():
 
 
 @router.get("/sensor-roles")
-def sensor_roles(dev: bool = Query(False)):
-    return {"sensor_roles": device_mapping_service.roles(dev=dev)}
+def sensor_roles(dev: bool = Query(False), include_state: bool = Query(False)):
+    return {"sensor_roles": device_mapping_service.roles(dev=dev, include_state=include_state)}
 
 
 @router.post("/sensor-roles")

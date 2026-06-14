@@ -1,4 +1,10 @@
-import type { SeniorCareTimelineItem } from '../data/mockSeniorCareData';
+type SeniorCareTimelineItem = {
+  id: string;
+  time: string;
+  title: string;
+  text: string;
+  tone?: 'calm' | 'note' | 'warm';
+};
 
 export function Timeline({ items }: { items: SeniorCareTimelineItem[] }) {
   return <div className="sc-timeline">{items.map((item) => <TimelineItem item={item} key={item.id} />)}</div>;

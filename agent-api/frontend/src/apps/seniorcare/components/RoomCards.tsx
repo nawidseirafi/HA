@@ -1,4 +1,10 @@
-import type { SeniorCareRoom } from '../data/mockSeniorCareData';
+type SeniorCareRoom = {
+  id: string;
+  name: string;
+  status?: 'quiet' | 'active' | 'resting';
+  summary?: string;
+  lastSeen?: string;
+};
 
 export function RoomMap({ rooms, variant = 'cards' }: { rooms: SeniorCareRoom[]; variant?: 'cards' | 'floorplan' }) {
   if (variant === 'floorplan') {
@@ -23,8 +29,8 @@ export function RoomCard({ room }: { room: SeniorCareRoom }) {
         <span className="sc-room-dot" />
         <strong>{room.name}</strong>
       </div>
-      <p>{room.summary}</p>
-      <small>{room.lastSeen}</small>
+      <p>{room.summary || ''}</p>
+      <small>{room.lastSeen || ''}</small>
     </article>
   );
 }

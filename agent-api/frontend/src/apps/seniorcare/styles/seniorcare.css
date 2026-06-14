@@ -744,6 +744,7 @@ button:disabled {
 
 .sc-form-grid input,
 .sc-form-grid select,
+.sc-form-grid textarea,
 .sc-template-editor textarea,
 .sc-danger-zone input,
 .sc-inline-add input,
@@ -756,6 +757,15 @@ button:disabled {
   min-height: 54px;
   padding: 0 14px;
   width: 100%;
+}
+
+.sc-form-grid textarea {
+  min-height: 130px;
+  padding: 14px;
+}
+
+.sc-form-wide {
+  grid-column: 1 / -1;
 }
 
 .sc-template-editor textarea {
@@ -813,10 +823,48 @@ button:disabled {
   place-items: center;
 }
 
+.sc-room-choice-card {
+  background: #f8fcfa;
+  border: 1px solid var(--sc-line);
+  border-radius: 22px;
+  display: grid;
+  gap: 12px;
+  padding: 8px;
+}
+
+.sc-room-choice-card > button {
+  border: 0;
+  min-height: 112px;
+  width: 100%;
+}
+
+.sc-room-choice-card.active,
 .sc-room-choice-grid button.active {
   background: var(--sc-green-soft);
   border-color: #84bea8;
   box-shadow: inset 0 0 0 2px rgba(47, 125, 95, 0.2);
+}
+
+.sc-room-sensor-toggles {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.sc-room-sensor-toggles label {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid #cce5db;
+  border-radius: 12px;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.sc-room-sensor-toggles input {
+  height: 18px;
+  width: 18px;
 }
 
 .sc-room-choice-grid span {
@@ -1114,8 +1162,9 @@ button:disabled {
 .sc-room-settings-list summary {
   align-items: center;
   cursor: pointer;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
   list-style: none;
   min-height: 68px;
   padding: 0 18px;
@@ -1125,24 +1174,26 @@ button:disabled {
   display: none;
 }
 
-.sc-room-settings-list summary::after {
-  color: var(--sc-muted);
-  content: 'Öffnen';
-  font-size: 0.95rem;
-  font-weight: 850;
-}
-
 .sc-room-settings-list details[open] summary {
   border-bottom: 1px solid #dfece6;
-}
-
-.sc-room-settings-list details[open] summary::after {
-  content: 'Schließen';
 }
 
 .sc-room-settings-list summary > div {
   display: grid;
   gap: 4px;
+}
+
+.sc-room-delete {
+  align-items: center;
+  background: var(--sc-red-soft);
+  border: 0;
+  border-radius: 12px;
+  color: var(--sc-red);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 10px;
 }
 
 .sc-room-settings-list summary strong {
@@ -1260,6 +1311,11 @@ button:disabled {
   color: var(--sc-red);
 }
 
+.sc-sensor-health .battery.unknown {
+  background: #edf2f0;
+  color: var(--sc-muted);
+}
+
 .sc-sensor-health i {
   background: #e5eee9;
   border-radius: 999px;
@@ -1363,6 +1419,33 @@ button:disabled {
   min-height: 50px;
   width: fit-content;
   padding: 0 18px;
+}
+
+.sc-empty-state {
+  align-items: center;
+  background: #f8fcfa;
+  border: 1px dashed #b8d6ca;
+  border-radius: 18px;
+  color: var(--sc-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.sc-empty-state p {
+  margin: 0;
+}
+
+.sc-empty-state button {
+  background: var(--sc-green);
+  border: 0;
+  border-radius: 14px;
+  color: white;
+  font-weight: 900;
+  min-height: 44px;
+  padding: 0 14px;
 }
 
 .sc-mobile-nav {

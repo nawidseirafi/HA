@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import type { TrustedContact } from '../data/mockSeniorCareData';
+
+type TrustedContact = {
+  name: string;
+  relation?: string;
+  email?: string;
+  note?: string;
+};
 
 export function InsightCard({ title, text, children }: { title: string; text: string; children?: ReactNode }) {
   return (
@@ -18,10 +24,10 @@ export function TrustedContactCard({ contact }: { contact: TrustedContact }) {
       <div className="sc-contact-avatar">{contact.name.slice(0, 1)}</div>
       <div>
         <strong>{contact.name}</strong>
-        <p>{contact.relation}</p>
+        <p>{contact.relation || 'Kontakt'}</p>
         <small>{contact.email}</small>
       </div>
-      <em>{contact.note}</em>
+      <em>{contact.note || ''}</em>
     </article>
   );
 }
