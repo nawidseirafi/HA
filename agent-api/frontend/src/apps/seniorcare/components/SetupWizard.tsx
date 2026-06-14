@@ -1,355 +1,410 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type SeniorCandidate, type SeniorCandidates, type SeniorSetupStatus } from '@shared/api/client';
-import { MatterPairingStep } from './MatterPairingStep';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, HeartHandshake, Loader2, Plus, Search, ShieldCheck, Trash2, Upload, UserRound } from 'lucide-react';
+import { api, type SeniorCandidate, type SeniorCandidates } from '@shared/api/client';
 
-const STEPS = ['Willkommen', 'Profil', 'Zuhause', 'Raeume', 'Sensoren', 'Kontakt', 'Hinweise', 'Fertig'];
-const ROOM_OPTIONS = [
-  { key: 'living_room', label: 'Wohnzimmer' },
-  { key: 'kitchen', label: 'Kueche' },
-  { key: 'bathroom', label: 'Bad' },
-  { key: 'bedroom', label: 'Schlafzimmer' },
-  { key: 'hallway', label: 'Flur' },
-  { key: 'entrance', label: 'Eingang' },
-];
-const ROOM_LABELS = Object.fromEntries(ROOM_OPTIONS.map((room) => [room.key, room.label]));
-
-const STEP_BY_KEY: Record<string, number> = {
-  welcome: 0,
-  profile: 1,
-  prepare_home: 2,
-  rooms: 3,
-  sensors: 4,
-  contacts: 5,
-  notifications: 6,
-  complete: 7,
+type Profile = {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  language: string;
+  photo?: string;
 };
 
-type SensorTask = { role: string; room: string; title: string; instruction: string };
-type DiscoveryUiState = {
+type Contact = {
+  id: string;
+  name: string;
+  relation: string;
+  phone: string;
+  email: string;
+  channels: string[];
+};
+
+type SensorBinding = {
+  id: string;
+  roomId: string;
+  type: 'motion' | 'door';
+  sensorId: string;
+  name: string;
+  status: 'idle' | 'searching' | 'connected' | 'missing' | 'skipped';
   sessionId?: number;
-  status: 'idle' | 'starting' | 'waiting' | 'needs_action' | 'found' | 'not_found' | 'confirmed' | 'error';
-  message?: string;
+  score?: number;
+  entityId?: string;
+};
+
+type DiscoveryState = {
   candidate?: SeniorCandidate | null;
   candidates?: SeniorCandidate[];
-  elapsedSeconds?: number;
   remainingSeconds?: number;
-  baselineStateCount?: number | null;
-  currentStateCount?: number | null;
-  changedCount?: number | null;
+  error?: string;
 };
 
+const steps = ['Willkommen', 'Senior-Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
+
+const roomOptions = [
+  { id: 'living_room', label: 'Wohnzimmer', icon: '🛋️', door: true },
+  { id: 'kitchen', label: 'Küche', icon: '🍳', door: true },
+  { id: 'bathroom', label: 'Bad', icon: '🛁', door: true },
+  { id: 'toilet', label: 'Toilette', icon: '🚽', door: true },
+  { id: 'bedroom', label: 'Schlafzimmer', icon: '🛏️', door: true },
+  { id: 'hallway', label: 'Flur/Eingang', icon: '🏠', door: true },
+  { id: 'office', label: 'Arbeitszimmer', icon: '📚', door: true },
+  { id: 'garden', label: 'Balkon/Garten', icon: '🌿', door: false },
+];
+
+const roomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, room.label]));
+
 export function SetupWizard({ onFinish }: { onFinish: () => void }) {
-  const [stepIndex, setStepIndex] = useState(0);
-  const [setupStatus, setSetupStatus] = useState<SeniorSetupStatus | null>(null);
-  const [profile, setProfile] = useState({ name: '', age: '', notes: '' });
-  const [rooms, setRooms] = useState<string[]>(['living_room', 'kitchen', 'bathroom']);
-  const [contact, setContact] = useState({ name: '', relationship: '', email: '' });
-  const [notifications, setNotifications] = useState({ anomalies: true, critical: true, daily_summary: false });
-  const [pairingCodes, setPairingCodes] = useState<Record<string, string>>({});
-  const [discovery, setDiscovery] = useState<Record<string, DiscoveryUiState>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const pollTimers = useRef<Record<string, number>>({});
+  const [step, setStep] = useState(0);
+  const [profile, setProfile] = useState<Profile>({ firstName: 'Hildegard', lastName: 'Müller', birthDate: '1948-03-18', language: 'Deutsch' });
+  const [selectedRooms, setSelectedRooms] = useState<string[]>(['living_room', 'kitchen', 'bathroom', 'bedroom', 'hallway']);
+  const [customRoom, setCustomRoom] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([
+    { id: 'maria', name: 'Maria Schneider', relation: 'Tochter', phone: '+49 151 23456789', email: 'maria.schneider@example.de', channels: ['WhatsApp', 'SMS'] },
+  ]);
+  const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+  const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
+  const [confirmed, setConfirmed] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [sensorBindings, setSensorBindings] = useState<SensorBinding[]>([]);
+  const [discovery, setDiscovery] = useState<Record<string, DiscoveryState>>({});
+  const timers = useRef<Record<string, number>>({});
+  const devMode = new URLSearchParams(window.location.search).get('dev') === '1';
 
   useEffect(() => {
-    void loadStatus();
-    return () => {
-      Object.values(pollTimers.current).forEach((timer) => window.clearTimeout(timer));
-    };
-  }, []);
+    setSensorBindings((current) => buildBindings(selectedRooms, current));
+  }, [selectedRooms]);
 
-  const progress = useMemo(() => ((stepIndex + 1) / STEPS.length) * 100, [stepIndex]);
-  const sensorTasks = useMemo(() => buildSensorTasks(rooms), [rooms]);
-  const devMode = useMemo(() => new URLSearchParams(window.location.search).get('dev') === '1', []);
+  useEffect(() => () => Object.values(timers.current).forEach((timer) => window.clearTimeout(timer)), []);
 
-  async function loadStatus() {
-    try {
-      const status = await api.seniorSetupStatus();
-      applyStatus(status);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
+  const age = useMemo(() => {
+    if (!profile.birthDate) return '';
+    const birth = new Date(profile.birthDate);
+    const today = new Date();
+    let years = today.getFullYear() - birth.getFullYear();
+    const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+    if (beforeBirthday) years -= 1;
+    return `${years} Jahre`;
+  }, [profile.birthDate]);
 
-  function applyStatus(status: SeniorSetupStatus) {
-    setSetupStatus(status);
-    if (status.selected_rooms.length) setRooms(status.selected_rooms);
-    setDiscovery((current) => {
-      const configured = Object.fromEntries(
-        status.sensor_roles
-          .filter((role) => role.configured)
-          .map((role) => [role.role, {
-            ...current[role.role],
-            status: 'confirmed' as const,
-            message: 'Sensor wurde bestaetigt und gespeichert.',
-          }]),
-      );
-      return { ...current, ...configured };
-    });
-    setStepIndex(STEP_BY_KEY[status.current_step] ?? 0);
-  }
-
-  async function guarded(action: () => Promise<SeniorSetupStatus | void>) {
-    setBusy(true);
-    setError('');
-    try {
-      const status = await action();
-      if (status) applyStatus(status);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function toggleRoom(room: string) {
-    setRooms((current) => current.includes(room) ? current.filter((item) => item !== room) : [...current, room]);
-  }
+  const connectedSensors = sensorBindings.filter((sensor) => sensor.status === 'connected').length;
+  const progress = Math.round(((step + 1) / steps.length) * 100);
 
   async function next() {
-    if (stepIndex === 0) return guarded(async () => api.startSeniorSetup()).then(() => setStepIndex(1));
-    if (stepIndex === 1) {
-      return guarded(async () => api.saveSeniorProfile({ name: profile.name, age: profile.age ? Number(profile.age) : null, notes: profile.notes })).then(() => setStepIndex(2));
+    const validation = validateStep();
+    setErrors(validation);
+    if (validation.length) return;
+
+    if (step === 0) {
+      await safeBackend(() => api.startSeniorSetup());
     }
-    if (stepIndex === 2) return setStepIndex(3);
-    if (stepIndex === 3) return guarded(async () => api.saveSeniorSetupRooms(rooms)).then(() => setStepIndex(4));
-    if (stepIndex === 4) return guarded(async () => api.saveSeniorSetupSensors()).then(() => setStepIndex(5));
-    if (stepIndex === 5) return guarded(async () => api.saveSeniorContact(contact)).then(() => setStepIndex(6));
-    if (stepIndex === 6) return guarded(async () => api.saveSeniorNotifications(notifications)).then(() => setStepIndex(7));
-    return guarded(async () => api.completeSeniorSetup()).then(onFinish);
+    if (step === 1) {
+      await safeBackend(() => api.saveSeniorProfile({ name: `${profile.firstName} ${profile.lastName}`.trim(), age: age ? Number.parseInt(age, 10) : null, notes: profile.language }));
+    }
+    if (step === 2) {
+      await safeBackend(() => api.saveSeniorSetupRooms(selectedRooms));
+    }
+    if (step === 4 && contacts[0]) {
+      await safeBackend(() => api.saveSeniorContact({ name: contacts[0].name, relationship: contacts[0].relation, email: contacts[0].email }));
+    }
+    if (step === 5) {
+      await safeBackend(() => api.saveSeniorNotifications({ anomalies: true, critical: true, daily_summary: false }));
+    }
+    if (step === steps.length - 1) {
+      await safeBackend(() => api.completeSeniorSetup());
+      onFinish();
+      return;
+    }
+    setStep((value) => Math.min(value + 1, steps.length - 1));
   }
 
-  async function startPairing(task: SensorTask) {
-    stopPolling(task.role);
-    setDiscovery((current) => ({ ...current, [task.role]: { status: 'starting', message: 'Kopplung wird gestartet.' } }));
-    setError('');
+  function back() {
+    setErrors([]);
+    setStep((value) => Math.max(value - 1, 0));
+  }
+
+  function validateStep() {
+    if (step === 1 && !profile.firstName.trim()) return ['Bitte geben Sie den Vornamen ein.'];
+    if (step === 2 && selectedRooms.length === 0) return ['Bitte wählen Sie mindestens einen Raum aus.'];
+    if (step === 4 && contacts.length === 0) return ['Bitte fügen Sie mindestens eine vertraute Person hinzu.'];
+    if (step === 6 && !confirmed) return ['Bitte bestätigen Sie die Zusammenfassung.'];
+    return [];
+  }
+
+  async function safeBackend(action: () => Promise<unknown>) {
     try {
-      const result = await api.startSeniorDiscovery({ role: task.role, room: task.room, pairing_code: pairingCodes[task.role] || undefined });
-      const uiStatus: DiscoveryUiState['status'] = result.status === 'pairing_needs_manual_action' ? 'needs_action' : 'waiting';
-      setDiscovery((current) => ({ ...current, [task.role]: { sessionId: result.session_id, status: uiStatus, message: result.message } }));
-      if (uiStatus === 'waiting') schedulePoll(task.role, result.session_id, Date.now());
-    } catch (err) {
-      setDiscovery((current) => ({ ...current, [task.role]: { status: 'error', message: errorMessage(err) } }));
+      await action();
+    } catch {
+      // The wizard remains usable with mock data when the local backend is not reachable.
     }
   }
 
-  function schedulePoll(role: string, sessionId: number, startedAt: number) {
-    stopPolling(role);
-    pollTimers.current[role] = window.setTimeout(() => {
-      void readCandidates(role, sessionId, startedAt, true);
+  function toggleRoom(roomId: string) {
+    setSelectedRooms((current) => current.includes(roomId) ? current.filter((id) => id !== roomId) : [...current, roomId]);
+  }
+
+  function addCustomRoom() {
+    const label = customRoom.trim();
+    if (!label) return;
+    const id = `custom_${label.toLowerCase().replace(/\s+/g, '_')}`;
+    roomLabel[id] = label;
+    setSelectedRooms((current) => current.includes(id) ? current : [...current, id]);
+    setCustomRoom('');
+  }
+
+  function updateSensor(id: string, patch: Partial<SensorBinding>) {
+    setSensorBindings((current) => current.map((sensor) => sensor.id === id ? { ...sensor, ...patch } : sensor));
+  }
+
+  async function searchSensor(sensor: SensorBinding) {
+    updateSensor(sensor.id, { status: 'searching' });
+    setDiscovery((current) => ({ ...current, [sensor.id]: { remainingSeconds: 30 } }));
+    try {
+      const result = await api.startSeniorDiscovery({ role: sensor.id, room: sensor.roomId, pairing_code: sensor.sensorId || undefined });
+      updateSensor(sensor.id, { sessionId: result.session_id });
+      pollSensor(sensor.id, result.session_id, Date.now());
+    } catch (err) {
+      updateSensor(sensor.id, { status: 'missing' });
+      setDiscovery((current) => ({ ...current, [sensor.id]: { error: err instanceof Error ? err.message : 'Sensor nicht gefunden.' } }));
+    }
+  }
+
+  function pollSensor(sensorId: string, sessionId: number, startedAt: number) {
+    window.clearTimeout(timers.current[sensorId]);
+    timers.current[sensorId] = window.setTimeout(async () => {
+      try {
+        const result = await api.seniorDiscoveryCandidates(sessionId, devMode);
+        const done = applyCandidate(sensorId, sessionId, result);
+        if (!done && Date.now() - startedAt < 30000) {
+          pollSensor(sensorId, sessionId, startedAt);
+        }
+      } catch (err) {
+        updateSensor(sensorId, { status: 'missing' });
+        setDiscovery((current) => ({ ...current, [sensorId]: { error: err instanceof Error ? err.message : 'Sensor nicht gefunden.' } }));
+      }
     }, 2000);
   }
 
-  function stopPolling(role: string) {
-    const timer = pollTimers.current[role];
-    if (timer) window.clearTimeout(timer);
-    delete pollTimers.current[role];
-  }
-
-  function applyCandidateResult(role: string, id: number, result: SeniorCandidates) {
-    const found = result.status === 'signal_detected' && result.candidate && (result.candidate.score ?? result.candidate.confidence) >= 50;
-    const timedOut = result.remaining_seconds === 0 || result.status === 'no_signal_detected';
-    setDiscovery((current) => ({
-      ...current,
-      [role]: {
-        ...current[role],
-        sessionId: id,
-        status: found ? 'found' : timedOut ? 'not_found' : 'waiting',
-        message: found ? 'Sensor erkannt.' : result.message,
-        candidate: result.candidate,
-        candidates: result.candidates,
-        elapsedSeconds: result.elapsed_seconds,
-        remainingSeconds: result.remaining_seconds,
-        baselineStateCount: result.baseline_state_count,
-        currentStateCount: result.current_state_count,
-        changedCount: result.changed_count,
-      },
-    }));
-    return Boolean(found || timedOut);
-  }
-
-  async function readCandidates(role: string, sessionId?: number, startedAt?: number, continuePolling = false) {
-    const id = sessionId ?? discovery[role]?.sessionId;
-    if (!id) return;
-    try {
-      const result = await api.seniorDiscoveryCandidates(id, devMode);
-      const done = applyCandidateResult(role, id, result);
-      const elapsed = Date.now() - (startedAt ?? Date.now());
-      if (continuePolling && !done && elapsed < 30000) {
-        schedulePoll(role, id, startedAt ?? Date.now());
-      } else {
-        stopPolling(role);
-      }
-    } catch (err) {
-      stopPolling(role);
-      setDiscovery((current) => ({ ...current, [role]: { sessionId: id, status: 'error', message: errorMessage(err) } }));
+  function applyCandidate(sensorId: string, sessionId: number, result: SeniorCandidates) {
+    const score = result.candidate ? (result.candidate.score ?? result.candidate.confidence) : 0;
+    const found = Boolean(result.candidate && score >= 50);
+    const timedOut = result.status === 'no_signal_detected' || result.remaining_seconds === 0;
+    setDiscovery((current) => ({ ...current, [sensorId]: { candidate: result.candidate, candidates: result.candidates, remainingSeconds: result.remaining_seconds } }));
+    if (found && result.candidate) {
+      updateSensor(sensorId, { status: 'connected', sessionId, score, entityId: result.candidate.entity_id, name: result.candidate.label || roomLabel[sensorId] || 'Sensor' });
+      void api.confirmSeniorDiscovery(sessionId, result.candidate.entity_id).catch(() => undefined);
+      return true;
     }
+    if (timedOut) {
+      updateSensor(sensorId, { status: 'missing' });
+      return true;
+    }
+    return false;
   }
 
-  async function confirmSensor(role: string) {
-    const state = discovery[role];
-    if (!state?.sessionId || !state.candidate?.entity_id) return;
-    try {
-      await api.confirmSeniorDiscovery(state.sessionId, state.candidate.entity_id);
-      setDiscovery((current) => ({ ...current, [role]: { ...state, status: 'confirmed', message: 'Sensor wurde bestaetigt und gespeichert.' } }));
-      await loadStatus();
-    } catch (err) {
-      setDiscovery((current) => ({ ...current, [role]: { ...state, status: 'error', message: errorMessage(err) } }));
+  function addContact() {
+    const nextErrors = [];
+    if (!contactForm.name.trim()) nextErrors.push('Bitte geben Sie einen Namen ein.');
+    if (!contactForm.phone.trim()) nextErrors.push('Bitte geben Sie eine Telefonnummer ein.');
+    if (!contactForm.channels.length) nextErrors.push('Bitte wählen Sie mindestens einen Kanal.');
+    if (nextErrors.length) {
+      setErrors(nextErrors);
+      return;
     }
+    setContacts((current) => [...current, { ...contactForm, id: crypto.randomUUID() }]);
+    setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+    setErrors([]);
   }
 
   return (
-    <section className="sc-setup-page">
-      <SetupStepHeader current={stepIndex + 1} total={STEPS.length} progress={progress} onBack={stepIndex > 0 ? () => setStepIndex((value) => value - 1) : undefined} />
-      {error && <div className="sc-setup-error">{error}</div>}
-      <div className="sc-setup-card sc-setup-card-readable">
-        <p className="sc-kicker">Einrichtung</p>
-        <h1>{STEPS[stepIndex]}</h1>
-        {renderStep()}
-        <div className="sc-setup-actions">
-          <button className="sc-primary-action" type="button" onClick={() => void next()} disabled={busy}>
-            {stepIndex === STEPS.length - 1 ? 'Zur Uebersicht' : 'Weiter'}
-          </button>
-        </div>
+    <section className="sc-wizard">
+      <WizardProgress step={step} progress={progress} />
+      {errors.length > 0 && <div className="sc-form-errors" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}
+      <div className="sc-wizard-card">
+        {step === 0 && <WelcomeStep />}
+        {step === 1 && <ProfileStep profile={profile} age={age} onChange={setProfile} />}
+        {step === 2 && <RoomsStep selected={selectedRooms} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} />}
+        {step === 3 && <SensorsStep sensors={sensorBindings} discovery={discovery} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
+        {step === 4 && <ContactsStep contacts={contacts} form={contactForm} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
+        {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
+        {step === 6 && <SummaryStep profile={profile} age={age} rooms={selectedRooms} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
       </div>
+      <footer className="sc-wizard-actions">
+        <button type="button" onClick={back} disabled={step === 0}><ArrowLeft size={20} /> Zurück</button>
+        <button className="primary" type="button" onClick={() => void next()}>
+          {step === 0 ? 'Einrichtung starten' : step === steps.length - 1 ? 'Einrichtung abschließen' : 'Weiter'}
+          <ArrowRight size={20} />
+        </button>
+      </footer>
     </section>
   );
-
-  function renderStep() {
-    if (stepIndex === 0) return <p>SeniorCare richtet das Zuhause Schritt fuer Schritt ein. Technische Details bleiben im Hintergrund.</p>;
-    if (stepIndex === 1) return (
-      <div className="sc-setup-fields">
-        <input value={profile.name} onChange={(event) => setProfile((value) => ({ ...value, name: event.target.value }))} placeholder="Name" />
-        <input value={profile.age} onChange={(event) => setProfile((value) => ({ ...value, age: event.target.value }))} placeholder="Alter" inputMode="numeric" />
-        <textarea value={profile.notes} onChange={(event) => setProfile((value) => ({ ...value, notes: event.target.value }))} placeholder="Wichtige Hinweise optional" />
-      </div>
-    );
-    if (stepIndex === 2) return <HomePreparation status={setupStatus} />;
-    if (stepIndex === 3) return (
-      <div className="sc-option-grid">
-        {ROOM_OPTIONS.map((room) => (
-          <button key={room.key} className={`sc-room-choice ${rooms.includes(room.key) ? 'is-active' : ''}`} type="button" onClick={() => toggleRoom(room.key)}>{room.label}</button>
-        ))}
-      </div>
-    );
-    if (stepIndex === 4) return (
-      <div className="sc-sensor-list">
-        <MatterPairingStep onSaved={() => void loadStatus()} />
-      </div>
-    );
-    if (stepIndex === 5) return (
-      <div className="sc-setup-fields">
-        <input value={contact.name} onChange={(event) => setContact((value) => ({ ...value, name: event.target.value }))} placeholder="Name" />
-        <input value={contact.relationship} onChange={(event) => setContact((value) => ({ ...value, relationship: event.target.value }))} placeholder="Beziehung" />
-        <input value={contact.email} onChange={(event) => setContact((value) => ({ ...value, email: event.target.value }))} placeholder="E-Mail-Adresse" />
-      </div>
-    );
-    if (stepIndex === 6) return (
-      <div className="sc-check-list">
-        {[
-          ['anomalies', 'Auffaelligkeiten'],
-          ['critical', 'Kritische Hinweise'],
-          ['daily_summary', 'Taegliche Zusammenfassung'],
-        ].map(([key, label]) => (
-          <label key={key}>
-            <input type="checkbox" checked={Boolean(notifications[key as keyof typeof notifications])} onChange={(event) => setNotifications((value) => ({ ...value, [key]: event.target.checked }))} />
-            <span>{label}</span>
-          </label>
-        ))}
-      </div>
-    );
-    return <p>Die Einrichtung ist gespeichert. Fehlende Sensoren koennen spaeter ergaenzt werden.</p>;
-  }
 }
 
-function HomePreparation({ status }: { status: SeniorSetupStatus | null }) {
-  const checks = [
-    ['Zuhause verbunden', status?.home.connected],
-    ['Sensor-Einrichtung bereit', status?.home.sensor_ready],
-    ['System bereit', status?.home.system_ready],
-  ];
-  return <div className="sc-prep-checks">{checks.map(([label, ok]) => <div key={String(label)} className={ok ? 'is-ok' : 'is-waiting'}><span>{ok ? '✓' : '...'}</span>{label}</div>)}</div>;
-}
-
-function SensorSetupCard({ task, code, state, devMode, onCodeChange, onStart, onCheck, onConfirm }: {
-  task: SensorTask;
-  code: string;
-  state: DiscoveryUiState;
-  devMode: boolean;
-  onCodeChange: (value: string) => void;
-  onStart: () => void;
-  onCheck: () => void;
-  onConfirm: () => void;
-}) {
-  const canConfirm = state.status === 'found' && Boolean(state.candidate?.entity_id);
+function WizardProgress({ step, progress }: { step: number; progress: number }) {
   return (
-    <article className={`sc-sensor-task sc-sensor-state-${state.status}`}>
+    <header className="sc-wizard-progress">
       <div>
-        <p className="sc-kicker">{ROOM_LABELS[task.room] || task.room}</p>
-        <h2>{task.title}</h2>
-        <p>{task.instruction}</p>
+        <p>Schritt {step + 1} von {steps.length}</p>
+        <h2>{steps[step]}</h2>
       </div>
-      <label className="sc-pairing-code">
-        <span>Kopplungscode optional</span>
-        <input value={code} onChange={(event) => onCodeChange(event.target.value)} placeholder="Code vom Geraet" />
-      </label>
-      <StatusText state={state} />
-      <div className="sc-sensor-actions">
-        <button type="button" onClick={onStart} disabled={state.status === 'starting' || state.status === 'waiting'}>{state.status === 'idle' ? 'Kopplung starten' : 'Erneut starten'}</button>
-        <button type="button" onClick={onCheck} disabled={!state.sessionId || state.status === 'starting' || state.status === 'needs_action'}>Signal pruefen</button>
-        <button type="button" onClick={onConfirm} disabled={!canConfirm}>Sensor bestaetigen</button>
+      <div className="sc-step-dots" aria-label={`Schritt ${step + 1} von ${steps.length}`}>
+        {steps.map((label, index) => <span key={label} className={index <= step ? 'active' : ''}>{index + 1}</span>)}
       </div>
-      {devMode && <SensorDebug state={state} />}
-    </article>
-  );
-}
-
-function StatusText({ state }: { state: DiscoveryUiState }) {
-  if (state.status === 'idle') return <p className="sc-sensor-status">Noch nicht gestartet.</p>;
-  if (state.status === 'starting') return <p className="sc-sensor-status">Kopplung wird gestartet.</p>;
-  if (state.status === 'waiting') return <p className="sc-sensor-status">Kopplung gestartet. Wir warten jetzt auf ein Signal.</p>;
-  if (state.status === 'needs_action') return <p className="sc-sensor-status is-bad">{state.message || 'Der Sensor konnte nicht verbunden werden. Bitte erneut versuchen.'}</p>;
-  if (state.status === 'found') return <p className="sc-sensor-status is-good">Signal erkannt. Bitte bestaetigen Sie den Sensor.</p>;
-  if (state.status === 'confirmed') return <p className="sc-sensor-status is-good">Sensor bestaetigt und gespeichert. Mit Weiter geht es zum naechsten Schritt.</p>;
-  if (state.status === 'error') return <p className="sc-sensor-status is-bad">{state.message || 'Fehler bei der Erkennung.'}</p>;
-  return <p className="sc-sensor-status is-bad">Kein eindeutiges Signal erkannt. Bitte Sensor ausloesen und erneut pruefen.</p>;
-}
-
-function SensorDebug({ state }: { state: DiscoveryUiState }) {
-  const candidates = state.candidates || (state.candidate ? [state.candidate] : []);
-  return (
-    <div className="sc-sensor-debug">
-      <span>Session {state.sessionId || '-'}</span>
-      <span>States {state.baselineStateCount ?? '-'} / {state.currentStateCount ?? '-'}</span>
-      <span>Geaendert {state.changedCount ?? '-'}</span>
-      <span>Rest {Math.ceil(state.remainingSeconds ?? 0)}s</span>
-      {candidates.slice(0, 3).map((candidate) => (
-        <code key={candidate.entity_id}>{candidate.entity_id} · Score {candidate.score ?? candidate.confidence}</code>
-      ))}
-    </div>
-  );
-}
-
-export function SetupStepHeader({ current, total, progress, onBack }: { current: number; total: number; progress: number; onBack?: () => void }) {
-  return (
-    <header className="sc-setup-header">
-      <div className="sc-progress"><span style={{ width: `${progress}%` }} /></div>
-      <div>
-        <button type="button" onClick={onBack} disabled={!onBack}>Zurueck</button>
-        <span>Schritt {current} / {total}</span>
-      </div>
+      <i><span style={{ width: `${progress}%` }} /></i>
     </header>
   );
 }
 
-function buildSensorTasks(rooms: string[]): SensorTask[] {
-  const tasks: SensorTask[] = [{ role: 'main_door', room: 'entrance', title: 'Wohnungstuer einrichten', instruction: 'Oeffnen und schliessen Sie bitte einmal die Wohnungstuer.' }];
-  for (const room of rooms.filter((item) => item !== 'entrance')) {
-    tasks.push({ role: `${room}_presence`, room, title: `${ROOM_LABELS[room] || room} einrichten`, instruction: `Gehen Sie bitte in den Bereich ${ROOM_LABELS[room] || room} und loesen Sie den Sensor aus.` });
-  }
-  return tasks;
+function WelcomeStep() {
+  return (
+    <section className="sc-wizard-welcome">
+      <span className="sc-hero-illustration"><HeartHandshake size={58} /><ShieldCheck size={66} /></span>
+      <h1>Willkommen bei Sentero</h1>
+      <p>Sentero achtet leise im Hintergrund auf vertraute Tagesabläufe. Wenn etwas ungewöhnlich wirkt, werden vertraute Personen behutsam informiert.</p>
+      <p>Die Einrichtung dauert nur wenige Minuten und kann später jederzeit angepasst werden.</p>
+    </section>
+  );
 }
 
-function errorMessage(err: unknown) {
-  return err instanceof Error ? err.message : String(err);
+function ProfileStep({ profile, age, onChange }: { profile: Profile; age: string; onChange: (profile: Profile) => void }) {
+  return (
+    <section className="sc-form-grid">
+      <label>Vorname<input required value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label>
+      <label>Nachname<input value={profile.lastName} onChange={(event) => onChange({ ...profile, lastName: event.target.value })} /></label>
+      <label>Geburtsdatum<input type="date" value={profile.birthDate} onChange={(event) => onChange({ ...profile, birthDate: event.target.value })} /></label>
+      <label>Alter<input readOnly value={age} aria-label="Berechnetes Alter" /></label>
+      <label>Sprache/Region<select value={profile.language} onChange={(event) => onChange({ ...profile, language: event.target.value })}><option>Deutsch</option><option>Deutsch - Schweiz</option><option>Deutsch - Österreich</option></select></label>
+      <label className="sc-upload-box"><Upload size={24} /> Foto hochladen<input type="file" accept="image/*" onChange={(event) => onChange({ ...profile, photo: event.target.files?.[0]?.name })} /></label>
+    </section>
+  );
+}
+
+function RoomsStep({ selected, customRoom, onToggle, onCustomChange, onCustomAdd }: { selected: string[]; customRoom: string; onToggle: (id: string) => void; onCustomChange: (value: string) => void; onCustomAdd: () => void }) {
+  return (
+    <section className="sc-room-select">
+      <p>Wählen Sie die Räume in der Wohnung.</p>
+      <div className="sc-room-choice-grid">
+        {roomOptions.map((room) => (
+          <button key={room.id} className={selected.includes(room.id) ? 'active' : ''} type="button" onClick={() => onToggle(room.id)}>
+            <span aria-hidden="true">{room.icon}</span>
+            <strong>{room.label}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="sc-inline-add">
+        <input value={customRoom} onChange={(event) => onCustomChange(event.target.value)} placeholder="Eigenen Raum hinzufügen" />
+        <button type="button" onClick={onCustomAdd}><Plus size={20} /> Hinzufügen</button>
+      </div>
+      <strong>{selected.length} Räume ausgewählt</strong>
+    </section>
+  );
+}
+
+function SensorsStep({ sensors, discovery, devMode, connected, total, onChange, onSearch }: { sensors: SensorBinding[]; discovery: Record<string, DiscoveryState>; devMode: boolean; connected: number; total: number; onChange: (id: string, patch: Partial<SensorBinding>) => void; onSearch: (sensor: SensorBinding) => void }) {
+  const grouped = sensors.reduce<Record<string, SensorBinding[]>>((acc, sensor) => {
+    acc[sensor.roomId] = [...(acc[sensor.roomId] || []), sensor];
+    return acc;
+  }, {});
+  return (
+    <section className="sc-sensor-step">
+      <p>{connected} von {total} Sensoren verbunden</p>
+      {Object.entries(grouped).map(([roomId, items]) => (
+        <article key={roomId} className="sc-sensor-room">
+          <h3>{roomLabel[roomId] || roomId}</h3>
+          {items.map((sensor) => (
+            <div key={sensor.id} className="sc-sensor-row">
+              <div>
+                <strong>{sensor.type === 'motion' ? 'Bewegungsmelder' : 'Türkontakt'}</strong>
+                <input value={sensor.sensorId} onChange={(event) => onChange(sensor.id, { sensorId: event.target.value })} placeholder="Sensor-ID eingeben" />
+                <input value={sensor.name} onChange={(event) => onChange(sensor.id, { name: event.target.value })} placeholder="Sensorname" />
+              </div>
+              <SensorStatus status={sensor.status} />
+              <div className="sc-sensor-buttons">
+                <button type="button" onClick={() => void onSearch(sensor)} disabled={sensor.status === 'searching'}><Search size={19} /> Automatisch suchen</button>
+                <button type="button" onClick={() => onChange(sensor.id, { status: 'skipped' })}>Sensor überspringen</button>
+              </div>
+              {devMode && (
+                <code className="sc-dev-line">
+                  {sensor.entityId || discovery[sensor.id]?.candidate?.entity_id || 'Keine Entity'} · Score {sensor.score ?? discovery[sensor.id]?.candidate?.score ?? '-'} · Rest {discovery[sensor.id]?.remainingSeconds ?? '-'}s
+                </code>
+              )}
+            </div>
+          ))}
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function SensorStatus({ status }: { status: SensorBinding['status'] }) {
+  if (status === 'searching') return <span className="sc-sensor-state searching"><Loader2 size={18} /> Suche...</span>;
+  if (status === 'connected') return <span className="sc-sensor-state connected"><Check size={18} /> Verbunden</span>;
+  if (status === 'missing') return <span className="sc-sensor-state missing">Nicht gefunden</span>;
+  if (status === 'skipped') return <span className="sc-sensor-state skipped">Übersprungen</span>;
+  return <span className="sc-sensor-state idle">Bereit</span>;
+}
+
+function ContactsStep({ contacts, form, onFormChange, onAdd, onDelete }: { contacts: Contact[]; form: Contact; onFormChange: (contact: Contact) => void; onAdd: () => void; onDelete: (id: string) => void }) {
+  return (
+    <section className="sc-contacts-step">
+      <p>Wen sollen wir bei Auffälligkeiten benachrichtigen?</p>
+      <div className="sc-form-grid">
+        <label>Name<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
+        <label>Beziehung<select value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })}>{['Tochter', 'Sohn', 'Pflegeperson', 'Nachbar', 'Arzt', 'Sonstige'].map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label>Telefonnummer<input type="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="+49 ..." /></label>
+        <label>E-Mail<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
+      </div>
+      <div className="sc-checkbox-row">{['SMS', 'WhatsApp', 'E-Mail'].map((channel) => <label key={channel}><input type="checkbox" checked={form.channels.includes(channel)} onChange={(event) => onFormChange({ ...form, channels: event.target.checked ? [...form.channels, channel] : form.channels.filter((item) => item !== channel) })} /> {channel}</label>)}</div>
+      <button className="sc-soft-button" type="button" onClick={onAdd}><Plus size={20} /> Person hinzufügen</button>
+      <div className="sc-contact-list-editor">
+        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.relation}</small><button type="button" onClick={() => onDelete(contact.id)}><Trash2 size={18} /></button></div>)}
+      </div>
+    </section>
+  );
+}
+
+function NotificationStep({ value, onChange }: { value: { from: string; to: string; nightCriticalOnly: boolean; sensitivity: number }; onChange: (value: { from: string; to: string; nightCriticalOnly: boolean; sensitivity: number }) => void }) {
+  const labels = ['Nur bei langen Pausen (>4h)', 'Ungewöhnliche Aktivitätsmuster (>2h)', 'Bei jeder kleinen Auffälligkeit (>1h)'];
+  return (
+    <section className="sc-notification-step">
+      <div className="sc-form-grid two">
+        <label>Von<input type="time" value={value.from} onChange={(event) => onChange({ ...value, from: event.target.value })} /></label>
+        <label>Bis<input type="time" value={value.to} onChange={(event) => onChange({ ...value, to: event.target.value })} /></label>
+      </div>
+      <label className="sc-large-check"><input type="checkbox" checked={value.nightCriticalOnly} onChange={(event) => onChange({ ...value, nightCriticalOnly: event.target.checked })} /> Nachts nur bei dringenden Alarmen</label>
+      <label className="sc-slider-label">Empfindlichkeit<strong>{labels[value.sensitivity - 1]}</strong><input type="range" min="1" max="3" value={value.sensitivity} onChange={(event) => onChange({ ...value, sensitivity: Number(event.target.value) })} /></label>
+    </section>
+  );
+}
+
+function SummaryStep({ profile, age, rooms, contacts, sensors, totalSensors, notification, confirmed, onConfirm }: { profile: Profile; age: string; rooms: string[]; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void }) {
+  return (
+    <section className="sc-summary-step">
+      <div className="sc-summary-card">
+        <UserRound size={28} /><strong>{profile.firstName} {profile.lastName}</strong><span>{age}</span>
+      </div>
+      <div className="sc-summary-grid">
+        <p><strong>Räume</strong>{rooms.map((room) => roomLabel[room] || room).join(', ')}</p>
+        <p><strong>Sensoren</strong>{sensors} von {totalSensors} verbunden</p>
+        <p><strong>Kontakte</strong>{contacts.map((contact) => `${contact.name} (${contact.relation})`).join(', ')}</p>
+        <p><strong>Benachrichtigungen</strong>{notification.from} - {notification.to}, Stufe {notification.sensitivity}</p>
+      </div>
+      <label className="sc-large-check"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} /> Ich bestätige, dass alle Angaben korrekt sind.</label>
+    </section>
+  );
+}
+
+function buildBindings(roomIds: string[], current: SensorBinding[]) {
+  const byId = Object.fromEntries(current.map((sensor) => [sensor.id, sensor]));
+  return roomIds.flatMap((roomId) => {
+    const option = roomOptions.find((room) => room.id === roomId);
+    const motionId = `${roomId}_motion`;
+    const bindings: SensorBinding[] = [
+      byId[motionId] || { id: motionId, roomId, type: 'motion', sensorId: '', name: `${roomLabel[roomId] || roomId} Präsenz`, status: 'idle' },
+    ];
+    if (option?.door !== false) {
+      const doorId = `${roomId}_door`;
+      bindings.push(byId[doorId] || { id: doorId, roomId, type: 'door', sensorId: '', name: `${roomLabel[roomId] || roomId} Türkontakt`, status: 'idle' });
+    }
+    return bindings;
+  });
 }

@@ -33,7 +33,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     <main className="sc-login-page">
       <section className="sc-login-card">
         <div className="sc-hero-copy">
-          <p className="sc-kicker">SeniorCare</p>
+          <p className="sc-kicker">Sentero</p>
           <h1>Willkommen zurueck.</h1>
           <p>Ein geschuetzter Blick auf den Alltag eines Menschen, der Ihnen wichtig ist.</p>
         </div>

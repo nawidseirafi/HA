@@ -60,7 +60,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     }
   };
 
-  const product = status?.product || (variant === 'seniorcare' ? 'SeniorCare' : 'RoboterSteve');
+  const product = status?.product || (variant === 'seniorcare' ? 'Sentero' : 'RoboterSteve');
   const uiState = status?.status || status?.state || 'idle';
   const isRunning = busy === 'install' || uiState === 'running';
   const isSuccess = uiState === 'success' || uiState === 'completed';
