@@ -176,7 +176,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
 
       {activeTab === 'profile' && (
         <section className="sc-panel sc-settings-panel">
-          <h2>Senior-Profil</h2>
+          <h2>Profil</h2>
           <div className="sc-form-grid">
             <label>Name<input value={profile.name} onChange={(event) => setProfile((value) => ({ ...value, name: event.target.value }))} /></label>
             <label>Alter<input inputMode="numeric" value={profile.age} onChange={(event) => setProfile((value) => ({ ...value, age: event.target.value }))} /></label>

@@ -36,17 +36,17 @@ type DiscoveryState = {
   error?: string;
 };
 
-const steps = ['Willkommen', 'Senior-Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
+const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
 
 const roomOptions = [
-  { id: 'living_room', label: 'Wohnzimmer', icon: '🛋️', door: true },
-  { id: 'kitchen', label: 'Küche', icon: '🍳', door: true },
-  { id: 'bathroom', label: 'Bad', icon: '🛁', door: true },
-  { id: 'toilet', label: 'Toilette', icon: '🚽', door: true },
-  { id: 'bedroom', label: 'Schlafzimmer', icon: '🛏️', door: true },
-  { id: 'hallway', label: 'Flur/Eingang', icon: '🏠', door: true },
-  { id: 'office', label: 'Arbeitszimmer', icon: '📚', door: true },
-  { id: 'garden', label: 'Balkon/Garten', icon: '🌿', door: false },
+  { id: 'living_room', label: 'Wohnzimmer', door: true },
+  { id: 'kitchen', label: 'Küche', door: true },
+  { id: 'bathroom', label: 'Bad', door: true },
+  { id: 'toilet', label: 'Toilette', door: true },
+  { id: 'bedroom', label: 'Schlafzimmer', door: true },
+  { id: 'hallway', label: 'Flur/Eingang', door: true },
+  { id: 'office', label: 'Arbeitszimmer', door: true },
+  { id: 'garden', label: 'Balkon/Garten', door: false },
 ];
 
 const baseRoomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, room.label]));
@@ -75,6 +75,12 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
     void api.seniorSetupStatus().then((status) => {
       if (status.selected_rooms.length) setSelectedRooms(status.selected_rooms);
+      const unknownRooms = Object.fromEntries(
+        status.selected_rooms
+          .filter((room) => !baseRoomLabel[room])
+          .map((room) => [room, room]),
+      );
+      if (Object.keys(unknownRooms).length) setCustomRooms((current) => ({ ...unknownRooms, ...current }));
       if (status.profile?.name) {
         setProfile((value) => ({
           ...value,
@@ -171,7 +177,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   function addCustomRoom() {
     const label = customRoom.trim();
     if (!label) return;
-    const id = `custom_${label.toLowerCase().replace(/\s+/g, '_')}`;
+    const id = label;
     setCustomRooms((current) => ({ ...current, [id]: label }));
     setSelectedRooms((current) => current.includes(id) ? current : [...current, id]);
     setSensorPlan((current) => ({ ...current, [id]: current[id] || { motion: true, door: false } }));
@@ -325,7 +331,7 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
   onCustomAdd: () => void;
   onToggleSensorType: (roomId: string, type: 'motion' | 'door') => void;
 }) {
-  const visibleRooms = [...roomOptions, ...Object.entries(customRooms).map(([id, label]) => ({ id, label, icon: '', door: false }))];
+  const visibleRooms = [...roomOptions, ...Object.entries(customRooms).map(([id, label]) => ({ id, label, door: false }))];
   return (
     <section className="sc-room-select">
       <p>Wählen Sie die Räume in der Wohnung.</p>
@@ -336,7 +342,6 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
           return (
             <div key={room.id} className={`sc-room-choice-card ${active ? 'active' : ''}`}>
               <button type="button" onClick={() => onToggle(room.id)}>
-                {room.icon && <span aria-hidden="true">{room.icon}</span>}
                 <strong>{room.label}</strong>
               </button>
               {active && (

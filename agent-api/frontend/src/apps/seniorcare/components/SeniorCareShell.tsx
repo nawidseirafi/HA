@@ -18,7 +18,7 @@ const navIcons = {
 };
 
 const settingsItems: Array<{ tab: SeniorCareSettingsTab; label: string; icon: typeof UserRound }> = [
-  { tab: 'profile', label: 'Senior-Profil', icon: UserRound },
+  { tab: 'profile', label: 'Profil', icon: UserRound },
   { tab: 'sensors', label: 'Räume & Sensoren', icon: Home },
   { tab: 'contacts', label: 'Vertraute Personen', icon: Users },
   { tab: 'notifications', label: 'Benachrichtigungen', icon: Bell },

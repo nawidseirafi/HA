@@ -813,28 +813,28 @@ button:disabled {
 }
 
 .sc-room-choice-grid button {
-  background: #f8fcfa;
-  border: 1px solid var(--sc-line);
-  border-radius: 22px;
-  display: grid;
-  gap: 10px;
-  min-height: 132px;
-  padding: 16px;
-  place-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--sc-text);
+  display: flex;
+  min-height: 76px;
+  padding: 14px;
+  text-align: left;
 }
 
 .sc-room-choice-card {
-  background: #f8fcfa;
-  border: 1px solid var(--sc-line);
-  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #dce9e3;
+  border-radius: 18px;
   display: grid;
-  gap: 12px;
-  padding: 8px;
+  gap: 4px;
+  padding: 0;
 }
 
 .sc-room-choice-card > button {
-  border: 0;
-  min-height: 112px;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 74px;
   width: 100%;
 }
 
@@ -848,7 +848,7 @@ button:disabled {
 .sc-room-sensor-toggles {
   display: grid;
   gap: 8px;
-  padding: 0 10px 10px;
+  padding: 0 12px 12px;
 }
 
 .sc-room-sensor-toggles label {
@@ -856,7 +856,10 @@ button:disabled {
   background: rgba(255, 255, 255, 0.74);
   border: 1px solid #cce5db;
   border-radius: 12px;
+  color: var(--sc-text);
   display: flex;
+  font-size: 0.95rem;
+  font-weight: 800;
   gap: 8px;
   min-height: 38px;
   padding: 0 10px;
@@ -867,8 +870,11 @@ button:disabled {
   width: 18px;
 }
 
-.sc-room-choice-grid span {
-  font-size: 2.3rem;
+.sc-room-choice-card strong {
+  color: var(--sc-text);
+  font-size: 1.08rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .sc-inline-add,
