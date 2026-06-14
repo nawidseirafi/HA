@@ -138,8 +138,8 @@ def mywellness_cancel_course(payload: CourseActionPayload):
 
 
 @router.get("/api/mywellness/bookings")
-def mywellness_bookings():
-    return mywellness_service.bookings()
+def mywellness_bookings(refresh: bool = Query(True)):
+    return mywellness_service.bookings(force_refresh=refresh)
 
 
 @router.get("/api/mywellness/logs")

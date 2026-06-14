@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import asyncio
+import json
 import os
 import re
 from pathlib import Path
@@ -146,6 +150,91 @@ class HomeAssistantService:
             raise self._runtime_error("Home Assistant Service-Aufruf fehlgeschlagen", exc) from exc
         return {"ok": True, "result": data}
 
+    def websocket_command(self, command: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
+        """Sendet einen Command an die HA Core WebSocket API (Port 8123, mit Auth)."""
+        if not self.configured():
+            raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
+        return asyncio.run(self._websocket_command(command, timeout=timeout))
+
+    async def _websocket_command(self, command: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
+        try:
+            import websockets
+        except Exception as exc:
+            raise RuntimeError("Python-Paket 'websockets' ist fuer Home Assistant WebSocket nicht installiert.") from exc
+
+        websocket_url = self._websocket_url()
+        async with websockets.connect(websocket_url, open_timeout=timeout) as websocket:
+            auth_required = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
+            if auth_required.get("type") != "auth_required":
+                raise RuntimeError(f"Unerwartete Home Assistant WebSocket-Antwort: {auth_required}")
+
+            await websocket.send(json.dumps({"type": "auth", "access_token": self.token}))
+            auth_result = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
+            if auth_result.get("type") != "auth_ok":
+                raise RuntimeError(f"Home Assistant WebSocket Auth fehlgeschlagen: {auth_result}")
+
+            payload = dict(command)
+            payload["id"] = 1
+            await websocket.send(json.dumps(payload))
+            response = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
+            return response if isinstance(response, dict) else {"success": False, "response": response}
+
+    # ------------------------------------------------------------------
+    # Matter Commissioning — Matter Server WebSocket (Port 5580, kein Auth)
+    # ------------------------------------------------------------------
+
+    def matter_commission(self, code: str, network_only: bool = False, timeout: int = 60) -> dict[str, Any]:
+        """
+        Commissioned ein neues Matter-Geraet ueber den Matter Server Add-on.
+
+        Verbindet sich direkt mit dem Matter Server WebSocket auf Port 5580
+        (kein HA-Auth erforderlich). Der Matter Server uebernimmt das BLE-
+        Commissioning selbst, sofern ein BLE-Proxy konfiguriert ist.
+
+        Args:
+            code:         Numerischer Pairing-Code oder QR-Code-Payload.
+            network_only: True = nur On-Network-Commissioning (kein BLE).
+            timeout:      Timeout in Sekunden (Commissioning kann laenger dauern).
+        """
+        return asyncio.run(self._matter_commission(code, network_only=network_only, timeout=timeout))
+
+    async def _matter_commission(
+        self, code: str, network_only: bool = False, timeout: int = 60
+    ) -> dict[str, Any]:
+        try:
+            import websockets
+        except Exception as exc:
+            raise RuntimeError(
+                "Python-Paket 'websockets' ist fuer Matter WebSocket nicht installiert."
+            ) from exc
+
+        url = self._matter_websocket_url()
+        try:
+            async with websockets.connect(url, open_timeout=10) as ws:
+                await ws.send(json.dumps({
+                    "message_id": "1",
+                    "command": "commission_with_code",
+                    "args": {
+                        "code": code,
+                        "network_only": network_only,
+                    },
+                }))
+                # Matter Server schickt ggf. mehrere Statusmessages — warten auf
+                # die Antwort mit passender message_id
+                async for raw in ws:
+                    msg = json.loads(raw)
+                    if msg.get("message_id") == "1":
+                        return msg
+        except Exception as exc:
+            raise RuntimeError(
+                f"Matter Server WebSocket-Fehler ({url}): {type(exc).__name__}: {exc}"
+            ) from exc
+        return {"success": False, "error": "Keine Antwort vom Matter Server erhalten."}
+
+    # ------------------------------------------------------------------
+    # Interne Hilfsmethoden
+    # ------------------------------------------------------------------
+
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.token}",
@@ -160,6 +249,28 @@ class HomeAssistantService:
                 "Erwartet wird z.B. http://homeassistant.local:8123"
             )
         return f"{self.base_url}{path}"
+
+    def _websocket_url(self) -> str:
+        """HA Core WebSocket auf Port 8123 — mit Token-Auth."""
+        parsed = urlparse(self.base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise RuntimeError(
+                f"Home Assistant URL ist ungueltig: {self.base_url!r}. "
+                "Erwartet wird z.B. http://homeassistant.local:8123"
+            )
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        # Hostname ohne Port verwenden, damit Port 8123 aus base_url erhalten bleibt
+        return f"{scheme}://{parsed.netloc}/api/websocket"
+
+    def _matter_websocket_url(self) -> str:
+        """Matter Server WebSocket auf Port 5580 — kein Auth erforderlich."""
+        parsed = urlparse(self.base_url)
+        if not parsed.hostname:
+            raise RuntimeError(
+                f"Home Assistant URL ist ungueltig: {self.base_url!r}. "
+                "Hostname konnte nicht ermittelt werden."
+            )
+        return f"ws://{parsed.hostname}:5580/ws"
 
     def _runtime_error(self, message: str, exc: Exception) -> RuntimeError:
         if isinstance(exc, RuntimeError):

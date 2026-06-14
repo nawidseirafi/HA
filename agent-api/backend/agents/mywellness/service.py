@@ -18,7 +18,14 @@ AGENT_SCRIPT = AGENTS_DIR / "mywellness" / "mywellness.py"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
-from .store import delete_prepared_courses, list_prepared_courses, replace_live_courses, save_booking_history, save_course_history
+from .store import (
+    delete_prepared_courses,
+    ensure_schema as ensure_course_schema,
+    list_prepared_courses,
+    replace_live_courses,
+    save_booking_history,
+    save_course_history,
+)
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -61,6 +68,7 @@ class MyWellnessService:
         self._courses_cache: Optional[list[dict[str, Any]]] = None
         self._courses_cache_time: Optional[float] = None
         self._cache_ttl = 0  # Cache deaktiviert
+        self._db_live_cache_ttl = timedelta(minutes=int(os.getenv("MYWELLNESS_DB_CACHE_TTL_MINUTES", "15")))
 
     def status(self) -> dict[str, Any]:
         settings = self._settings()
@@ -231,27 +239,33 @@ class MyWellnessService:
         self._write_status(state)
         return {"courses": courses}
 
-    def bookings(self) -> dict[str, Any]:
+    def bookings(self, force_refresh: bool = True) -> dict[str, Any]:
         state = self._read_status()
         try:
-            courses = self._courses_from_db_cache()
-            if not courses:
-                courses = state.get("upcoming_courses") or state.get("available_courses") or []
+            if force_refresh:
+                courses = self._fetch_courses(force_refresh=True)
+            else:
+                courses = self._courses_from_db_cache(max_age=self._db_live_cache_ttl)
+                if not courses:
+                    courses = self._fetch_courses(force_refresh=True)
             state["current_bookings"] = self._bookings_from_courses(courses)
             state["last_bookings_refresh"] = utc_now()
             state["last_error"] = None
             self._write_status(state)
             return {"bookings": self._bookings_from_courses(courses)}
         except Exception as exc:
-            state["last_error"] = str(exc)
+            message = f"Buchungen konnten nicht aktualisiert werden: {exc}"
+            state["last_error"] = message
             self._write_status(state)
             bookings = state.get("current_bookings") or []
-            return {"bookings": bookings or self._bookings_from_logs(), "error": str(exc)}
+            if self._courses_are_recent(bookings, self._db_live_cache_ttl):
+                return {"bookings": bookings, "error": message, "stale": True}
+            return {"bookings": [], "error": message, "stale": True}
 
     def upcoming_courses(self, force_refresh: bool = False) -> dict[str, Any]:
         state = self._read_status()
         try:
-            cached_courses = [] if force_refresh else self._courses_from_db_cache()
+            cached_courses = [] if force_refresh else self._courses_from_db_cache(max_age=self._db_live_cache_ttl)
             if cached_courses and self._courses_cache_covers_horizon(cached_courses):
                 courses = self._filter_upcoming(cached_courses)
                 state["upcoming_courses"] = courses
@@ -273,7 +287,10 @@ class MyWellnessService:
             self._agent_log(message)
             state["last_error"] = message
             self._write_status(state)
-            return {"courses": state.get("upcoming_courses", []), "error": message}
+            cached = state.get("upcoming_courses", [])
+            if self._courses_are_recent(cached, self._db_live_cache_ttl):
+                return {"courses": cached, "error": message, "stale": True}
+            return {"courses": [], "error": message, "stale": True}
 
     def book_course(self, course_id: str) -> dict[str, Any]:
         return self._change_booking(course_id=course_id, action="book")
@@ -295,8 +312,18 @@ class MyWellnessService:
         if not has_error:
             state["last_successful_run"] = utc_now()
         if mode == "book":
-            bookings = self._bookings_from_courses(state.get("available_courses", []))
-            state["current_bookings"] = bookings or self._bookings_from_output(output)
+            if has_error:
+                state["current_bookings"] = self._bookings_from_output(output)
+            else:
+                try:
+                    courses = self._fetch_courses(force_refresh=True)
+                    state["available_courses"] = courses
+                    state["upcoming_courses"] = self._filter_upcoming(courses)
+                    state["current_bookings"] = self._bookings_from_courses(courses)
+                    state["last_bookings_refresh"] = utc_now()
+                except Exception as exc:
+                    state["last_error"] = f"Buchungen konnten nach dem Lauf nicht aktualisiert werden: {exc}"
+                    state["current_bookings"] = self._bookings_from_output(output)
         status = "error" if has_error else "ok"
         message = state["last_error"] if has_error else f"{mode} abgeschlossen in {duration:.1f}s."
         self._record_action_result(mode, status, message or "", duration, started_at)
@@ -725,7 +752,7 @@ class MyWellnessService:
         _, target_date = self._dates()
         return list_prepared_courses(target_date)
 
-    def _courses_from_db_cache(self) -> list[dict[str, Any]]:
+    def _courses_from_db_cache(self, max_age: Optional[timedelta] = None) -> list[dict[str, Any]]:
         """Lädt Kurse aus der Datenbank (live source)"""
         try:
             with self._connect() as connection:
@@ -736,7 +763,11 @@ class MyWellnessService:
                     order by start_time, title
                     """
                 ).fetchall()
-            return [self._course_row_to_api(row) for row in rows]
+            courses = [self._course_row_to_api(row) for row in rows]
+            if max_age is not None and not self._courses_are_recent(courses, max_age):
+                self._agent_log("Live-Kurscache ist veraltet und wird ignoriert.")
+                return []
+            return courses
         except Exception:
             return []
 
@@ -765,6 +796,7 @@ class MyWellnessService:
             "booking_status": row["status"],
             "is_desired": bool(row["is_desired"]),
             "is_participant": bool(row["booked"]),
+            "updated_at": row["updated_at"],
         }
 
     def _filter_upcoming(self, courses: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -793,6 +825,25 @@ class MyWellnessService:
                 max_partition = partition
         return max_partition >= target_date
 
+    def _courses_are_recent(self, courses: list[dict[str, Any]], max_age: timedelta) -> bool:
+        updated_values = [self._parse_datetime(course.get("updated_at")) for course in courses if isinstance(course, dict)]
+        updated_values = [value for value in updated_values if value is not None]
+        if not updated_values:
+            return False
+        newest = max(updated_values)
+        return datetime.now(timezone.utc) - newest <= max_age
+
+    def _parse_datetime(self, value: Any) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
     def _bookings_from_output(self, output: str) -> list[dict[str, Any]]:
         names = re.findall(r"Erfolgreich gebucht:\s*(.+)", output or "")
         booked = []
@@ -800,9 +851,7 @@ class MyWellnessService:
             for item in re.split(r",|\n", name):
                 if item.strip():
                     booked.append(self._booking_item(item.strip(), "booked"))
-        if booked:
-            return booked
-        return self._bookings_from_logs()
+        return booked
 
     def _bookings_from_logs(self) -> list[dict[str, Any]]:
         log_file = self.get_log_path()
@@ -896,6 +945,7 @@ class MyWellnessService:
 
     def _ensure_schema(self) -> None:
         with self._connect() as connection:
+            ensure_course_schema(connection)
             connection.execute(
                 """
                 create table if not exists mywellness_settings (
@@ -1181,7 +1231,13 @@ class MyWellnessService:
             for line in (output or "").splitlines()
             if "Home Assistant Notification" not in line
         ]
-        return bool(re.search(r"\b(Fehler|Traceback|Exception|Error)\b", "\n".join(relevant_lines), re.IGNORECASE))
+        return bool(
+            re.search(
+                r"\b(Fehler|Traceback|Exception|Error)\b|Keine erfolgreiche Buchung|Buchung abgebrochen",
+                "\n".join(relevant_lines),
+                re.IGNORECASE,
+            )
+        )
 
     def _extract_error(self, output: str) -> Optional[str]:
         for line in reversed((output or "").splitlines()):

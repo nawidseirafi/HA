@@ -2237,3 +2237,302 @@
   flex: 0 0 auto;
   stroke-width: 2.2;
 }
+
+/* SeniorCare setup wizard: readable, status-driven sensor pairing flow. */
+.sc-setup-card-readable {
+  background: #fffdf7;
+  color: #101818;
+}
+
+.sc-setup-card-readable h1,
+.sc-setup-card-readable h2,
+.sc-setup-card-readable p,
+.sc-setup-card-readable span,
+.sc-setup-card-readable label {
+  color: #101818;
+}
+
+.sc-setup-error {
+  background: #fff2ec;
+  border: 1px solid #e17d5b;
+  border-radius: 18px;
+  color: #7d2413;
+  font-weight: 800;
+  margin: 0 auto 14px;
+  max-width: 860px;
+  padding: 14px 18px;
+}
+
+.sc-setup-actions {
+  margin-top: 26px;
+}
+
+.sc-room-choice {
+  background: #f3f7ed;
+  border: 1px solid rgba(83, 125, 91, 0.28);
+  border-radius: 22px;
+  color: #193421;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  min-height: 74px;
+  padding: 18px;
+  text-align: left;
+}
+
+.sc-room-choice.is-active {
+  background: #d9f0d4;
+  border-color: rgba(50, 128, 73, 0.62);
+  box-shadow: inset 0 0 0 2px rgba(50, 128, 73, 0.16);
+}
+
+.sc-prep-checks,
+.sc-sensor-list,
+.sc-check-list {
+  display: grid;
+  gap: 14px;
+}
+
+.sc-prep-checks div {
+  align-items: center;
+  background: #f7f4eb;
+  border: 1px solid rgba(52, 76, 62, 0.16);
+  border-radius: 18px;
+  display: flex;
+  font-weight: 850;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.sc-prep-checks span {
+  align-items: center;
+  background: #24392b;
+  border-radius: 50%;
+  color: #fffdf7;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.sc-prep-checks .is-waiting span {
+  background: #98652c;
+}
+
+.sc-sensor-task {
+  background: #f8f4ea;
+  border: 1px solid rgba(52, 76, 62, 0.18);
+  border-radius: 26px;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.sc-sensor-task h2 {
+  font-size: clamp(1.16rem, 2.4vw, 1.45rem);
+  margin: 2px 0 8px;
+}
+
+.sc-pairing-code {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-pairing-code span {
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.sc-pairing-code input,
+.sc-setup-fields textarea {
+  background: #fffdf7;
+  border: 1px solid rgba(42, 66, 50, 0.24);
+  border-radius: 16px;
+  color: #111a15;
+  font: inherit;
+  min-height: 48px;
+  padding: 12px 14px;
+}
+
+.sc-setup-fields textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.sc-sensor-status {
+  background: #fffdf7;
+  border: 1px solid rgba(42, 66, 50, 0.18);
+  border-radius: 18px;
+  color: #243027;
+  font-weight: 800;
+  margin: 0;
+  padding: 13px 15px;
+}
+
+.sc-sensor-status.is-good {
+  background: #e5f5df;
+  border-color: rgba(49, 128, 70, 0.34);
+  color: #1d6430;
+}
+
+.sc-sensor-status.is-bad {
+  background: #fff2ec;
+  border-color: rgba(190, 84, 49, 0.32);
+  color: #7d2413;
+}
+
+.sc-sensor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sc-sensor-actions button {
+  background: #1f3a29;
+  border: 1px solid #1f3a29;
+  border-radius: 999px;
+  color: #fffdf7;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  min-height: 46px;
+  padding: 0 16px;
+}
+
+.sc-sensor-actions button:nth-child(2) {
+  background: #fffdf7;
+  color: #1f3a29;
+}
+
+.sc-sensor-actions button:disabled {
+  background: #e3e0d8;
+  border-color: #d4d0c6;
+  color: #777166;
+  cursor: not-allowed;
+}
+
+.sc-sensor-debug {
+  background: #111a15;
+  border-radius: 14px;
+  color: #d7e8d8;
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  padding: 10px 12px;
+}
+
+.sc-sensor-debug span,
+.sc-sensor-debug code {
+  color: #d7e8d8;
+}
+
+.sc-sensor-debug code {
+  overflow-wrap: anywhere;
+}
+
+.sc-matter-step,
+.sc-matter-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.sc-matter-panel {
+  background: #f7f4eb;
+  border: 1px solid rgba(52, 76, 62, 0.16);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.sc-matter-scanner {
+  align-items: center;
+  aspect-ratio: 4 / 3;
+  background: #111a15;
+  border-radius: 18px;
+  display: grid;
+  justify-items: center;
+  overflow: hidden;
+}
+
+.sc-matter-scanner video {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.sc-matter-scanner button,
+.sc-matter-actions button,
+.sc-matter-panel select {
+  background: #fffdf7;
+  border: 1px solid rgba(42, 66, 50, 0.24);
+  border-radius: 14px;
+  color: #111a15;
+  font: inherit;
+  font-weight: 850;
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+.sc-matter-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-matter-progress div {
+  align-items: center;
+  background: #f1eee6;
+  border: 1px solid rgba(52, 76, 62, 0.14);
+  border-radius: 14px;
+  display: flex;
+  font-weight: 850;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.sc-matter-progress div.is-active {
+  background: #e5f5df;
+  border-color: rgba(49, 128, 70, 0.34);
+}
+
+.sc-matter-progress span {
+  align-items: center;
+  background: #1f3a29;
+  border-radius: 50%;
+  color: #fffdf7;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.sc-matter-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.sc-matter-dev {
+  background: #111a15;
+  border-radius: 14px;
+  color: #d7e8d8;
+  font-size: 0.78rem;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.sc-check-list label {
+  align-items: center;
+  background: #f7f4eb;
+  border: 1px solid rgba(52, 76, 62, 0.16);
+  border-radius: 18px;
+  display: flex;
+  font-weight: 850;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.sc-check-list input {
+  height: 20px;
+  width: 20px;
+}

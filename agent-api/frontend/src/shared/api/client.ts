@@ -106,7 +106,88 @@ export type SeniorStatus = {
   status: string;
   enabled: boolean;
   message: string;
+  sensor_roles?: SeniorSensorRole[];
   updated_at: string;
+};
+
+export type SeniorSensorRole = {
+  role: string;
+  room?: string | null;
+  label: string;
+  configured: boolean;
+  updated_at?: string | null;
+};
+
+export type SeniorSetupStatus = {
+  current_step: string;
+  completed_steps: string[];
+  selected_rooms: string[];
+  is_complete: boolean;
+  home: { connected: boolean; sensor_ready: boolean; system_ready: boolean };
+  has_profile: boolean;
+  trusted_contacts_count: number;
+  sensor_roles: SeniorSensorRole[];
+  updated_at: string;
+};
+
+export type SeniorCandidate = {
+  label: string;
+  confidence: number;
+  score?: number;
+  entity_id: string;
+  reasons?: string[];
+  device_class?: string | null;
+  domain?: string | null;
+};
+
+export type SeniorPairingStart = {
+  session_id: number;
+  status: 'waiting_for_signal' | 'pairing_started' | 'pairing_needs_manual_action' | string;
+  message: string;
+};
+
+export type SeniorCandidates = {
+  session_id: number;
+  status: 'signal_detected' | 'no_signal_detected' | 'waiting_for_signal' | string;
+  message: string;
+  candidate: SeniorCandidate | null;
+  candidates: SeniorCandidate[];
+  elapsed_seconds?: number;
+  remaining_seconds?: number;
+  changed_count?: number | null;
+  current_state_count?: number | null;
+  baseline_state_count?: number | null;
+};
+
+export type SeniorMatterStatus = {
+  status: 'waiting' | 'commissioning' | 'completed' | 'failed' | string;
+  commissioning_status?: string;
+  setup_payload?: string;
+  ha_response?: unknown;
+  error?: string | null;
+  logs?: unknown[];
+};
+
+export type SeniorMatterDevice = {
+  device_detected: boolean;
+  friendly_name: string;
+  suggestions: Array<{ role?: string; kind?: string; label: string; score?: number }>;
+  device_id?: string | null;
+  entity_ids?: string[];
+  suggestions_raw?: unknown[];
+  home_assistant_response?: unknown;
+  logs?: unknown[];
+};
+
+export type SeniorMatterCapabilities = {
+  home_assistant: boolean;
+  matter_integration: boolean;
+  matter_server: boolean;
+  commissioning_available: boolean;
+  ipv6_available: boolean;
+  thread_available: boolean;
+  message: string;
+  details?: unknown;
 };
 
 export type SystemVersion = {
@@ -1269,6 +1350,43 @@ export const api = {
   importMywellnessWithings: () =>
     request<{ metrics: MyWellnessHealthMetrics; missing: string[]; mapping_source?: string }>('/api/mywellness/health/withings/import', { method: 'POST' }),
   mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),
+  seniorSetupStatus: () => request<SeniorSetupStatus>('/api/senior/setup/status'),
+  startSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/start', { method: 'POST' }),
+  saveSeniorProfile: (payload: { name?: string; age?: number | null; notes?: string }) =>
+    request<SeniorSetupStatus>('/api/senior/setup/profile', { method: 'POST', body: JSON.stringify(payload) }),
+  saveSeniorSetupRooms: (rooms: string[]) =>
+    request<SeniorSetupStatus>('/api/senior/setup/rooms', { method: 'POST', body: JSON.stringify({ rooms }) }),
+  startSeniorDiscovery: (payload: { role: string; room?: string | null; pairing_code?: string }) =>
+    request<SeniorPairingStart>('/api/senior/setup/discovery/start', { method: 'POST', body: JSON.stringify(payload) }),
+  startSeniorPairing: (payload: { role: string; room?: string | null; pairing_code?: string }) =>
+    request<SeniorPairingStart>('/api/senior/setup/pairing/matter/start', { method: 'POST', body: JSON.stringify(payload) }),
+  seniorDiscoveryCandidates: (sessionId: number, dev = false) =>
+    request<SeniorCandidates>(`/api/senior/setup/discovery/${sessionId}/candidates${dev ? '?dev=true' : ''}`),
+  startSeniorMatter: (payload: { setup_code?: string; qr_payload?: string }) =>
+    request<{ commissioning_id: string }>('/api/senior/matter/start', { method: 'POST', body: JSON.stringify(payload) }),
+  seniorMatterCapabilities: (dev = false) =>
+    request<SeniorMatterCapabilities>(`/api/senior/matter/capabilities${dev ? '?dev=true' : ''}`),
+  seniorMatterStatus: (commissioningId: string, dev = false) =>
+    request<SeniorMatterStatus>(`/api/senior/matter/status/${encodeURIComponent(commissioningId)}${dev ? '?dev=true' : ''}`),
+  seniorMatterDevice: (commissioningId: string, dev = false) =>
+    request<SeniorMatterDevice>(`/api/senior/matter/device/${encodeURIComponent(commissioningId)}${dev ? '?dev=true' : ''}`),
+  assignSeniorMatterDevice: (commissioningId: string, payload: { room: string; role: string }) =>
+    request<{ status: string; room: string; role: SeniorSensorRole }>(`/api/senior/matter/device/${encodeURIComponent(commissioningId)}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  confirmSeniorDiscovery: (sessionId: number, entityId: string) =>
+    request<{ status: string; role: SeniorSensorRole }>(`/api/senior/setup/discovery/${sessionId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ entity_id: entityId }),
+    }),
+  saveSeniorSetupSensors: () => request<SeniorSetupStatus>('/api/senior/setup/sensors', { method: 'POST' }),
+  saveSeniorContact: (payload: { name: string; relationship?: string; email?: string }) =>
+    request<SeniorSetupStatus>('/api/senior/setup/contact', { method: 'POST', body: JSON.stringify(payload) }),
+  saveSeniorNotifications: (payload: { anomalies: boolean; critical: boolean; daily_summary: boolean }) =>
+    request<SeniorSetupStatus>('/api/senior/setup/notifications', { method: 'POST', body: JSON.stringify(payload) }),
+  completeSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/complete', { method: 'POST' }),
+  seniorSensorRoles: () => request<{ sensor_roles: SeniorSensorRole[] }>('/api/senior/sensor-roles'),
   upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);
