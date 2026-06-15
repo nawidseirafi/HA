@@ -92,6 +92,21 @@ def run_senior_agent():
     return senior_service.run(dry_run=False)
 
 
+@router.get("/behavior/latest")
+def senior_behavior_latest():
+    return {"assessment": senior_service.latest_behavior()}
+
+
+@router.get("/behavior/history")
+def senior_behavior_history(limit: int = Query(20, ge=1, le=100)):
+    return {"assessments": senior_service.behavior_history(limit=limit)}
+
+
+@router.get("/behavior/timeline")
+def senior_behavior_timeline():
+    return senior_service.behavior_timeline_today()
+
+
 @router.get("/setup/status")
 def setup_status():
     return setup_service.status()

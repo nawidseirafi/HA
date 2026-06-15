@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, type SeniorSensorRole } from '@shared/api/client';
+import { api, type SeniorBehaviorAssessment, type SeniorSensorRole } from '@shared/api/client';
+
+type BehaviorEvent = { event_time: string; room?: string | null; role?: string | null; state?: string | null };
 
 export function HistoryPage() {
   const [sensors, setSensors] = useState<SeniorSensorRole[]>([]);
+  const [events, setEvents] = useState<BehaviorEvent[]>([]);
+  const [assessment, setAssessment] = useState<SeniorBehaviorAssessment | null>(null);
 
   useEffect(() => {
     void api.seniorSensorRoles(true).then((result) => setSensors(result.sensor_roles)).catch(() => undefined);
+    void api.seniorBehaviorTimeline().then((result) => {
+      setEvents(result.events || []);
+      setAssessment(result.assessment);
+    }).catch(() => undefined);
   }, []);
 
   const items = useMemo(() => sensors
@@ -20,8 +28,23 @@ export function HistoryPage() {
         <h1>Letzte Sensoraktivität.</h1>
         <p>{items.length ? 'Der Verlauf basiert auf echten Sensor-Zeitstempeln.' : 'Noch kein Sensorverlauf verfügbar.'}</p>
       </div>
+      {assessment && (
+        <article className={`sc-behavior-card ${assessment.status}`}>
+          <div><span aria-hidden="true">{behaviorIcon(assessment.status)}</span><div><small>KI Bewertung</small><strong>{assessment.summary}</strong></div></div>
+          <p>{assessment.recommendation}</p>
+        </article>
+      )}
       <div className="sc-timeline">
-        {items.map((sensor) => (
+        {(events.length ? events : []).map((event, index) => (
+          <article className="sc-timeline-item calm" key={`${event.event_time}-${event.role}-${index}`}>
+            <time>{format(new Date(event.event_time).getTime())}</time>
+            <div>
+              <strong>{roomLabel(event.room) || event.role || 'Sensor'}</strong>
+              <p>{event.state ? `Aktivität erkannt (${event.state}).` : 'Aktivität erkannt.'}</p>
+            </div>
+          </article>
+        ))}
+        {!events.length && items.map((sensor) => (
           <article className="sc-timeline-item calm" key={sensor.role}>
             <time>{format(stamp(sensor))}</time>
             <div>
@@ -33,6 +56,25 @@ export function HistoryPage() {
       </div>
     </section>
   );
+}
+
+function behaviorIcon(status?: string | null) {
+  if (status === 'yellow') return '🟡';
+  if (status === 'orange') return '🟠';
+  if (status === 'red') return '🔴';
+  return '🟢';
+}
+
+function roomLabel(room?: string | null) {
+  const labels: Record<string, string> = {
+    kitchen: 'Küche',
+    living_room: 'Wohnzimmer',
+    bathroom: 'Bad',
+    bedroom: 'Schlafzimmer',
+    hallway: 'Flur',
+    entrance: 'Eingang',
+  };
+  return room ? labels[room] || room : '';
 }
 
 function stamp(sensor: SeniorSensorRole) {

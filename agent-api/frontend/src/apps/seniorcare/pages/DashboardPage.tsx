@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Clock3, Coffee, Footprints, Home, ShieldCheck, Sunrise } from 'lucide-react';
-import { api, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
+import { api, type SeniorBehaviorAssessment, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 
 export function DashboardPage() {
   const [status, setStatus] = useState<SeniorSetupStatus | null>(null);
+  const [behavior, setBehavior] = useState<SeniorBehaviorAssessment | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const next = await api.seniorSetupStatus();
+        const [next, latestBehavior] = await Promise.all([
+          api.seniorSetupStatus(),
+          api.seniorBehaviorLatest().catch(() => ({ assessment: null })),
+        ]);
         if (active) {
           setStatus(next);
+          setBehavior(latestBehavior.assessment);
           setError('');
         }
       } catch (err) {
@@ -59,6 +64,18 @@ export function DashboardPage() {
         <em><ShieldCheck size={17} aria-hidden="true" /> Alles in Ordnung</em>
       </article>
 
+      <article className={`sc-behavior-card ${behavior?.status || 'green'}`} aria-label="Status heute">
+        <div>
+          <span aria-hidden="true">{behaviorIcon(behavior?.status)}</span>
+          <div>
+            <small>Status heute</small>
+            <strong>{behaviorTitle(behavior?.status)}</strong>
+          </div>
+        </div>
+        <p>{behavior?.summary || 'Noch keine KI-Bewertung vorhanden. Sentero lernt den Tagesablauf mit den verbundenen Sensoren.'}</p>
+        {behavior?.recommendation && <em>{behavior.recommendation}</em>}
+      </article>
+
       <article className="sc-simple-day-card" aria-label="Tagesverlauf">
         <div className="sc-simple-day-head">
           <strong>Tagesverlauf</strong>
@@ -95,6 +112,20 @@ function Fact({ icon: Icon, label, value, highlight }: { icon: typeof Clock3; la
       </div>
     </div>
   );
+}
+
+function behaviorTitle(status?: string | null) {
+  if (status === 'yellow') return 'Auffälligkeit erkannt';
+  if (status === 'orange') return 'Bitte prüfen';
+  if (status === 'red') return 'Handlungsbedarf';
+  return 'Alles normal';
+}
+
+function behaviorIcon(status?: string | null) {
+  if (status === 'yellow') return '🟡';
+  if (status === 'orange') return '🟠';
+  if (status === 'red') return '🔴';
+  return '🟢';
 }
 
 function latestPresenceRole(roles: SeniorSensorRole[]) {

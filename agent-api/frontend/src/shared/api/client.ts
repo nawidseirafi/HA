@@ -107,7 +107,20 @@ export type SeniorStatus = {
   enabled: boolean;
   message: string;
   sensor_roles?: SeniorSensorRole[];
+  behavior_assessment?: SeniorBehaviorAssessment | null;
   updated_at: string;
+};
+
+export type SeniorBehaviorAssessment = {
+  id?: number;
+  assessment_time: string;
+  status: 'green' | 'yellow' | 'orange' | 'red' | string;
+  confidence: number;
+  summary: string;
+  findings: string[];
+  recommendation: string;
+  llm_response?: string | null;
+  created_at?: string;
 };
 
 export type SeniorSensorRole = {
@@ -1382,6 +1395,8 @@ export const api = {
     request<{ metrics: MyWellnessHealthMetrics; missing: string[]; mapping_source?: string }>('/api/mywellness/health/withings/import', { method: 'POST' }),
   mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),
   seniorSetupStatus: () => request<SeniorSetupStatus>('/api/senior/setup/status'),
+  seniorBehaviorLatest: () => request<{ assessment: SeniorBehaviorAssessment | null }>('/api/senior/behavior/latest'),
+  seniorBehaviorTimeline: () => request<{ events: Array<{ event_time: string; room?: string | null; role?: string | null; state?: string | null }>; assessment: SeniorBehaviorAssessment | null }>('/api/senior/behavior/timeline'),
   startSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/start', { method: 'POST' }),
   saveSeniorProfile: (payload: { name?: string; age?: number | null; notes?: string }) =>
     request<SeniorSetupStatus>('/api/senior/setup/profile', { method: 'POST', body: JSON.stringify(payload) }),

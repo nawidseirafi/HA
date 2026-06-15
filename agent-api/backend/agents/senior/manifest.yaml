@@ -12,3 +12,18 @@ ui:
   dashboard_route: seniorDashboard
 settings:
   edition: seniorcare
+scheduler:
+  tasks:
+    - name: Sentero Behavioral Intelligence
+      description: Bewertet stuendlich den Tagesablauf anhand von Profil, Sensorhistorie und aktuellem Verlauf.
+      enabled: true
+      schedule_type: cron
+      schedule:
+        cron: "0 * * * *"
+        timezone: "Europe/Berlin"
+      target_agent: senior
+      target_action: run
+      action_type: execute_action
+      action_payload:
+        dry_run: false
+      default_key: senior:behavior-hourly
