@@ -174,6 +174,7 @@ export type SeniorPairingStart = {
   session_id: number;
   status: 'waiting_for_signal' | 'pairing_started' | 'pairing_needs_manual_action' | string;
   message: string;
+  detail?: { ok?: boolean; provider?: string; reason?: string; message?: string; attempts?: unknown[] } | null;
 };
 
 export type SeniorCandidates = {
@@ -1390,6 +1391,8 @@ export const api = {
     request<SeniorPairingStart>('/api/senior/setup/discovery/start', { method: 'POST', body: JSON.stringify(payload) }),
   startSeniorPairing: (payload: { role: string; room?: string | null; pairing_code?: string }) =>
     request<SeniorPairingStart>('/api/senior/setup/pairing/matter/start', { method: 'POST', body: JSON.stringify(payload) }),
+  startSeniorZigbeePairing: (payload: { role: string; room?: string | null; duration?: number }) =>
+    request<SeniorPairingStart>('/api/senior/setup/pairing/zigbee/start', { method: 'POST', body: JSON.stringify(payload) }),
   seniorDiscoveryCandidates: (sessionId: number, dev = false) =>
     request<SeniorCandidates>(`/api/senior/setup/discovery/${sessionId}/candidates${dev ? '?dev=true' : ''}`),
   startSeniorMatter: (payload: { setup_code?: string; qr_payload?: string }) =>
@@ -1413,6 +1416,8 @@ export const api = {
   saveSeniorSetupSensors: () => request<SeniorSetupStatus>('/api/senior/setup/sensors', { method: 'POST' }),
   saveSeniorContact: (payload: { name: string; relationship?: string; email?: string }) =>
     request<SeniorSetupStatus>('/api/senior/setup/contact', { method: 'POST', body: JSON.stringify(payload) }),
+  updateSeniorContact: (contactId: number, payload: { name: string; relationship?: string; email?: string }) =>
+    request<SeniorSetupStatus>(`/api/senior/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteSeniorContact: (contactId: number) =>
     request<SeniorSetupStatus>(`/api/senior/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'DELETE' }),
   saveSeniorNotifications: (payload: { anomalies: boolean; critical: boolean; daily_summary: boolean }) =>

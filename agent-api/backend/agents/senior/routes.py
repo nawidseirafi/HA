@@ -36,6 +36,12 @@ class DiscoveryStartPayload(BaseModel):
     pairing_code: str | None = None
 
 
+class ZigbeePairingStartPayload(BaseModel):
+    role: str
+    room: str | None = None
+    duration: int | None = None
+
+
 class ConfirmPayload(BaseModel):
     entity_id: str
 
@@ -127,6 +133,14 @@ def matter_pairing_start(payload: DiscoveryStartPayload):
         raise api_error(exc) from exc
 
 
+@router.post("/setup/pairing/zigbee/start")
+def zigbee_pairing_start(payload: ZigbeePairingStartPayload):
+    try:
+        return device_mapping_service.start_zigbee_pairing(payload.role, payload.room, duration=payload.duration or 60)
+    except Exception as exc:
+        raise api_error(exc) from exc
+
+
 @router.post("/matter/start")
 def matter_start(payload: MatterStartPayload):
     try:
@@ -203,6 +217,14 @@ def setup_sensors():
 @router.post("/setup/contact")
 def setup_contact(payload: ContactPayload):
     return setup_service.contact(model_data(payload))
+
+
+@router.put("/setup/contact/{contact_id}")
+def setup_contact_update(contact_id: int, payload: ContactPayload):
+    try:
+        return setup_service.update_contact(contact_id, model_data(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/setup/contact/{contact_id}")

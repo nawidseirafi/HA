@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Clock3, Coffee, Footprints, Home, ShieldCheck, Sunrise } from 'lucide-react';
 import { api, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 
 export function DashboardPage() {
@@ -28,9 +29,11 @@ export function DashboardPage() {
 
   const roles = status?.sensor_roles ?? [];
   const latest = useMemo(() => latestPresenceRole(roles), [roles]);
-  const profileName = status?.profile?.name?.trim() || 'Zuhause';
-  const bars = useMemo(() => activityBarsFromRoles(roles), [roles]);
-  const lastSeen = latest ? relativeTime(latest.last_changed || latest.last_updated || latest.updated_at) : 'noch keine Daten';
+  const personName = status?.profile?.name?.trim() || 'Mama';
+  const activitySlots = useMemo(() => activitySlotsFromRoles(roles), [roles]);
+  const hasActivity = activitySlots.some((slot) => slot.active);
+  const lastUpdate = latest ? formatTime(new Date(timestamp(latest.last_changed || latest.last_updated || latest.updated_at))) : formatTime(new Date());
+  const lastSeen = latest ? relativeTime(latest.last_changed || latest.last_updated || latest.updated_at) : 'Noch keine Daten';
   const morning = firstActivityTime(roles);
   const kitchen = lastRoomActivity(roles, 'kitchen');
 
@@ -38,39 +41,58 @@ export function DashboardPage() {
     <section className="sc-page sc-simple-dashboard" aria-label="Sentero Tagesstatus">
       <header className="sc-simple-hero">
         <p className="sc-simple-date">{formatHeaderDate(new Date())}</p>
-        <p className="sc-simple-person"><span aria-hidden="true" /> {profileName} · Zuhause</p>
+        <p className="sc-simple-person"><span aria-hidden="true" /> {personName} · Zuhause</p>
         <h2>{error ? 'Bitte prüfen.' : 'Alles in Ordnung.'}</h2>
         <p className="sc-simple-copy">
           {error ? 'Aktuelle Daten konnten gerade nicht geladen werden.' : latest ? 'Der aktuelle Verlauf basiert auf den verbundenen Sensoren.' : 'Noch keine Sensoraktivität vorhanden.'}
         </p>
       </header>
 
+      <article className="sc-dashboard-status-card" aria-label="Aktueller Status">
+        <div>
+          <Home size={22} aria-hidden="true" />
+          <div>
+            <strong>{personName} ist zuhause</strong>
+            <span>Zuletzt aktualisiert: {lastUpdate}</span>
+          </div>
+        </div>
+        <em><ShieldCheck size={17} aria-hidden="true" /> Alles in Ordnung</em>
+      </article>
+
       <article className="sc-simple-day-card" aria-label="Tagesverlauf">
         <div className="sc-simple-day-head">
           <strong>Tagesverlauf</strong>
           <span>{error ? 'Prüfen' : 'Ruhig'}</span>
         </div>
-        <div className="sc-simple-bars" aria-hidden="true">
-          {bars.map((height, index) => (
-            <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
-          ))}
+        <div className={`sc-simple-dayline ${hasActivity ? 'has-activity' : ''}`}>
+          <div className="sc-simple-dots" aria-hidden="true">
+            {activitySlots.map((slot) => <i key={slot.label} className={slot.active ? 'active' : ''} />)}
+          </div>
+          <div className="sc-simple-times" aria-hidden="true">
+            {activitySlots.map((slot) => <span key={slot.label}>{slot.label}</span>)}
+          </div>
+          {!hasActivity && <p>Noch keine Aktivität erkannt</p>}
         </div>
       </article>
 
+      <h3 className="sc-simple-section-title">Heute</h3>
       <section className="sc-simple-facts" aria-label="Wichtige Tagespunkte">
-        <Fact label="Aufgestanden" value={morning || 'Noch offen'} />
-        <Fact label="In der Küche" value={kitchen || 'Keine Aktivität'} />
-        <Fact label="Letzte Bewegung" value={lastSeen} highlight={Boolean(latest)} />
+        <Fact icon={Sunrise} label="Aufgestanden" value={morning || 'Noch offen'} />
+        <Fact icon={Coffee} label="Küche" value={kitchen || 'Keine Aktivität'} />
+        <Fact icon={Footprints} label="Letzte Bewegung" value={lastSeen} highlight={Boolean(latest)} />
       </section>
     </section>
   );
 }
 
-function Fact({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Fact({ icon: Icon, label, value, highlight }: { icon: typeof Clock3; label: string; value: string; highlight?: boolean }) {
   return (
     <div className="sc-simple-fact">
-      <span>{label}</span>
-      <strong className={highlight ? 'highlight' : ''}>{value}</strong>
+      <span><Icon size={20} aria-hidden="true" /></span>
+      <div>
+        <small>{label}</small>
+        <strong className={highlight ? 'highlight' : ''}>{value}</strong>
+      </div>
     </div>
   );
 }
@@ -102,18 +124,21 @@ function lastRoomActivity(roles: SeniorSensorRole[], room: string) {
   return value ? formatTime(new Date(value)) : '';
 }
 
-function activityBarsFromRoles(roles: SeniorSensorRole[]) {
-  const hours = Array.from({ length: 10 }, () => 18);
+function activitySlotsFromRoles(roles: SeniorSensorRole[]) {
+  const slots = [6, 9, 12, 15, 18, 21].map((hour) => ({ hour, label: String(hour).padStart(2, '0'), active: false }));
   const today = new Date();
   for (const role of roles) {
     const value = timestamp(role.last_changed || role.last_updated || role.updated_at);
     if (!value) continue;
     const date = new Date(value);
     if (date.toDateString() !== today.toDateString()) continue;
-    const index = Math.min(9, Math.max(0, Math.floor((date.getHours() - 6) / 2)));
-    hours[index] = Math.min(88, hours[index] + 18);
+    const index = slots.findIndex((slot, slotIndex) => {
+      const next = slots[slotIndex + 1]?.hour ?? 24;
+      return date.getHours() >= slot.hour && date.getHours() < next;
+    });
+    if (index >= 0) slots[index].active = true;
   }
-  return hours;
+  return slots;
 }
 
 function timestamp(value?: string | null) {

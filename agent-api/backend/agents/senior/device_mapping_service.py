@@ -115,6 +115,46 @@ class DeviceMappingService:
         )
         return {'session_id': session_id, 'status': status, 'message': message, 'detail': detail}
 
+    def start_zigbee_pairing(self, role: str, room: str | None, duration: int = 60) -> dict[str, Any]:
+        ha_url = getattr(self.ha, 'base_url', '')
+        duration = min(max(int(duration or 60), 10), 300)
+        try:
+            baseline = self.snapshot()
+            ha_reachable = True
+        except Exception:
+            logger.exception("SeniorCare Zigbee pairing baseline failed. ha_url=%s reachable=no", ha_url)
+            raise
+        detail = self._open_zigbee_permit_join(duration)
+        status = 'pairing_started' if detail.get('ok') else 'pairing_needs_manual_action'
+        message = (
+            'Sensor-Suche gestartet. Bitte aktivieren Sie den Sensor jetzt.'
+            if detail.get('ok')
+            else 'Die Sensor-Einrichtung ist noch nicht bereit.'
+        )
+        with self.connect() as con:
+            cur = con.execute(
+                '''insert into sensor_discovery_sessions
+                   (target_role, target_room, started_at, status, baseline_snapshot_json, pairing_code_provided, pairing_detail_json)
+                   values (?, ?, ?, ?, ?, ?, ?)''',
+                (role, room, now(), status, json.dumps(baseline, ensure_ascii=False), 0, json.dumps(detail, ensure_ascii=False)),
+            )
+            con.commit()
+            session_id = int(cur.lastrowid)
+        logger.info(
+            "SeniorCare Zigbee pairing start session=%s role=%s room=%s ha_url=%s reachable=%s baseline_states=%s status=%s provider=%s",
+            session_id,
+            role,
+            room,
+            ha_url,
+            "yes" if ha_reachable else "no",
+            len(baseline),
+            status,
+            detail.get('provider'),
+        )
+        if not detail.get('ok'):
+            logger.warning("SeniorCare Zigbee pairing unavailable session=%s detail=%s", session_id, detail)
+        return {'session_id': session_id, 'status': status, 'message': message, 'detail': detail}
+
     def candidates(self, session_id: int, dev: bool = False) -> dict[str, Any]:
         with self.connect() as con:
             row = con.execute('select * from sensor_discovery_sessions where id = ?', (session_id,)).fetchone()
@@ -312,6 +352,31 @@ class DeviceMappingService:
             return {'ok': False, 'reason': 'pairing_call_failed', 'error': str(exc)}
         return {'ok': bool(response.get('success', True)), 'response': response}
 
+    def _open_zigbee_permit_join(self, duration: int) -> dict[str, Any]:
+        attempts: list[dict[str, Any]] = []
+        try:
+            response = self.ha.call_service('zha', 'permit', {'duration': duration})
+            logger.info("SeniorCare Zigbee permit_join sent provider=zha duration=%s", duration)
+            return {'ok': True, 'provider': 'zha', 'duration': duration, 'response': response}
+        except Exception as exc:
+            attempts.append({'provider': 'zha', 'error': str(exc)})
+            logger.info("SeniorCare Zigbee permit_join failed provider=zha error=%s", exc)
+        try:
+            response = self.ha.call_service(
+                'mqtt',
+                'publish',
+                {
+                    'topic': 'zigbee2mqtt/bridge/request/permit_join',
+                    'payload': json.dumps({'value': True, 'time': duration}),
+                },
+            )
+            logger.info("SeniorCare Zigbee permit_join sent provider=zigbee2mqtt duration=%s", duration)
+            return {'ok': True, 'provider': 'zigbee2mqtt', 'duration': duration, 'response': response, 'attempts': attempts}
+        except Exception as exc:
+            attempts.append({'provider': 'zigbee2mqtt', 'error': str(exc)})
+            logger.info("SeniorCare Zigbee permit_join failed provider=zigbee2mqtt error=%s", exc)
+        return {'ok': False, 'reason': 'zigbee_pairing_unavailable', 'message': 'Zigbee-Anlernen nicht verfuegbar', 'attempts': attempts}
+
 
 def ensure_schema(con: sqlite3.Connection) -> None:
     con.execute('''create table if not exists setup_state (id integer primary key check (id = 1), current_step text not null default 'welcome', completed_steps text not null default '[]', is_complete integer not null default 0, updated_at text not null)''')
@@ -383,7 +448,7 @@ def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any
 
 
 def domain_matches(role: str, domain: Any) -> bool:
-    if role.endswith('presence') or role in {'main_door', 'window_contact'}:
+    if role_is_presence(role) or role_is_contact(role):
         return str(domain or '') == 'binary_sensor'
     return bool(domain)
 
@@ -414,20 +479,29 @@ def role_candidate_matches(role: str, item: dict[str, Any], allow_missing_device
     domain = str(item.get('domain') or '')
     device_class = item.get('device_class')
     has_device_class = bool(str(device_class or '').strip())
-    if role.endswith('presence'):
+    if role_is_presence(role):
         return domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class))
-    if role in {'main_door', 'window_contact'}:
+    if role_is_contact(role):
         return domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class))
     return domain == 'binary_sensor'
 
 
 def class_matches(role: str, device_class: Any) -> bool:
     dc = str(device_class or '').lower()
-    if role.endswith('presence'):
+    if role_is_presence(role):
         return dc in PRESENCE_CLASSES
-    if role in {'main_door', 'window_contact'}:
+    if role_is_contact(role):
         return dc in CONTACT_CLASSES
     return False
+
+
+def role_is_presence(role: str) -> bool:
+    return str(role or '').endswith(('presence', '_motion'))
+
+
+def role_is_contact(role: str) -> bool:
+    value = str(role or '')
+    return value in {'main_door', 'window_contact'} or value.endswith(('_door', '_contact'))
 
 
 def room_matches(room: str | None, entity_id: str, friendly_name: Any) -> bool:

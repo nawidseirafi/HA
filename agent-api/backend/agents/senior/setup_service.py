@@ -72,6 +72,21 @@ class SeniorSetupService:
             con.commit()
         return self.set_step('notifications', 'contacts')
 
+    def update_contact(self, contact_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        name = str(payload.get('name') or '').strip()
+        if not name:
+            raise ValueError('name is required')
+        with self.mapping.connect() as con:
+            row = con.execute('select id from trusted_contacts where id = ? and active = 1', (contact_id,)).fetchone()
+            if not row:
+                raise ValueError('contact not found')
+            con.execute(
+                'update trusted_contacts set name = ?, relationship = ?, email = ?, updated_at = ? where id = ?',
+                (name, payload.get('relationship'), payload.get('email'), now(), contact_id),
+            )
+            con.commit()
+        return self.status()
+
     def delete_contact(self, contact_id: int) -> dict[str, Any]:
         with self.mapping.connect() as con:
             con.execute('update trusted_contacts set active = 0, updated_at = ? where id = ?', (now(), contact_id))

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Battery, CheckCircle2, Mail, Pencil, Plus, Save, Send, ShieldAlert, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { Battery, CheckCircle2, Mail, Pencil, Plus, Save, Send, ShieldAlert, Trash2, Wifi, WifiOff, X } from 'lucide-react';
 import { api, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
 import type { SeniorCareSettingsTab } from '../routes/routes';
+import { seniorCareRouteToPath } from '../routes/routes';
 
 const roomLabels: Record<string, string> = {
   living_room: 'Wohnzimmer',
@@ -13,6 +14,14 @@ const roomLabels: Record<string, string> = {
   entrance: 'Eingang',
 };
 
+const settingsTabs: Array<{ tab: SeniorCareSettingsTab; label: string; shortLabel: string }> = [
+  { tab: 'profile', label: 'Profil', shortLabel: 'Profil' },
+  { tab: 'sensors', label: 'Räume & Sensoren', shortLabel: 'Räume' },
+  { tab: 'contacts', label: 'Vertraute Personen', shortLabel: 'Personen' },
+  { tab: 'notifications', label: 'Benachrichtigungen', shortLabel: 'Benachr.' },
+  { tab: 'system', label: 'System', shortLabel: 'System' },
+];
+
 export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }) {
   const [status, setStatus] = useState<SeniorSetupStatus | null>(null);
   const [sensors, setSensors] = useState<SeniorSensorRole[]>([]);
@@ -21,6 +30,9 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   const [resetText, setResetText] = useState('');
   const [profile, setProfile] = useState({ name: '', age: '', notes: '' });
   const [contactForm, setContactForm] = useState({ name: '', relationship: '', email: '' });
+  const [contactFormOpen, setContactFormOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<number | null>(null);
+  const [editContactForm, setEditContactForm] = useState({ name: '', relationship: '', email: '' });
   const [roomDraft, setRoomDraft] = useState('');
   const [notifications, setNotifications] = useState({ anomalies: true, critical: true, daily_summary: false });
   const [template, setTemplate] = useState('Hallo, bei {name} wurde um {uhrzeit} im Bereich {raum} seit {dauer} keine gewohnte Aktivität erkannt.');
@@ -65,6 +77,11 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
     .replace('{uhrzeit}', '13:08')
     .replace('{dauer}', '2 Stunden');
 
+  function navigateTab(tab: SeniorCareSettingsTab) {
+    window.history.pushState({}, '', seniorCareRouteToPath({ name: 'settings', tab }));
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
   function toast(message = 'Gespeichert') {
     setSaved(`✓ ${message}`);
     window.setTimeout(() => setSaved(''), 2200);
@@ -88,6 +105,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
     try {
       await api.saveSeniorContact(contactForm);
       setContactForm({ name: '', relationship: '', email: '' });
+      setContactFormOpen(false);
       toast('Person hinzugefügt');
       await load();
     } catch (err) {
@@ -103,6 +121,28 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kontakt konnte nicht gelöscht werden.');
+    }
+  }
+
+  function startEditContact(contact: { id: number; name: string; relationship?: string | null; email?: string | null }) {
+    setEditingContactId(contact.id);
+    setEditContactForm({ name: contact.name, relationship: contact.relationship || '', email: contact.email || '' });
+  }
+
+  async function saveEditedContact() {
+    if (!editingContactId) return;
+    if (!editContactForm.name.trim()) {
+      setError('Bitte geben Sie einen Namen ein.');
+      return;
+    }
+    try {
+      await api.updateSeniorContact(editingContactId, editContactForm);
+      setEditingContactId(null);
+      setEditContactForm({ name: '', relationship: '', email: '' });
+      toast('Person gespeichert');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kontakt konnte nicht gespeichert werden.');
     }
   }
 
@@ -173,6 +213,20 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
     <section className="sc-page sc-settings">
       {saved && <div className="sc-toast" role="status">{saved}</div>}
       {error && <div className="sc-form-errors" role="alert"><p>{error}</p></div>}
+      <nav className="sc-settings-tabs" aria-label="Einstellungsbereiche">
+        {settingsTabs.map((item) => (
+          <button
+            key={item.tab}
+            className={activeTab === item.tab ? 'active' : ''}
+            type="button"
+            onClick={() => navigateTab(item.tab)}
+            aria-current={activeTab === item.tab ? 'page' : undefined}
+          >
+            <span className="full">{item.label}</span>
+            <span className="short">{item.shortLabel}</span>
+          </button>
+        ))}
+      </nav>
 
       {activeTab === 'profile' && (
         <section className="sc-panel sc-settings-panel">
@@ -241,23 +295,55 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       )}
 
       {activeTab === 'contacts' && (
-        <section className="sc-panel sc-settings-panel">
-          <div className="sc-section-title"><h2>Vertraute Personen</h2><button type="button" onClick={() => void addContact()}><Plus size={20} /> Person hinzufügen</button></div>
-          <div className="sc-form-grid">
-            <label>Name<input value={contactForm.name} onChange={(event) => setContactForm((value) => ({ ...value, name: event.target.value }))} /></label>
-            <label>Beziehung<input value={contactForm.relationship} onChange={(event) => setContactForm((value) => ({ ...value, relationship: event.target.value }))} /></label>
-            <label>E-Mail<input type="email" value={contactForm.email} onChange={(event) => setContactForm((value) => ({ ...value, email: event.target.value }))} /></label>
+        <section className="sc-panel sc-settings-panel sc-contacts-panel">
+          <div className="sc-section-title sc-contacts-title">
+            <div>
+              <h2>Vertraute Personen</h2>
+              <p>Menschen, die bei Auffälligkeiten informiert werden.</p>
+            </div>
+            <button className="sc-round-add" type="button" onClick={() => setContactFormOpen(true)} aria-label="Person hinzufügen"><Plus size={28} /></button>
           </div>
+          {contactFormOpen && (
+            <div className="sc-contact-form-card">
+              <div className="sc-contact-form-head">
+                <strong>Person hinzufügen</strong>
+                <button type="button" onClick={() => setContactFormOpen(false)} aria-label="Formular schließen"><X size={20} /></button>
+              </div>
+              <div className="sc-form-grid">
+                <label>Name<input value={contactForm.name} onChange={(event) => setContactForm((value) => ({ ...value, name: event.target.value }))} /></label>
+                <label>Beziehung<input value={contactForm.relationship} onChange={(event) => setContactForm((value) => ({ ...value, relationship: event.target.value }))} /></label>
+                <label>E-Mail<input type="email" value={contactForm.email} onChange={(event) => setContactForm((value) => ({ ...value, email: event.target.value }))} /></label>
+              </div>
+              <button className="sc-primary-button" type="button" onClick={() => void addContact()}><Save size={20} /> Speichern</button>
+            </div>
+          )}
           <div className="sc-settings-contact-grid">
             {(status?.trusted_contacts || []).map((contact) => (
               <article key={contact.id}>
-                <span className="sc-avatar">{contact.name[0]}</span>
-                <h3>{contact.name}</h3>
-                <p>{contact.relationship || 'Kontakt'}</p>
-                <small>{contact.email || 'Keine E-Mail hinterlegt'}</small>
-                <footer>
-                  <button type="button" onClick={() => void deleteContact(contact.id)}><Trash2 size={18} /> Löschen</button>
-                </footer>
+                {editingContactId === contact.id ? (
+                  <>
+                    <div className="sc-contact-edit-grid">
+                      <label>Name<input value={editContactForm.name} onChange={(event) => setEditContactForm((value) => ({ ...value, name: event.target.value }))} /></label>
+                      <label>Beziehung<input value={editContactForm.relationship} onChange={(event) => setEditContactForm((value) => ({ ...value, relationship: event.target.value }))} /></label>
+                      <label>E-Mail<input type="email" value={editContactForm.email} onChange={(event) => setEditContactForm((value) => ({ ...value, email: event.target.value }))} /></label>
+                    </div>
+                    <footer>
+                      <button type="button" onClick={() => void saveEditedContact()}><Save size={18} /> Speichern</button>
+                      <button type="button" onClick={() => setEditingContactId(null)}><X size={18} /> Abbrechen</button>
+                    </footer>
+                  </>
+                ) : (
+                  <>
+                    <span className="sc-avatar">{contact.name[0]}</span>
+                    <h3>{contact.name}</h3>
+                    <p>{contact.relationship || 'Kontakt'}</p>
+                    <small>{contact.email || 'Keine E-Mail hinterlegt'}</small>
+                    <footer>
+                      <button type="button" onClick={() => startEditContact(contact)}><Pencil size={18} /> Bearbeiten</button>
+                      <button type="button" onClick={() => void deleteContact(contact.id)}><Trash2 size={18} /> Löschen</button>
+                    </footer>
+                  </>
+                )}
               </article>
             ))}
           </div>

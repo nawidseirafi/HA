@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, HeartHandshake, Loader2, Plus, Search, ShieldCheck, Trash2, UserRound } from 'lucide-react';
-import { api, type SeniorCandidate, type SeniorCandidates } from '@shared/api/client';
+import { ArrowLeft, ArrowRight, HeartHandshake, Plus, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { api, type SeniorCandidates } from '@shared/api/client';
+import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './SensorWizard';
 
 type Profile = {
   name: string;
@@ -15,25 +16,6 @@ type Contact = {
   phone: string;
   email: string;
   channels: string[];
-};
-
-type SensorBinding = {
-  id: string;
-  roomId: string;
-  type: 'motion' | 'door';
-  sensorId: string;
-  name: string;
-  status: 'idle' | 'searching' | 'connected' | 'missing' | 'skipped';
-  sessionId?: number;
-  score?: number;
-  entityId?: string;
-};
-
-type DiscoveryState = {
-  candidate?: SeniorCandidate | null;
-  candidates?: SeniorCandidate[];
-  remainingSeconds?: number;
-  error?: string;
 };
 
 const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
@@ -64,7 +46,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [sensorBindings, setSensorBindings] = useState<SensorBinding[]>([]);
-  const [discovery, setDiscovery] = useState<Record<string, DiscoveryState>>({});
+  const [discovery, setDiscovery] = useState<Record<string, SensorDiscoveryState>>({});
   const timers = useRef<Record<string, number>>({});
   const devMode = new URLSearchParams(window.location.search).get('dev') === '1';
 
@@ -115,7 +97,6 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const displayAge = profile.age || (calculatedAge ? calculatedAge.replace(/\D+/g, '') : '');
 
   const connectedSensors = sensorBindings.filter((sensor) => sensor.status === 'connected').length;
-  const progress = Math.round(((step + 1) / steps.length) * 100);
 
   async function next() {
     const validation = validateStep();
@@ -205,8 +186,12 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     updateSensor(sensor.id, { status: 'searching' });
     setDiscovery((current) => ({ ...current, [sensor.id]: { remainingSeconds: 30 } }));
     try {
-      const result = await api.startSeniorDiscovery({ role: sensor.id, room: sensor.roomId, pairing_code: sensor.sensorId || undefined });
+      const result = await api.startSeniorZigbeePairing({ role: sensor.id, room: sensor.roomId, duration: 60 });
+      if (result.status === 'pairing_needs_manual_action') {
+        throw new Error(result.message || 'Die Sensor-Einrichtung ist noch nicht bereit.');
+      }
       updateSensor(sensor.id, { sessionId: result.session_id });
+      setDiscovery((current) => ({ ...current, [sensor.id]: { ...(current[sensor.id] || {}), provider: result.detail?.provider, remainingSeconds: 30 } }));
       pollSensor(sensor.id, result.session_id, Date.now());
     } catch (err) {
       updateSensor(sensor.id, { status: 'missing' });
@@ -263,13 +248,13 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
 
   return (
     <section className="sc-wizard">
-      <WizardProgress step={step} progress={progress} />
+      <WizardProgress step={step} />
       {errors.length > 0 && <div className="sc-form-errors" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}
       <div className="sc-wizard-card">
         {step === 0 && <WelcomeStep />}
         {step === 1 && <ProfileStep profile={profile} calculatedAge={calculatedAge} onChange={setProfile} />}
         {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
-        {step === 3 && <SensorsStep sensors={sensorBindings} discovery={discovery} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
+        {step === 3 && <SensorWizard sensors={sensorBindings} discovery={discovery} roomLabel={roomLabel} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
         {step === 4 && <ContactsStep contacts={contacts} form={contactForm} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
         {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
         {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
@@ -285,17 +270,25 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   );
 }
 
-function WizardProgress({ step, progress }: { step: number; progress: number }) {
+function WizardProgress({ step }: { step: number }) {
   return (
     <header className="sc-wizard-progress">
-      <div>
+      <div className="sc-stepper-scroll" aria-label={`Schritt ${step + 1} von ${steps.length}`}>
+        <ol className="sc-stepper">
+          {steps.map((label, index) => {
+            const state = index < step ? 'completed' : index === step ? 'current' : 'future';
+            return (
+              <li key={label} className={state}>
+                <span aria-current={index === step ? 'step' : undefined}>{index + 1}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <div className="sc-wizard-step-title">
         <p>Schritt {step + 1} von {steps.length}</p>
         <h2>{steps[step]}</h2>
       </div>
-      <div className="sc-step-dots" aria-label={`Schritt ${step + 1} von ${steps.length}`}>
-        {steps.map((label, index) => <span key={label} className={index <= step ? 'active' : ''}>{index + 1}</span>)}
-      </div>
-      <i><span style={{ width: `${progress}%` }} /></i>
     </header>
   );
 }
@@ -363,50 +356,6 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
   );
 }
 
-function SensorsStep({ sensors, discovery, devMode, connected, total, onChange, onSearch }: { sensors: SensorBinding[]; discovery: Record<string, DiscoveryState>; devMode: boolean; connected: number; total: number; onChange: (id: string, patch: Partial<SensorBinding>) => void; onSearch: (sensor: SensorBinding) => void }) {
-  const grouped = sensors.reduce<Record<string, SensorBinding[]>>((acc, sensor) => {
-    acc[sensor.roomId] = [...(acc[sensor.roomId] || []), sensor];
-    return acc;
-  }, {});
-  return (
-    <section className="sc-sensor-step">
-      <p>{connected} von {total} Sensoren verbunden</p>
-      {Object.entries(grouped).map(([roomId, items]) => (
-        <article key={roomId} className="sc-sensor-room">
-          <h3>{baseRoomLabel[roomId] || roomId}</h3>
-          {items.map((sensor) => (
-            <div key={sensor.id} className="sc-sensor-row">
-              <div>
-                <strong>{sensor.type === 'motion' ? 'Bewegungsmelder' : 'Türkontakt'}</strong>
-                <input value={sensor.sensorId} onChange={(event) => onChange(sensor.id, { sensorId: event.target.value })} placeholder="Sensor-ID eingeben" />
-                <input value={sensor.name} onChange={(event) => onChange(sensor.id, { name: event.target.value })} placeholder="Sensorname" />
-              </div>
-              <SensorStatus status={sensor.status} />
-              <div className="sc-sensor-buttons">
-                <button type="button" onClick={() => void onSearch(sensor)} disabled={sensor.status === 'searching'}><Search size={19} /> Automatisch suchen</button>
-                <button type="button" onClick={() => onChange(sensor.id, { status: 'skipped' })}>Sensor überspringen</button>
-              </div>
-              {devMode && (
-                <code className="sc-dev-line">
-                  {sensor.entityId || discovery[sensor.id]?.candidate?.entity_id || 'Keine Entity'} · Score {sensor.score ?? discovery[sensor.id]?.candidate?.score ?? '-'} · Rest {discovery[sensor.id]?.remainingSeconds ?? '-'}s
-                </code>
-              )}
-            </div>
-          ))}
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function SensorStatus({ status }: { status: SensorBinding['status'] }) {
-  if (status === 'searching') return <span className="sc-sensor-state searching"><Loader2 size={18} /> Suche...</span>;
-  if (status === 'connected') return <span className="sc-sensor-state connected"><Check size={18} /> Verbunden</span>;
-  if (status === 'missing') return <span className="sc-sensor-state missing">Nicht gefunden</span>;
-  if (status === 'skipped') return <span className="sc-sensor-state skipped">Übersprungen</span>;
-  return <span className="sc-sensor-state idle">Bereit</span>;
-}
-
 function ContactsStep({ contacts, form, onFormChange, onAdd, onDelete }: { contacts: Contact[]; form: Contact; onFormChange: (contact: Contact) => void; onAdd: () => void; onDelete: (id: string) => void }) {
   return (
     <section className="sc-contacts-step">
@@ -464,7 +413,7 @@ function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: b
     const plan = sensorPlan[roomId] || defaultSensorPlan(roomId);
     const bindings: SensorBinding[] = [];
     if (plan.motion) {
-      const motionId = `${roomId}_motion`;
+      const motionId = `${roomId}_presence`;
       bindings.push(byId[motionId] || { id: motionId, roomId, type: 'motion', sensorId: '', name: `${label} Präsenz`, status: 'idle' });
     }
     if (plan.door) {
