@@ -12,18 +12,26 @@ from backend.paths import API_DIR
 from backend.services.homeassistant_service import HomeAssistantService
 
 DB_PATH = API_DIR / 'data' / 'senior' / 'seniorcare.db'
-DISCOVERY_TIMEOUT_SECONDS = 30
+DISCOVERY_TIMEOUT_SECONDS = 180
 DISCOVERY_CONFIDENCE_THRESHOLD = 50
 PRESENCE_CLASSES = {'occupancy', 'motion', 'presence'}
-CONTACT_CLASSES = {'door', 'window', 'opening', 'contact'}
+CONTACT_CLASSES = {'door', 'window', 'opening', 'contact', 'vibration'}
 logger = logging.getLogger(__name__)
 ROOM_TERMS = {
-    'living_room': ['wohnzimmer', 'living'],
+    'living_room': ['wohnzimmer', 'living', 'living_room'],
     'kitchen': ['kueche', 'küche', 'kitchen'],
     'bathroom': ['bad', 'bathroom', 'wc'],
     'bedroom': ['schlafzimmer', 'bedroom'],
     'hallway': ['flur', 'hallway', 'diele'],
     'entrance': ['eingang', 'tuer', 'tür', 'door', 'front'],
+}
+ROOM_LABELS = {
+    'living_room': 'Wohnzimmer',
+    'kitchen': 'Küche',
+    'bathroom': 'Bad',
+    'bedroom': 'Schlafzimmer',
+    'hallway': 'Flur',
+    'entrance': 'Eingang',
 }
 
 
@@ -180,6 +188,7 @@ class DeviceMappingService:
         baseline = json.loads(row['baseline_snapshot_json'] or '[]')
         current = self.snapshot()
         scored = score_candidates(baseline, current, row['target_role'], row['target_room'], row['started_at'])
+        raw_changed_count = count_changed_entities(baseline, current, row['started_at'])
         changed_count = len(scored)
         best_scored = scored[0] if scored else None
         best = best_scored if best_scored and best_scored['confidence'] >= DISCOVERY_CONFIDENCE_THRESHOLD else None
@@ -199,11 +208,12 @@ class DeviceMappingService:
             )
             con.commit()
         logger.info(
-            "SeniorCare discovery poll session=%s ha_url=%s baseline_states=%s current_states=%s changed_entities=%s best=%s best_score=%s status=%s elapsed=%.1f",
+            "SeniorCare discovery poll session=%s ha_url=%s baseline_states=%s current_states=%s raw_changed=%s changed_entities=%s best=%s best_score=%s status=%s elapsed=%.1f",
             session_id,
             getattr(self.ha, 'base_url', ''),
             len(baseline),
             len(current),
+            raw_changed_count,
             changed_count,
             best_scored.get('entity_id') if best_scored else None,
             best_scored.get('confidence') if best_scored else None,
@@ -219,7 +229,11 @@ class DeviceMappingService:
                         'entity_id': item.get('entity_id'),
                         'score': item.get('confidence'),
                         'reasons': item.get('reasons', []),
+                        'new_device': item.get('is_new_device'),
+                        'new_entity': item.get('is_new'),
+                        'device_id': item.get('device_id'),
                         'device_class': item.get('device_class'),
+                        'model': item.get('model'),
                         'domain': item.get('domain'),
                     }
                     for item in scored[:5]
@@ -239,7 +253,7 @@ class DeviceMappingService:
             'baseline_state_count': len(baseline) if dev else None,
         }
 
-    def confirm(self, session_id: int, entity_id: str, dev: bool = False) -> dict[str, Any]:
+    def confirm(self, session_id: int, entity_id: str, name: str | None = None, room: str | None = None, dev: bool = False) -> dict[str, Any]:
         with self.connect() as con:
             session = con.execute('select * from sensor_discovery_sessions where id = ?', (session_id,)).fetchone()
         if not session:
@@ -249,12 +263,15 @@ class DeviceMappingService:
         if not entity:
             entity = {'entity_id': entity_id, 'domain': entity_id.split('.')[0], 'attributes': {}}
         attrs = entity.get('attributes') or {}
+        target_room = str(room or session['target_room'] or '').strip() or None
+        desired_name = str(name or '').strip() or attrs.get('friendly_name') or entity.get('friendly_name') or 'Sensor'
+        metadata_detail = self._apply_home_assistant_metadata(entity, desired_name, target_room)
         payload = {
             'role': session['target_role'],
-            'room': session['target_room'],
+            'room': target_room,
             'entity_id': entity_id,
             'device_id': attrs.get('device_id') or entity.get('device_id'),
-            'friendly_name': attrs.get('friendly_name') or entity.get('friendly_name'),
+            'friendly_name': desired_name,
             'device_class': attrs.get('device_class') or entity.get('device_class'),
             'domain': entity_id.split('.')[0],
             'source': 'wizard',
@@ -264,7 +281,20 @@ class DeviceMappingService:
         with self.connect() as con:
             con.execute('update sensor_discovery_sessions set status = ?, selected_entity_id = ?, ended_at = ? where id = ?', ('confirmed', entity_id, now(), session_id))
             con.commit()
-        return {'status': 'confirmed', 'role': role if dev else public_role(role)}
+        logger.info(
+            "SeniorCare discovery confirmed session=%s role=%s room=%s entity=%s device=%s name=%s metadata=%s",
+            session_id,
+            session['target_role'],
+            target_room,
+            entity_id,
+            payload.get('device_id'),
+            desired_name,
+            metadata_detail,
+        )
+        response = {'status': 'confirmed', 'role': role if dev else public_role(role)}
+        if dev:
+            response['metadata'] = metadata_detail
+        return response
 
     def upsert_role(self, data: dict[str, Any]) -> dict[str, Any]:
         role = str(data.get('role') or '').strip()
@@ -273,7 +303,7 @@ class DeviceMappingService:
             raise ValueError('role and entity_id required')
         domain = str(data.get('domain') or entity_id.split('.')[0] if '.' in entity_id else '').strip()
         data = {**data, 'domain': domain}
-        if not role_candidate_matches(role, data):
+        if not role_candidate_matches(role, data, allow_missing_device_class=True):
             raise ValueError('entity does not match expected sensor class for role')
         timestamp = now()
         with self.connect() as con:
@@ -296,10 +326,137 @@ class DeviceMappingService:
         return data if dev else public_role(data)
 
     def delete_role(self, role: str) -> dict[str, Any]:
+        mapped = self.get_role(role, dev=True)
+        if not mapped:
+            raise ValueError('sensor role not found')
+        removal = self._remove_zigbee_device(mapped)
+        if not removal.get('ok'):
+            raise RuntimeError(removal.get('message') or 'Zigbee-Geraet konnte nicht entfernt werden.')
         with self.connect() as con:
-            con.execute('update sensor_roles set active = 0, updated_at = ? where role = ?', (now(), role))
+            timestamp = now()
+            device_id = str(mapped.get('device_id') or '').strip()
+            if device_id:
+                con.execute('update sensor_roles set active = 0, updated_at = ? where device_id = ? and active = 1', (timestamp, device_id))
+            else:
+                con.execute('update sensor_roles set active = 0, updated_at = ? where role = ?', (timestamp, role))
             con.commit()
-        return {'deleted': True, 'role': role}
+        logger.info("SeniorCare sensor deleted role=%s entity=%s device=%s removal=%s", role, mapped.get('entity_id'), mapped.get('device_id'), removal)
+        return {'deleted': True, 'role': role, 'removal': removal}
+
+    def rename_role(self, role: str, name: str) -> dict[str, Any]:
+        clean_name = str(name or '').strip()
+        if not clean_name:
+            raise ValueError('name required')
+        mapped = self.get_role(role, dev=True)
+        if not mapped:
+            raise ValueError('sensor role not found')
+        entity_id = str(mapped.get('entity_id') or '').strip()
+        current = self.snapshot()
+        entity = next((item for item in current if item.get('entity_id') == entity_id), None) or {
+            'entity_id': entity_id,
+            'device_id': mapped.get('device_id'),
+            'domain': mapped.get('domain') or entity_id.split('.')[0],
+        }
+        metadata = self._apply_home_assistant_metadata(entity, clean_name, mapped.get('room'))
+        timestamp = now()
+        with self.connect() as con:
+            con.execute(
+                'update sensor_roles set friendly_name = ?, updated_at = ? where role = ? and active = 1',
+                (clean_name, timestamp, role),
+            )
+            con.commit()
+        logger.info(
+            "SeniorCare sensor renamed role=%s entity=%s name=%s metadata=%s",
+            role,
+            entity_id,
+            clean_name,
+            metadata,
+        )
+        return {'status': 'renamed', 'role': public_role(self.get_role(role, dev=True) or {}), 'metadata': metadata}
+
+    def test_role(self, role: str) -> dict[str, Any]:
+        mapped = self.get_role(role, dev=True)
+        if not mapped:
+            raise ValueError('sensor role not found')
+        entity_id = str(mapped.get('entity_id') or '').strip()
+        device_id = str(mapped.get('device_id') or '').strip()
+        states = self.snapshot()
+        identify = find_identify_entity(states, device_id, entity_id)
+        if identify:
+            response = self.ha.call_service('button', 'press', {'entity_id': identify['entity_id']})
+            logger.info(
+                "SeniorCare sensor test identify role=%s entity=%s identify_entity=%s device=%s",
+                role,
+                entity_id,
+                identify.get('entity_id'),
+                device_id,
+            )
+            return {
+                'ok': True,
+                'mode': 'identify',
+                'message': 'Sensor wurde identifiziert.',
+                'entity_id': identify.get('entity_id'),
+                'response': response,
+            }
+        state = self.ha.fetch_entity_state(entity_id)
+        if not state:
+            logger.info("SeniorCare sensor test unreachable role=%s entity=%s device=%s", role, entity_id, device_id)
+            return {'ok': False, 'mode': 'state_check', 'message': 'Sensor ist aktuell nicht erreichbar.', 'entity_id': entity_id}
+        logger.info("SeniorCare sensor test state_check role=%s entity=%s state=%s device=%s", role, entity_id, state.get('state'), device_id)
+        return {'ok': True, 'mode': 'state_check', 'message': 'Sensor ist erreichbar.', 'entity_id': entity_id, 'state': state.get('state')}
+
+    def _remove_zigbee_device(self, mapped: dict[str, Any]) -> dict[str, Any]:
+        entity_id = str(mapped.get('entity_id') or '').strip()
+        device_id = str(mapped.get('device_id') or '').strip()
+        states = self.snapshot()
+        device_entities = [item for item in states if device_id and str(item.get('device_id') or '') == device_id]
+        if not device_entities:
+            device_entities = [item for item in states if str(item.get('entity_id') or '') == entity_id]
+        if not device_entities:
+            return {
+                'ok': True,
+                'provider': 'home_assistant',
+                'reason': 'already_missing',
+                'message': 'Geraet war in Home Assistant bereits nicht mehr vorhanden.',
+                'entity_id': entity_id,
+                'device_id': device_id or None,
+            }
+        identifiers = []
+        for item in device_entities:
+            identifiers.extend(parse_identifiers(item.get('identifiers')))
+        ieee = first_identifier_value(identifiers, {'zha'})
+        mqtt_id = first_identifier_value(identifiers, {'mqtt', 'zigbee2mqtt'})
+        attempts: list[dict[str, Any]] = []
+        if ieee:
+            try:
+                response = self.ha.call_service('zha', 'remove', {'ieee': ieee})
+                return {'ok': True, 'provider': 'zha', 'ieee': ieee, 'response': response}
+            except Exception as exc:
+                attempts.append({'provider': 'zha', 'ieee': ieee, 'error': str(exc)})
+                logger.info("SeniorCare Zigbee device remove failed provider=zha entity=%s device=%s ieee=%s error=%s", entity_id, device_id, ieee, exc)
+        if mqtt_id:
+            try:
+                response = self.ha.call_service(
+                    'mqtt',
+                    'publish',
+                    {
+                        'topic': 'zigbee2mqtt/bridge/request/device/remove',
+                        'payload': json.dumps({'id': mqtt_id, 'force': True}),
+                    },
+                )
+                return {'ok': True, 'provider': 'zigbee2mqtt', 'id': mqtt_id, 'response': response, 'attempts': attempts}
+            except Exception as exc:
+                attempts.append({'provider': 'zigbee2mqtt', 'id': mqtt_id, 'error': str(exc)})
+                logger.info("SeniorCare Zigbee device remove failed provider=zigbee2mqtt entity=%s device=%s id=%s error=%s", entity_id, device_id, mqtt_id, exc)
+        return {
+            'ok': False,
+            'reason': 'zigbee_remove_unavailable',
+            'message': 'Zigbee-Geraet konnte nicht entfernt werden.',
+            'entity_id': entity_id,
+            'device_id': device_id or None,
+            'identifiers': identifiers,
+            'attempts': attempts,
+        }
 
     def _attach_state(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         try:
@@ -327,20 +484,115 @@ class DeviceMappingService:
 
     def snapshot(self) -> list[dict[str, Any]]:
         states = self.ha.get_states()
+        entity_registry = self._entity_registry_by_entity_id()
+        device_registry = self._device_registry_by_id()
         result = []
         for item in states:
             entity_id = str(item.get('entity_id') or '')
             attrs = item.get('attributes') or {}
+            registry = entity_registry.get(entity_id, {})
+            device_id = registry.get('device_id') or attrs.get('device_id')
+            device = device_registry.get(str(device_id or ''), {})
             result.append({
                 'entity_id': entity_id,
                 'domain': entity_id.split('.')[0] if '.' in entity_id else '',
                 'state': item.get('state'),
                 'friendly_name': attrs.get('friendly_name'),
                 'device_class': attrs.get('device_class'),
+                'device_id': device_id,
+                'area_id': registry.get('area_id') or device.get('area_id'),
+                'platform': registry.get('platform'),
+                'unique_id': registry.get('unique_id'),
+                'original_name': registry.get('original_name'),
+                'device_name': device.get('name_by_user') or device.get('name'),
+                'manufacturer': device.get('manufacturer'),
+                'model': device.get('model'),
+                'identifiers': device.get('identifiers'),
                 'last_changed': item.get('last_changed'),
                 'last_updated': item.get('last_updated'),
             })
         return result
+
+    def _entity_registry_by_entity_id(self) -> dict[str, dict[str, Any]]:
+        try:
+            response = self.ha.websocket_command({'type': 'config/entity_registry/list'}, timeout=12)
+            rows = registry_result_list(response)
+        except Exception as exc:
+            logger.info("SeniorCare HA entity registry unavailable ha_url=%s error=%s", getattr(self.ha, 'base_url', ''), exc)
+            return {}
+        return {str(item.get('entity_id') or ''): item for item in rows if item.get('entity_id')}
+
+    def _device_registry_by_id(self) -> dict[str, dict[str, Any]]:
+        try:
+            response = self.ha.websocket_command({'type': 'config/device_registry/list'}, timeout=12)
+            rows = registry_result_list(response)
+        except Exception as exc:
+            logger.info("SeniorCare HA device registry unavailable ha_url=%s error=%s", getattr(self.ha, 'base_url', ''), exc)
+            return {}
+        return {str(item.get('id') or ''): item for item in rows if item.get('id')}
+
+    def _area_registry(self) -> list[dict[str, Any]]:
+        try:
+            response = self.ha.websocket_command({'type': 'config/area_registry/list'}, timeout=12)
+            return registry_result_list(response)
+        except Exception as exc:
+            logger.info("SeniorCare HA area registry unavailable ha_url=%s error=%s", getattr(self.ha, 'base_url', ''), exc)
+            return []
+
+    def _ensure_home_assistant_area(self, room: str | None) -> str | None:
+        if not room:
+            return None
+        wanted = normalize(room)
+        terms = {wanted, *[normalize(term) for term in ROOM_TERMS.get(room, [room])]}
+        for area in self._area_registry():
+            area_id = str(area.get('area_id') or area.get('id') or '')
+            name = str(area.get('name') or '')
+            if normalize(area_id) in terms or normalize(name) in terms:
+                return area_id
+        label = ROOM_LABELS.get(room) or str(room).replace('_', ' ').strip().title()
+        try:
+            response = assert_ha_success(self.ha.websocket_command({'type': 'config/area_registry/create', 'name': label}, timeout=12))
+            result = response.get('result') if isinstance(response, dict) else None
+            if isinstance(result, dict):
+                return result.get('area_id') or result.get('id')
+        except Exception as exc:
+            logger.info("SeniorCare HA area create failed room=%s label=%s error=%s", room, label, exc)
+        return None
+
+    def _apply_home_assistant_metadata(self, entity: dict[str, Any], name: str, room: str | None) -> dict[str, Any]:
+        entity_id = str(entity.get('entity_id') or '').strip()
+        device_id = str(entity.get('device_id') or '').strip()
+        area_id = self._ensure_home_assistant_area(room)
+        detail: dict[str, Any] = {'entity_id': entity_id, 'device_id': device_id or None, 'name': name, 'room': room, 'area_id': area_id, 'updated': []}
+        if not entity_id:
+            detail['ok'] = False
+            detail['reason'] = 'missing_entity_id'
+            return detail
+        if device_id and (area_id or name):
+            payload: dict[str, Any] = {'type': 'config/device_registry/update', 'device_id': device_id}
+            if area_id:
+                payload['area_id'] = area_id
+            if name:
+                payload['name_by_user'] = name
+            try:
+                assert_ha_success(self.ha.websocket_command(payload, timeout=12))
+                detail['updated'].append('device_registry')
+            except Exception as exc:
+                detail.setdefault('errors', []).append({'target': 'device_registry', 'error': str(exc)})
+                logger.info("SeniorCare HA device metadata update failed entity=%s device=%s area=%s error=%s", entity_id, device_id, area_id, exc)
+        payload = {'type': 'config/entity_registry/update', 'entity_id': entity_id}
+        if name:
+            payload['name'] = name
+        if area_id:
+            payload['area_id'] = area_id
+        try:
+            assert_ha_success(self.ha.websocket_command(payload, timeout=12))
+            detail['updated'].append('entity_registry')
+        except Exception as exc:
+            detail.setdefault('errors', []).append({'target': 'entity_registry', 'error': str(exc)})
+            logger.info("SeniorCare HA entity metadata update failed entity=%s area=%s error=%s", entity_id, area_id, exc)
+        detail['ok'] = bool(detail['updated'])
+        return detail
 
     def _try_matter_pairing(self, pairing_code: str) -> dict[str, Any]:
         code = str(pairing_code or '').strip().replace(' ', '')
@@ -404,6 +656,7 @@ def ensure_schema(con: sqlite3.Connection) -> None:
 
 def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any]], role: str, room: str | None, started_at: str | datetime) -> list[dict[str, Any]]:
     before = {item.get('entity_id'): item for item in baseline}
+    baseline_device_ids = {str(item.get('device_id') or '') for item in baseline if item.get('device_id')}
     started = parse_time(started_at)
     scored = []
     for item in current:
@@ -412,18 +665,26 @@ def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any
             continue
         if str(item.get('state') or '').lower() in {'unknown', 'unavailable'}:
             continue
-        if not role_candidate_matches(role, item, allow_device_class_mismatch=True):
-            continue
         old = before.get(entity_id, {})
         is_new = entity_id not in before
+        device_id = str(item.get('device_id') or '')
+        is_new_device = bool(is_new and device_id and device_id not in baseline_device_ids)
+        if not role_candidate_matches(role, item, allow_device_class_mismatch=is_new or is_new_device):
+            continue
         state_changed = bool(old) and item.get('state') != old.get('state')
         last_changed_updated = is_after(item.get('last_changed'), started)
         last_updated_updated = is_after(item.get('last_updated'), started)
-        changed = is_new or state_changed or last_changed_updated or last_updated_updated
+        changed = is_new or is_new_device or state_changed or last_changed_updated or last_updated_updated
         if not changed:
             continue
         confidence = 0
         reasons = []
+        if is_new_device:
+            confidence += 60
+            reasons.append('new_device')
+        if is_new:
+            confidence += 45
+            reasons.append('new_entity')
         if state_changed:
             confidence += 40
             reasons.append('state_changed')
@@ -433,23 +694,44 @@ def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any
         if class_matches(role, item.get('device_class')):
             confidence += 25
             reasons.append('device_class_match')
+        elif role_keyword_matches(role, item, include_model=is_new or is_new_device):
+            confidence += 25
+            reasons.append('role_keyword_match')
         if room_matches(room, entity_id, item.get('friendly_name')):
             confidence += 20
             reasons.append('room_match')
         if domain_matches(role, item.get('domain')):
             confidence += 10
             reasons.append('domain_match')
-        if is_new:
-            confidence += 10
-            reasons.append('new_entity')
+        priority = candidate_entity_priority(role, item)
+        confidence += priority
+        if priority:
+            reasons.append(f'entity_priority_{priority}')
         if confidence:
-            scored.append({**item, 'confidence': confidence, 'reasons': reasons, 'is_new': is_new})
-    return sorted(scored, key=lambda x: x['confidence'], reverse=True)
+            scored.append({**item, 'confidence': confidence, 'reasons': reasons, 'is_new': is_new, 'is_new_device': is_new_device, 'entity_priority': priority})
+    return sorted(scored, key=lambda x: (bool(x.get('is_new_device')), bool(x.get('is_new')), x['confidence'], x.get('entity_priority') or 0, parse_time(x.get('last_updated')).timestamp()), reverse=True)
+
+
+def count_changed_entities(baseline: list[dict[str, Any]], current: list[dict[str, Any]], started_at: str | datetime) -> int:
+    before = {item.get('entity_id'): item for item in baseline}
+    started = parse_time(started_at)
+    count = 0
+    for item in current:
+        entity_id = item.get('entity_id')
+        old = before.get(entity_id, {})
+        if (
+            entity_id not in before
+            or (old and item.get('state') != old.get('state'))
+            or is_after(item.get('last_changed'), started)
+            or is_after(item.get('last_updated'), started)
+        ):
+            count += 1
+    return count
 
 
 def domain_matches(role: str, domain: Any) -> bool:
     if role_is_presence(role) or role_is_contact(role):
-        return str(domain or '') == 'binary_sensor'
+        return str(domain or '') in {'binary_sensor', 'sensor', 'lock', 'switch'}
     return bool(domain)
 
 
@@ -480,9 +762,16 @@ def role_candidate_matches(role: str, item: dict[str, Any], allow_missing_device
     device_class = item.get('device_class')
     has_device_class = bool(str(device_class or '').strip())
     if role_is_presence(role):
-        return domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class))
+        return (
+            (domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class)))
+            or (domain == 'sensor' and role_keyword_matches(role, item, include_model=allow_device_class_mismatch))
+        )
     if role_is_contact(role):
-        return domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class))
+        return (
+            (domain == 'binary_sensor' and (allow_device_class_mismatch or class_matches(role, device_class) or (allow_missing_device_class and not has_device_class)))
+            or (domain == 'sensor' and contact_sensor_candidate_matches(item, include_model=allow_device_class_mismatch))
+            or (domain in {'lock', 'switch'} and role_keyword_matches(role, item, include_model=True))
+        )
     return domain == 'binary_sensor'
 
 
@@ -493,6 +782,71 @@ def class_matches(role: str, device_class: Any) -> bool:
     if role_is_contact(role):
         return dc in CONTACT_CLASSES
     return False
+
+
+def role_keyword_matches(role: str, item: dict[str, Any], include_model: bool = True) -> bool:
+    values = [
+        item.get('entity_id'),
+        item.get('friendly_name'),
+        item.get('original_name'),
+        item.get('device_name'),
+    ]
+    if include_model:
+        values.extend([item.get('model'), item.get('manufacturer'), item.get('unique_id'), item.get('identifiers')])
+    haystack = normalize(' '.join(str(value or '') for value in values))
+    if role_is_presence(role):
+        return any(term in haystack for term in ['occupy', 'occupancy', 'motion', 'presence', 'bewegung', 'praesenz', 'präsenz'])
+    if role_is_contact(role):
+        return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tür', 'tuerschloss', 'türschloss', 'fenster', 'vibration', 'vibrate', 'erschuetterung'])
+    return False
+
+
+def contact_sensor_candidate_matches(item: dict[str, Any], include_model: bool = False) -> bool:
+    domain = str(item.get('domain') or '')
+    device_class = str(item.get('device_class') or '').lower()
+    if domain == 'binary_sensor' and device_class in CONTACT_CLASSES:
+        return True
+    if not include_model:
+        return False
+    haystack = normalize(' '.join(str(value or '') for value in [
+        item.get('entity_id'),
+        item.get('friendly_name'),
+        item.get('original_name'),
+        item.get('device_name'),
+    ]))
+    haystack = f"{haystack} {normalize(str(item.get('model') or ''))}"
+    return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tuerschloss', 'fenster', 'vibration', 'vibrate', 'erschuetterung'])
+
+
+def candidate_entity_priority(role: str, item: dict[str, Any]) -> int:
+    domain = str(item.get('domain') or '')
+    device_class = str(item.get('device_class') or '').lower()
+    haystack = normalize(' '.join(str(value or '') for value in [
+        item.get('entity_id'),
+        item.get('friendly_name'),
+        item.get('original_name'),
+        item.get('device_name'),
+        item.get('model'),
+    ]))
+    if domain in {'button', 'update'}:
+        return -80
+    if device_class in {'battery', 'signal_strength'} or any(term in haystack for term in ['batterie', 'battery', 'rssi', 'lqi', 'firmware', 'identifizieren']):
+        return -50
+    if role_is_presence(role):
+        if domain == 'binary_sensor' and class_matches(role, device_class):
+            return 40
+        if any(term in haystack for term in ['occupy', 'occupancy', 'presence', 'praesenz', 'präsenz', 'motion', 'bewegung']):
+            return 25
+        if device_class in {'illuminance'}:
+            return 5
+    if role_is_contact(role):
+        if domain == 'binary_sensor' and class_matches(role, device_class):
+            return 40
+        if domain == 'lock' and any(term in haystack for term in ['turschloss', 'tuerschloss', 'türschloss', 'door', 'lock', 'vibration']):
+            return 35
+        if domain == 'switch' and any(term in haystack for term in ['vibration', 'door', 'tuer', 'tür']):
+            return 20
+    return 0
 
 
 def role_is_presence(role: str) -> bool:
@@ -522,6 +876,66 @@ def candidate_public(item: dict[str, Any] | None, dev: bool) -> dict[str, Any] |
     if dev:
         data.update(item)
     return data
+
+
+def find_identify_entity(states: list[dict[str, Any]], device_id: str, entity_id: str) -> dict[str, Any] | None:
+    entity_prefix = entity_id.rsplit('_', 1)[0] if '_' in entity_id else entity_id.rsplit('.', 1)[-1]
+    candidates = []
+    for item in states:
+        current_entity = str(item.get('entity_id') or '')
+        if not current_entity.startswith('button.'):
+            continue
+        haystack = normalize(f"{current_entity} {item.get('friendly_name') or ''} {item.get('device_class') or ''}")
+        same_device = bool(device_id and str(item.get('device_id') or '') == device_id)
+        same_prefix = bool(entity_prefix and normalize(entity_prefix) in normalize(current_entity))
+        if (same_device or same_prefix) and any(term in haystack for term in ['identify', 'identifizieren']):
+            candidates.append(item)
+    return candidates[0] if candidates else None
+
+
+def parse_identifiers(value: Any) -> list[tuple[str, str]]:
+    raw = value
+    if isinstance(value, str):
+        try:
+            raw = json.loads(value)
+        except ValueError:
+            return []
+    result: list[tuple[str, str]] = []
+    if not isinstance(raw, list):
+        return result
+    for item in raw:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            domain = str(item[0] or '').strip()
+            identifier = str(item[1] or '').strip()
+            if domain and identifier:
+                result.append((domain, identifier))
+    return result
+
+
+def first_identifier_value(identifiers: list[tuple[str, str]], domains: set[str]) -> str | None:
+    wanted = {normalize(domain) for domain in domains}
+    for domain, value in identifiers:
+        if normalize(domain) in wanted and value:
+            return value
+    return None
+
+
+def registry_result_list(response: dict[str, Any]) -> list[dict[str, Any]]:
+    result = response.get('result') if isinstance(response, dict) else None
+    if isinstance(result, list):
+        return [item for item in result if isinstance(item, dict)]
+    if isinstance(result, dict):
+        for key in ('entities', 'devices', 'areas', 'items'):
+            value = result.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def assert_ha_success(response: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(response, dict) and response.get('success') is False:
+        raise RuntimeError(str(response.get('error') or response))
+    return response
 
 
 def public_role(data: dict[str, Any]) -> dict[str, Any]:

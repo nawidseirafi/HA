@@ -44,6 +44,8 @@ class ZigbeePairingStartPayload(BaseModel):
 
 class ConfirmPayload(BaseModel):
     entity_id: str
+    name: str | None = None
+    room: str | None = None
 
 
 class MatterStartPayload(BaseModel):
@@ -66,6 +68,10 @@ class NotificationPayload(BaseModel):
     anomalies: bool = True
     critical: bool = True
     daily_summary: bool = False
+
+
+class SensorRoleNamePayload(BaseModel):
+    name: str
 
 
 def model_data(model: BaseModel) -> dict[str, Any]:
@@ -217,7 +223,7 @@ def discovery_candidates(session_id: int, dev: bool = Query(False)):
 @router.post("/setup/discovery/{session_id}/confirm")
 def discovery_confirm(session_id: int, payload: ConfirmPayload, dev: bool = Query(False)):
     try:
-        return device_mapping_service.confirm(session_id, payload.entity_id, dev=dev)
+        return device_mapping_service.confirm(session_id, payload.entity_id, name=payload.name, room=payload.room, dev=dev)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
@@ -272,4 +278,29 @@ def sensor_role_save(payload: dict[str, Any]):
 
 @router.delete("/sensor-roles/{role}")
 def sensor_role_delete(role: str):
-    return device_mapping_service.delete_role(role)
+    try:
+        return device_mapping_service.delete_role(role)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise api_error(exc) from exc
+
+
+@router.post("/sensor-roles/{role}/test")
+def sensor_role_test(role: str):
+    try:
+        return device_mapping_service.test_role(role)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise api_error(exc) from exc
+
+
+@router.put("/sensor-roles/{role}/name")
+def sensor_role_rename(role: str, payload: SensorRoleNamePayload):
+    try:
+        return device_mapping_service.rename_role(role, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise api_error(exc) from exc

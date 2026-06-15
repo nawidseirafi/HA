@@ -20,6 +20,7 @@ type Contact = {
 };
 
 const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
+const ZIGBEE_DISCOVERY_SECONDS = 180;
 
 const roomOptions = [
   { id: 'living_room', label: 'Wohnzimmer', door: true },
@@ -186,29 +187,29 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
 
   async function searchSensor(sensor: SensorBinding) {
     updateSensor(sensor.id, { status: 'searching' });
-    setDiscovery((current) => ({ ...current, [sensor.id]: { remainingSeconds: 30 } }));
+    setDiscovery((current) => ({ ...current, [sensor.id]: { remainingSeconds: ZIGBEE_DISCOVERY_SECONDS } }));
     try {
-      const result = await api.startSeniorZigbeePairing({ role: sensor.id, room: sensor.roomId, duration: 60 });
+      const result = await api.startSeniorZigbeePairing({ role: sensor.id, room: sensor.roomId, duration: ZIGBEE_DISCOVERY_SECONDS });
       if (result.status === 'pairing_needs_manual_action') {
         throw new Error(result.message || 'Die Sensor-Einrichtung ist noch nicht bereit.');
       }
       updateSensor(sensor.id, { sessionId: result.session_id });
-      setDiscovery((current) => ({ ...current, [sensor.id]: { ...(current[sensor.id] || {}), provider: result.detail?.provider, remainingSeconds: 30 } }));
-      pollSensor(sensor.id, result.session_id, Date.now());
+      setDiscovery((current) => ({ ...current, [sensor.id]: { ...(current[sensor.id] || {}), provider: result.detail?.provider, remainingSeconds: ZIGBEE_DISCOVERY_SECONDS } }));
+      pollSensor(sensor.id, result.session_id, Date.now(), sensor.name, sensor.roomId);
     } catch (err) {
       updateSensor(sensor.id, { status: 'missing' });
       setDiscovery((current) => ({ ...current, [sensor.id]: { error: err instanceof Error ? err.message : 'Sensor nicht gefunden.' } }));
     }
   }
 
-  function pollSensor(sensorId: string, sessionId: number, startedAt: number) {
+  function pollSensor(sensorId: string, sessionId: number, startedAt: number, sensorName: string, roomId: string) {
     window.clearTimeout(timers.current[sensorId]);
     timers.current[sensorId] = window.setTimeout(async () => {
       try {
         const result = await api.seniorDiscoveryCandidates(sessionId, devMode);
-        const done = applyCandidate(sensorId, sessionId, result);
-        if (!done && Date.now() - startedAt < 30000) {
-          pollSensor(sensorId, sessionId, startedAt);
+        const done = await applyCandidate(sensorId, sessionId, result, sensorName, roomId);
+        if (!done && Date.now() - startedAt < ZIGBEE_DISCOVERY_SECONDS * 1000) {
+          pollSensor(sensorId, sessionId, startedAt, sensorName, roomId);
         }
       } catch (err) {
         updateSensor(sensorId, { status: 'missing' });
@@ -217,14 +218,20 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     }, 2000);
   }
 
-  function applyCandidate(sensorId: string, sessionId: number, result: SeniorCandidates) {
+  async function applyCandidate(sensorId: string, sessionId: number, result: SeniorCandidates, sensorName: string, roomId: string) {
     const score = result.candidate ? (result.candidate.score ?? result.candidate.confidence) : 0;
     const found = Boolean(result.candidate && score >= 50);
     const timedOut = result.status === 'no_signal_detected' || result.remaining_seconds === 0;
     setDiscovery((current) => ({ ...current, [sensorId]: { candidate: result.candidate, candidates: result.candidates, remainingSeconds: result.remaining_seconds } }));
     if (found && result.candidate) {
-      updateSensor(sensorId, { status: 'connected', sessionId, score, entityId: result.candidate.entity_id, name: result.candidate.label || 'Sensor' });
-      void api.confirmSeniorDiscovery(sessionId, result.candidate.entity_id).catch(() => undefined);
+      const name = sensorName || result.candidate.label || 'Sensor';
+      try {
+        await api.confirmSeniorDiscovery(sessionId, result.candidate.entity_id, { name, room: roomId });
+        updateSensor(sensorId, { status: 'connected', sessionId, score, entityId: result.candidate.entity_id, name });
+      } catch (err) {
+        updateSensor(sensorId, { status: 'missing' });
+        setDiscovery((current) => ({ ...current, [sensorId]: { ...(current[sensorId] || {}), error: err instanceof Error ? err.message : 'Sensor konnte nicht gespeichert werden.' } }));
+      }
       return true;
     }
     if (timedOut) {

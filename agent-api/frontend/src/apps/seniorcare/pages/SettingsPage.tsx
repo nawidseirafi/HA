@@ -173,7 +173,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   async function deleteRoom(room: string) {
     const roomSensors = sensors.filter((sensor) => sensor.room === room);
     const message = roomSensors.length
-      ? 'Raum wirklich löschen? Zugeordnete Sensoren werden ebenfalls entfernt.'
+      ? 'Raum wirklich löschen? Zugeordnete Sensoren werden auch aus Zigbee entfernt.'
       : 'Raum wirklich löschen?';
     if (!window.confirm(message)) return;
     try {
@@ -199,13 +199,41 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   }
 
   async function deleteSensor(role: string) {
-    if (!window.confirm('Sensor wirklich entfernen?')) return;
+    if (!window.confirm('Sensor wirklich aus Zigbee entfernen? Das Gerät muss danach neu gekoppelt werden.')) return;
     try {
       await api.deleteSeniorSensorRole(role);
-      toast('Sensor entfernt');
+      toast('Sensor aus Zigbee entfernt');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sensor konnte nicht entfernt werden.');
+    }
+  }
+
+  async function renameSensor(sensor: SeniorSensorRole) {
+    const currentName = sensor.label || sensor.role;
+    const nextName = window.prompt('Neuer Sensorname', currentName);
+    if (nextName === null) return;
+    const cleanName = nextName.trim();
+    if (!cleanName) {
+      setError('Bitte geben Sie einen Sensornamen ein.');
+      return;
+    }
+    try {
+      await api.renameSeniorSensorRole(sensor.role, cleanName);
+      toast('Sensor umbenannt');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sensor konnte nicht umbenannt werden.');
+    }
+  }
+
+  async function testSensor(role: string) {
+    try {
+      const result = await api.testSeniorSensorRole(role);
+      toast(result.message || (result.ok ? 'Sensor geprüft' : 'Sensor nicht erreichbar'));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sensor konnte nicht geprüft werden.');
     }
   }
 
@@ -280,8 +308,8 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
                           </div>
                         </div>
                         <div className="sc-sensor-settings-actions">
-                          <button type="button"><Pencil size={18} /> Name</button>
-                          <button type="button" onClick={() => toast('Sensor geprüft')}><Wifi size={18} /> Test</button>
+                          <button type="button" onClick={() => void renameSensor(sensor)}><Pencil size={18} /> Name</button>
+                          <button type="button" onClick={() => void testSensor(sensor.role)}><Wifi size={18} /> Test</button>
                           <button type="button" onClick={() => void deleteSensor(sensor.role)}><Trash2 size={18} /> Löschen</button>
                         </div>
                       </div>
@@ -395,7 +423,9 @@ function EmptyState({ text, action }: { text: string; action: string }) {
 }
 
 function sensorType(sensor: SeniorSensorRole) {
-  if (sensor.role === 'main_door' || ['door', 'window', 'opening', 'contact'].includes(String(sensor.device_class || ''))) return 'Türkontakt';
+  if (sensor.role === 'main_door' || sensor.role.endsWith('_door') || ['door', 'window', 'opening', 'contact'].includes(String(sensor.device_class || ''))) return 'Türkontakt';
+  if (String(sensor.device_class || '') === 'vibration') return 'Vibrationssensor';
+  if (String(sensor.domain || '') === 'lock') return 'Türsensor';
   return 'Bewegung';
 }
 

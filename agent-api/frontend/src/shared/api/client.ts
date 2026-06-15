@@ -1423,10 +1423,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  confirmSeniorDiscovery: (sessionId: number, entityId: string) =>
+  confirmSeniorDiscovery: (sessionId: number, entityId: string, payload?: { name?: string; room?: string }) =>
     request<{ status: string; role: SeniorSensorRole }>(`/api/senior/setup/discovery/${sessionId}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ entity_id: entityId }),
+      body: JSON.stringify({ entity_id: entityId, ...(payload || {}) }),
     }),
   saveSeniorSetupSensors: () => request<SeniorSetupStatus>('/api/senior/setup/sensors', { method: 'POST' }),
   saveSeniorContact: (payload: { name: string; relationship?: string; email?: string }) =>
@@ -1439,6 +1439,13 @@ export const api = {
     request<SeniorSetupStatus>('/api/senior/setup/notifications', { method: 'POST', body: JSON.stringify(payload) }),
   completeSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/complete', { method: 'POST' }),
   seniorSensorRoles: (includeState = false) => request<{ sensor_roles: SeniorSensorRole[] }>(`/api/senior/sensor-roles${includeState ? '?include_state=true' : ''}`),
+  renameSeniorSensorRole: (role: string, name: string) =>
+    request<{ status: string; role: SeniorSensorRole }>(`/api/senior/sensor-roles/${encodeURIComponent(role)}/name`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    }),
+  testSeniorSensorRole: (role: string) =>
+    request<{ ok: boolean; mode: string; message: string; entity_id?: string; state?: string }>(`/api/senior/sensor-roles/${encodeURIComponent(role)}/test`, { method: 'POST' }),
   deleteSeniorSensorRole: (role: string) =>
     request<{ deleted: boolean; role: string }>(`/api/senior/sensor-roles/${encodeURIComponent(role)}`, { method: 'DELETE' }),
   upload: async (file: File) => {
