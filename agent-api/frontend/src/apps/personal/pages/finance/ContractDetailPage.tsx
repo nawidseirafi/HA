@@ -42,16 +42,13 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
   };
 
   const updateCancellationPeriod = (value: string) => {
-    const suggestedDate = suggestedDateFromPeriod(value);
-    setDraft((current) => {
-      if (!suggestedDate || dateInputValue(current.end_date) || dateInputValue(current.renewal_date)) {
-        return { ...current, cancellation_period: value };
-      }
-      return { ...current, cancellation_period: value, renewal_date: suggestedDate };
-    });
+    setDraft((current) => ({ ...current, cancellation_period: value }));
   };
 
   if (!contract) return <div className="page-stack"><section className="panel">Vertrag wird geladen...</section></div>;
+  const nextCancellation = contract.next_cancellation;
+  const nextCancellationLabel = nextCancellation?.deadline ? shortDate(nextCancellation.deadline) : 'offen';
+  const nextCancellationNote = cancellationNote(nextCancellation, contract.cancellation_period);
 
   return (
     <div className="page-stack">
@@ -76,6 +73,7 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
         <Kpi label="Jährlich" value={currency(contract.annual_cost)} />
         <Kpi label="Laufzeit bis" value={contract.end_date ? shortDate(contract.end_date) : 'offen'} />
         <Kpi label="Verlängerung" value={contract.renewal_date ? shortDate(contract.renewal_date) : 'offen'} />
+        <Kpi label="Nächste Beendigung" value={nextCancellationLabel} note={nextCancellationNote} />
       </section>
 
       <section className="dashboard-grid">
@@ -130,7 +128,7 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
               </div>
             </label>
           </div>
-          <p className="contract-form-help">Wenn Enddatum und Verlängerungsdatum leer sind, setzt der Agent aus der Kündigungsfrist automatisch ein Vorschlagsdatum. Beispiel: 1 Monat ab heute ergibt ein Verlängerungsdatum in einem Monat.</p>
+          <p className="contract-form-help">Bei monatlich oder jederzeit kündbaren Verträgen wird die nächste mögliche Beendigung dynamisch aus dem heutigen Datum plus Kündigungsfrist berechnet.</p>
           <label className="contract-field contract-notes-field">
             <span>Notizen / KI-Bewertung</span>
             <textarea className="contract-notes" placeholder="Zusammenfassung, offene Punkte oder KI-Hinweise" value={draft.notes || ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
@@ -151,8 +149,8 @@ export function ContractDetailPage({ id, navigate }: { id: number; navigate: (ro
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return <div className="kpi-card blue"><span>{label}</span><strong>{value}</strong></div>;
+function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
+  return <div className="kpi-card blue"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>;
 }
 
 function StatusRow({ icon: Icon, label, value }: { icon: typeof BrainCircuit; label: string; value: string }) {
@@ -181,27 +179,13 @@ function editableContractPayload(draft: Partial<Contract>): Partial<Contract> {
   };
 }
 
-function suggestedDateFromPeriod(value: string) {
-  const period = parsePeriod(value);
-  if (!period) return '';
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  if (period.unit === 'days') today.setDate(today.getDate() + period.amount);
-  if (period.unit === 'weeks') today.setDate(today.getDate() + period.amount * 7);
-  if (period.unit === 'months') today.setMonth(today.getMonth() + period.amount);
-  if (period.unit === 'years') today.setFullYear(today.getFullYear() + period.amount);
-  return today.toISOString().slice(0, 10);
-}
-
-function parsePeriod(value: string): { amount: number; unit: 'days' | 'weeks' | 'months' | 'years' } | null {
-  const match = value.toLowerCase().match(/(\d+)\.?\s*(tag|tage|day|days|woche|wochen|week|weeks|monat|monate|month|months|jahr|jahre|year|years)/);
-  if (!match) return null;
-  const amount = Number(match[1]);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  const unit = match[2];
-  if (unit.startsWith('tag') || unit.startsWith('day')) return { amount, unit: 'days' };
-  if (unit.startsWith('woch') || unit.startsWith('week')) return { amount, unit: 'weeks' };
-  if (unit.startsWith('monat') || unit.startsWith('month')) return { amount, unit: 'months' };
-  if (unit.startsWith('jahr') || unit.startsWith('year')) return { amount, unit: 'years' };
-  return null;
+function cancellationNote(nextCancellation: Contract['next_cancellation'], period?: string | null) {
+  if (!nextCancellation) return period || 'Keine Kündigungsfrist hinterlegt';
+  if (nextCancellation.rolling) return `${period || 'Kündigungsfrist'} · dynamisch berechnet`;
+  if (nextCancellation.days_left < 0) {
+    const days = Math.abs(nextCancellation.days_left);
+    return `überfällig seit ${days === 1 ? '1 Tag' : `${days} Tagen`}`;
+  }
+  if (nextCancellation.days_left === 0) return 'heute fällig';
+  return `in ${nextCancellation.days_left === 1 ? '1 Tag' : `${nextCancellation.days_left} Tagen`}`;
 }

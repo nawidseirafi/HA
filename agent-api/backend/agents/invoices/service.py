@@ -705,33 +705,36 @@ class InvoiceService:
         }
 
     def upload(self, file: UploadFile) -> dict[str, Any]:
-        self.inbox_dir.mkdir(parents=True, exist_ok=True)
-        safe_name = secure_filename(file.filename or "upload")
-        stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex}-{safe_name}"
-        destination = self.inbox_dir / stored_name
-        with destination.open("wb") as output_file:
-            shutil.copyfileobj(file.file, output_file)
-        result = {
-            "status": "uploaded",
-            "filename": safe_name,
-            "stored_filename": stored_name,
-            "path": str(destination),
-        }
+        result = self._store_upload(file, self.inbox_dir)
         try:
             MessagingService().create_message(
                 source="invoice",
                 category="invoice",
                 severity="info",
                 title="Rechnung verarbeitet",
-                message=f"Beleg {safe_name} wurde hochgeladen.",
-                payload={"filename": safe_name, "stored_filename": stored_name},
+                message=f"Beleg {result['filename']} wurde hochgeladen.",
+                payload={"filename": result["filename"], "stored_filename": result["stored_filename"]},
             )
         except Exception:
             pass
         return result
 
+    def _store_upload(self, file: UploadFile, directory: Path) -> dict[str, Any]:
+        directory.mkdir(parents=True, exist_ok=True)
+        safe_name = secure_filename(file.filename or "upload")
+        stored_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex}-{safe_name}"
+        destination = directory / stored_name
+        with destination.open("wb") as output_file:
+            shutil.copyfileobj(file.file, output_file)
+        return {
+            "status": "uploaded",
+            "filename": safe_name,
+            "stored_filename": stored_name,
+            "path": str(destination),
+        }
+
     def upload_contract_document(self, file: UploadFile) -> dict[str, Any]:
-        upload_result = self.upload(file)
+        upload_result = self._store_upload(file, self.review_dir / "contracts")
         path = Path(upload_result["path"])
         try:
             metadata = self._reanalyze_with_ai(path)
@@ -1116,8 +1119,11 @@ class InvoiceService:
         invoice_summary = self.summary()
         contracts = self.contracts()
         active = [item for item in contracts if item["status"] in ACTIVE_CONTRACT_STATUSES]
-        monthly_total = round(sum(float(item.get("monthly_cost") or 0) for item in active), 2)
-        annual_total = round(sum(float(item.get("annual_cost") or 0) for item in active), 2)
+        monthly_total = round(sum(self._contract_monthly_cost(item) for item in active), 2)
+        annual_total = round(sum(self._contract_annual_cost(item) for item in active), 2)
+        active_insurances = [item for item in active if item.get("category") == "insurance"]
+        insurance_monthly_total = round(sum(self._contract_monthly_cost(item) for item in active_insurances), 2)
+        insurance_annual_total = round(sum(self._contract_annual_cost(item) for item in active_insurances), 2)
         by_category: dict[str, dict[str, Any]] = {}
         for item in active:
             key = item.get("category") or "other"
@@ -1125,8 +1131,8 @@ class InvoiceService:
                 key,
                 {"category": key, "label": CONTRACT_CATEGORIES.get(key, "Sonstige"), "monthly_cost": 0.0, "annual_cost": 0.0, "count": 0},
             )
-            bucket["monthly_cost"] = round(bucket["monthly_cost"] + float(item.get("monthly_cost") or 0), 2)
-            bucket["annual_cost"] = round(bucket["annual_cost"] + float(item.get("annual_cost") or 0), 2)
+            bucket["monthly_cost"] = round(bucket["monthly_cost"] + self._contract_monthly_cost(item), 2)
+            bucket["annual_cost"] = round(bucket["annual_cost"] + self._contract_annual_cost(item), 2)
             bucket["count"] += 1
         next_deadline = self._next_contract_deadline(active)
         return {
@@ -1134,9 +1140,12 @@ class InvoiceService:
             "monthly_obligations": monthly_total,
             "annual_obligations": annual_total,
             "active_contracts": len(active),
-            "active_insurances": sum(1 for item in active if item.get("category") == "insurance"),
+            "active_insurances": len(active_insurances),
+            "insurance_monthly_total": insurance_monthly_total,
+            "insurance_annual_total": insurance_annual_total,
             "active_subscriptions": sum(1 for item in active if item.get("category") == "subscription"),
-            "next_cancellation_deadline": next_deadline,
+            "next_cancellation_deadline": next_deadline["deadline"] if next_deadline else None,
+            "next_cancellation": next_deadline,
             "costs_by_category": sorted(by_category.values(), key=lambda row: row["monthly_cost"], reverse=True),
             "reminders": self.contract_reminders(),
             "optimization_hints": self.contract_analysis()["hints"],
@@ -1149,7 +1158,7 @@ class InvoiceService:
         params: list[Any] = []
         for key in ("category", "status"):
             if filters.get(key):
-                where.append(f"lower({key}) = ?")
+                where.append(f"lower(contracts.{key}) = ?")
                 params.append(str(filters[key]).lower())
         if filters.get("search"):
             needle = f"%{str(filters['search']).lower()}%"
@@ -1247,17 +1256,17 @@ class InvoiceService:
         today = date.today()
         reminders = []
         for contract in self.contracts({"status": "active"}):
-            deadline = self._contract_deadline_date(contract)
-            if deadline is None:
+            deadline_info = self._contract_deadline_info(contract, today=today)
+            if deadline_info is None or deadline_info.get("rolling"):
                 continue
-            days_left = (deadline - today).days
+            days_left = int(deadline_info["days_left"])
             for threshold in CONTRACT_REMINDER_DAYS:
                 if 0 <= days_left <= threshold:
                     reminders.append({
                         "contract_id": contract["id"],
                         "name": contract["name"],
                         "provider": contract["provider"],
-                        "deadline": deadline.isoformat(),
+                        "deadline": deadline_info["deadline"],
                         "days_left": days_left,
                         "threshold_days": threshold,
                         "message": f"Kuendigungsfrist fuer {contract['name']} endet in {days_left} Tagen.",
@@ -1271,9 +1280,9 @@ class InvoiceService:
         today = date.today()
         for contract in contracts:
             monthly = float(contract.get("monthly_cost") or 0)
-            deadline = self._contract_deadline_date(contract)
-            if deadline is not None:
-                days_left = (deadline - today).days
+            deadline_info = self._contract_deadline_info(contract, today=today)
+            if deadline_info is not None and not deadline_info.get("rolling"):
+                days_left = int(deadline_info["days_left"])
                 if 0 <= days_left <= 30:
                     hints.append(self._hint(contract, "deadline", "high", f"Die Kuendigungsfrist endet in {days_left} Tagen."))
             start = self._parse_date(contract.get("start_date"))
@@ -1333,12 +1342,6 @@ class InvoiceService:
         for key in ("start_date", "end_date", "renewal_date"):
             if key in data:
                 data[key] = self._date_or_none(data[key])
-        if (
-            data.get("cancellation_period")
-            and not data.get("end_date")
-            and not data.get("renewal_date")
-        ):
-            data["renewal_date"] = self._date_from_period(data["cancellation_period"])
         if "auto_renew" in data:
             data["auto_renew"] = 1 if bool(data["auto_renew"]) else 0
         if "document_id" in data and data["document_id"] in ("", None):
@@ -1567,27 +1570,113 @@ class InvoiceService:
             connection.commit()
         return int(row["id"])
 
-    def _next_contract_deadline(self, contracts: list[dict[str, Any]]) -> Optional[str]:
-        deadlines = [deadline for deadline in (self._contract_deadline_date(contract) for contract in contracts) if deadline is not None and deadline >= date.today()]
-        return min(deadlines).isoformat() if deadlines else None
+    def _next_contract_deadline(self, contracts: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        today = date.today()
+        deadlines: list[dict[str, Any]] = []
+        for contract in contracts:
+            deadline_info = self._contract_deadline_info(contract, today=today)
+            if deadline_info is None:
+                continue
+            deadlines.append(
+                {
+                    "contract_id": contract.get("id"),
+                    "name": contract.get("name"),
+                    "provider": contract.get("provider"),
+                    **deadline_info,
+                }
+            )
+        upcoming = [item for item in deadlines if item["days_left"] >= 0]
+        if upcoming:
+            return min(upcoming, key=lambda item: item["deadline"])
+        return max(deadlines, key=lambda item: item["deadline"]) if deadlines else None
+
+    def _contract_deadline_info(self, contract: dict[str, Any], today: date | None = None) -> Optional[dict[str, Any]]:
+        today = today or date.today()
+        period = self._parse_cancellation_period(contract.get("cancellation_period"))
+        if self._is_monthly_rolling_contract(contract, period):
+            deadline = self._add_months(today, period["amount"])
+            return {
+                "deadline": deadline.isoformat(),
+                "days_left": (deadline - today).days,
+                "overdue": False,
+                "rolling": True,
+                "basis": "rolling_cancellation_period",
+            }
+        deadline = self._contract_deadline_date(contract)
+        if deadline is None:
+            return None
+        return {
+            "deadline": deadline.isoformat(),
+            "days_left": (deadline - today).days,
+            "overdue": deadline < today,
+            "rolling": False,
+            "basis": "renewal_or_end_date",
+        }
 
     def _contract_deadline_date(self, contract: dict[str, Any]) -> Optional[date]:
         renewal = self._parse_date(contract.get("renewal_date") or contract.get("end_date"))
         if renewal is None:
             return None
-        period = str(contract.get("cancellation_period") or "").lower()
-        days = 0
-        match = re.search(r"(\d+)\s*(tag|tage|day|days|monat|monate|month|months|woche|wochen|week|weeks)", period)
-        if match:
-            amount = int(match.group(1))
-            unit = match.group(2)
-            if unit.startswith(("monat", "month")):
-                days = amount * 30
-            elif unit.startswith(("woche", "week")):
-                days = amount * 7
-            else:
-                days = amount
-        return renewal - timedelta(days=days)
+        period = self._parse_cancellation_period(contract.get("cancellation_period"))
+        if period:
+            amount = period["amount"]
+            unit = period["unit"]
+            if unit == "months":
+                return self._add_months(renewal, -amount)
+            if unit == "weeks":
+                return renewal - timedelta(days=amount * 7)
+            if unit == "years":
+                return self._add_months(renewal, -(amount * 12))
+            return renewal - timedelta(days=amount)
+        return renewal
+
+    @staticmethod
+    def _parse_cancellation_period(value: object) -> Optional[dict[str, Any]]:
+        text = str(value or "").lower()
+        match = re.search(r"(\d+)\s*(tag|tage|day|days|monat|monate|month|months|woche|wochen|week|weeks|jahr|jahre|year|years)", text)
+        if not match:
+            return None
+        amount = int(match.group(1))
+        unit_text = match.group(2)
+        if unit_text.startswith(("tag", "day")):
+            unit = "days"
+        elif unit_text.startswith(("woche", "week")):
+            unit = "weeks"
+        elif unit_text.startswith(("monat", "month")):
+            unit = "months"
+        elif unit_text.startswith(("jahr", "year")):
+            unit = "years"
+        else:
+            return None
+        return {"amount": amount, "unit": unit, "raw": text}
+
+    @staticmethod
+    def _is_monthly_rolling_contract(contract: dict[str, Any], period: Optional[dict[str, Any]]) -> bool:
+        if not period or period["unit"] != "months" or period["amount"] != 1:
+            return False
+        text = " ".join(
+            str(contract.get(key) or "").lower()
+            for key in ("cancellation_period", "notes", "subcategory", "name")
+        )
+        if any(token in text for token in ("jederzeit", "monatlich", "monatlicher", "monthly", "flexibel")):
+            return True
+        return True
+
+    @staticmethod
+    def _contract_monthly_cost(contract: dict[str, Any]) -> float:
+        monthly = InvoiceService._number(contract.get("monthly_cost"))
+        annual = InvoiceService._number(contract.get("annual_cost"))
+        if monthly is None and annual is not None:
+            return round(annual / 12, 2)
+        return round(monthly or 0.0, 2)
+
+    @staticmethod
+    def _contract_annual_cost(contract: dict[str, Any]) -> float:
+        annual = InvoiceService._number(contract.get("annual_cost"))
+        monthly = InvoiceService._number(contract.get("monthly_cost"))
+        if annual is None and monthly is not None:
+            return round(monthly * 12, 2)
+        return round(annual or 0.0, 2)
 
     def _hint(self, contract: dict[str, Any], kind: str, severity: str, message: str) -> dict[str, Any]:
         return {
@@ -1645,8 +1734,7 @@ class InvoiceService:
         data["is_tax_relevant"] = bool(data.get("is_tax_relevant", 1))
         return data
 
-    @staticmethod
-    def _row_to_contract(row: sqlite3.Row) -> dict[str, Any]:
+    def _row_to_contract(self, row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
         document_date = str(data.pop("document_date", "") or "")[:10]
         if document_date:
@@ -1657,6 +1745,7 @@ class InvoiceService:
         data["monthly_cost"] = data.get("monthly_cost")
         data["annual_cost"] = data.get("annual_cost")
         data["category_label"] = CONTRACT_CATEGORIES.get(data.get("category") or "other", "Sonstige")
+        data["next_cancellation"] = self._contract_deadline_info(data)
         return data
 
     @staticmethod

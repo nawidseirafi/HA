@@ -152,6 +152,13 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const invoices = summary?.latest_uploads ?? [];
   const confidence = confidenceRate(invoices);
   const categories = categoryTotals(yearInvoices);
+  const nextCancellation = finance?.next_cancellation;
+  const nextCancellationDays = nextCancellation?.deadline ? daysUntilDate(nextCancellation.deadline) : nextCancellation?.days_left ?? 0;
+  const nextCancellationDistance = Math.abs(nextCancellationDays);
+  const nextCancellationDaysLabel = nextCancellationDistance === 1 ? '1 Tag' : `${nextCancellationDistance} Tagen`;
+  const nextCancellationNote = nextCancellation
+    ? `${nextCancellation.name || 'Vertrag'} · ${nextCancellationDays < 0 ? `überfällig seit ${nextCancellationDaysLabel}` : nextCancellationDays === 0 ? 'heute fällig' : `in ${nextCancellationDaysLabel}`}`
+    : 'Keine offene Kündigungsfrist';
 
   return (
     <div className="page-stack">
@@ -169,11 +176,11 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       </header>
 
       <section className="kpi-grid">
-        <Kpi icon={WalletCards} label="Monatliche Verpflichtungen" value={currency(finance?.monthly_obligations)} note={`${finance?.active_contracts ?? 0} aktive Verträge`} tone="blue" />
-        <Kpi icon={ShieldCheck} label="Versicherungen" value={finance?.active_insurances ?? 0} note={`${finance?.active_subscriptions ?? 0} aktive Abos`} tone="green" />
+        <Kpi icon={WalletCards} label="Monatliche Verpflichtungen" value={currency(finance?.monthly_obligations)} note={`${finance?.active_contracts ?? 0} aktive Verträge · ${currency(finance?.annual_obligations)} pro Jahr`} tone="blue" />
+        <Kpi icon={ShieldCheck} label="Versicherungen" value={currency(finance?.insurance_monthly_total)} note={`${finance?.active_insurances ?? 0} aktive Versicherungen · ${currency(finance?.insurance_annual_total)} pro Jahr`} tone="green" />
         <Kpi icon={Euro} label="Ausgaben aktueller Monat" value={currency(summary?.current_month_total)} note={`${monthNames[currentMonth - 1]} ${currentYear}`} tone="blue" />
         <Kpi icon={WalletCards} label="Ausgaben aktuelles Jahr" value={currency(summary?.current_year_total)} note={`${currentYear} laufend`} tone="violet" />
-        <Kpi icon={AlertTriangle} label="Nächste Frist" value={finance?.next_cancellation_deadline ? shortDate(finance.next_cancellation_deadline) : 'keine'} note="Kündigung/Verlängerung" tone="yellow" />
+        <Kpi icon={AlertTriangle} label="Nächste Frist" value={nextCancellation?.deadline ? shortDate(nextCancellation.deadline) : 'keine'} note={nextCancellationNote} tone="yellow" />
       </section>
 
       {(agentStatus || agentError) && (
@@ -591,6 +598,15 @@ function confidenceRate(invoices: Invoice[]) {
   if (!values.length) return 0;
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   return Math.round(average <= 1 ? average * 100 : average);
+}
+
+function daysUntilDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return 0;
+  const target = new Date(year, month - 1, day);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
 function categoryTotals(invoices: Invoice[]) {

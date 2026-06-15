@@ -72,6 +72,13 @@ export interface Contract {
   status: 'active' | 'needs_review' | 'cancelled' | 'expired' | 'paused' | string;
   notes?: string | null;
   document_id?: number | null;
+  next_cancellation?: {
+    deadline: string;
+    days_left: number;
+    overdue?: boolean;
+    rolling?: boolean;
+    basis?: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -102,8 +109,20 @@ export interface FinanceSummary {
   annual_obligations: number;
   active_contracts: number;
   active_insurances: number;
+  insurance_monthly_total: number;
+  insurance_annual_total: number;
   active_subscriptions: number;
   next_cancellation_deadline?: string | null;
+  next_cancellation?: {
+    contract_id?: number;
+    name?: string | null;
+    provider?: string | null;
+    deadline: string;
+    days_left: number;
+    overdue?: boolean;
+    rolling?: boolean;
+    basis?: string;
+  } | null;
   costs_by_category: Array<{
     category: ContractCategory;
     label: string;
