@@ -46,8 +46,11 @@ class SeniorSetupService:
 
     def profile(self, payload: dict[str, Any]) -> dict[str, Any]:
         timestamp = now()
+        notes_provided = payload.get('notes') is not None
         with self.mapping.connect() as con:
-            con.execute('''insert into senior_profile (id, name, age, notes, created_at, updated_at) values (1, ?, ?, ?, ?, ?) on conflict(id) do update set name = excluded.name, age = excluded.age, notes = excluded.notes, updated_at = excluded.updated_at''', (payload.get('name'), payload.get('age'), payload.get('notes'), timestamp, timestamp))
+            existing = con.execute('select notes from senior_profile where id = 1').fetchone()
+            notes = payload.get('notes') if notes_provided else (existing['notes'] if existing else None)
+            con.execute('''insert into senior_profile (id, name, age, notes, created_at, updated_at) values (1, ?, ?, ?, ?, ?) on conflict(id) do update set name = excluded.name, age = excluded.age, notes = excluded.notes, updated_at = excluded.updated_at''', (payload.get('name'), payload.get('age'), notes, timestamp, timestamp))
             con.commit()
         return self.set_step('prepare_home', 'profile')
 

@@ -2567,6 +2567,19 @@ button:disabled {
   width: 18px;
 }
 
+.sc-simple-person.neutral span,
+.sc-simple-person.learning span {
+  animation: none;
+  background: #9aa8a2;
+  box-shadow: 0 0 0 4px rgba(154, 168, 162, 0.14);
+}
+
+.sc-simple-person.error span {
+  animation: none;
+  background: #d95a62;
+  box-shadow: 0 0 0 4px rgba(217, 90, 98, 0.14);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sc-simple-person span,
   .sc-stepper li.current span {
@@ -2648,6 +2661,37 @@ button:disabled {
   padding: 0 12px;
 }
 
+.sc-dashboard-status-card.neutral,
+.sc-dashboard-status-card.learning {
+  background: #f6f8f7;
+  border-color: #dce5e1;
+}
+
+.sc-dashboard-status-card.neutral > div > svg,
+.sc-dashboard-status-card.learning > div > svg {
+  color: #6f7f78;
+}
+
+.sc-dashboard-status-card.neutral em,
+.sc-dashboard-status-card.learning em {
+  background: #edf2f0;
+  color: #596962;
+}
+
+.sc-dashboard-status-card.error {
+  background: #fff7f7;
+  border-color: #ffd5d8;
+}
+
+.sc-dashboard-status-card.error > div > svg {
+  color: var(--sc-red);
+}
+
+.sc-dashboard-status-card.error em {
+  background: var(--sc-red-soft);
+  color: var(--sc-red);
+}
+
 .sc-behavior-card {
   background: #f8fcfa;
   border: 1px solid #dce9e3;
@@ -2719,6 +2763,15 @@ button:disabled {
 .sc-behavior-card.red {
   background: #fff5f3;
   border-color: #ffc8bd;
+}
+
+.sc-behavior-card.neutral {
+  background: #f8faf9;
+  border-color: #dce5e1;
+}
+
+.sc-behavior-card.neutral > div > span {
+  color: #7f8d86;
 }
 
 .sc-simple-day-card {

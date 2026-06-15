@@ -7,6 +7,7 @@ type Profile = {
   name: string;
   birthDate: string;
   age: string;
+  notes: string;
 };
 
 type Contact = {
@@ -35,7 +36,7 @@ const baseRoomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, roo
 
 export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [step, setStep] = useState(0);
-  const [profile, setProfile] = useState<Profile>({ name: '', birthDate: '', age: '' });
+  const [profile, setProfile] = useState<Profile>({ name: '', birthDate: '', age: '', notes: '' });
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
   const [customRooms, setCustomRooms] = useState<Record<string, string>>({});
   const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
@@ -68,6 +69,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
           ...value,
           name: status.profile?.name || '',
           age: status.profile?.age ? String(status.profile.age) : '',
+          notes: status.profile?.notes || '',
         }));
       }
       if (status.trusted_contacts?.length) {
@@ -107,7 +109,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       await safeBackend(() => api.startSeniorSetup());
     }
     if (step === 1) {
-      await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), age: displayAge ? Number.parseInt(displayAge, 10) : null, notes: '' }));
+      await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), age: displayAge ? Number.parseInt(displayAge, 10) : null, notes: profile.notes }));
     }
     if (step === 2) {
       await safeBackend(() => api.saveSeniorSetupRooms(selectedRooms));
@@ -310,6 +312,7 @@ function ProfileStep({ profile, calculatedAge, onChange }: { profile: Profile; c
       <label>Name<input required value={profile.name} onChange={(event) => onChange({ ...profile, name: event.target.value })} /></label>
       <label>Geburtsdatum<input type="date" value={profile.birthDate} onChange={(event) => onChange({ ...profile, birthDate: event.target.value })} /></label>
       <label>Alter<input inputMode="numeric" value={profile.age || calculatedAge.replace(/\D+/g, '')} onChange={(event) => onChange({ ...profile, age: event.target.value })} aria-label="Alter" /></label>
+      <label className="sc-form-wide">Hinweise<textarea value={profile.notes} onChange={(event) => onChange({ ...profile, notes: event.target.value })} placeholder="z.B. steht normalerweise früh auf, eingeschränkte Mobilität, wichtige Gewohnheiten" /></label>
     </section>
   );
 }

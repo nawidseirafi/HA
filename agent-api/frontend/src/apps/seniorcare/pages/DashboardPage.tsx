@@ -33,47 +33,51 @@ export function DashboardPage() {
   }, []);
 
   const roles = status?.sensor_roles ?? [];
+  const configuredRoles = roles.filter((role) => role.configured);
+  const hasSensors = configuredRoles.length > 0;
   const latest = useMemo(() => latestPresenceRole(roles), [roles]);
-  const personName = status?.profile?.name?.trim() || 'Mama';
+  const personName = status?.profile?.name?.trim() || 'Person';
   const activitySlots = useMemo(() => activitySlotsFromRoles(roles), [roles]);
   const hasActivity = activitySlots.some((slot) => slot.active);
-  const lastUpdate = latest ? formatTime(new Date(timestamp(latest.last_changed || latest.last_updated || latest.updated_at))) : formatTime(new Date());
+  const hasBehavior = Boolean(behavior && hasSensors);
+  const lastUpdate = latest ? formatTime(new Date(timestamp(latest.last_changed || latest.last_updated || latest.updated_at))) : '';
   const lastSeen = latest ? relativeTime(latest.last_changed || latest.last_updated || latest.updated_at) : 'Noch keine Daten';
   const morning = firstActivityTime(roles);
   const kitchen = lastRoomActivity(roles, 'kitchen');
+  const dashboardState = getDashboardState({ error, hasSensors, latest: Boolean(latest), behavior });
 
   return (
     <section className="sc-page sc-simple-dashboard" aria-label="Sentero Tagesstatus">
       <header className="sc-simple-hero">
         <p className="sc-simple-date">{formatHeaderDate(new Date())}</p>
-        <p className="sc-simple-person"><span aria-hidden="true" /> {personName} · Zuhause</p>
-        <h2>{error ? 'Bitte prüfen.' : 'Alles in Ordnung.'}</h2>
+        <p className={`sc-simple-person ${dashboardState.tone}`}><span aria-hidden="true" /> {personName} · {dashboardState.kicker}</p>
+        <h2>{dashboardState.headline}</h2>
         <p className="sc-simple-copy">
-          {error ? 'Aktuelle Daten konnten gerade nicht geladen werden.' : latest ? 'Der aktuelle Verlauf basiert auf den verbundenen Sensoren.' : 'Noch keine Sensoraktivität vorhanden.'}
+          {dashboardState.copy}
         </p>
       </header>
 
-      <article className="sc-dashboard-status-card" aria-label="Aktueller Status">
+      <article className={`sc-dashboard-status-card ${dashboardState.tone}`} aria-label="Aktueller Status">
         <div>
           <Home size={22} aria-hidden="true" />
           <div>
-            <strong>{personName} ist zuhause</strong>
-            <span>Zuletzt aktualisiert: {lastUpdate}</span>
+            <strong>{dashboardState.statusTitle}</strong>
+            <span>{lastUpdate ? `Zuletzt aktualisiert: ${lastUpdate}` : dashboardState.statusMeta}</span>
           </div>
         </div>
-        <em><ShieldCheck size={17} aria-hidden="true" /> Alles in Ordnung</em>
+        <em><ShieldCheck size={17} aria-hidden="true" /> {dashboardState.badge}</em>
       </article>
 
-      <article className={`sc-behavior-card ${behavior?.status || 'green'}`} aria-label="Status heute">
+      <article className={`sc-behavior-card ${hasBehavior ? behavior?.status : 'neutral'}`} aria-label="Status heute">
         <div>
-          <span aria-hidden="true">{behaviorIcon(behavior?.status)}</span>
+          <span aria-hidden="true">{hasBehavior ? behaviorIcon(behavior?.status) : '○'}</span>
           <div>
             <small>Status heute</small>
-            <strong>{behaviorTitle(behavior?.status)}</strong>
+            <strong>{hasBehavior ? behaviorTitle(behavior?.status) : behaviorPlaceholderTitle(error, hasSensors)}</strong>
           </div>
         </div>
-        <p>{behavior?.summary || 'Noch keine KI-Bewertung vorhanden. Sentero lernt den Tagesablauf mit den verbundenen Sensoren.'}</p>
-        {behavior?.recommendation && <em>{behavior.recommendation}</em>}
+        <p>{hasBehavior ? behavior?.summary : behaviorPlaceholderText(error, hasSensors)}</p>
+        {hasBehavior && behavior?.recommendation && <em>{behavior.recommendation}</em>}
       </article>
 
       <article className="sc-simple-day-card" aria-label="Tagesverlauf">
@@ -112,6 +116,68 @@ function Fact({ icon: Icon, label, value, highlight }: { icon: typeof Clock3; la
       </div>
     </div>
   );
+}
+
+function getDashboardState({ error, hasSensors, latest, behavior }: { error: string; hasSensors: boolean; latest: boolean; behavior: SeniorBehaviorAssessment | null }) {
+  if (error) {
+    return {
+      tone: 'error',
+      kicker: 'Datenquelle nicht erreichbar',
+      headline: 'Bitte prüfen.',
+      copy: 'Aktuelle Daten konnten gerade nicht geladen werden.',
+      statusTitle: 'Datenquelle nicht erreichbar',
+      statusMeta: 'Bitte Verbindung und Backend prüfen',
+      badge: 'Prüfen',
+    };
+  }
+  if (!hasSensors) {
+    return {
+      tone: 'neutral',
+      kicker: 'Einrichtung offen',
+      headline: 'Noch keine Sensoren.',
+      copy: 'Verbinden Sie zuerst Sensoren, damit Sentero den Tagesablauf zuverlässig bewerten kann.',
+      statusTitle: 'Noch keine Sensoren eingerichtet',
+      statusMeta: 'Sensoren im Wizard verbinden',
+      badge: 'Einrichtung offen',
+    };
+  }
+  if (!latest) {
+    return {
+      tone: 'learning',
+      kicker: 'Sensoren verbunden',
+      headline: 'Sentero lernt.',
+      copy: 'Sensoren sind eingerichtet, aber heute wurde noch keine verwertbare Aktivität erkannt.',
+      statusTitle: 'Sensoren eingerichtet',
+      statusMeta: 'Noch keine Aktivität erkannt',
+      badge: 'Lernt Tagesablauf',
+    };
+  }
+  const titleByStatus: Record<string, string> = {
+    yellow: 'Leichte Auffälligkeit.',
+    orange: 'Bitte prüfen.',
+    red: 'Handlungsbedarf.',
+  };
+  return {
+    tone: behavior?.status || 'ok',
+    kicker: 'Aktivität erkannt',
+    headline: titleByStatus[String(behavior?.status || '')] || 'Alles in Ordnung.',
+    copy: behavior?.summary || 'Der aktuelle Verlauf basiert auf verbundenen Sensoren.',
+    statusTitle: 'Aktivität zuhause erkannt',
+    statusMeta: 'Sensoraktivität vorhanden',
+    badge: behaviorTitle(behavior?.status),
+  };
+}
+
+function behaviorPlaceholderTitle(error: string, hasSensors: boolean) {
+  if (error) return 'Keine Bewertung verfügbar';
+  if (!hasSensors) return 'Noch nicht aktiv';
+  return 'Lernphase';
+}
+
+function behaviorPlaceholderText(error: string, hasSensors: boolean) {
+  if (error) return 'Sentero kann den Tagesstatus erst bewerten, wenn die Daten wieder geladen werden.';
+  if (!hasSensors) return 'Die KI-Bewertung startet, sobald Sensoren eingerichtet sind und erste Aktivitätsdaten vorliegen.';
+  return 'Sentero sammelt Sensorhistorie, um normale Tagesabläufe von Auffälligkeiten unterscheiden zu können.';
 }
 
 function behaviorTitle(status?: string | null) {
