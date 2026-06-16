@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -383,27 +384,69 @@ class DeviceMappingService:
         states = self.snapshot()
         identify = find_identify_entity(states, device_id, entity_id)
         if identify:
-            response = self.ha.call_service('button', 'press', {'entity_id': identify['entity_id']})
+            try:
+                response = self.ha.call_service('button', 'press', {'entity_id': identify['entity_id']})
+                logger.info(
+                    "SeniorCare sensor test identify role=%s entity=%s identify_entity=%s device=%s",
+                    role,
+                    entity_id,
+                    identify.get('entity_id'),
+                    device_id,
+                )
+                return {
+                    'ok': True,
+                    'mode': 'identify',
+                    'message': 'Sensor wurde identifiziert.',
+                    'entity_id': identify.get('entity_id'),
+                    'response': response,
+                }
+            except Exception as exc:
+                logger.info(
+                    "SeniorCare sensor test identify failed role=%s entity=%s identify_entity=%s device=%s error=%s",
+                    role,
+                    entity_id,
+                    identify.get('entity_id'),
+                    device_id,
+                    exc,
+                )
+        device_entities = [item for item in states if device_id and str(item.get('device_id') or '') == device_id]
+        if not device_entities:
+            device_entities = [item for item in states if str(item.get('entity_id') or '') == entity_id]
+        usable_entities = [item for item in device_entities if testable_state_entity(item)]
+        reachable = [item for item in usable_entities if state_is_reachable(item.get('state'))]
+        if not reachable:
             logger.info(
-                "SeniorCare sensor test identify role=%s entity=%s identify_entity=%s device=%s",
+                "SeniorCare sensor test unreachable role=%s entity=%s device=%s device_entities=%s usable_entities=%s",
                 role,
                 entity_id,
-                identify.get('entity_id'),
                 device_id,
+                len(device_entities),
+                len(usable_entities),
             )
             return {
-                'ok': True,
-                'mode': 'identify',
-                'message': 'Sensor wurde identifiziert.',
-                'entity_id': identify.get('entity_id'),
-                'response': response,
+                'ok': False,
+                'mode': 'state_check',
+                'message': 'Sensor ist aktuell nicht erreichbar.',
+                'entity_id': entity_id,
+                'entity_count': len(device_entities),
             }
-        state = self.ha.fetch_entity_state(entity_id)
-        if not state:
-            logger.info("SeniorCare sensor test unreachable role=%s entity=%s device=%s", role, entity_id, device_id)
-            return {'ok': False, 'mode': 'state_check', 'message': 'Sensor ist aktuell nicht erreichbar.', 'entity_id': entity_id}
-        logger.info("SeniorCare sensor test state_check role=%s entity=%s state=%s device=%s", role, entity_id, state.get('state'), device_id)
-        return {'ok': True, 'mode': 'state_check', 'message': 'Sensor ist erreichbar.', 'entity_id': entity_id, 'state': state.get('state')}
+        primary = next((item for item in reachable if str(item.get('entity_id') or '') == entity_id), reachable[0])
+        logger.info(
+            "SeniorCare sensor test state_check role=%s entity=%s state=%s device=%s reachable_entities=%s",
+            role,
+            primary.get('entity_id'),
+            primary.get('state'),
+            device_id,
+            len(reachable),
+        )
+        return {
+            'ok': True,
+            'mode': 'state_check',
+            'message': 'Sensor ist erreichbar.',
+            'entity_id': primary.get('entity_id'),
+            'state': primary.get('state'),
+            'entity_count': len(device_entities),
+        }
 
     def _remove_zigbee_device(self, mapped: dict[str, Any]) -> dict[str, Any]:
         entity_id = str(mapped.get('entity_id') or '').strip()
@@ -425,29 +468,34 @@ class DeviceMappingService:
         for item in device_entities:
             identifiers.extend(parse_identifiers(item.get('identifiers')))
         ieee = first_identifier_value(identifiers, {'zha'})
-        mqtt_id = first_identifier_value(identifiers, {'mqtt', 'zigbee2mqtt'})
+        mqtt_ids = zigbee2mqtt_identifiers(identifiers, device_entities)
         attempts: list[dict[str, Any]] = []
-        if ieee:
-            try:
-                response = self.ha.call_service('zha', 'remove', {'ieee': ieee})
-                return {'ok': True, 'provider': 'zha', 'ieee': ieee, 'response': response}
-            except Exception as exc:
-                attempts.append({'provider': 'zha', 'ieee': ieee, 'error': str(exc)})
-                logger.info("SeniorCare Zigbee device remove failed provider=zha entity=%s device=%s ieee=%s error=%s", entity_id, device_id, ieee, exc)
-        if mqtt_id:
-            try:
-                response = self.ha.call_service(
-                    'mqtt',
-                    'publish',
-                    {
-                        'topic': 'zigbee2mqtt/bridge/request/device/remove',
-                        'payload': json.dumps({'id': mqtt_id, 'force': True}),
-                    },
-                )
-                return {'ok': True, 'provider': 'zigbee2mqtt', 'id': mqtt_id, 'response': response, 'attempts': attempts}
-            except Exception as exc:
-                attempts.append({'provider': 'zigbee2mqtt', 'id': mqtt_id, 'error': str(exc)})
-                logger.info("SeniorCare Zigbee device remove failed provider=zigbee2mqtt entity=%s device=%s id=%s error=%s", entity_id, device_id, mqtt_id, exc)
+        for provider in zigbee_provider_order():
+            if provider == 'zha':
+                if not ieee:
+                    continue
+                try:
+                    response = self.ha.call_service('zha', 'remove', {'ieee': ieee})
+                    return {'ok': True, 'provider': 'zha', 'ieee': ieee, 'response': response, 'attempts': attempts}
+                except Exception as exc:
+                    attempts.append({'provider': 'zha', 'ieee': ieee, 'error': str(exc)})
+                    logger.info("SeniorCare Zigbee device remove failed provider=zha entity=%s device=%s ieee=%s error=%s", entity_id, device_id, ieee, exc)
+                continue
+            if provider == 'zigbee2mqtt':
+                for mqtt_id in mqtt_ids:
+                    try:
+                        response = self.ha.call_service(
+                            'mqtt',
+                            'publish',
+                            {
+                                'topic': 'zigbee2mqtt/bridge/request/device/remove',
+                                'payload': json.dumps({'id': mqtt_id, 'force': True}),
+                            },
+                        )
+                        return {'ok': True, 'provider': 'zigbee2mqtt', 'id': mqtt_id, 'response': response, 'attempts': attempts}
+                    except Exception as exc:
+                        attempts.append({'provider': 'zigbee2mqtt', 'id': mqtt_id, 'error': str(exc)})
+                        logger.info("SeniorCare Zigbee device remove failed provider=zigbee2mqtt entity=%s device=%s id=%s error=%s", entity_id, device_id, mqtt_id, exc)
         return {
             'ok': False,
             'reason': 'zigbee_remove_unavailable',
@@ -455,12 +503,13 @@ class DeviceMappingService:
             'entity_id': entity_id,
             'device_id': device_id or None,
             'identifiers': identifiers,
+            'mqtt_ids': mqtt_ids,
             'attempts': attempts,
         }
 
     def _attach_state(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         try:
-            states = self.ha.get_states()
+            states = self.snapshot()
         except Exception:
             logger.exception("SeniorCare sensor state refresh failed. ha_url=%s", getattr(self.ha, 'base_url', ''))
             return [{**row, 'reachable': False, 'state': None, 'last_changed': None, 'last_updated': None, 'battery_level': None} for row in rows]
@@ -469,7 +518,6 @@ class DeviceMappingService:
         for row in rows:
             entity_id = str(row.get('entity_id') or '')
             state = by_entity.get(entity_id)
-            attrs = state.get('attributes') if state else {}
             value = state.get('state') if state else None
             reachable = bool(state and value not in {None, '', 'unknown', 'unavailable'})
             result.append({
@@ -478,7 +526,7 @@ class DeviceMappingService:
                 'reachable': reachable,
                 'last_changed': state.get('last_changed') if state else None,
                 'last_updated': state.get('last_updated') if state else None,
-                'battery_level': find_battery_level(row, states, attrs or {}),
+                'battery_level': find_battery_level({**row, **(state or {})}, states),
             })
         return result
 
@@ -606,27 +654,31 @@ class DeviceMappingService:
 
     def _open_zigbee_permit_join(self, duration: int) -> dict[str, Any]:
         attempts: list[dict[str, Any]] = []
-        try:
-            response = self.ha.call_service('zha', 'permit', {'duration': duration})
-            logger.info("SeniorCare Zigbee permit_join sent provider=zha duration=%s", duration)
-            return {'ok': True, 'provider': 'zha', 'duration': duration, 'response': response}
-        except Exception as exc:
-            attempts.append({'provider': 'zha', 'error': str(exc)})
-            logger.info("SeniorCare Zigbee permit_join failed provider=zha error=%s", exc)
-        try:
-            response = self.ha.call_service(
-                'mqtt',
-                'publish',
-                {
-                    'topic': 'zigbee2mqtt/bridge/request/permit_join',
-                    'payload': json.dumps({'value': True, 'time': duration}),
-                },
-            )
-            logger.info("SeniorCare Zigbee permit_join sent provider=zigbee2mqtt duration=%s", duration)
-            return {'ok': True, 'provider': 'zigbee2mqtt', 'duration': duration, 'response': response, 'attempts': attempts}
-        except Exception as exc:
-            attempts.append({'provider': 'zigbee2mqtt', 'error': str(exc)})
-            logger.info("SeniorCare Zigbee permit_join failed provider=zigbee2mqtt error=%s", exc)
+        for provider in zigbee_provider_order():
+            if provider == 'zha':
+                try:
+                    response = self.ha.call_service('zha', 'permit', {'duration': duration})
+                    logger.info("SeniorCare Zigbee permit_join sent provider=zha duration=%s", duration)
+                    return {'ok': True, 'provider': 'zha', 'duration': duration, 'response': response, 'attempts': attempts}
+                except Exception as exc:
+                    attempts.append({'provider': 'zha', 'error': str(exc)})
+                    logger.info("SeniorCare Zigbee permit_join failed provider=zha error=%s", exc)
+                continue
+            if provider == 'zigbee2mqtt':
+                try:
+                    response = self.ha.call_service(
+                        'mqtt',
+                        'publish',
+                        {
+                            'topic': 'zigbee2mqtt/bridge/request/permit_join',
+                            'payload': json.dumps({'value': True, 'time': duration}),
+                        },
+                    )
+                    logger.info("SeniorCare Zigbee permit_join sent provider=zigbee2mqtt duration=%s", duration)
+                    return {'ok': True, 'provider': 'zigbee2mqtt', 'duration': duration, 'response': response, 'attempts': attempts}
+                except Exception as exc:
+                    attempts.append({'provider': 'zigbee2mqtt', 'error': str(exc)})
+                    logger.info("SeniorCare Zigbee permit_join failed provider=zigbee2mqtt error=%s", exc)
         return {'ok': False, 'reason': 'zigbee_pairing_unavailable', 'message': 'Zigbee-Anlernen nicht verfuegbar', 'attempts': attempts}
 
 
@@ -849,6 +901,21 @@ def candidate_entity_priority(role: str, item: dict[str, Any]) -> int:
     return 0
 
 
+def testable_state_entity(item: dict[str, Any]) -> bool:
+    entity_id = str(item.get('entity_id') or '')
+    domain = str(item.get('domain') or entity_id.split('.', 1)[0] if '.' in entity_id else '')
+    if domain in {'button', 'update'}:
+        return False
+    haystack = normalize(f"{entity_id} {item.get('friendly_name') or ''} {item.get('original_name') or ''}")
+    if any(term in haystack for term in ['identifizieren', 'identify', 'firmware']):
+        return False
+    return domain in {'binary_sensor', 'sensor', 'lock', 'switch'}
+
+
+def state_is_reachable(value: Any) -> bool:
+    return str(value or '').strip().lower() not in {'', 'unknown', 'unavailable', 'none'}
+
+
 def role_is_presence(role: str) -> bool:
     return str(role or '').endswith(('presence', '_motion'))
 
@@ -920,6 +987,57 @@ def first_identifier_value(identifiers: list[tuple[str, str]], domains: set[str]
     return None
 
 
+def zigbee_provider_order() -> list[str]:
+    configured = normalize(os.getenv('SENTERO_ZIGBEE_PROVIDER') or os.getenv('ZIGBEE_PROVIDER') or 'auto')
+    if configured in {'zigbee2mqtt', 'z2m', 'mqtt'}:
+        return ['zigbee2mqtt', 'zha']
+    if configured == 'zha':
+        return ['zha', 'zigbee2mqtt']
+    return ['zigbee2mqtt', 'zha']
+
+
+def zigbee2mqtt_identifiers(identifiers: list[tuple[str, str]], entities: list[dict[str, Any]]) -> list[str]:
+    values: list[str] = []
+    for domain, value in identifiers:
+        if normalize(domain) not in {'mqtt', 'zigbee2mqtt'}:
+            continue
+        values.extend(expand_zigbee2mqtt_id(value))
+    for item in entities:
+        for field in ('unique_id', 'entity_id', 'device_name', 'friendly_name'):
+            values.extend(expand_zigbee2mqtt_id(item.get(field)))
+    return dedupe([value for value in values if value])
+
+
+def expand_zigbee2mqtt_id(value: Any) -> list[str]:
+    text = str(value or '').strip()
+    if not text:
+        return []
+    ieee_match = re.search(r'0x[0-9a-fA-F]{12,16}', text)
+    if ieee_match:
+        return [ieee_match.group(0)]
+    normalized = text
+    for prefix in ('zigbee2mqtt_', 'mqtt_'):
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix):]
+            return [normalized] if normalized else []
+    result = [text]
+    if '.' in text:
+        result.append(text.rsplit('.', 1)[-1])
+    return result
+
+
+def dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result = []
+    for value in values:
+        key = value.strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(key)
+    return result
+
+
 def registry_result_list(response: dict[str, Any]) -> list[dict[str, Any]]:
     result = response.get('result') if isinstance(response, dict) else None
     if isinstance(result, list):
@@ -955,7 +1073,8 @@ def public_role(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]], attrs: dict[str, Any]) -> int | None:
+def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]]) -> int | None:
+    attrs = role.get('attributes') if isinstance(role.get('attributes'), dict) else {}
     direct = parse_battery(attrs.get('battery_level') or attrs.get('battery') or attrs.get('battery_percentage'))
     if direct is not None:
         return direct
@@ -965,14 +1084,13 @@ def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]], attrs
     role_prefix = role_entity.rsplit('_', 1)[0] if '_' in role_entity else role_entity
     for state in states:
         entity_id = str(state.get('entity_id') or '')
-        state_attrs = state.get('attributes') or {}
-        if state_attrs.get('device_class') != 'battery' and not entity_id.startswith('sensor.'):
+        if not is_battery_entity(state):
             continue
-        if device_id and state_attrs.get('device_id') == device_id:
+        if device_id and str(state.get('device_id') or '') == device_id:
             parsed = parse_battery(state.get('state'))
             if parsed is not None:
                 return parsed
-        haystack = normalize(f"{entity_id} {state_attrs.get('friendly_name') or ''}")
+        haystack = normalize(f"{entity_id} {state.get('friendly_name') or ''} {state.get('original_name') or ''}")
         if friendly and friendly in haystack:
             parsed = parse_battery(state.get('state'))
             if parsed is not None:
@@ -982,6 +1100,17 @@ def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]], attrs
             if parsed is not None:
                 return parsed
     return None
+
+
+def is_battery_entity(state: dict[str, Any]) -> bool:
+    entity_id = str(state.get('entity_id') or '')
+    if not entity_id.startswith('sensor.'):
+        return False
+    device_class = str(state.get('device_class') or '').lower()
+    if device_class == 'battery':
+        return True
+    haystack = normalize(f"{entity_id} {state.get('friendly_name') or ''} {state.get('original_name') or ''}")
+    return any(term in haystack for term in ['battery', 'batterie', 'akku'])
 
 
 def parse_battery(value: Any) -> int | None:

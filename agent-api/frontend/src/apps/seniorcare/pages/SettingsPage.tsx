@@ -230,7 +230,12 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   async function testSensor(role: string) {
     try {
       const result = await api.testSeniorSensorRole(role);
-      toast(result.message || (result.ok ? 'Sensor geprüft' : 'Sensor nicht erreichbar'));
+      if (!result.ok) {
+        setError(result.message || 'Sensor ist aktuell nicht erreichbar.');
+      } else {
+        setError('');
+        toast(result.message || 'Sensor geprüft');
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sensor konnte nicht geprüft werden.');
