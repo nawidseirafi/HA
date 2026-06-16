@@ -704,6 +704,8 @@ function HomeSection({
     const open = data.security.openings_open;
     const issues = data.security.problems.length + data.health.unavailable.length;
     const batterySummary = homeBatterySummary(data);
+    const wallBatteries = wallBatteryEntities(data.health.batteries ?? []);
+    const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
     return (
@@ -756,8 +758,8 @@ function HomeSection({
                 busy={garage ? busyEntity === garage.entity_id : false}
                 onCommand={onGarageCommand}
             />
-            <MetricCard icon={batterySummary.icon} label="Batterien" value={`${data.health.low_batteries.length}`}
-                        detail={`${data.health.battery_total} gesamt`} tone={batterySummary.tone}
+            <MetricCard icon={batterySummary.icon} label="Batterien" value={`${wallLowBatteries.length}`}
+                        detail={`${wallBatteries.length} gesamt`} tone={batterySummary.tone}
                         onClick={onBatteries}/>
             <MetricCard
                 icon={<Wifi size={24}/>}
@@ -1315,6 +1317,7 @@ function ClimateSection({
 
 function SecuritySection({data}: { data: WallDashboardData }) {
     const openItems = data.security.openings.filter((item) => item.state === 'on');
+    const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     return (
         <div className="wall-card-grid">
             <MetricCard icon={<DoorOpen size={24}/>} label="Offene Kontakte" value={`${openItems.length}`}
@@ -1324,17 +1327,17 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <MetricCard icon={<Zap size={24}/>} label="Offline" value={`${data.health.unavailable.length}`}
                         detail="unknown/unavailable" tone={data.health.unavailable.length ? 'neutral' : 'ok'}/>
             <MetricCard icon={<BatteryWarning size={24}/>} label="Batterie"
-                        value={`${data.health.low_batteries.length}`} detail="niedrig"
-                        tone={data.health.low_batteries.length ? 'critical' : 'ok'}/>
+                        value={`${wallLowBatteries.length}`} detail="niedrig"
+                        tone={wallLowBatteries.length ? 'critical' : 'ok'}/>
             <ListPanel title="Offene Fenster & Türen" items={openItems}/>
-            <ListPanel title="Niedrige Batterien" items={data.health.low_batteries}/>
+            <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
         </div>
     );
 }
 
 function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () => void }) {
-    const batteries = data.health.batteries ?? data.health.low_batteries;
+    const batteries = wallBatteryEntities(data.health.batteries ?? data.health.low_batteries);
     return (
         <div className="wall-page-stack">
 
@@ -1755,7 +1758,7 @@ function formatBatteryLevel(battery: WallEntity & { level?: number | null }) {
 }
 
 function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: ReactNode } {
-    const batteries = data.health.batteries ?? [];
+    const batteries = wallBatteryEntities(data.health.batteries ?? []);
     const hasUnknown = batteries.some((battery) => battery.level === null || battery.level === undefined || ['unknown', 'unavailable'].includes(String(battery.state).toLowerCase()));
     const levels = batteries
         .map((battery) => battery.level)
@@ -1771,6 +1774,25 @@ function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: 
         return {tone: 'neutral', icon: <Battery size={24}/>};
     }
     return {tone: 'ok', icon: <BatteryFull size={24}/>};
+}
+
+function wallBatteryEntities(items: Array<WallEntity & { level?: number | null }>) {
+    return items.filter((item) => isWallBatteryEntity(item));
+}
+
+function wallLowBatteryEntities(items: Array<WallEntity & { level?: number | null }>) {
+    return wallBatteryEntities(items).filter((battery) => {
+        const level = battery.level;
+        return String(battery.state || '').toLowerCase() === 'low'
+            || (level !== null && level !== undefined && Number.isFinite(Number(level)) && Number(level) < LOW_BATTERY_THRESHOLD);
+    });
+}
+
+function isWallBatteryEntity(item: WallEntity) {
+    const entityId = String(item.entity_id || '').toLowerCase();
+    if (!entityId.startsWith('sensor.')) return false;
+    const objectId = entityId.split('.', 2)[1] || entityId;
+    return objectId.endsWith('_battery') || objectId.endsWith('_batterie');
 }
 
 function garageCover(data: WallDashboardData): WallCover | null {

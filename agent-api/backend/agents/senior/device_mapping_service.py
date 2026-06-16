@@ -520,13 +520,22 @@ class DeviceMappingService:
             state = by_entity.get(entity_id)
             value = state.get('state') if state else None
             reachable = bool(state and value not in {None, '', 'unknown', 'unavailable'})
+            battery_entity = find_battery_entity({**row, **(state or {})}, states)
+            battery_level = parse_battery(battery_entity.get('state')) if battery_entity else None
+            logger.info(
+                "SeniorCare sensor battery role=%s entity=%s battery_entity=%s battery_level=%s",
+                row.get('role'),
+                entity_id,
+                battery_entity.get('entity_id') if battery_entity else None,
+                battery_level,
+            )
             result.append({
                 **row,
                 'state': value,
                 'reachable': reachable,
                 'last_changed': state.get('last_changed') if state else None,
                 'last_updated': state.get('last_updated') if state else None,
-                'battery_level': find_battery_level({**row, **(state or {})}, states),
+                'battery_level': battery_level,
             })
         return result
 
@@ -1074,12 +1083,14 @@ def public_role(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]]) -> int | None:
-    attrs = role.get('attributes') if isinstance(role.get('attributes'), dict) else {}
-    direct = parse_battery(attrs.get('battery_level') or attrs.get('battery') or attrs.get('battery_percentage'))
-    if direct is not None:
-        return direct
+    match = find_battery_entity(role, states)
+    if not match:
+        return None
+    return parse_battery(match.get('state'))
+
+
+def find_battery_entity(role: dict[str, Any], states: list[dict[str, Any]]) -> dict[str, Any] | None:
     device_id = str(role.get('device_id') or '').strip()
-    friendly = normalize(str(role.get('friendly_name') or role.get('role') or ''))
     role_entity = str(role.get('entity_id') or '')
     role_prefix = role_entity.rsplit('_', 1)[0] if '_' in role_entity else role_entity
     for state in states:
@@ -1087,18 +1098,11 @@ def find_battery_level(role: dict[str, Any], states: list[dict[str, Any]]) -> in
         if not is_battery_entity(state):
             continue
         if device_id and str(state.get('device_id') or '') == device_id:
-            parsed = parse_battery(state.get('state'))
-            if parsed is not None:
-                return parsed
-        haystack = normalize(f"{entity_id} {state.get('friendly_name') or ''} {state.get('original_name') or ''}")
-        if friendly and friendly in haystack:
-            parsed = parse_battery(state.get('state'))
-            if parsed is not None:
-                return parsed
+            if parse_battery(state.get('state')) is not None:
+                return state
         if role_prefix and entity_id.startswith(role_prefix):
-            parsed = parse_battery(state.get('state'))
-            if parsed is not None:
-                return parsed
+            if parse_battery(state.get('state')) is not None:
+                return state
     return None
 
 
@@ -1106,11 +1110,13 @@ def is_battery_entity(state: dict[str, Any]) -> bool:
     entity_id = str(state.get('entity_id') or '')
     if not entity_id.startswith('sensor.'):
         return False
-    device_class = str(state.get('device_class') or '').lower()
-    if device_class == 'battery':
-        return True
-    haystack = normalize(f"{entity_id} {state.get('friendly_name') or ''} {state.get('original_name') or ''}")
-    return any(term in haystack for term in ['battery', 'batterie', 'akku'])
+    object_id = normalize(entity_id.split('.', 1)[1] if '.' in entity_id else entity_id)
+    names = [
+        object_id,
+        normalize(str(state.get('friendly_name') or '')),
+        normalize(str(state.get('original_name') or '')),
+    ]
+    return any(name.endswith(('_battery', '_batterie')) or name in {'battery', 'batterie'} for name in names if name)
 
 
 def parse_battery(value: Any) -> int | None:

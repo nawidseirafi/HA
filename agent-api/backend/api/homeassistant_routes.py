@@ -330,20 +330,16 @@ def _battery_item(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_battery_state(state: dict[str, Any]) -> bool:
-    attributes = state.get("attributes", {})
-    device_class = str(attributes.get("device_class") or "").lower()
     entity_id = str(state.get("entity_id") or "").lower()
-    name = str(_name(state) or "").lower()
+    if not entity_id.startswith("sensor."):
+        return False
+    object_id = entity_id.split(".", 1)[1]
+    if not object_id.endswith(("_battery", "_batterie")):
+        return False
+    attributes = state.get("attributes", {})
     unit = str(attributes.get("unit_of_measurement") or "").strip()
     state_value = str(state.get("state") or "").strip().lower()
-
-    if device_class == "battery":
-        return True
-    if "batterie" in entity_id or "battery" in entity_id or "batterie" in name or "battery" in name:
-        if "voltage" in entity_id or "batteriespannung" in entity_id or device_class == "voltage" or unit.lower() in {"v", "mv"}:
-            return False
-        return unit == "%" or _is_numeric_state(state_value) or state_value in {"low", "normal", "high", "ok", "unknown", "unavailable"}
-    return False
+    return unit == "%" or _is_numeric_state(state_value) or state_value in {"low", "normal", "high", "ok", "unknown", "unavailable"}
 
 
 def _battery_level(state: dict[str, Any]) -> float | None:
