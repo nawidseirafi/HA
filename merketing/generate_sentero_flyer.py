@@ -74,7 +74,6 @@ def text_width(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.FreeTypeFont
     bbox = draw.textbbox((0, 0), text, font=fnt)
     return bbox[2] - bbox[0]
 
-
 def wrap(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.FreeTypeFont, width: int) -> list[str]:
     lines: list[str] = []
     for paragraph in text.split("\n"):
@@ -401,23 +400,22 @@ def main() -> None:
         62,
     )
 
-    y += 134
+    y += 125
     draw_wrapped(
         draw,
         (margin, y),
-        "Sentero erkennt diskret,\nob der Alltag wie gewohnt verläuft.",
+        "Sentero erkennt diskret, ob der Alltag wie gewohnt verläuft.",
         font(38),
         MUTED,
-        980,
+        1500,
         52,
     )
 
-    promise_y = y + 150
-    draw.rounded_rectangle((margin, promise_y, W - margin, promise_y + 176), radius=44, fill=(240, 248, 242), outline=(207, 233, 214), width=2)
-    draw.text((margin + 48, promise_y + 34), "Ohne Kamera.", font=font(38, "bold"), fill=INK)
-    draw.text((margin + 48, promise_y + 82), "Ohne Cloud-Zwang. Ohne komplizierte Technik.", font=font(34), fill=(83, 97, 88))
+    promise_y = y + 100
+    draw.rounded_rectangle((margin, promise_y, W - margin, promise_y + 170), radius=44, fill=(240, 248, 242), outline=(207, 233, 214), width=2)
+    draw.text((margin + 200, promise_y + 60), "Ohne Kamera, ohne Cloud-Zwang, ohne komplizierte Technik.", font=font(38, "bold"), fill=INK)
 
-    benefits_y = promise_y + 232
+    benefits_y = promise_y + 220
     benefits = [
         "Keine Kamera",
         "Lokal verarbeitet",
@@ -434,7 +432,7 @@ def main() -> None:
         draw_check(draw, (x + 22, yy + 22), 20)
         draw.text((x + 58, yy + 2), item, font=font(31, "bold"), fill=(39, 52, 44))
 
-    story_y = benefits_y + 196
+    story_y = benefits_y + 210
     story = (
         "Viele ältere Menschen möchten selbstständig leben.\n\n"
         "Viele Angehörige möchten einfach wissen, dass alles in Ordnung ist.\n\n"
