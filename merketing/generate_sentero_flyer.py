@@ -356,7 +356,7 @@ def main() -> None:
     daughter_w = W - margin * 2 - mother_w - gap
 
     mother = cover_image(ROOT / "Margarete.png", (mother_w, hero_h), (0.48, 0.24))
-    daughter = cover_image(ROOT / "Thomas.png", (daughter_w, hero_h), (0.50, 0.22))
+    daughter = cover_image(ROOT / "Daniela.png", (daughter_w, hero_h), (0.50, 0.22))
     paste_round(canvas, mother, (margin, hero_y), 88)
     paste_round(canvas, daughter, (margin + mother_w + gap, hero_y), 88)
 
@@ -368,7 +368,7 @@ def main() -> None:
     label_font = font(28, "bold")
     for x, y, label in [
         (margin + 42, hero_y + hero_h - 92, "Margarete, 78"),
-        (margin + mother_w + gap + 42, hero_y + hero_h - 92, "Thomas, 55"),
+        (margin + mother_w + gap + 42, hero_y + hero_h - 92, "Daniela, 48"),
     ]:
         tw = text_width(draw, label, label_font)
         draw.rounded_rectangle((x, y, x + tw + 78, y + 50), radius=25, fill=(255, 255, 255, 226))
