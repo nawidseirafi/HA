@@ -517,20 +517,32 @@ class DeviceMappingService:
         result = []
         for row in rows:
             entity_id = str(row.get('entity_id') or '')
-            state = by_entity.get(entity_id)
+            state = resolve_role_state(dict(row), states, by_entity)
             value = state.get('state') if state else None
             reachable = bool(state and value not in {None, '', 'unknown', 'unavailable'})
             battery_entity = find_battery_entity({**row, **(state or {})}, states)
             battery_level = parse_battery(battery_entity.get('state')) if battery_entity else None
             logger.info(
-                "SeniorCare sensor battery role=%s entity=%s battery_entity=%s battery_level=%s",
+                "SeniorCare sensor health role=%s stored_entity=%s resolved_entity=%s reachable=%s battery_entity=%s battery_level=%s",
                 row.get('role'),
                 entity_id,
+                state.get('entity_id') if state else None,
+                reachable,
                 battery_entity.get('entity_id') if battery_entity else None,
                 battery_level,
             )
             result.append({
                 **row,
+                'device_id': row.get('device_id') or (state.get('device_id') if state else None),
+                'area_id': state.get('area_id') if state else None,
+                'platform': state.get('platform') if state else None,
+                'unique_id': state.get('unique_id') if state else None,
+                'original_name': state.get('original_name') if state else None,
+                'device_name': state.get('device_name') if state else None,
+                'manufacturer': state.get('manufacturer') if state else None,
+                'model': state.get('model') if state else None,
+                'identifiers': state.get('identifiers') if state else None,
+                'resolved_entity_id': state.get('entity_id') if state else None,
                 'state': value,
                 'reachable': reachable,
                 'last_changed': state.get('last_changed') if state else None,
@@ -556,6 +568,8 @@ class DeviceMappingService:
                 'state': item.get('state'),
                 'friendly_name': attrs.get('friendly_name'),
                 'device_class': attrs.get('device_class'),
+                'unit': attrs.get('unit_of_measurement'),
+                'unit_of_measurement': attrs.get('unit_of_measurement'),
                 'device_id': device_id,
                 'area_id': registry.get('area_id') or device.get('area_id'),
                 'platform': registry.get('platform'),
@@ -648,8 +662,37 @@ class DeviceMappingService:
         except Exception as exc:
             detail.setdefault('errors', []).append({'target': 'entity_registry', 'error': str(exc)})
             logger.info("SeniorCare HA entity metadata update failed entity=%s area=%s error=%s", entity_id, area_id, exc)
+        zigbee2mqtt_rename = self._rename_zigbee2mqtt_device(entity, name)
+        if zigbee2mqtt_rename.get('ok'):
+            detail['updated'].append('zigbee2mqtt')
+        elif zigbee2mqtt_rename.get('reason') != 'no_zigbee2mqtt_id':
+            detail.setdefault('errors', []).append({'target': 'zigbee2mqtt', 'error': zigbee2mqtt_rename})
         detail['ok'] = bool(detail['updated'])
         return detail
+
+    def _rename_zigbee2mqtt_device(self, entity: dict[str, Any], name: str) -> dict[str, Any]:
+        clean_name = str(name or '').strip()
+        if not clean_name:
+            return {'ok': False, 'reason': 'missing_name'}
+        identifiers = parse_identifiers(entity.get('identifiers'))
+        candidates = zigbee2mqtt_identifiers(identifiers, [entity])
+        source_id = next((value for value in candidates if re.fullmatch(r'0x[0-9a-fA-F]{12,16}', value)), None)
+        if not source_id:
+            return {'ok': False, 'reason': 'no_zigbee2mqtt_id', 'candidates': candidates}
+        try:
+            response = self.ha.call_service(
+                'mqtt',
+                'publish',
+                {
+                    'topic': 'zigbee2mqtt/bridge/request/device/rename',
+                    'payload': json.dumps({'from': source_id, 'to': clean_name, 'homeassistant_rename': True}),
+                },
+            )
+            logger.info("SeniorCare Zigbee2MQTT rename sent from=%s to=%s entity=%s", source_id, clean_name, entity.get('entity_id'))
+            return {'ok': True, 'provider': 'zigbee2mqtt', 'from': source_id, 'to': clean_name, 'response': response}
+        except Exception as exc:
+            logger.info("SeniorCare Zigbee2MQTT rename failed from=%s to=%s entity=%s error=%s", source_id, clean_name, entity.get('entity_id'), exc)
+            return {'ok': False, 'reason': 'rename_failed', 'from': source_id, 'to': clean_name, 'error': str(exc)}
 
     def _try_matter_pairing(self, pairing_code: str) -> dict[str, Any]:
         code = str(pairing_code or '').strip().replace(' ', '')
@@ -908,6 +951,65 @@ def candidate_entity_priority(role: str, item: dict[str, Any]) -> int:
         if domain == 'switch' and any(term in haystack for term in ['vibration', 'door', 'tuer', 'tür']):
             return 20
     return 0
+
+
+def resolve_role_state(row: dict[str, Any], states: list[dict[str, Any]], by_entity: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    entity_id = str(row.get('entity_id') or '')
+    direct = by_entity.get(entity_id)
+    if direct and state_is_reachable(direct.get('state')) and role_state_matches(str(row.get('role') or ''), direct):
+        return direct
+    device_id = str(row.get('device_id') or '').strip()
+    candidates = []
+    if device_id:
+        candidates = [item for item in states if str(item.get('device_id') or '') == device_id and role_state_matches(str(row.get('role') or ''), item)]
+    if not candidates and entity_id:
+        prefix = entity_id.rsplit('_', 1)[0] if '_' in entity_id else entity_id.rsplit('.', 1)[-1]
+        candidates = [item for item in states if prefix and str(item.get('entity_id') or '').startswith(prefix) and role_state_matches(str(row.get('role') or ''), item)]
+    if not candidates:
+        room = str(row.get('room') or '')
+        label = str(row.get('friendly_name') or row.get('role') or '')
+        candidates = [
+            item for item in states
+            if role_state_matches(str(row.get('role') or ''), item)
+            and (
+                room_matches(room, str(item.get('entity_id') or ''), item.get('friendly_name'))
+                or (label and normalize(label).split('_')[0] in normalize(f"{item.get('entity_id') or ''} {item.get('friendly_name') or ''}"))
+            )
+        ]
+    reachable = [item for item in candidates if state_is_reachable(item.get('state'))]
+    selected = sorted(reachable or candidates, key=lambda item: role_state_priority(str(row.get('role') or ''), item), reverse=True)
+    if selected:
+        return selected[0]
+    return direct
+
+
+def role_state_matches(role: str, item: dict[str, Any]) -> bool:
+    domain = str(item.get('domain') or str(item.get('entity_id') or '').split('.', 1)[0])
+    if domain in {'button', 'update', 'number', 'select'}:
+        return False
+    haystack = normalize(' '.join(str(item.get(key) or '') for key in ['entity_id', 'friendly_name', 'original_name', 'device_name']))
+    if any(term in haystack for term in ['battery', 'batterie', 'voltage', 'spannung', 'illuminance', 'beleuchtungsstaerke', 'humidity', 'luftfeuchtigkeit', 'temperature', 'temperatur', 'identify', 'identifizieren', 'firmware']):
+        return False
+    return role_candidate_matches(role, item, allow_missing_device_class=True, allow_device_class_mismatch=False)
+
+
+def role_state_priority(role: str, item: dict[str, Any]) -> int:
+    entity_id = normalize(str(item.get('entity_id') or ''))
+    device_class = str(item.get('device_class') or '').lower()
+    score = candidate_entity_priority(role, item)
+    if role_is_presence(role):
+        if any(term in entity_id for term in ['presence', 'praesenz', 'occupancy', 'occupy']):
+            score += 25
+        if 'pir' in entity_id or 'motion' in entity_id or 'bewegung' in entity_id:
+            score += 10
+        if device_class in {'occupancy', 'presence'}:
+            score += 20
+    if role_is_contact(role):
+        if any(term in entity_id for term in ['contact', 'door', 'tuer', 'window', 'fenster']):
+            score += 25
+        if device_class in CONTACT_CLASSES:
+            score += 20
+    return score
 
 
 def testable_state_entity(item: dict[str, Any]) -> bool:

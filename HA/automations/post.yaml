@@ -2,7 +2,7 @@
   description: "Setzt Meldung wenn Post da ist (persistent bis manuell zurückgesetzt)"
   trigger:
     - platform: state
-      entity_id: binary_sensor.briefkasten
+      entity_id: binary_sensor.briefkasten_vibration
       from: "off"
       to: "on"
   condition: []

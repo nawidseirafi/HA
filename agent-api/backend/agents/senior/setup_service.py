@@ -70,22 +70,41 @@ class SeniorSetupService:
 
     def contact(self, payload: dict[str, Any]) -> dict[str, Any]:
         timestamp = now()
+        name = str(payload.get('name') or '').strip()
+        email = normalize_email(payload.get('email'))
+        if not name:
+            raise ValueError('name is required')
         with self.mapping.connect() as con:
-            con.execute('insert into trusted_contacts (name, relationship, email, active, created_at, updated_at) values (?, ?, ?, 1, ?, ?)', (payload.get('name'), payload.get('relationship'), payload.get('email'), timestamp, timestamp))
+            existing = con.execute('select id from trusted_contacts where lower(email) = ? and active = 1', (email,)).fetchone() if email else None
+            if existing:
+                con.execute(
+                    'update trusted_contacts set name = ?, relationship = ?, email = ?, updated_at = ? where id = ?',
+                    (name, payload.get('relationship'), email, timestamp, existing['id']),
+                )
+            else:
+                con.execute(
+                    'insert into trusted_contacts (name, relationship, email, active, created_at, updated_at) values (?, ?, ?, 1, ?, ?)',
+                    (name, payload.get('relationship'), email, timestamp, timestamp),
+                )
             con.commit()
         return self.set_step('notifications', 'contacts')
 
     def update_contact(self, contact_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         name = str(payload.get('name') or '').strip()
+        email = normalize_email(payload.get('email'))
         if not name:
             raise ValueError('name is required')
         with self.mapping.connect() as con:
             row = con.execute('select id from trusted_contacts where id = ? and active = 1', (contact_id,)).fetchone()
             if not row:
                 raise ValueError('contact not found')
+            if email:
+                duplicate = con.execute('select id from trusted_contacts where lower(email) = ? and active = 1 and id != ?', (email, contact_id)).fetchone()
+                if duplicate:
+                    raise ValueError('email already exists')
             con.execute(
                 'update trusted_contacts set name = ?, relationship = ?, email = ?, updated_at = ? where id = ?',
-                (name, payload.get('relationship'), payload.get('email'), now(), contact_id),
+                (name, payload.get('relationship'), email, now(), contact_id),
             )
             con.commit()
         return self.status()
@@ -101,3 +120,7 @@ class SeniorSetupService:
             con.execute('''insert into notification_preferences (id, anomalies, critical, daily_summary, updated_at) values (1, ?, ?, ?, ?) on conflict(id) do update set anomalies = excluded.anomalies, critical = excluded.critical, daily_summary = excluded.daily_summary, updated_at = excluded.updated_at''', (int(bool(payload.get('anomalies', True))), int(bool(payload.get('critical', True))), int(bool(payload.get('daily_summary', False))), now()))
             con.commit()
         return self.set_step('complete', 'notifications')
+
+
+def normalize_email(value: Any) -> str:
+    return str(value or '').strip().lower()

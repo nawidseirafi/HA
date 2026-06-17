@@ -102,8 +102,13 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       setError('Bitte geben Sie einen Namen ein.');
       return;
     }
+    const email = normalizeEmail(contactForm.email);
+    if (email && (status?.trusted_contacts || []).some((contact) => normalizeEmail(contact.email || '') === email)) {
+      setError('Diese E-Mail-Adresse ist bereits hinterlegt.');
+      return;
+    }
     try {
-      await api.saveSeniorContact(contactForm);
+      await api.saveSeniorContact({ ...contactForm, email });
       setContactForm({ name: '', relationship: '', email: '' });
       setContactFormOpen(false);
       toast('Person hinzugefügt');
@@ -135,8 +140,13 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       setError('Bitte geben Sie einen Namen ein.');
       return;
     }
+    const email = normalizeEmail(editContactForm.email);
+    if (email && (status?.trusted_contacts || []).some((contact) => contact.id !== editingContactId && normalizeEmail(contact.email || '') === email)) {
+      setError('Diese E-Mail-Adresse ist bereits hinterlegt.');
+      return;
+    }
     try {
-      await api.updateSeniorContact(editingContactId, editContactForm);
+      await api.updateSeniorContact(editingContactId, { ...editContactForm, email });
       setEditingContactId(null);
       setEditContactForm({ name: '', relationship: '', email: '' });
       toast('Person gespeichert');
@@ -439,6 +449,10 @@ function batteryClass(value?: number | null) {
   if (value < 30) return 'battery low';
   if (value < 50) return 'battery medium';
   return 'battery';
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function formatDateTime(value?: string | null) {

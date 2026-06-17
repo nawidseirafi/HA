@@ -1212,6 +1212,19 @@ button:disabled {
   gap: 12px;
 }
 
+.sc-contacts-wizard-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.sc-contacts-wizard-head p {
+  color: var(--sc-muted);
+  font-size: 1.16rem;
+  margin: 0;
+}
+
 .sc-contact-list-editor > div {
   align-items: center;
   background: #f8fcfa;

@@ -81,10 +81,15 @@ class SeniorBehaviorAgent:
         profile = self._profile()
         contacts = self._contacts()
         sensor_snapshot = self.mapping.roles(dev=True, include_state=True)
+        try:
+            ha_snapshot = self.mapping.snapshot()
+        except Exception as exc:
+            logger.info("Senior behavior HA snapshot unavailable for presence analysis: %s", exc)
+            ha_snapshot = []
         if not dry_run:
-            self._record_snapshot(sensor_snapshot)
+            self._record_snapshot(sensor_snapshot, ha_snapshot)
         history = self._history(days=30)
-        payload = self._analysis_payload(profile, contacts, sensor_snapshot, history)
+        payload = self._analysis_payload(profile, contacts, sensor_snapshot, history, ha_snapshot)
         assessment = self._assess(payload)
         stored = assessment if dry_run else self._store_assessment(assessment)
         if not dry_run:
@@ -129,17 +134,18 @@ class SeniorBehaviorAgent:
             rows = con.execute("select * from trusted_contacts where active = 1 order by id").fetchall()
         return [dict(row) for row in rows]
 
-    def _record_snapshot(self, roles: list[dict[str, Any]]) -> None:
+    def _record_snapshot(self, roles: list[dict[str, Any]], ha_snapshot: list[dict[str, Any]] | None = None) -> None:
         timestamp = now()
+        extra_events = self._fp300_snapshot_events(roles, ha_snapshot or [], timestamp)
         with self.mapping.connect() as con:
-            for role in roles:
+            for role in [*roles, *extra_events]:
                 state = role.get("state")
                 if state in (None, "", "unknown", "unavailable"):
                     continue
                 con.execute(
                     """insert into senior_sensor_events
                        (event_time, role, room, entity_id, state, device_class, source, created_at)
-                       values (?, ?, ?, ?, ?, ?, 'snapshot', ?)""",
+                       values (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         role.get("last_changed") or role.get("last_updated") or timestamp,
                         role.get("role"),
@@ -147,6 +153,7 @@ class SeniorBehaviorAgent:
                         role.get("entity_id"),
                         state,
                         role.get("device_class"),
+                        role.get("source") or "snapshot",
                         timestamp,
                     ),
                 )
@@ -167,6 +174,7 @@ class SeniorBehaviorAgent:
         contacts: list[dict[str, Any]],
         sensor_snapshot: list[dict[str, Any]],
         history: list[dict[str, Any]],
+        ha_snapshot: list[dict[str, Any]],
     ) -> dict[str, Any]:
         today = datetime.now(timezone.utc).date()
         today_events = [event for event in history if self._parse_time(event.get("event_time")).date() == today]
@@ -183,11 +191,17 @@ class SeniorBehaviorAgent:
             "daily_profile": self._daily_profile(previous_events),
             "current_day": self._day_summary(today_events),
             "current_sensor_snapshot": self._compact_roles(sensor_snapshot),
+            "presence_sensor_analysis": self._fp300_analysis(sensor_snapshot, ha_snapshot, history),
             "deviations": self._deviations(today_events, previous_events, sensor_snapshot),
             "safety_rules": {
                 "no_medical_diagnosis": True,
                 "no_emergency_calls": True,
                 "only_behavioral_anomaly_detection": True,
+                "presence_sensor_limits": [
+                    "Aqara FP300 erkennt Anwesenheit und Bewegung, aber keine Atmung.",
+                    "Aqara FP300 unterscheidet Sitzen und Liegen nicht zuverlässig.",
+                    "Aqara FP300 ist kein Sturzsensor und darf nicht als medizinisches Signal bewertet werden.",
+                ],
             },
         }
 
@@ -197,6 +211,7 @@ class SeniorBehaviorAgent:
             response = client.generate(
                 prompt=(
                     "Bewerte diesen Sentero Tagesablauf. Nutze historische Routinen stärker als einzelne Sensorwerte. "
+                    "Presence-Sensor-Auswertungen sind Näherungen: niemals Atmung, Sturz, Schlaf oder Körperposition behaupten. "
                     "Erzeuge auch einen menschenfreundlichen E-Mail-Text für orange/red, sonst leer lassen.\n\n"
                     f"{json.dumps(payload, ensure_ascii=False)}"
                 ),
@@ -343,6 +358,226 @@ class SeniorBehaviorAgent:
             "activity_ratio": round(ratio, 2),
             "inactive_hours": round(inactive_hours, 2),
         }
+
+    def _fp300_snapshot_events(self, roles: list[dict[str, Any]], ha_snapshot: list[dict[str, Any]], timestamp: str) -> list[dict[str, Any]]:
+        events: list[dict[str, Any]] = []
+        for role in roles:
+            if not self._is_presence_role(role):
+                continue
+            related = self._related_presence_entities(role, ha_snapshot)
+            for kind, item in related.items():
+                if not item:
+                    continue
+                events.append({
+                    "role": f"{role.get('role')}_{kind}",
+                    "room": role.get("room"),
+                    "entity_id": item.get("entity_id"),
+                    "state": item.get("state"),
+                    "device_class": item.get("device_class"),
+                    "source": "fp300_snapshot",
+                    "last_changed": item.get("last_changed") or timestamp,
+                    "last_updated": item.get("last_updated") or timestamp,
+                })
+        return events
+
+    def _fp300_analysis(
+        self,
+        roles: list[dict[str, Any]],
+        ha_snapshot: list[dict[str, Any]],
+        history: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        devices = []
+        for role in roles:
+            if not self._is_presence_role(role):
+                continue
+            related = self._related_presence_entities(role, ha_snapshot)
+            presence = related.get("presence")
+            motion = related.get("motion")
+            devices.append({
+                "room": role.get("room"),
+                "role": role.get("role"),
+                "device_model": role.get("model"),
+                "manufacturer": role.get("manufacturer"),
+                "presence_entity": self._entity_compact(presence),
+                "motion_entity": self._entity_compact(motion),
+                "illuminance_entity": self._entity_compact(related.get("illuminance")),
+                "temperature_entity": self._entity_compact(related.get("temperature")),
+                "humidity_entity": self._entity_compact(related.get("humidity")),
+                "battery_entity": self._entity_compact(related.get("battery")),
+                "current": self._presence_current_metrics(presence, motion),
+                "measurements": self._presence_measurements(related),
+                "today": self._presence_history_metrics(history, role.get("room"), days=1),
+                "history_30d": self._presence_history_metrics(history, role.get("room"), days=30),
+            })
+        return {
+            "sensor_family": "Aqara FP300 compatible presence sensor",
+            "capabilities": {
+                "presence": True,
+                "pir_motion": True,
+                "illuminance": True,
+                "temperature": True,
+                "humidity": True,
+                "battery": True,
+                "presence_duration_calculable": True,
+                "stillness_duration_calculable": True,
+                "breathing_detection": False,
+                "fall_detection": False,
+                "sleep_detection": False,
+                "posture_detection": False,
+                "people_counting": False,
+                "zone_tracking": False,
+            },
+            "interpretation_notes": [
+                "presence=true und motion=false über längere Zeit bedeutet nur: Person ist im Raum und bewegt sich kaum.",
+                "Stillstand kann Sitzen, Liegen oder ruhiges Verhalten bedeuten und ist keine medizinische Aussage.",
+                "Atmung, Sturz, Schlaf und Körperposition dürfen aus diesen Daten nicht abgeleitet werden.",
+            ],
+            "devices": devices,
+        }
+
+    def _related_presence_entities(self, role: dict[str, Any], ha_snapshot: list[dict[str, Any]]) -> dict[str, dict[str, Any] | None]:
+        role_entity = str(role.get("entity_id") or "")
+        device_id = str(role.get("device_id") or "").strip()
+        same_device = [item for item in ha_snapshot if device_id and str(item.get("device_id") or "") == device_id]
+        if not same_device:
+            prefix = role_entity.rsplit("_", 1)[0] if "_" in role_entity else role_entity.rsplit(".", 1)[-1]
+            same_device = [item for item in ha_snapshot if prefix and str(item.get("entity_id") or "").startswith(prefix)]
+        return {
+            "presence": self._best_entity(same_device, self._is_presence_entity) or (role if self._is_presence_entity(role) else None),
+            "motion": self._best_entity(same_device, self._is_motion_entity),
+            "illuminance": self._best_entity(same_device, lambda item: self._device_class(item) == "illuminance" or "illuminance" in self._entity_text(item)),
+            "temperature": self._best_entity(same_device, lambda item: self._device_class(item) == "temperature" or self._entity_id(item).endswith(("_temperature", "_temperatur"))),
+            "humidity": self._best_entity(same_device, lambda item: self._device_class(item) == "humidity" or self._entity_id(item).endswith(("_humidity", "_luftfeuchtigkeit"))),
+            "battery": self._best_entity(same_device, lambda item: self._entity_id(item).endswith(("_battery", "_batterie"))),
+        }
+
+    def _presence_measurements(self, related: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
+        presence = related.get("presence")
+        motion = related.get("motion")
+        illuminance = related.get("illuminance")
+        temperature = related.get("temperature")
+        humidity = related.get("humidity")
+        battery = related.get("battery")
+        return {
+            "presence": self._boolean_measurement(presence),
+            "pir_motion": self._boolean_measurement(motion),
+            "illuminance_lux": self._numeric_measurement(illuminance),
+            "temperature_celsius": self._numeric_measurement(temperature),
+            "humidity_percent": self._numeric_measurement(humidity),
+            "battery_percent": self._numeric_measurement(battery),
+        }
+
+    def _presence_current_metrics(self, presence: dict[str, Any] | None, motion: dict[str, Any] | None) -> dict[str, Any]:
+        presence_active = self._is_on(presence.get("state") if presence else None)
+        motion_active = self._is_on(motion.get("state") if motion else None)
+        presence_since = self._parse_time(presence.get("last_changed") or presence.get("last_updated")) if presence else None
+        motion_since = self._parse_time(motion.get("last_changed") or motion.get("last_updated")) if motion else None
+        current_time = datetime.now(timezone.utc)
+        presence_duration = int((current_time - presence_since).total_seconds()) if presence_active and presence_since else 0
+        stillness_since = max([value for value in [presence_since, motion_since] if value], default=None)
+        stillness_duration = int((current_time - stillness_since).total_seconds()) if presence_active and not motion_active and stillness_since else 0
+        return {
+            "presence_active": presence_active,
+            "motion_active": motion_active,
+            "presence_duration_seconds": max(presence_duration, 0),
+            "stillness_duration_seconds": max(stillness_duration, 0),
+            "interpretation": "person_present_but_still" if presence_active and not motion_active else "motion_detected" if motion_active else "not_present",
+        }
+
+    def _presence_history_metrics(self, history: list[dict[str, Any]], room: Any, days: int) -> dict[str, Any]:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        events = [
+            event for event in history
+            if event.get("room") == room
+            and str(event.get("source") or "") == "fp300_snapshot"
+            and self._parse_time(event.get("event_time")) >= since
+        ]
+        presence_events = [event for event in events if str(event.get("role") or "").endswith("_presence")]
+        motion_events = [event for event in events if str(event.get("role") or "").endswith("_motion")]
+        presence_active_count = sum(1 for event in presence_events if self._is_on(event.get("state")))
+        motion_active_count = sum(1 for event in motion_events if self._is_on(event.get("state")))
+        still_count = max(presence_active_count - motion_active_count, 0)
+        return {
+            "sample_count": len(events),
+            "presence_samples": len(presence_events),
+            "motion_samples": len(motion_events),
+            "presence_active_samples": presence_active_count,
+            "motion_active_samples": motion_active_count,
+            "stillness_samples": still_count,
+            "stillness_ratio": round(still_count / presence_active_count, 2) if presence_active_count else 0,
+        }
+
+    def _entity_compact(self, item: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not item:
+            return None
+        return {
+            "entity_id": item.get("entity_id"),
+            "name": item.get("friendly_name") or item.get("label") or item.get("original_name"),
+            "state": item.get("state"),
+            "numeric_value": self._number(item.get("state")),
+            "unit": item.get("unit") or item.get("unit_of_measurement"),
+            "device_class": item.get("device_class"),
+            "last_changed": item.get("last_changed"),
+            "last_updated": item.get("last_updated"),
+        }
+
+    def _boolean_measurement(self, item: dict[str, Any] | None) -> dict[str, Any]:
+        compact = self._entity_compact(item)
+        return {
+            "active": self._is_on(item.get("state") if item else None),
+            "entity": compact,
+        }
+
+    def _numeric_measurement(self, item: dict[str, Any] | None) -> dict[str, Any]:
+        compact = self._entity_compact(item)
+        return {
+            "value": self._number(item.get("state") if item else None),
+            "unit": (item.get("unit") or item.get("unit_of_measurement")) if item else None,
+            "entity": compact,
+        }
+
+    def _best_entity(self, items: list[dict[str, Any]], predicate: Any) -> dict[str, Any] | None:
+        matches = [item for item in items if predicate(item)]
+        return sorted(matches, key=lambda item: (self._entity_id(item).startswith("binary_sensor."), self._parse_time(item.get("last_updated")).timestamp()), reverse=True)[0] if matches else None
+
+    def _is_presence_role(self, role: dict[str, Any]) -> bool:
+        text = self._entity_text(role)
+        return str(role.get("role") or "").endswith("presence") or self._is_presence_entity(role) or "occupy" in text
+
+    def _is_presence_entity(self, item: dict[str, Any]) -> bool:
+        dc = self._device_class(item)
+        text = self._entity_text(item)
+        return dc in {"occupancy", "presence"} or any(term in text for term in ["presence", "praesenz", "präsenz", "occupancy", "occupy"])
+
+    def _is_motion_entity(self, item: dict[str, Any]) -> bool:
+        dc = self._device_class(item)
+        text = self._entity_text(item)
+        return dc == "motion" or any(term in text for term in ["motion", "bewegung", "pir_detection", "pir detection", "pir"])
+
+    @staticmethod
+    def _device_class(item: dict[str, Any]) -> str:
+        return str(item.get("device_class") or "").lower()
+
+    @staticmethod
+    def _entity_id(item: dict[str, Any]) -> str:
+        return str(item.get("entity_id") or "").lower()
+
+    @staticmethod
+    def _entity_text(item: dict[str, Any]) -> str:
+        return " ".join(str(item.get(key) or "").lower() for key in ["entity_id", "friendly_name", "label", "original_name", "device_name", "model"])
+
+    @staticmethod
+    def _is_on(value: Any) -> bool:
+        return str(value or "").strip().lower() in {"on", "true", "detected", "occupied", "home", "present", "1"}
+
+    @staticmethod
+    def _number(value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            return float(str(value).replace("%", "").replace(",", ".").strip())
+        except ValueError:
+            return None
 
     def _compact_roles(self, roles: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [

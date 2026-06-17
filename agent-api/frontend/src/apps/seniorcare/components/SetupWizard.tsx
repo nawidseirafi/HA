@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, HeartHandshake, Plus, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HeartHandshake, Plus, Save, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
 import { api, type SeniorCandidates } from '@shared/api/client';
 import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './SensorWizard';
 
@@ -44,6 +44,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [customRoom, setCustomRoom] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+  const [contactFormOpen, setContactFormOpen] = useState(false);
   const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
   const [confirmed, setConfirmed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -115,8 +116,10 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     if (step === 2) {
       await safeBackend(() => api.saveSeniorSetupRooms(selectedRooms));
     }
-    if (step === 4 && contacts[0]) {
-      await safeBackend(() => api.saveSeniorContact({ name: contacts[0].name, relationship: contacts[0].relation, email: contacts[0].email }));
+    if (step === 4 && contacts.length) {
+      await safeBackend(() => Promise.all(
+        contacts.map((contact) => api.saveSeniorContact({ name: contact.name, relationship: contact.relation, email: normalizeEmail(contact.email) })),
+      ));
     }
     if (step === 5) {
       await safeBackend(() => api.saveSeniorNotifications({ anomalies: true, critical: true, daily_summary: false }));
@@ -244,14 +247,16 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   function addContact() {
     const nextErrors = [];
     if (!contactForm.name.trim()) nextErrors.push('Bitte geben Sie einen Namen ein.');
-    if (!contactForm.phone.trim()) nextErrors.push('Bitte geben Sie eine Telefonnummer ein.');
-    if (!contactForm.channels.length) nextErrors.push('Bitte wählen Sie mindestens einen Kanal.');
+    if (!normalizeEmail(contactForm.email)) nextErrors.push('Bitte geben Sie eine E-Mail-Adresse ein.');
+    const email = normalizeEmail(contactForm.email);
+    if (email && contacts.some((contact) => normalizeEmail(contact.email) === email)) nextErrors.push('Diese E-Mail-Adresse ist bereits hinterlegt.');
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
     }
-    setContacts((current) => [...current, { ...contactForm, id: crypto.randomUUID() }]);
+    setContacts((current) => [...current, { ...contactForm, email, id: crypto.randomUUID() }]);
     setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+    setContactFormOpen(false);
     setErrors([]);
   }
 
@@ -264,7 +269,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
         {step === 1 && <ProfileStep profile={profile} calculatedAge={calculatedAge} onChange={setProfile} />}
         {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
         {step === 3 && <SensorWizard sensors={sensorBindings} discovery={discovery} roomLabel={roomLabel} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
-        {step === 4 && <ContactsStep contacts={contacts} form={contactForm} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
+        {step === 4 && <ContactsStep contacts={contacts} form={contactForm} formOpen={contactFormOpen} onOpen={() => setContactFormOpen(true)} onClose={() => setContactFormOpen(false)} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
         {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
         {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
       </div>
@@ -366,20 +371,30 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
   );
 }
 
-function ContactsStep({ contacts, form, onFormChange, onAdd, onDelete }: { contacts: Contact[]; form: Contact; onFormChange: (contact: Contact) => void; onAdd: () => void; onDelete: (id: string) => void }) {
+function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange, onAdd, onDelete }: { contacts: Contact[]; form: Contact; formOpen: boolean; onOpen: () => void; onClose: () => void; onFormChange: (contact: Contact) => void; onAdd: () => void; onDelete: (id: string) => void }) {
   return (
     <section className="sc-contacts-step">
-      <p>Wen sollen wir bei Auffälligkeiten benachrichtigen?</p>
-      <div className="sc-form-grid">
-        <label>Name<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
-        <label>Beziehung<select value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })}>{['Tochter', 'Sohn', 'Pflegeperson', 'Nachbar', 'Arzt', 'Sonstige'].map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label>Telefonnummer<input type="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="+49 ..." /></label>
-        <label>E-Mail<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
+      <div className="sc-contacts-wizard-head">
+        <p>Wen sollen wir bei Auffälligkeiten per E-Mail benachrichtigen?</p>
+        <button className="sc-round-add" type="button" onClick={onOpen} aria-label="Person hinzufügen"><Plus size={28} /></button>
       </div>
-      <div className="sc-checkbox-row">{['SMS', 'WhatsApp', 'E-Mail'].map((channel) => <label key={channel}><input type="checkbox" checked={form.channels.includes(channel)} onChange={(event) => onFormChange({ ...form, channels: event.target.checked ? [...form.channels, channel] : form.channels.filter((item) => item !== channel) })} /> {channel}</label>)}</div>
-      <button className="sc-soft-button" type="button" onClick={onAdd}><Plus size={20} /> Person hinzufügen</button>
+      {formOpen && (
+        <div className="sc-contact-form-card">
+          <div className="sc-contact-form-head">
+            <strong>Person hinzufügen</strong>
+            <button type="button" onClick={onClose} aria-label="Formular schließen"><X size={20} /></button>
+          </div>
+          <div className="sc-form-grid">
+            <label>Name<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
+            <label>Beziehung<select value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })}>{['Tochter', 'Sohn', 'Pflegeperson', 'Nachbar', 'Arzt', 'Sonstige'].map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label className="sc-form-wide">E-Mail<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
+          </div>
+          <button className="sc-primary-button" type="button" onClick={onAdd}><Save size={20} /> Speichern</button>
+        </div>
+      )}
       <div className="sc-contact-list-editor">
-        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.relation}</small><button type="button" onClick={() => onDelete(contact.id)}><Trash2 size={18} /></button></div>)}
+        {contacts.length === 0 && <p className="sc-muted-note">Noch keine vertraute Person hinterlegt.</p>}
+        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.email || contact.relation}</small><button type="button" onClick={() => onDelete(contact.id)} aria-label={`${contact.name} löschen`}><Trash2 size={18} /></button></div>)}
       </div>
     </section>
   );
@@ -437,4 +452,8 @@ function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: b
 function defaultSensorPlan(roomId: string) {
   const option = roomOptions.find((room) => room.id === roomId);
   return { motion: true, door: option?.door !== false };
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
 }
