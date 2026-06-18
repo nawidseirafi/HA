@@ -117,7 +117,9 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), age: displayAge ? Number.parseInt(displayAge, 10) : null, notes: profile.notes }));
     }
     if (step === 2) {
-      await safeBackend(() => api.saveSeniorSetupRooms(selectedRooms));
+      const roomsWithSensors = selectedRoomsWithSensors(selectedRooms, sensorPlan);
+      setSelectedRooms(roomsWithSensors);
+      await safeBackend(() => api.saveSeniorSetupRooms(roomsWithSensors));
     }
     if (step === 4 && contacts.length) {
       await safeBackend(() => Promise.all(
@@ -153,6 +155,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   function validateStep() {
     if (step === 1 && !profile.name.trim()) return ['Bitte geben Sie den Namen ein.'];
     if (step === 2 && selectedRooms.length === 0) return ['Bitte wählen Sie mindestens einen Raum aus.'];
+    if (step === 2 && selectedRoomsWithSensors(selectedRooms, sensorPlan).length === 0) return ['Bitte wählen Sie mindestens einen Raum mit Sensor aus.'];
     if (step === 4 && contacts.length === 0) return ['Bitte fügen Sie mindestens eine vertraute Person hinzu.'];
     if (step === 4 && !contacts.some((contact) => isValidEmail(normalizeEmail(contact.email)))) return ['Bitte hinterlegen Sie mindestens eine gültige E-Mail-Adresse.'];
     if (step === 6 && !confirmed) return ['Bitte bestätigen Sie die Zusammenfassung.'];
@@ -210,7 +213,6 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     setSensorPlan((current) => {
       const fallback = defaultSensorPlan(roomId);
       const next = { ...(current[roomId] || fallback), [type]: !(current[roomId] || fallback)[type] };
-      if (!next.motion && !next.door) next[type] = true;
       return { ...current, [roomId]: next };
     });
   }
@@ -501,6 +503,13 @@ function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: b
       bindings.push(byId[doorId] || { id: doorId, roomId, type: 'door', sensorId: '', name: `${label} Türkontakt`, status: 'idle' });
     }
     return bindings;
+  });
+}
+
+function selectedRoomsWithSensors(roomIds: string[], sensorPlan: Record<string, { motion: boolean; door: boolean }>) {
+  return roomIds.filter((roomId) => {
+    const plan = sensorPlan[roomId] || defaultSensorPlan(roomId);
+    return plan.motion || plan.door;
   });
 }
 

@@ -70,6 +70,12 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       setSensors(nextSensors.sensor_roles);
       setChannels(nextChannels.channels);
       hydrateChannelForms(nextChannels.channels);
+      const sensorRooms = Array.from(new Set(nextSensors.sensor_roles.map((sensor) => sensor.room).filter(Boolean))) as string[];
+      const savedRooms = nextStatus.selected_rooms || [];
+      const cleanedRooms = savedRooms.filter((room) => sensorRooms.includes(room));
+      if (cleanedRooms.length !== savedRooms.length) {
+        void api.saveSeniorSetupRooms(cleanedRooms).catch(() => undefined);
+      }
       setProfile({
         name: nextStatus.profile?.name || '',
         age: nextStatus.profile?.age ? String(nextStatus.profile.age) : '',
@@ -87,10 +93,9 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   }
 
   const rooms = useMemo(() => {
-    const selected = status?.selected_rooms || [];
     const fromSensors = sensors.map((sensor) => sensor.room).filter(Boolean) as string[];
-    return Array.from(new Set([...selected, ...fromSensors]));
-  }, [status?.selected_rooms, sensors]);
+    return Array.from(new Set(fromSensors));
+  }, [sensors]);
 
   const availableChannels = useMemo(() => channelAvailability(channels), [channels]);
 
@@ -254,7 +259,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       return;
     }
     setRoomDraft('');
-    await saveRooms([...rooms, label]);
+    setError('Räume werden gemeinsam mit einem Sensor eingerichtet. Bitte nutzen Sie „Sensor hinzufügen“.');
   }
 
   async function deleteRoom(room: string) {
