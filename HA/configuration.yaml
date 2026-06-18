@@ -1,6 +1,36 @@
 input_boolean: !include input_booleans.yaml
 default_config:
-
+mqtt:
+  sensor:
+    - name: "Diebstahlsensor Aktion"
+      unique_id: diebstahlsensor_action
+      state_topic: "zigbee2mqtt/Diebstahlsensor"
+      value_template: "{{ value_json.action | default('unknown') }}"
+      json_attributes_topic: "zigbee2mqtt/Diebstahlsensor"
+    - name: "Diebstahlsensor Batterie"
+      unique_id: diebstahlsensor_battery
+      state_topic: "zigbee2mqtt/Diebstahlsensor"
+      value_template: "{{ value_json.battery }}"
+      unit_of_measurement: "%"
+      device_class: battery
+      state_class: measurement
+  binary_sensor:
+    - name: "Tasche Bewegung"
+      unique_id: tasche_bewegung
+      state_topic: "zigbee2mqtt/Diebstahlsensor"
+      payload_on: "on"
+      payload_off: "off"
+      device_class: motion
+      off_delay: 120
+      payload_available: "online"
+      payload_not_available: "offline"
+      availability_topic: "zigbee2mqtt/bridge/state"
+      value_template: >
+        {% if value_json.action in ['movement', 'vibration'] %}
+          on
+        {% else %}
+          off
+        {% endif %}
 command_line:
   - sensor:
       name: "Abfall naechster Termin"

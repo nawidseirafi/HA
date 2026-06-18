@@ -1,0 +1,29 @@
+- alias: "🚨 Tasche - Bewegung erkannt"
+  description: "Benachrichtigt, wenn Zigbee2MQTT fuer den Diebstahlsensor eine Bewegung meldet"
+  trigger:
+    - platform: mqtt
+      id: action_topic_movement
+      topic: "zigbee2mqtt/Diebstahlsensor/action"
+      payload: "movement"
+    - platform: mqtt
+      id: action_topic_vibration
+      topic: "zigbee2mqtt/Diebstahlsensor/action"
+      payload: "vibration"
+    - platform: mqtt
+      id: json_topic_movement
+      topic: "zigbee2mqtt/Diebstahlsensor"
+      payload: "movement"
+      value_template: "{{ value_json.action | default('') }}"
+    - platform: mqtt
+      id: json_topic_vibration
+      topic: "zigbee2mqtt/Diebstahlsensor"
+      payload: "vibration"
+      value_template: "{{ value_json.action | default('') }}"
+  condition: []
+  action:
+    - service: notify.mobile_app_system_error_404
+      data:
+        title: "🚨 Tasche bewegt"
+        message: "Der Diebstahlsensor hat eine Bewegung erkannt."
+  mode: queued
+  max: 10

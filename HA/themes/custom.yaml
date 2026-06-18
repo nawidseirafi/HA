@@ -1,0 +1,7 @@
+Mushroom:
+  # erzwingt 4 gleich breite Spalten in sections-Views
+  card-mod-view-yaml: |
+    hui-sections-view$: |
+      .container {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      }
