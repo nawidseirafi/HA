@@ -1,5 +1,6 @@
 import json
 import hashlib
+import tarfile
 import tempfile
 import unittest
 import zipfile
@@ -394,6 +395,10 @@ class UpdateServiceTests(unittest.TestCase):
             (deploy / "config.yaml").write_text("secret: keep", encoding="utf-8")
             (deploy / "data").mkdir()
             (deploy / "data" / "local.db").write_text("db", encoding="utf-8")
+            (deploy / "backend").mkdir()
+            (deploy / "backend" / "main.py").write_text("old", encoding="utf-8")
+            (deploy / "frontend" / "dist").mkdir(parents=True)
+            (deploy / "frontend" / "dist" / "index.html").write_text("old-ui", encoding="utf-8")
             (deploy / "docker-compose.yml").write_text("old-compose", encoding="utf-8")
             (deploy / "version.json").write_text(json.dumps({"version": "1.2.0"}), encoding="utf-8")
             source_zip = paths.api_dir / "seniorcare.zip"
@@ -454,6 +459,12 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertEqual((deploy / "backend" / "main.py").read_text(encoding="utf-8"), "new")
             self.assertEqual((deploy / "docker-compose.yml").read_text(encoding="utf-8"), "services: {}")
             self.assertTrue((deploy / "backups").exists())
+            backup_path = Path(service.admin_status()["backup"]["path"])
+            with tarfile.open(backup_path, "r:gz") as archive:
+                names = set(archive.getnames())
+            self.assertIn("backend/main.py", names)
+            self.assertIn("frontend/dist/index.html", names)
+            self.assertIn("docker-compose.yml", names)
             self.assertIn(["docker", "compose", "up", "-d", "--build"], commands)
             self.assertNotIn(["docker", "restart", "robotersteve-api"], commands)
             self.assertFalse(any(command[-1:] == ["restart"] or "restart" in command for command in commands))

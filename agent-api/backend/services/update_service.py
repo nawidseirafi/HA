@@ -590,15 +590,25 @@ class BackupEngine(UpdateConfigMixin):
     def _backup_sources(self) -> list[Path]:
         if self.execution_mode() == "zip_docker":
             root = self.deployment_dir()
-            return [
+            persistent_sources = [
                 root / "config.yaml",
                 root / ".env",
                 root / "data",
                 root / "settings",
                 root / "editions",
-                root / "version.json",
-                root / "docker-compose.yml",
             ]
+            application_sources = [
+                root / name
+                for name in ZIP_DOCKER_COPY_NAMES
+                if name not in NEVER_OVERWRITE_NAMES
+            ]
+            seen: set[Path] = set()
+            sources: list[Path] = []
+            for path in [*persistent_sources, *application_sources]:
+                if path not in seen:
+                    seen.add(path)
+                    sources.append(path)
+            return sources
         return [
             self.paths.api_dir / "config",
             self.paths.config_path,
