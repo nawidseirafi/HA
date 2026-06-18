@@ -2883,48 +2883,36 @@ button:disabled {
 }
 
 .sc-simple-facts {
+  background: transparent;
   display: grid;
-  gap: 12px;
+  gap: 0;
+  padding: 0 clamp(12px, 3vw, 20px);
 }
 
 .sc-simple-fact {
   align-items: center;
-  background: #f8fcfa;
-  border: 1px solid #dce9e3;
-  border-radius: 22px;
+  border-bottom: 1px solid #d7dde1;
   display: flex;
-  gap: 14px;
+  gap: 18px;
+  justify-content: space-between;
   min-height: 82px;
-  padding: 16px;
+  padding: 18px 0;
 }
 
 .sc-simple-fact span {
-  align-items: center;
-  background: white;
-  border-radius: 17px;
-  color: var(--sc-green);
-  display: inline-flex;
-  flex: 0 0 auto;
-  height: 46px;
-  justify-content: center;
-  width: 46px;
-}
-
-.sc-simple-fact div {
-  display: grid;
-  gap: 3px;
-}
-
-.sc-simple-fact small {
   color: #626b77;
-  font-size: 0.96rem;
-  font-weight: 850;
+  font-size: clamp(1.18rem, 3.7vw, 1.58rem);
+  font-weight: 500;
+  min-width: 0;
 }
 
 .sc-simple-fact strong {
   color: #080d18;
-  font-size: 1.2rem;
+  flex: 0 0 auto;
+  font-size: clamp(1.18rem, 3.7vw, 1.58rem);
   font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .sc-simple-fact strong.highlight {
@@ -2972,18 +2960,18 @@ button:disabled {
     padding: 7px 13px;
   }
 
+  .sc-simple-facts {
+    padding: 0 8px;
+  }
+
   .sc-simple-fact {
-    min-height: 74px;
-    padding: 14px;
+    gap: 14px;
+    min-height: 68px;
+    padding: 15px 0;
   }
 
+  .sc-simple-fact span,
   .sc-simple-fact strong {
-    font-size: 1.08rem;
-  }
-
-  .sc-simple-fact span {
-    border-radius: 15px;
-    height: 42px;
-    width: 42px;
+    font-size: 1.15rem;
   }
 }
