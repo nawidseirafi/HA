@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
 import { useAuth } from '@shared/auth/AuthContext';
+import senteroLogo from '../assets/logo.png';
 import '../styles/seniorcare.css';
 
 export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
@@ -33,22 +34,27 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     <main className="sc-login-page">
       <section className="sc-login-card">
         <div className="sc-hero-copy">
-          <p className="sc-kicker">Sentero</p>
-          <h1>Willkommen zurueck.</h1>
-          <p>Ein geschuetzter Blick auf den Alltag eines Menschen, der Ihnen wichtig ist.</p>
+          <div className="sc-login-brand">
+            <img src={senteroLogo} alt="Sentero" />
+          </div>
+          <p>Melden Sie sich an, um den Alltag Ihrer Angehörigen im Blick zu behalten.</p>
         </div>
         <form className="sc-login-form" onSubmit={submit}>
-          <label>
-            <span>Benutzername</span>
-            <input autoFocus value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
+          <label className="sc-floating-field">
+            <input autoFocus value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder=" " />
+            <span>E-Mail-Adresse</span>
           </label>
-          <label>
+          <label className="sc-floating-field">
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder=" " />
             <span>Passwort</span>
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
           </label>
-          <label className="sc-check-row">
+          <div className="sc-login-form-row">
+            <a className="sc-login-link" href="/seniorcare/password-forgotten" onClick={(event) => event.preventDefault()}>Passwort vergessen?</a>
+          </div>
+          <label className={`sc-check-row${remember ? ' active' : ''}`}>
+            <span>Dieses Gerät merken</span>
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-            Auf diesem Geraet angemeldet bleiben
+            <i aria-hidden="true" />
           </label>
           {error && <div className="sc-form-note" role="alert">{error}</div>}
           <button className="sc-primary-action" type="submit" disabled={busy}>
@@ -57,6 +63,11 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           </button>
         </form>
       </section>
+      <footer className="sc-login-footer">
+        <a href="https://www.mma-plus.com/datenschutz" onClick={(event) => event.preventDefault()}>Datenschutz</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.mma-plus.com/impressum" onClick={(event) => event.preventDefault()}>Impressum</a>
+      </footer>
     </main>
   );
 }

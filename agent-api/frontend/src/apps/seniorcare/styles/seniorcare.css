@@ -30,6 +30,7 @@
 .sc-login-page {
   align-items: center;
   display: grid;
+  gap: 18px;
   padding: 28px;
 }
 
@@ -48,23 +49,40 @@
 
 .sc-hero-copy {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.sc-login-brand {
+  align-items: center;
+  display: block;
+  aspect-ratio: 2.35 / 1;
+  border-radius: 24px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.sc-login-brand img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+  width: 100%;
 }
 
 .sc-kicker {
   color: var(--sc-green);
   font-size: 0.95rem;
   font-weight: 900;
-  letter-spacing: 0.22em;
+  letter-spacing: 0;
   margin: 0;
   text-transform: uppercase;
 }
 
 .sc-hero-copy h1 {
   color: var(--sc-text);
-  font-size: clamp(2.4rem, 7vw, 4rem);
-  letter-spacing: -0.05em;
-  line-height: 1;
+  font-size: clamp(2.35rem, 7vw, 3.85rem);
+  letter-spacing: 0;
+  line-height: 1.03;
   margin: 0;
 }
 
@@ -77,7 +95,7 @@
 
 .sc-login-form {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .sc-login-form label {
@@ -87,57 +105,126 @@
   font-weight: 850;
 }
 
-.sc-login-form input[type="text"],
-.sc-login-form input[type="password"],
-.sc-login-form input:not([type]) {
+.sc-floating-field {
+  display: block !important;
+  position: relative;
+}
+
+.sc-floating-field input {
   background: white;
   border: 1px solid var(--sc-line);
-  border-radius: 16px;
+  border-radius: 18px;
   color: var(--sc-text);
-  min-height: 56px;
-  padding: 0 14px;
+  font-weight: 850;
+  min-height: 64px;
+  outline: none;
+  padding: 24px 16px 9px;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+  width: 100%;
+}
+
+.sc-floating-field span {
+  color: var(--sc-muted);
+  font-size: 1rem;
+  font-weight: 850;
+  left: 16px;
+  line-height: 1;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left top;
+  transition: color 0.18s ease, font-size 0.18s ease, top 0.18s ease, transform 0.18s ease;
+}
+
+.sc-floating-field input:focus {
+  background: #fbfffd;
+  border-color: #9bcbb9;
+  box-shadow: 0 0 0 3px rgba(47, 125, 95, 0.09);
+}
+
+.sc-floating-field input:focus + span,
+.sc-floating-field input:not(:placeholder-shown) + span {
+  color: var(--sc-green);
+  font-size: 0.78rem;
+  top: 13px;
+  transform: none;
+}
+
+.sc-login-form-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
 }
 
 .sc-check-row {
   align-items: center;
-  background: #f8fcfa;
+  background: white;
   border: 1px solid var(--sc-line);
-  border-radius: 16px;
-  display: flex !important;
-  flex-direction: row;
-  gap: 10px;
-  min-height: 54px;
-  padding: 0 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  display: grid !important;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 58px;
+  padding: 14px 16px;
 }
 
 .sc-check-row input {
-  appearance: none;
-  background: white;
-  border: 2px solid #b7d8cb;
-  border-radius: 7px;
-  display: grid;
-  height: 22px;
-  place-items: center;
-  width: 22px;
-}
-
-.sc-check-row input::after {
-  border-bottom: 2px solid white;
-  border-right: 2px solid white;
-  content: "";
-  height: 10px;
   opacity: 0;
-  transform: rotate(45deg) translate(-1px, -1px);
-  width: 5px;
+  pointer-events: none;
+  position: absolute;
 }
 
-.sc-check-row input:checked {
+.sc-check-row span {
+  color: var(--sc-text);
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.sc-check-row i {
+  background: #dfe9e4;
+  border-radius: 999px;
+  height: 30px;
+  position: relative;
+  width: 54px;
+}
+
+.sc-check-row i::after {
+  background: white;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(31, 78, 60, 0.18);
+  content: "";
+  height: 24px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  transition: transform 0.18s ease;
+  width: 24px;
+}
+
+.sc-check-row.active {
+  background: #f8fcfa;
+  border-color: #b7d8cb;
+}
+
+.sc-check-row.active i {
   background: var(--sc-green);
-  border-color: var(--sc-green);
 }
 
-.sc-check-row input:checked::after {
-  opacity: 1;
+.sc-check-row.active i::after {
+  transform: translateX(24px);
+}
+
+.sc-login-link {
+  color: var(--sc-green);
+  font-size: 0.95rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.sc-login-link:hover {
+  text-decoration: underline;
 }
 
 .sc-form-note {
@@ -161,6 +248,26 @@
   justify-content: center;
   min-height: 58px;
   padding: 0 18px;
+}
+
+.sc-login-footer {
+  align-items: center;
+  color: var(--sc-muted);
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 750;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.sc-login-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sc-login-footer a:hover {
+  color: var(--sc-green);
 }
 
 button,
