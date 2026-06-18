@@ -412,7 +412,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
               <small>Diese Informationen helfen Sentero, Auffälligkeiten besser einzuordnen.</small>
             </label>
           </div>
-          <button className="sc-primary-button" type="button" onClick={() => void saveProfile()}><Save size={20} /> Speichern</button>
+          <button className="sc-profile-save-button" type="button" onClick={() => void saveProfile()}><Save size={18} /> Speichern</button>
         </section>
       )}
 

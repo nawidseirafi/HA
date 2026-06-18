@@ -86,6 +86,10 @@ export function SeniorCareShell({ route, onNavigate, onLogout, children }: Props
             </button>
           );
         })}
+        <button className="sc-mobile-logout" type="button" onClick={onLogout}>
+          <LogOut size={22} aria-hidden="true" />
+          <span>Abmelden</span>
+        </button>
       </nav>
     </main>
   );
