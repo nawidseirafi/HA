@@ -742,7 +742,36 @@ def ensure_schema(con: sqlite3.Connection) -> None:
         pass
     con.execute('''create table if not exists senior_profile (id integer primary key check (id = 1), name text, age integer, notes text, created_at text not null, updated_at text not null)''')
     con.execute('''create table if not exists trusted_contacts (id integer primary key autoincrement, name text not null, relationship text, email text, active integer not null default 1, created_at text not null, updated_at text not null)''')
+    for statement in [
+        "alter table trusted_contacts add column phone text",
+        "alter table trusted_contacts add column telegram_chat_id text",
+        "alter table trusted_contacts add column whatsapp_phone_number text",
+        "alter table trusted_contacts add column preferred_channels text not null default '[\"email\"]'",
+        "alter table trusted_contacts add column notification_enabled integer not null default 1",
+    ]:
+        try:
+            con.execute(statement)
+        except sqlite3.OperationalError:
+            pass
     con.execute('''create table if not exists notification_preferences (id integer primary key check (id = 1), anomalies integer not null default 1, critical integer not null default 1, daily_summary integer not null default 0, updated_at text not null)''')
+    con.execute('''create table if not exists notification_channel_settings (
+        id integer primary key autoincrement,
+        channel text not null unique,
+        enabled integer not null default 0,
+        config_json text not null default '{}',
+        created_at text not null,
+        updated_at text not null
+    )''')
+    con.execute('''create table if not exists notification_logs (
+        id integer primary key autoincrement,
+        contact_id integer,
+        channel text not null,
+        severity text not null,
+        status text not null,
+        message_title text,
+        error_message text,
+        created_at text not null
+    )''')
     con.execute('''create table if not exists sensor_roles (id integer primary key autoincrement, role text not null, room text, entity_id text not null, device_id text, friendly_name text, device_class text, domain text, source text, confidence real, active integer not null default 1, created_at text not null, updated_at text not null)''')
     con.execute('create unique index if not exists idx_sensor_roles_active_role on sensor_roles(role) where active = 1')
     con.execute('''create table if not exists sensor_discovery_sessions (id integer primary key autoincrement, target_role text not null, target_room text, started_at text not null, ended_at text, status text not null, baseline_snapshot_json text, candidate_snapshot_json text, selected_entity_id text)''')
@@ -756,6 +785,10 @@ def ensure_schema(con: sqlite3.Connection) -> None:
             pass
     con.execute('insert or ignore into setup_state (id, updated_at) values (1, ?)', (now(),))
     con.execute('insert or ignore into notification_preferences (id, updated_at) values (1, ?)', (now(),))
+    con.execute(
+        "insert or ignore into notification_channel_settings (channel, enabled, config_json, created_at, updated_at) values ('email', 1, '{}', ?, ?)",
+        (now(), now()),
+    )
 
 
 def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any]], role: str, room: str | None, started_at: str | datetime) -> list[dict[str, Any]]:

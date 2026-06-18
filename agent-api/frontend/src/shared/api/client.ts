@@ -149,6 +149,11 @@ export type SeniorTrustedContact = {
   name: string;
   relationship?: string | null;
   email?: string | null;
+  phone?: string | null;
+  telegram_chat_id?: string | null;
+  whatsapp_phone_number?: string | null;
+  preferred_channels?: string | string[] | null;
+  notification_enabled?: number | boolean;
   active?: number;
 };
 
@@ -171,6 +176,36 @@ export type SeniorSetupStatus = {
   notifications?: SeniorNotifications | null;
   sensor_roles: SeniorSensorRole[];
   updated_at: string;
+};
+
+export type SeniorNotificationChannel = {
+  channel: 'email' | 'telegram' | 'whatsapp' | string;
+  enabled: boolean;
+  configured: boolean;
+  config: Record<string, unknown>;
+  updated_at?: string | null;
+};
+
+export type SeniorNotificationLog = {
+  id: number;
+  contact_id?: number | null;
+  channel: string;
+  severity: string;
+  status: 'sent' | 'failed' | 'fallback_sent' | string;
+  message_title?: string | null;
+  error_message?: string | null;
+  created_at: string;
+};
+
+export type SeniorContactPayload = {
+  name: string;
+  relationship?: string;
+  email?: string;
+  phone?: string;
+  telegram_chat_id?: string;
+  whatsapp_phone_number?: string;
+  preferred_channels?: string[];
+  notification_enabled?: boolean;
 };
 
 export type SeniorCandidate = {
@@ -1429,14 +1464,20 @@ export const api = {
       body: JSON.stringify({ entity_id: entityId, ...(payload || {}) }),
     }),
   saveSeniorSetupSensors: () => request<SeniorSetupStatus>('/api/senior/setup/sensors', { method: 'POST' }),
-  saveSeniorContact: (payload: { name: string; relationship?: string; email?: string }) =>
+  saveSeniorContact: (payload: SeniorContactPayload) =>
     request<SeniorSetupStatus>('/api/senior/setup/contact', { method: 'POST', body: JSON.stringify(payload) }),
-  updateSeniorContact: (contactId: number, payload: { name: string; relationship?: string; email?: string }) =>
+  updateSeniorContact: (contactId: number, payload: SeniorContactPayload) =>
     request<SeniorSetupStatus>(`/api/senior/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteSeniorContact: (contactId: number) =>
     request<SeniorSetupStatus>(`/api/senior/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'DELETE' }),
   saveSeniorNotifications: (payload: { anomalies: boolean; critical: boolean; daily_summary: boolean }) =>
     request<SeniorSetupStatus>('/api/senior/setup/notifications', { method: 'POST', body: JSON.stringify(payload) }),
+  seniorNotificationChannels: () => request<{ channels: SeniorNotificationChannel[] }>('/api/senior/notifications/channels'),
+  saveSeniorNotificationChannel: (channel: 'email' | 'telegram' | 'whatsapp', payload: { enabled: boolean; config: Record<string, unknown> }) =>
+    request<{ channels: SeniorNotificationChannel[] }>(`/api/senior/notifications/channels/${channel}`, { method: 'POST', body: JSON.stringify(payload) }),
+  testSeniorNotificationChannel: (channel: 'email' | 'telegram' | 'whatsapp') =>
+    request<{ ok: boolean; message: string; detail?: string }>(`/api/senior/notifications/test/${channel}`, { method: 'POST' }),
+  seniorNotificationLogs: () => request<{ logs: SeniorNotificationLog[] }>('/api/senior/notifications/logs'),
   completeSeniorSetup: () => request<SeniorSetupStatus>('/api/senior/setup/complete', { method: 'POST' }),
   seniorSensorRoles: (includeState = false) => request<{ sensor_roles: SeniorSensorRole[] }>(`/api/senior/sensor-roles${includeState ? '?include_state=true' : ''}`),
   renameSeniorSensorRole: (role: string, name: string) =>

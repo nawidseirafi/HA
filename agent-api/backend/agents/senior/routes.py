@@ -9,15 +9,23 @@ from pydantic import BaseModel
 from .commissioning_service import CommissioningService
 from .device_mapping_service import DeviceMappingService
 from .matter_service import MatterCommissioningUnavailable
+from .notification_service import NotificationService
 from .service import SeniorService
 from .setup_service import SeniorSetupService
 
 
-router = APIRouter(prefix="/api/senior", tags=["senior"])
+class SenteroRouter(APIRouter):
+    def add_api_route(self, path: str, endpoint: Any, **kwargs: Any) -> None:
+        super().add_api_route(f"/api/senior{path}", endpoint, **kwargs)
+        super().add_api_route(f"/api/sentero{path}", endpoint, **kwargs)
+
+
+router = SenteroRouter(tags=["senior"])
 device_mapping_service = DeviceMappingService()
 setup_service = SeniorSetupService(device_mapping_service)
 senior_service = SeniorService(device_mapping_service)
 commissioning_service = CommissioningService(mapping=device_mapping_service)
+notification_service = NotificationService(device_mapping_service)
 
 
 class ProfilePayload(BaseModel):
@@ -62,6 +70,11 @@ class ContactPayload(BaseModel):
     name: str
     relationship: str | None = None
     email: str | None = None
+    phone: str | None = None
+    telegram_chat_id: str | None = None
+    whatsapp_phone_number: str | None = None
+    preferred_channels: list[str] | None = None
+    notification_enabled: bool = True
 
 
 class NotificationPayload(BaseModel):
@@ -72,6 +85,11 @@ class NotificationPayload(BaseModel):
 
 class SensorRoleNamePayload(BaseModel):
     name: str
+
+
+class ChannelSettingsPayload(BaseModel):
+    enabled: bool = False
+    config: dict[str, Any] = {}
 
 
 def model_data(model: BaseModel) -> dict[str, Any]:
@@ -256,6 +274,46 @@ def setup_contact_delete(contact_id: int):
 @router.post("/setup/notifications")
 def setup_notifications(payload: NotificationPayload):
     return setup_service.notifications(model_data(payload))
+
+
+@router.get("/notifications/channels")
+def notification_channels():
+    return notification_service.channels()
+
+
+@router.post("/notifications/channels/email")
+def notification_channel_email(payload: ChannelSettingsPayload):
+    return notification_service.save_channel("email", True, payload.config)
+
+
+@router.post("/notifications/channels/telegram")
+def notification_channel_telegram(payload: ChannelSettingsPayload):
+    return notification_service.save_channel("telegram", payload.enabled, payload.config)
+
+
+@router.post("/notifications/channels/whatsapp")
+def notification_channel_whatsapp(payload: ChannelSettingsPayload):
+    return notification_service.save_channel("whatsapp", payload.enabled, payload.config)
+
+
+@router.post("/notifications/test/email")
+def notification_test_email(dev: bool = Query(False)):
+    return notification_service.test("email", dev=is_dev_mode(dev))
+
+
+@router.post("/notifications/test/telegram")
+def notification_test_telegram(dev: bool = Query(False)):
+    return notification_service.test("telegram", dev=is_dev_mode(dev))
+
+
+@router.post("/notifications/test/whatsapp")
+def notification_test_whatsapp(dev: bool = Query(False)):
+    return notification_service.test("whatsapp", dev=is_dev_mode(dev))
+
+
+@router.get("/notifications/logs")
+def notification_logs(limit: int = Query(100, ge=1, le=500)):
+    return notification_service.logs(limit=limit)
 
 
 @router.post("/setup/complete")

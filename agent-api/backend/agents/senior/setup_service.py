@@ -72,19 +72,29 @@ class SeniorSetupService:
         timestamp = now()
         name = str(payload.get('name') or '').strip()
         email = normalize_email(payload.get('email'))
+        channels = normalize_channels(payload.get('preferred_channels'), email=email)
+        phone = normalize_text(payload.get('phone'))
+        telegram_chat_id = normalize_text(payload.get('telegram_chat_id'))
+        whatsapp_phone_number = normalize_text(payload.get('whatsapp_phone_number') or payload.get('phone'))
+        validate_contact_channels(channels, email, telegram_chat_id, whatsapp_phone_number)
         if not name:
             raise ValueError('name is required')
         with self.mapping.connect() as con:
             existing = con.execute('select id from trusted_contacts where lower(email) = ? and active = 1', (email,)).fetchone() if email else None
             if existing:
                 con.execute(
-                    'update trusted_contacts set name = ?, relationship = ?, email = ?, updated_at = ? where id = ?',
-                    (name, payload.get('relationship'), email, timestamp, existing['id']),
+                    '''update trusted_contacts
+                       set name = ?, relationship = ?, email = ?, phone = ?, telegram_chat_id = ?,
+                           whatsapp_phone_number = ?, preferred_channels = ?, notification_enabled = ?, updated_at = ?
+                       where id = ?''',
+                    (name, payload.get('relationship'), email, phone, telegram_chat_id, whatsapp_phone_number, json.dumps(channels), int(bool(payload.get('notification_enabled', True))), timestamp, existing['id']),
                 )
             else:
                 con.execute(
-                    'insert into trusted_contacts (name, relationship, email, active, created_at, updated_at) values (?, ?, ?, 1, ?, ?)',
-                    (name, payload.get('relationship'), email, timestamp, timestamp),
+                    '''insert into trusted_contacts
+                       (name, relationship, email, phone, telegram_chat_id, whatsapp_phone_number, preferred_channels, notification_enabled, active, created_at, updated_at)
+                       values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)''',
+                    (name, payload.get('relationship'), email, phone, telegram_chat_id, whatsapp_phone_number, json.dumps(channels), int(bool(payload.get('notification_enabled', True))), timestamp, timestamp),
                 )
             con.commit()
         return self.set_step('notifications', 'contacts')
@@ -92,6 +102,11 @@ class SeniorSetupService:
     def update_contact(self, contact_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         name = str(payload.get('name') or '').strip()
         email = normalize_email(payload.get('email'))
+        channels = normalize_channels(payload.get('preferred_channels'), email=email)
+        phone = normalize_text(payload.get('phone'))
+        telegram_chat_id = normalize_text(payload.get('telegram_chat_id'))
+        whatsapp_phone_number = normalize_text(payload.get('whatsapp_phone_number') or payload.get('phone'))
+        validate_contact_channels(channels, email, telegram_chat_id, whatsapp_phone_number)
         if not name:
             raise ValueError('name is required')
         with self.mapping.connect() as con:
@@ -103,8 +118,11 @@ class SeniorSetupService:
                 if duplicate:
                     raise ValueError('email already exists')
             con.execute(
-                'update trusted_contacts set name = ?, relationship = ?, email = ?, updated_at = ? where id = ?',
-                (name, payload.get('relationship'), email, now(), contact_id),
+                '''update trusted_contacts
+                   set name = ?, relationship = ?, email = ?, phone = ?, telegram_chat_id = ?,
+                       whatsapp_phone_number = ?, preferred_channels = ?, notification_enabled = ?, updated_at = ?
+                   where id = ?''',
+                (name, payload.get('relationship'), email, phone, telegram_chat_id, whatsapp_phone_number, json.dumps(channels), int(bool(payload.get('notification_enabled', True))), now(), contact_id),
             )
             con.commit()
         return self.status()
@@ -124,3 +142,36 @@ class SeniorSetupService:
 
 def normalize_email(value: Any) -> str:
     return str(value or '').strip().lower()
+
+
+def normalize_text(value: Any) -> str:
+    return str(value or '').strip()
+
+
+def normalize_channels(value: Any, email: str = '') -> list[str]:
+    explicit_value = value is not None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            value = [value]
+    source = value if isinstance(value, list) else (['email'] if email else [])
+    channels = []
+    for item in source:
+        channel = str(item or '').strip().lower()
+        if channel in {'email', 'telegram', 'whatsapp'} and channel not in channels:
+            channels.append(channel)
+    if not channels and not explicit_value and email:
+        channels = ['email']
+    if channels and 'email' not in channels and email:
+        channels.insert(0, 'email')
+    return channels
+
+
+def validate_contact_channels(channels: list[str], email: str, telegram_chat_id: str, whatsapp_phone_number: str) -> None:
+    if 'email' in channels and not email:
+        raise ValueError('email is required')
+    if 'telegram' in channels and not telegram_chat_id:
+        raise ValueError('telegram chat id is required')
+    if 'whatsapp' in channels and not whatsapp_phone_number:
+        raise ValueError('whatsapp phone number is required')

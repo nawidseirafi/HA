@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, HeartHandshake, Plus, Save, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HeartHandshake, Plus, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
 import { api, type SeniorCandidates } from '@shared/api/client';
 import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './SensorWizard';
 
@@ -43,7 +43,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
   const [customRoom, setCustomRoom] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+  const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: [] });
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
   const [confirmed, setConfirmed] = useState(false);
@@ -81,7 +81,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
           relation: contact.relationship || '',
           phone: '',
           email: contact.email || '',
-          channels: ['E-Mail'],
+          channels: contact.email ? ['E-Mail'] : [],
         })));
       }
     }).catch(() => undefined);
@@ -118,7 +118,16 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     }
     if (step === 4 && contacts.length) {
       await safeBackend(() => Promise.all(
-        contacts.map((contact) => api.saveSeniorContact({ name: contact.name, relationship: contact.relation, email: normalizeEmail(contact.email) })),
+        contacts.map((contact) => {
+          const email = normalizeEmail(contact.email);
+          return api.saveSeniorContact({
+            name: contact.name.trim(),
+            relationship: contact.relation,
+            email,
+            preferred_channels: email ? ['email'] : [],
+            notification_enabled: Boolean(email),
+          });
+        }),
       ));
     }
     if (step === 5) {
@@ -247,15 +256,14 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   function addContact() {
     const nextErrors = [];
     if (!contactForm.name.trim()) nextErrors.push('Bitte geben Sie einen Namen ein.');
-    if (!normalizeEmail(contactForm.email)) nextErrors.push('Bitte geben Sie eine E-Mail-Adresse ein.');
     const email = normalizeEmail(contactForm.email);
     if (email && contacts.some((contact) => normalizeEmail(contact.email) === email)) nextErrors.push('Diese E-Mail-Adresse ist bereits hinterlegt.');
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
     }
-    setContacts((current) => [...current, { ...contactForm, email, id: crypto.randomUUID() }]);
-    setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['WhatsApp'] });
+    setContacts((current) => [...current, { ...contactForm, email, channels: email ? ['E-Mail'] : [], id: crypto.randomUUID() }]);
+    setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: [] });
     setContactFormOpen(false);
     setErrors([]);
   }
@@ -354,8 +362,8 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
               </button>
               {active && (
                 <div className="sc-room-sensor-toggles">
-                  <label><input type="checkbox" checked={plan.motion} onChange={() => onToggleSensorType(room.id, 'motion')} /> Präsenzsensor</label>
-                  <label><input type="checkbox" checked={plan.door} onChange={() => onToggleSensorType(room.id, 'door')} /> Türsensor</label>
+                  <label className={plan.motion ? 'active' : ''}><input type="checkbox" checked={plan.motion} onChange={() => onToggleSensorType(room.id, 'motion')} /><i aria-hidden="true" /> Präsenzsensor</label>
+                  <label className={plan.door ? 'active' : ''}><input type="checkbox" checked={plan.door} onChange={() => onToggleSensorType(room.id, 'door')} /><i aria-hidden="true" /> Türsensor</label>
                 </div>
               )}
             </div>
@@ -375,7 +383,10 @@ function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange,
   return (
     <section className="sc-contacts-step">
       <div className="sc-contacts-wizard-head">
-        <p>Wen sollen wir bei Auffälligkeiten per E-Mail benachrichtigen?</p>
+        <div>
+          <p>Wer soll bei wichtigen Hinweisen informiert werden?</p>
+          <small>E-Mail kann direkt hinterlegt werden. Der Versand wird später in den Benachrichtigungen eingerichtet und getestet.</small>
+        </div>
         <button className="sc-round-add" type="button" onClick={onOpen} aria-label="Person hinzufügen"><Plus size={28} /></button>
       </div>
       {formOpen && (
@@ -386,15 +397,15 @@ function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange,
           </div>
           <div className="sc-form-grid">
             <label>Name<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
-            <label>Beziehung<select value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })}>{['Tochter', 'Sohn', 'Pflegeperson', 'Nachbar', 'Arzt', 'Sonstige'].map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label className="sc-form-wide">E-Mail<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
+            <label>Beziehung<input value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })} /></label>
+            <label className="sc-form-wide">E-Mail (optional)<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
           </div>
-          <button className="sc-primary-button" type="button" onClick={onAdd}><Save size={20} /> Speichern</button>
+          <button className="sc-primary-button" type="button" onClick={onAdd}><Plus size={20} /> Person hinzufügen</button>
         </div>
       )}
       <div className="sc-contact-list-editor">
         {contacts.length === 0 && <p className="sc-muted-note">Noch keine vertraute Person hinterlegt.</p>}
-        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.email || contact.relation}</small><button type="button" onClick={() => onDelete(contact.id)} aria-label={`${contact.name} löschen`}><Trash2 size={18} /></button></div>)}
+        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.email || `${contact.relation} - Kanal später einrichten`}</small><button type="button" onClick={() => onDelete(contact.id)} aria-label={`${contact.name} löschen`}><Trash2 size={18} /></button></div>)}
       </div>
     </section>
   );
@@ -408,7 +419,7 @@ function NotificationStep({ value, onChange }: { value: { from: string; to: stri
         <label>Von<input type="time" value={value.from} onChange={(event) => onChange({ ...value, from: event.target.value })} /></label>
         <label>Bis<input type="time" value={value.to} onChange={(event) => onChange({ ...value, to: event.target.value })} /></label>
       </div>
-      <label className="sc-large-check"><input type="checkbox" checked={value.nightCriticalOnly} onChange={(event) => onChange({ ...value, nightCriticalOnly: event.target.checked })} /> Nachts nur bei dringenden Alarmen</label>
+      <label className={`sc-large-check${value.nightCriticalOnly ? ' active' : ''}`}><span>Nachts nur bei dringenden Alarmen</span><input type="checkbox" checked={value.nightCriticalOnly} onChange={(event) => onChange({ ...value, nightCriticalOnly: event.target.checked })} /><i aria-hidden="true" /></label>
       <label className="sc-slider-label">Empfindlichkeit<strong>{labels[value.sensitivity - 1]}</strong><input type="range" min="1" max="3" value={value.sensitivity} onChange={(event) => onChange({ ...value, sensitivity: Number(event.target.value) })} /></label>
     </section>
   );
@@ -426,7 +437,7 @@ function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalS
         <p><strong>Kontakte</strong>{contacts.map((contact) => `${contact.name} (${contact.relation})`).join(', ')}</p>
         <p><strong>Benachrichtigungen</strong>{notification.from} - {notification.to}, Stufe {notification.sensitivity}</p>
       </div>
-      <label className="sc-large-check"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} /> Ich bestätige, dass alle Angaben korrekt sind.</label>
+      <label className={`sc-large-check${confirmed ? ' active' : ''}`}><span>Ich bestätige, dass alle Angaben korrekt sind.</span><input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} /><i aria-hidden="true" /></label>
     </section>
   );
 }

@@ -11,6 +11,7 @@ from backend.services.llm.factory import create_llm_client
 from backend.services.messaging import MessagingService
 
 from .device_mapping_service import DeviceMappingService, now
+from .notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class SeniorBehaviorAgent:
     def __init__(self, mapping: DeviceMappingService | None = None, messaging: MessagingService | None = None) -> None:
         self.mapping = mapping or DeviceMappingService()
         self.messaging = messaging or MessagingService()
+        self.notifications = NotificationService(self.mapping, self.messaging)
         self.ensure_schema()
 
     def ensure_schema(self) -> None:
@@ -315,6 +317,7 @@ class SeniorBehaviorAgent:
                 "email_subject": assessment.get("email_subject") or "Sentero Hinweis",
             },
         )
+        self.notifications.notify_assessment(assessment, contacts)
 
     def _daily_profile(self, events: list[dict[str, Any]]) -> dict[str, Any]:
         by_room: dict[str, list[int]] = defaultdict(list)
