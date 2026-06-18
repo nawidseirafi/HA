@@ -12,8 +12,6 @@ from backend.agents.routes import router as agents_router
 from backend.editions import active_edition, is_core_service_enabled
 from backend.logging_config import configure_logging
 from backend.paths import FRONTEND_DIST
-from backend.agents.senior.auth_service import SenteroAuthService
-from backend.agents.senior.device_mapping_service import DeviceMappingService
 from backend.services.auth_service import user_from_request
 from backend.services.messaging.routes import router as messaging_router
 
@@ -61,15 +59,30 @@ PUBLIC_SENTERO_AUTH_PATHS = {
     "/api/sentero/auth/forgot-password",
     "/api/sentero/auth/reset-password",
 }
-sentero_auth_service = SenteroAuthService(DeviceMappingService())
+sentero_auth_service = None
+
+
+def get_sentero_auth_service():
+    global sentero_auth_service
+    if "senior" not in set(active_edition().enabled_agents):
+        return None
+    if sentero_auth_service is None:
+        from backend.agents.senior.auth_service import SenteroAuthService
+        from backend.agents.senior.device_mapping_service import DeviceMappingService
+
+        sentero_auth_service = SenteroAuthService(DeviceMappingService())
+    return sentero_auth_service
 
 
 @app.middleware("http")
 async def require_api_auth(request, call_next):
     path = request.url.path
     if path.startswith("/api/sentero/") and path not in PUBLIC_SENTERO_AUTH_PATHS:
+        auth_service = get_sentero_auth_service()
+        if auth_service is None:
+            return JSONResponse({"detail": "Sentero ist in dieser Edition nicht verfuegbar."}, status_code=404)
         try:
-            sentero_auth_service.user_from_request(request)
+            auth_service.user_from_request(request)
         except Exception as exc:
             return JSONResponse({"detail": getattr(exc, "detail", "Nicht angemeldet.")}, status_code=getattr(exc, "status_code", 401))
     elif path.startswith("/api/") and path not in PUBLIC_API_PATHS and not path.startswith("/api/sentero/"):
