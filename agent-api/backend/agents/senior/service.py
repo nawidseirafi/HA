@@ -15,11 +15,13 @@ class SeniorService:
 
     def status(self) -> dict[str, Any]:
         latest_assessment = self.behavior.latest()
+        sensor_roles = self.mapping.roles()
+        configured = bool(sensor_roles)
         return {
-            "status": "ready" if self.enabled else "disabled",
+            "status": "ready" if self.enabled and configured else "waiting_for_sensors" if self.enabled else "disabled",
             "enabled": self.enabled,
-            "message": "SeniorBehaviorAgent ist bereit.",
-            "sensor_roles": self.mapping.roles(),
+            "message": "Sentero ist bereit." if configured else "Sentero wartet auf eingerichtete Sensoren.",
+            "sensor_roles": sensor_roles,
             "behavior_assessment": latest_assessment,
             "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }

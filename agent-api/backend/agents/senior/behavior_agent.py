@@ -80,6 +80,15 @@ class SeniorBehaviorAgent:
 
     def run(self, dry_run: bool = False) -> dict[str, Any]:
         self.ensure_schema()
+        configured_roles = self.mapping.roles(dev=True, include_state=False)
+        if not configured_roles:
+            return {
+                "status": "not_configured",
+                "assessment": None,
+                "payload": {"reason": "no_sensors_configured"},
+                "dry_run": dry_run,
+                "message": "Sentero wartet auf eingerichtete Sensoren. Es wurde keine KI-Auswertung gestartet und keine Benachrichtigung versendet.",
+            }
         profile = self._profile()
         contacts = self._contacts()
         sensor_snapshot = self.mapping.roles(dev=True, include_state=True)
@@ -300,6 +309,9 @@ class SeniorBehaviorAgent:
         return stored
 
     def _notify_if_needed(self, assessment: dict[str, Any], contacts: list[dict[str, Any]]) -> None:
+        if not self.mapping.roles(dev=True, include_state=False):
+            logger.info("Sentero notification skipped because no sensors are configured")
+            return
         status = assessment.get("status")
         if status not in {"orange", "red"}:
             return

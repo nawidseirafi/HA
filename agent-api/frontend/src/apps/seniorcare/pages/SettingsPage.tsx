@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Battery, CheckCircle2, KeyRound, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, UserRound, Wifi, WifiOff, X } from 'lucide-react';
+import { Battery, CheckCircle2, KeyRound, Lightbulb, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, UserRound, Wifi, WifiOff, X } from 'lucide-react';
 import { api, type SeniorNotificationChannel, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
 import { useSenteroAuth } from '../auth/SenteroAuthContext';
@@ -44,6 +44,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [channels, setChannels] = useState<SeniorNotificationChannel[]>([]);
   const [setupChannel, setSetupChannel] = useState<'email' | 'telegram' | 'whatsapp' | null>(null);
+  const [helpChannel, setHelpChannel] = useState<'email' | 'telegram' | 'whatsapp' | null>(null);
   const [channelForms, setChannelForms] = useState({
     email: { smtp_host: '', smtp_port: '587', smtp_user: '', smtp_password: '', test_recipient: '' },
     telegram: { bot_token: '', default_chat_id: '', test_recipient: '' },
@@ -554,9 +555,9 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
               <h3>Benachrichtigungskanäle</h3>
             </div>
             <div className="sc-channel-overview-grid">
-              <NotificationChannelOverviewCard channel="email" channels={channels} onOpen={() => setSetupChannel('email')} />
-              <NotificationChannelOverviewCard channel="telegram" channels={channels} optional onOpen={() => setSetupChannel('telegram')} />
-              <NotificationChannelOverviewCard channel="whatsapp" channels={channels} optional onOpen={() => setSetupChannel('whatsapp')} />
+              <NotificationChannelOverviewCard channel="email" channels={channels} onOpen={() => setSetupChannel('email')} onHelp={() => setHelpChannel('email')} />
+              <NotificationChannelOverviewCard channel="telegram" channels={channels} optional onOpen={() => setSetupChannel('telegram')} onHelp={() => setHelpChannel('telegram')} />
+              <NotificationChannelOverviewCard channel="whatsapp" channels={channels} optional onOpen={() => setSetupChannel('whatsapp')} onHelp={() => setHelpChannel('whatsapp')} />
             </div>
           </section>
 
@@ -571,6 +572,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
               onTest={() => void testChannel(setupChannel)}
             />
           )}
+          {helpChannel && <ChannelHelpModal channel={helpChannel} onClose={() => setHelpChannel(null)} />}
         </section>
       )}
 
@@ -704,27 +706,60 @@ function NotificationChannelOverviewCard({
   channels,
   optional = false,
   onOpen,
+  onHelp,
 }: {
   channel: 'email' | 'telegram' | 'whatsapp';
   channels: SeniorNotificationChannel[];
   optional?: boolean;
   onOpen: () => void;
+  onHelp: () => void;
 }) {
   const item = channels.find((entry) => entry.channel === channel);
   const state = channelState(channels, channel);
   const configured = Boolean(item?.configured);
   return (
-    <article className="sc-channel-overview-card">
+    <article className="sc-channel-overview-card" onClick={onOpen}>
       <header>
         <span>{channelIcon(channel, 24)}</span>
         <div>
           <strong>{channelLabel(channel)}</strong>
           <small>{state}</small>
         </div>
-        {optional && <em>Optional</em>}
+        <button className="sc-help-icon" type="button" onClick={(event) => { event.stopPropagation(); onHelp(); }} aria-label={`${channelLabel(channel)} Hilfe öffnen`}><Lightbulb size={17} /></button>
+        <em>{optional ? "Optional" : "Pflicht"}</em>
       </header>
-      <button type="button" onClick={onOpen}>{configured ? 'Bearbeiten' : 'Einrichten'}</button>
     </article>
+  );
+}
+
+function ChannelHelpModal({ channel, onClose }: { channel: 'email' | 'telegram' | 'whatsapp'; onClose: () => void }) {
+  const help = channelHelpContent(channel);
+  return (
+    <div className="sc-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="sc-channel-modal sc-help-modal" role="dialog" aria-modal="true" aria-label={help.title} onMouseDown={(event) => event.stopPropagation()}>
+        <header>
+          <span>{channelIcon(channel, 24)}</span>
+          <div>
+            <h3>{help.title}</h3>
+            <p>{help.intro}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Dialog schließen"><X size={20} /></button>
+        </header>
+        <div className="sc-help-content">
+          {help.sections.map((section) => (
+            <section key={section.title}>
+              <h4>{section.title}</h4>
+              {section.text?.map((item) => <p key={item}>{item}</p>)}
+              {section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}
+              {section.steps && <ol>{section.steps.map((item) => <li key={item}>{item}</li>)}</ol>}
+            </section>
+          ))}
+        </div>
+        <footer>
+          <button type="button" onClick={onClose}>Verstanden</button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -974,6 +1009,46 @@ function channelSetupMeta(channel: 'email' | 'telegram' | 'whatsapp') {
       ['smtp_user', 'SMTP Benutzer'],
       ['smtp_password', 'SMTP Passwort'],
     ] as Array<[string, string]>,
+  };
+}
+
+function channelHelpContent(channel: 'email' | 'telegram' | 'whatsapp') {
+  if (channel === 'telegram') {
+    return {
+      title: 'Telegram einrichten',
+      intro: 'Telegram kann zusätzlich zu E-Mail verwendet werden.',
+      sections: [
+        { title: 'Was wird benötigt?', items: ['Bot Token', 'Chat ID'] },
+        { title: 'Schritt 1', text: ['Öffnen Sie Telegram und suchen Sie nach @BotFather.'] },
+        { title: 'Schritt 2', text: ['Erstellen Sie mit BotFather einen neuen Bot. Danach erhalten Sie einen Bot Token.'] },
+        { title: 'Schritt 3', text: ['Senden Sie Ihrem neuen Bot mindestens eine Nachricht.'] },
+        { title: 'Schritt 4', text: ['Ermitteln Sie Ihre Chat ID. Diese kann über die Telegram Bot API oder über einen Telegram-ID-Helfer ermittelt werden.'] },
+        { title: 'Hinweis', text: ['Telegram ist optional. Für die meisten Sentero-Installationen reicht E-Mail aus.'] },
+      ],
+    };
+  }
+  if (channel === 'whatsapp') {
+    return {
+      title: 'WhatsApp einrichten',
+      intro: 'WhatsApp-Benachrichtigungen benötigen die offizielle WhatsApp Cloud API von Meta.',
+      sections: [
+        { title: 'Was wird benötigt?', items: ['Meta Entwicklerkonto', 'WhatsApp Business Konto', 'Access Token', 'Phone Number ID', 'Business Account ID'] },
+        { title: 'Wichtig', text: ['WhatsApp kann nicht einfach mit einer privaten WhatsApp-Nummer verbunden werden.', 'Diese Funktion richtet sich an fortgeschrittene Nutzer oder Unternehmen.'] },
+        { title: 'Empfehlung', text: ['Nutzen Sie zuerst E-Mail. WhatsApp kann später zusätzlich eingerichtet werden.'] },
+      ],
+    };
+  }
+  return {
+    title: 'E-Mail einrichten',
+    intro: 'E-Mail ist der empfohlene Standardkanal für Sentero.',
+    sections: [
+      { title: 'Warum E-Mail?', text: ['Sentero nutzt Ihre E-Mail-Zugangsdaten, um Hinweise und Warnungen an Ihre Vertrauenspersonen zu senden.'] },
+      { title: 'Was wird benötigt?', items: ['SMTP Host', 'SMTP Port', 'E-Mail-Adresse oder Benutzername', 'App-Passwort oder E-Mail-Passwort'] },
+      { title: 'Beispiel Gmail', text: ['SMTP Host: smtp.gmail.com', 'SMTP Port: 587', 'Verschlüsselung: STARTTLS'] },
+      { title: 'Wichtig bei Gmail', text: ['Bei Gmail sollte ein App-Passwort verwendet werden. Das normale Google-Passwort funktioniert meistens nicht.'] },
+      { title: 'So erstellen Sie ein App-Passwort', steps: ['Öffnen Sie Ihr Google-Konto.', 'Aktivieren Sie die Zwei-Faktor-Authentifizierung.', 'Öffnen Sie „App-Passwörter“.', 'Erstellen Sie ein neues App-Passwort für „Mail“.', 'Tragen Sie dieses Passwort in Sentero ein.'] },
+      { title: 'Hinweis', text: ['Wenn Sie einen anderen E-Mail-Anbieter verwenden, finden Sie die SMTP-Daten meist in den Hilfe-Seiten Ihres Anbieters.'] },
+    ],
   };
 }
 
