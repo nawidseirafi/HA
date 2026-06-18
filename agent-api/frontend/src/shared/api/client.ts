@@ -168,6 +168,7 @@ export type SeniorTrustedContact = {
   whatsapp_phone_number?: string | null;
   preferred_channels?: string | string[] | null;
   notification_enabled?: number | boolean;
+  primary_contact?: number | boolean;
   active?: number;
 };
 
@@ -220,6 +221,7 @@ export type SeniorContactPayload = {
   whatsapp_phone_number?: string;
   preferred_channels?: string[];
   notification_enabled?: boolean;
+  primary_contact?: boolean;
 };
 
 export type SeniorCandidate = {

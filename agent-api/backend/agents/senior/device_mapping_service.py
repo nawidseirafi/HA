@@ -748,6 +748,7 @@ def ensure_schema(con: sqlite3.Connection) -> None:
         "alter table trusted_contacts add column whatsapp_phone_number text",
         "alter table trusted_contacts add column preferred_channels text not null default '[\"email\"]'",
         "alter table trusted_contacts add column notification_enabled integer not null default 1",
+        "alter table trusted_contacts add column primary_contact integer not null default 0",
     ]:
         try:
             con.execute(statement)

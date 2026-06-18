@@ -188,6 +188,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
     whatsapp_phone_number?: string | null;
     preferred_channels?: string | string[] | null;
     notification_enabled?: number | boolean;
+    primary_contact?: number | boolean;
   }) {
     setEditingContactId(contact.id);
     setEditContactForm({
@@ -199,6 +200,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       whatsapp_phone_number: contact.whatsapp_phone_number || '',
       preferred_channels: normalizeChannels(contact.preferred_channels),
       notification_enabled: Boolean(contact.notification_enabled ?? true),
+      primary_contact: Boolean(contact.primary_contact),
     });
   }
 
@@ -562,6 +564,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
             <ChannelSetupModal
               channel={setupChannel}
               form={channelForms[setupChannel]}
+              recipient={primaryNotificationRecipient(status?.trusted_contacts || [])}
               onClose={() => setSetupChannel(null)}
               onFormChange={(form) => setChannelForms((value) => ({ ...value, [setupChannel]: form as never }))}
               onSave={() => void saveChannel(setupChannel)}
@@ -728,6 +731,7 @@ function NotificationChannelOverviewCard({
 function ChannelSetupModal({
   channel,
   form,
+  recipient,
   onClose,
   onFormChange,
   onSave,
@@ -735,6 +739,7 @@ function ChannelSetupModal({
 }: {
   channel: 'email' | 'telegram' | 'whatsapp';
   form: Record<string, string>;
+  recipient?: { name: string; email: string; relationship?: string; primary: boolean } | null;
   onClose: () => void;
   onFormChange: (form: Record<string, string>) => void;
   onSave: () => void;
@@ -764,6 +769,20 @@ function ChannelSetupModal({
             </label>
           ))}
         </div>
+        {channel === 'email' && (
+          <div className="sc-channel-recipient">
+            <span>Empfänger</span>
+            {recipient ? (
+              <>
+                <strong>{recipient.name}</strong>
+                <small>{recipient.email}</small>
+                {recipient.primary && <em>Hauptansprechpartner</em>}
+              </>
+            ) : (
+              <small>Bitte hinterlegen Sie zuerst eine Vertrauensperson mit E-Mail-Adresse.</small>
+            )}
+          </div>
+        )}
         {channel === 'email' && <p className="sc-modal-help">Diese Angaben werden benötigt, damit Sentero E-Mails versenden kann.</p>}
         <footer>
           <button type="button" onClick={onTest}><Send size={18} /> {channel === 'email' ? 'Test senden' : 'Testen'}</button>
@@ -842,6 +861,7 @@ function emptyContactForm() {
     whatsapp_phone_number: '',
     preferred_channels: ['email'],
     notification_enabled: true,
+    primary_contact: false,
   };
 }
 
@@ -867,6 +887,7 @@ function contactPayload(form: ReturnType<typeof emptyContactForm>, available: Re
     whatsapp_phone_number: (form.whatsapp_phone_number || form.phone).trim(),
     preferred_channels: sanitizeChannels(normalizeChannels(form.preferred_channels), available),
     notification_enabled: form.notification_enabled,
+    primary_contact: Boolean(form.primary_contact),
   };
 }
 
@@ -930,7 +951,6 @@ function channelSetupMeta(channel: 'email' | 'telegram' | 'whatsapp') {
       fields: [
         ['bot_token', 'Bot Token'],
         ['default_chat_id', 'Chat ID'],
-        ['test_recipient', 'Testempfänger optional'],
       ] as Array<[string, string]>,
     };
   }
@@ -942,7 +962,6 @@ function channelSetupMeta(channel: 'email' | 'telegram' | 'whatsapp') {
         ['access_token', 'Access Token'],
         ['phone_number_id', 'Phone Number ID'],
         ['business_account_id', 'Business Account ID'],
-        ['test_recipient', 'Testempfänger'],
       ] as Array<[string, string]>,
     };
   }
@@ -954,8 +973,20 @@ function channelSetupMeta(channel: 'email' | 'telegram' | 'whatsapp') {
       ['smtp_port', 'SMTP Port'],
       ['smtp_user', 'SMTP Benutzer'],
       ['smtp_password', 'SMTP Passwort'],
-      ['test_recipient', 'Testempfänger'],
     ] as Array<[string, string]>,
+  };
+}
+
+function primaryNotificationRecipient(contacts: NonNullable<SeniorSetupStatus['trusted_contacts']>) {
+  const contact = [...contacts]
+    .filter((item) => item.email)
+    .sort((a, b) => Number(Boolean(b.primary_contact)) - Number(Boolean(a.primary_contact)))[0];
+  if (!contact?.email) return null;
+  return {
+    name: contact.name,
+    email: contact.email,
+    relationship: contact.relationship || undefined,
+    primary: Boolean(contact.primary_contact),
   };
 }
 

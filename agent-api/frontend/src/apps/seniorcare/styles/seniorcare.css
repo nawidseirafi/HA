@@ -1483,6 +1483,15 @@ button:disabled {
   padding: 12px;
 }
 
+.sc-contact-list-editor > div.primary {
+  background: #f2faf6;
+  border-color: #b7d8cb;
+}
+
+.sc-contact-list-editor small {
+  white-space: pre-line;
+}
+
 .sc-contact-list-editor button {
   background: var(--sc-red-soft);
   border: 0;
@@ -1505,6 +1514,46 @@ button:disabled {
   display: flex;
   gap: 12px;
   padding: 18px;
+}
+
+.sc-setup-blocker {
+  background: #fffaf0;
+  border: 1px solid #f0d59c;
+  border-radius: 20px;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.sc-setup-blocker h3,
+.sc-setup-blocker p {
+  margin: 0;
+}
+
+.sc-setup-blocker h3 {
+  color: var(--sc-text);
+  font-size: 1.25rem;
+}
+
+.sc-setup-blocker p {
+  color: var(--sc-muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.sc-setup-blocker button {
+  align-items: center;
+  background: var(--sc-green);
+  border: 0;
+  border-radius: 14px;
+  color: white;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 15px;
+  width: fit-content;
 }
 
 .sc-summary-card strong {
@@ -2550,6 +2599,36 @@ button:disabled {
 .sc-channel-modal h3,
 .sc-channel-modal p {
   margin: 0;
+}
+
+.sc-channel-recipient {
+  background: #f8fcfa;
+  border: 1px solid #d9e9e2;
+  border-radius: 18px;
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+}
+
+.sc-channel-recipient span,
+.sc-channel-recipient small {
+  color: var(--sc-muted);
+  font-weight: 800;
+}
+
+.sc-channel-recipient strong {
+  color: var(--sc-text);
+  font-size: 1.06rem;
+}
+
+.sc-channel-recipient em {
+  background: #eef7f3;
+  border-radius: 999px;
+  color: var(--sc-green);
+  font-style: normal;
+  font-weight: 900;
+  justify-self: start;
+  padding: 5px 9px;
 }
 
 .sc-channel-modal h3 {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, HeartHandshake, Plus, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HeartHandshake, Mail, Plus, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
 import { api, type SeniorCandidates } from '@shared/api/client';
 import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './SensorWizard';
 
@@ -17,6 +17,7 @@ type Contact = {
   phone: string;
   email: string;
   channels: string[];
+  primary: boolean;
 };
 
 const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
@@ -43,10 +44,11 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
   const [customRoom, setCustomRoom] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: [] });
+  const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['E-Mail'], primary: true });
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
   const [confirmed, setConfirmed] = useState(false);
+  const [emailSetupRequired, setEmailSetupRequired] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [sensorBindings, setSensorBindings] = useState<SensorBinding[]>([]);
   const [discovery, setDiscovery] = useState<Record<string, SensorDiscoveryState>>({});
@@ -82,6 +84,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
           phone: '',
           email: contact.email || '',
           channels: contact.email ? ['E-Mail'] : [],
+          primary: Boolean(contact.primary_contact),
         })));
       }
     }).catch(() => undefined);
@@ -124,8 +127,9 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
             name: contact.name.trim(),
             relationship: contact.relation,
             email,
-            preferred_channels: email ? ['email'] : [],
-            notification_enabled: Boolean(email),
+            preferred_channels: ['email'],
+            notification_enabled: true,
+            primary_contact: contact.primary,
           });
         }),
       ));
@@ -134,8 +138,8 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       await safeBackend(() => api.saveSeniorNotifications({ anomalies: true, critical: true, daily_summary: false }));
     }
     if (step === steps.length - 1) {
-      await safeBackend(() => api.completeSeniorSetup());
-      onFinish();
+      const ok = await completeSetup();
+      if (ok) onFinish();
       return;
     }
     setStep((value) => Math.min(value + 1, steps.length - 1));
@@ -150,8 +154,26 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
     if (step === 1 && !profile.name.trim()) return ['Bitte geben Sie den Namen ein.'];
     if (step === 2 && selectedRooms.length === 0) return ['Bitte wählen Sie mindestens einen Raum aus.'];
     if (step === 4 && contacts.length === 0) return ['Bitte fügen Sie mindestens eine vertraute Person hinzu.'];
+    if (step === 4 && !contacts.some((contact) => isValidEmail(normalizeEmail(contact.email)))) return ['Bitte hinterlegen Sie mindestens eine gültige E-Mail-Adresse.'];
     if (step === 6 && !confirmed) return ['Bitte bestätigen Sie die Zusammenfassung.'];
     return [];
+  }
+
+  async function completeSetup() {
+    try {
+      const channels = await api.seniorNotificationChannels();
+      const email = channels.channels.find((channel) => channel.channel === 'email');
+      if (!email?.enabled || !email?.configured) {
+        setEmailSetupRequired(true);
+        setErrors([]);
+        return false;
+      }
+      await api.completeSeniorSetup();
+      return true;
+    } catch {
+      setEmailSetupRequired(true);
+      return false;
+    }
   }
 
   async function safeBackend(action: () => Promise<unknown>) {
@@ -256,14 +278,20 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   function addContact() {
     const nextErrors = [];
     if (!contactForm.name.trim()) nextErrors.push('Bitte geben Sie einen Namen ein.');
+    if (!contactForm.relation.trim()) nextErrors.push('Bitte geben Sie die Beziehung ein.');
     const email = normalizeEmail(contactForm.email);
+    if (!isValidEmail(email)) nextErrors.push('Bitte geben Sie eine gültige E-Mail-Adresse ein.');
     if (email && contacts.some((contact) => normalizeEmail(contact.email) === email)) nextErrors.push('Diese E-Mail-Adresse ist bereits hinterlegt.');
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
     }
-    setContacts((current) => [...current, { ...contactForm, email, channels: email ? ['E-Mail'] : [], id: crypto.randomUUID() }]);
-    setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: [] });
+    setContacts((current) => {
+      const primary = contactForm.primary || current.length === 0;
+      const existing = primary ? current.map((contact) => ({ ...contact, primary: false })) : current;
+      return [...existing, { ...contactForm, email, channels: ['E-Mail'], primary, id: crypto.randomUUID() }];
+    });
+    setContactForm({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['E-Mail'], primary: false });
     setContactFormOpen(false);
     setErrors([]);
   }
@@ -277,9 +305,15 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
         {step === 1 && <ProfileStep profile={profile} calculatedAge={calculatedAge} onChange={setProfile} />}
         {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
         {step === 3 && <SensorWizard sensors={sensorBindings} discovery={discovery} roomLabel={roomLabel} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
-        {step === 4 && <ContactsStep contacts={contacts} form={contactForm} formOpen={contactFormOpen} onOpen={() => setContactFormOpen(true)} onClose={() => setContactFormOpen(false)} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => current.filter((contact) => contact.id !== id))} />}
+        {step === 4 && <ContactsStep contacts={contacts} form={contactForm} formOpen={contactFormOpen} onOpen={() => setContactFormOpen(true)} onClose={() => setContactFormOpen(false)} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => {
+          const nextContacts = current.filter((contact) => contact.id !== id);
+          if (nextContacts.length && !nextContacts.some((contact) => contact.primary)) {
+            return nextContacts.map((contact, index) => ({ ...contact, primary: index === 0 }));
+          }
+          return nextContacts;
+        })} />}
         {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
-        {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} />}
+        {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} emailSetupRequired={emailSetupRequired} />}
       </div>
       <footer className="sc-wizard-actions">
         <button type="button" onClick={back} disabled={step === 0}><ArrowLeft size={20} /> Zurück</button>
@@ -384,8 +418,8 @@ function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange,
     <section className="sc-contacts-step">
       <div className="sc-contacts-wizard-head">
         <div>
-          <p>Wer soll bei wichtigen Hinweisen informiert werden?</p>
-          <small>E-Mail kann direkt hinterlegt werden. Der Versand wird später in den Benachrichtigungen eingerichtet und getestet.</small>
+          <p>Wer soll benachrichtigt werden?</p>
+          <small>Hinterlegen Sie mindestens eine Vertrauensperson, die bei wichtigen Hinweisen oder Warnungen informiert werden kann.</small>
         </div>
         <button className="sc-round-add" type="button" onClick={onOpen} aria-label="Person hinzufügen"><Plus size={28} /></button>
       </div>
@@ -396,16 +430,17 @@ function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange,
             <button type="button" onClick={onClose} aria-label="Formular schließen"><X size={20} /></button>
           </div>
           <div className="sc-form-grid">
-            <label>Name<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
-            <label>Beziehung<input value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })} /></label>
-            <label className="sc-form-wide">E-Mail (optional)<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
+            <label>Name *<input value={form.name} onChange={(event) => onFormChange({ ...form, name: event.target.value })} /></label>
+            <label>Beziehung *<input value={form.relation} onChange={(event) => onFormChange({ ...form, relation: event.target.value })} /></label>
+            <label className="sc-form-wide">E-Mail-Adresse *<input type="email" value={form.email} onChange={(event) => onFormChange({ ...form, email: event.target.value })} /></label>
           </div>
+          <label className={`sc-large-check${form.primary ? ' active' : ''}`}><span>Diese Person als Hauptansprechpartner verwenden</span><input type="checkbox" checked={form.primary} onChange={(event) => onFormChange({ ...form, primary: event.target.checked })} /><i aria-hidden="true" /></label>
           <button className="sc-primary-button" type="button" onClick={onAdd}><Plus size={20} /> Person hinzufügen</button>
         </div>
       )}
       <div className="sc-contact-list-editor">
         {contacts.length === 0 && <p className="sc-muted-note">Noch keine vertraute Person hinterlegt.</p>}
-        {contacts.map((contact) => <div key={contact.id}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.name}</strong><small>{contact.email || `${contact.relation} - Kanal später einrichten`}</small><button type="button" onClick={() => onDelete(contact.id)} aria-label={`${contact.name} löschen`}><Trash2 size={18} /></button></div>)}
+        {contacts.map((contact) => <div key={contact.id} className={contact.primary ? 'primary' : ''}><span className="sc-avatar">{contact.name[0]}</span><strong>{contact.primary ? '✓ Hauptansprechpartner eingerichtet' : contact.name}</strong><small>{contact.primary ? `${contact.name}\n${contact.email}\n${contact.relation}` : `${contact.email} · ${contact.relation}`}</small><button type="button" onClick={() => onDelete(contact.id)} aria-label={`${contact.name} löschen`}><Trash2 size={18} /></button></div>)}
       </div>
     </section>
   );
@@ -425,22 +460,31 @@ function NotificationStep({ value, onChange }: { value: { from: string; to: stri
   );
 }
 
-function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalSensors, notification, confirmed, onConfirm }: { profile: Profile; age: string; rooms: string[]; roomLabel: (room: string) => string; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void }) {
+function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalSensors, notification, confirmed, onConfirm, emailSetupRequired }: { profile: Profile; age: string; rooms: string[]; roomLabel: (room: string) => string; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void; emailSetupRequired: boolean }) {
+  const primary = contacts.find((contact) => contact.primary) || contacts[0];
   return (
     <section className="sc-summary-step">
+      {emailSetupRequired && (
+        <div className="sc-setup-blocker">
+          <h3>Fast geschafft.</h3>
+          <p>Damit Sentero wichtige Hinweise versenden kann, richten Sie jetzt den E-Mail-Versand ein.</p>
+          <button type="button" onClick={() => window.location.assign('/seniorcare/settings/notifications')}><Mail size={18} /> E-Mail-Versand einrichten</button>
+        </div>
+      )}
       <div className="sc-summary-card">
         <UserRound size={28} /><strong>{profile.name}</strong><span>{age ? `${age} Jahre` : 'Alter offen'}</span>
       </div>
       <div className="sc-summary-grid">
         <p><strong>Räume</strong>{rooms.map((room) => roomLabel(room)).join(', ')}</p>
         <p><strong>Sensoren</strong>{sensors} von {totalSensors} verbunden</p>
-        <p><strong>Kontakte</strong>{contacts.map((contact) => `${contact.name} (${contact.relation})`).join(', ')}</p>
+        <p><strong>Hauptansprechpartner</strong>{primary ? `${primary.name} (${primary.email})` : 'Noch nicht eingerichtet'}</p>
         <p><strong>Benachrichtigungen</strong>{notification.from} - {notification.to}, Stufe {notification.sensitivity}</p>
       </div>
       <label className={`sc-large-check${confirmed ? ' active' : ''}`}><span>Ich bestätige, dass alle Angaben korrekt sind.</span><input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} /><i aria-hidden="true" /></label>
     </section>
   );
 }
+
 
 function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: boolean; door: boolean }>, customRooms: Record<string, string>, current: SensorBinding[]) {
   const byId = Object.fromEntries(current.map((sensor) => [sensor.id, sensor]));
@@ -467,4 +511,8 @@ function defaultSensorPlan(roomId: string) {
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }

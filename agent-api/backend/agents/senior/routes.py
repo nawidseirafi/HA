@@ -80,6 +80,7 @@ class ContactPayload(BaseModel):
     whatsapp_phone_number: str | None = None
     preferred_channels: list[str] | None = None
     notification_enabled: bool = True
+    primary_contact: bool = False
 
 
 class NotificationPayload(BaseModel):
@@ -339,7 +340,10 @@ def setup_sensors():
 
 @router.post("/setup/contact")
 def setup_contact(payload: ContactPayload):
-    return setup_service.contact(model_data(payload))
+    try:
+        return setup_service.contact(model_data(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.put("/setup/contact/{contact_id}")
@@ -347,7 +351,7 @@ def setup_contact_update(contact_id: int, payload: ContactPayload):
     try:
         return setup_service.update_contact(contact_id, model_data(payload))
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/setup/contact/{contact_id}")
@@ -402,7 +406,10 @@ def notification_logs(limit: int = Query(100, ge=1, le=500)):
 
 @router.post("/setup/complete")
 def setup_complete():
-    return setup_service.set_step("complete", "complete", complete=True)
+    try:
+        return setup_service.complete()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/sensor-roles")

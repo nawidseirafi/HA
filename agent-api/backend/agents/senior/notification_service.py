@@ -244,10 +244,8 @@ class NotificationService:
 
     def _test_contact(self, channel: str, config: dict[str, Any]) -> dict[str, Any]:
         with self.mapping.connect() as con:
-            row = con.execute("select * from trusted_contacts where active = 1 order by id limit 1").fetchone()
-        contact = dict(row) if row else {"id": None, "email": config.get("test_recipient")}
-        if channel == "email" and config.get("test_recipient"):
-            contact["email"] = config.get("test_recipient")
+            row = con.execute("select * from trusted_contacts where active = 1 order by primary_contact desc, id limit 1").fetchone()
+        contact = dict(row) if row else {"id": None}
         if channel == "telegram":
             contact["telegram_chat_id"] = config.get("test_recipient") or contact.get("telegram_chat_id") or config.get("default_chat_id")
         if channel == "whatsapp":
