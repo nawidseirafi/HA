@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Battery, CheckCircle2, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, Wifi, WifiOff, X } from 'lucide-react';
+import { Battery, CheckCircle2, KeyRound, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, UserRound, Wifi, WifiOff, X } from 'lucide-react';
 import { api, type SeniorNotificationChannel, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
+import { useSenteroAuth } from '../auth/SenteroAuthContext';
 import type { SeniorCareSettingsTab } from '../routes/routes';
 import { seniorCareRouteToPath } from '../routes/routes';
 
@@ -19,10 +20,12 @@ const settingsTabs: Array<{ tab: SeniorCareSettingsTab; label: string; shortLabe
   { tab: 'sensors', label: 'Räume & Sensoren', shortLabel: 'Räume' },
   { tab: 'contacts', label: 'Vertraute Personen', shortLabel: 'Personen' },
   { tab: 'notifications', label: 'Benachrichtigungen', shortLabel: 'Benachr.' },
+  { tab: 'account', label: 'Konto & Zugriff', shortLabel: 'Konto' },
   { tab: 'system', label: 'System', shortLabel: 'System' },
 ];
 
 export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }) {
+  const { user, updateMe, changePassword } = useSenteroAuth();
   const [status, setStatus] = useState<SeniorSetupStatus | null>(null);
   const [sensors, setSensors] = useState<SeniorSensorRole[]>([]);
   const [saved, setSaved] = useState('');
@@ -35,6 +38,10 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   const [editContactForm, setEditContactForm] = useState(emptyContactForm());
   const [roomDraft, setRoomDraft] = useState('');
   const [notifications, setNotifications] = useState({ anomalies: true, critical: true, daily_summary: false });
+  const [accountForm, setAccountForm] = useState({ display_name: '', email: '' });
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', new_password_confirm: '' });
+  const [accountEditing, setAccountEditing] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [channels, setChannels] = useState<SeniorNotificationChannel[]>([]);
   const [setupChannel, setSetupChannel] = useState<'email' | 'telegram' | 'whatsapp' | null>(null);
   const [channelForms, setChannelForms] = useState({
@@ -46,6 +53,10 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setAccountForm({ display_name: user?.display_name || '', email: user?.email || '' });
+  }, [user]);
 
   async function load() {
     try {
@@ -99,6 +110,33 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Profil konnte nicht gespeichert werden.');
+    }
+  }
+
+  async function saveAccount() {
+    try {
+      await updateMe({ displayName: accountForm.display_name, email: accountForm.email });
+      toast('Konto gespeichert');
+      setAccountEditing(false);
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Konto konnte nicht gespeichert werden.');
+    }
+  }
+
+  async function savePassword() {
+    try {
+      await changePassword({
+        currentPassword: passwordForm.current_password,
+        newPassword: passwordForm.new_password,
+        newPasswordConfirm: passwordForm.new_password_confirm,
+      });
+      setPasswordForm({ current_password: '', new_password: '', new_password_confirm: '' });
+      setPasswordModalOpen(false);
+      toast('Passwort geändert');
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Passwort konnte nicht geändert werden.');
     }
   }
 
@@ -529,6 +567,87 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
               onSave={() => void saveChannel(setupChannel)}
               onTest={() => void testChannel(setupChannel)}
             />
+          )}
+        </section>
+      )}
+
+      {activeTab === 'account' && (
+        <section className="sc-panel sc-settings-panel sc-account-panel">
+          <div className="sc-settings-hero">
+            <h2>Konto & Zugriff</h2>
+            <p>Verwalten Sie Ihr Sentero-Konto und Ihre Sicherheit.</p>
+          </div>
+
+          <div className="sc-account-grid">
+            <article className="sc-account-card">
+              <header>
+                <span><UserRound size={22} /></span>
+                <div>
+                  <h3>Mein Konto</h3>
+                  <p>Persönliche Zugangsdaten</p>
+                </div>
+              </header>
+              {!accountEditing ? (
+                <>
+                  <div className="sc-account-details">
+                    <p><span>Name</span><strong>{user?.display_name || accountForm.display_name || 'Nicht hinterlegt'}</strong></p>
+                    <p><span>E-Mail-Adresse</span><strong>{user?.email || accountForm.email || 'Nicht hinterlegt'}</strong></p>
+                    <p><span>Rolle</span><strong>{user?.role === 'owner' ? 'Inhaber-Konto' : user?.role === 'admin' ? 'Admin-Konto' : 'Ansichtskonto'}</strong></p>
+                  </div>
+                  <button className="sc-soft-action" type="button" onClick={() => setAccountEditing(true)}><Pencil size={18} /> Konto bearbeiten</button>
+                </>
+              ) : (
+                <>
+                  <div className="sc-form-grid">
+                    <label>Name<input value={accountForm.display_name} onChange={(event) => setAccountForm((value) => ({ ...value, display_name: event.target.value }))} /></label>
+                    <label>E-Mail-Adresse<input type="email" value={accountForm.email} onChange={(event) => setAccountForm((value) => ({ ...value, email: event.target.value }))} /></label>
+                  </div>
+                  <footer className="sc-account-actions">
+                    <button className="sc-soft-action" type="button" onClick={() => { setAccountEditing(false); setAccountForm({ display_name: user?.display_name || '', email: user?.email || '' }); }}>Abbrechen</button>
+                    <button className="sc-soft-action primary" type="button" onClick={() => void saveAccount()}><Save size={18} /> Speichern</button>
+                  </footer>
+                </>
+              )}
+            </article>
+
+            <article className="sc-account-card">
+              <header>
+                <span><KeyRound size={22} /></span>
+                <div>
+                  <h3>Sicherheit</h3>
+                  <p>Schützen Sie den Zugang zu Sentero.</p>
+                </div>
+              </header>
+              <div className="sc-account-details">
+                <p><span>Passwort</span><strong>Gespeichert</strong></p>
+                <p><span>Zuletzt geändert</span><strong>Noch nicht verfügbar</strong></p>
+              </div>
+              <button className="sc-soft-action" type="button" onClick={() => setPasswordModalOpen(true)}><KeyRound size={18} /> Passwort ändern</button>
+            </article>
+          </div>
+
+          {passwordModalOpen && (
+            <div className="sc-modal-backdrop" role="presentation" onMouseDown={() => setPasswordModalOpen(false)}>
+              <section className="sc-channel-modal sc-password-modal" role="dialog" aria-modal="true" aria-label="Passwort ändern" onMouseDown={(event) => event.stopPropagation()}>
+                <header>
+                  <span><KeyRound size={22} /></span>
+                  <div>
+                    <h3>Passwort ändern</h3>
+                    <p>Nutzen Sie ein sicheres Passwort mit mindestens 8 Zeichen.</p>
+                  </div>
+                  <button type="button" onClick={() => setPasswordModalOpen(false)} aria-label="Dialog schließen"><X size={20} /></button>
+                </header>
+                <div className="sc-form-grid">
+                  <label>Aktuelles Passwort<input type="password" value={passwordForm.current_password} onChange={(event) => setPasswordForm((value) => ({ ...value, current_password: event.target.value }))} autoComplete="current-password" /></label>
+                  <label>Neues Passwort<input type="password" value={passwordForm.new_password} onChange={(event) => setPasswordForm((value) => ({ ...value, new_password: event.target.value }))} autoComplete="new-password" /></label>
+                  <label className="sc-form-wide">Neues Passwort bestätigen<input type="password" value={passwordForm.new_password_confirm} onChange={(event) => setPasswordForm((value) => ({ ...value, new_password_confirm: event.target.value }))} autoComplete="new-password" /></label>
+                </div>
+                <footer>
+                  <button type="button" onClick={() => setPasswordModalOpen(false)}>Abbrechen</button>
+                  <button type="button" onClick={() => void savePassword()}><KeyRound size={18} /> Passwort ändern</button>
+                </footer>
+              </section>
+            </div>
           )}
         </section>
       )}

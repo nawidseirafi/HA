@@ -236,6 +236,12 @@
   padding: 12px 14px;
 }
 
+.sc-form-note.success {
+  background: var(--sc-green-soft);
+  border-color: #b7d8cb;
+  color: var(--sc-green);
+}
+
 .sc-primary-action {
   align-items: center;
   background: var(--sc-green);
@@ -248,6 +254,14 @@
   justify-content: center;
   min-height: 58px;
   padding: 0 18px;
+}
+
+.sc-login-secondary {
+  background: transparent;
+  border: 0;
+  color: var(--sc-green);
+  font-weight: 850;
+  min-height: 42px;
 }
 
 .sc-login-footer {
@@ -1571,9 +1585,116 @@ button:disabled {
 .sc-room-settings-list,
 .sc-sensor-settings-list,
 .sc-settings-contact-grid,
+.sc-account-grid,
 .sc-system-grid {
   display: grid;
   gap: 14px;
+}
+
+.sc-account-grid {
+  gap: 18px;
+  grid-template-columns: 1fr;
+}
+
+.sc-account-card {
+  background: #ffffff;
+  border: 1px solid var(--sc-line);
+  border-radius: 24px;
+  display: grid;
+  gap: 22px;
+  padding: clamp(18px, 3vw, 26px);
+}
+
+.sc-account-grid header {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.sc-account-grid header > span {
+  align-items: center;
+  background: #f3faf6;
+  border-radius: 16px;
+  color: var(--sc-green);
+  display: inline-flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.sc-account-grid h3,
+.sc-account-grid p {
+  margin: 0;
+}
+
+.sc-account-grid h3 {
+  color: var(--sc-text);
+  font-size: 1.16rem;
+}
+
+.sc-account-grid p {
+  color: var(--sc-muted);
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+.sc-account-details {
+  display: grid;
+  gap: 14px;
+}
+
+.sc-account-details p {
+  align-items: start;
+  background: #fbfefa;
+  border: 1px solid #edf4f0;
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.sc-account-details span {
+  color: var(--sc-muted);
+  font-size: 0.92rem;
+  font-weight: 850;
+}
+
+.sc-account-details strong {
+  color: var(--sc-text);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.sc-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sc-soft-action {
+  align-items: center;
+  background: #eef7f3;
+  border: 0;
+  border-radius: 14px;
+  color: var(--sc-green);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  width: fit-content;
+}
+
+.sc-soft-action.primary {
+  background: var(--sc-green);
+  color: white;
+}
+
+.sc-password-modal {
+  max-width: 620px;
 }
 
 .sc-room-settings-list details {
@@ -2762,6 +2883,7 @@ button:disabled {
   .sc-optional-channel-grid,
   .sc-summary-grid,
   .sc-settings-contact-grid,
+  .sc-account-grid,
   .sc-system-grid {
     grid-template-columns: 1fr;
   }

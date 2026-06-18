@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Bell, Home, LogOut, Settings, ShieldCheck, Sparkles, UserRound, Users, Wifi } from 'lucide-react';
+import { Bell, Home, KeyRound, LogOut, Settings, ShieldCheck, Sparkles, UserRound, Users, Wifi } from 'lucide-react';
 import type { SeniorCareRoute, SeniorCareRouteName, SeniorCareSettingsTab } from '../routes/routes';
 import { seniorCareNavigation } from '../navigation/navigation';
 
@@ -22,6 +22,7 @@ const settingsItems: Array<{ tab: SeniorCareSettingsTab; label: string; icon: ty
   { tab: 'sensors', label: 'Räume & Sensoren', icon: Home },
   { tab: 'contacts', label: 'Vertraute Personen', icon: Users },
   { tab: 'notifications', label: 'Benachrichtigungen', icon: Bell },
+  { tab: 'account', label: 'Konto & Zugriff', icon: KeyRound },
   { tab: 'system', label: 'System', icon: Wifi },
 ];
 

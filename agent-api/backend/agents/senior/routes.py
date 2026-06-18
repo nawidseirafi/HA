@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
+from .auth_service import SenteroAuthService
 from .commissioning_service import CommissioningService
 from .device_mapping_service import DeviceMappingService
 from .matter_service import MatterCommissioningUnavailable
@@ -16,6 +17,9 @@ from .setup_service import SeniorSetupService
 
 class SenteroRouter(APIRouter):
     def add_api_route(self, path: str, endpoint: Any, **kwargs: Any) -> None:
+        if path.startswith("/api/"):
+            super().add_api_route(path, endpoint, **kwargs)
+            return
         super().add_api_route(f"/api/senior{path}", endpoint, **kwargs)
         super().add_api_route(f"/api/sentero{path}", endpoint, **kwargs)
 
@@ -26,6 +30,7 @@ setup_service = SeniorSetupService(device_mapping_service)
 senior_service = SeniorService(device_mapping_service)
 commissioning_service = CommissioningService(mapping=device_mapping_service)
 notification_service = NotificationService(device_mapping_service)
+auth_service = SenteroAuthService(device_mapping_service)
 
 
 class ProfilePayload(BaseModel):
@@ -92,6 +97,40 @@ class ChannelSettingsPayload(BaseModel):
     config: dict[str, Any] = {}
 
 
+class SenteroSetupPayload(BaseModel):
+    name: str
+    email: str
+    password: str
+    password_confirm: str
+
+
+class SenteroLoginPayload(BaseModel):
+    email: str
+    password: str
+
+
+class ForgotPasswordPayload(BaseModel):
+    email: str
+
+
+class ResetPasswordPayload(BaseModel):
+    token: str
+    password: str
+    password_confirm: str
+
+
+class UpdateMePayload(BaseModel):
+    display_name: str | None = None
+    name: str | None = None
+    email: str
+
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str
+    new_password: str
+    new_password_confirm: str
+
+
 def model_data(model: BaseModel) -> dict[str, Any]:
     if hasattr(model, "model_dump"):
         return model.model_dump()
@@ -104,6 +143,51 @@ def api_error(exc: Exception) -> HTTPException:
 
 def is_dev_mode(dev: bool = False) -> bool:
     return dev or os.getenv("ROBOTERSTEVE_DEV_MODE", "").lower() in {"1", "true", "yes", "on"}
+
+
+@router.get("/api/sentero/auth/status")
+def sentero_auth_status(request: Request):
+    return auth_service.status(request)
+
+
+@router.post("/api/sentero/auth/setup")
+def sentero_auth_setup(payload: SenteroSetupPayload, request: Request, response: Response):
+    return auth_service.setup(model_data(payload), response, request)
+
+
+@router.post("/api/sentero/auth/login")
+def sentero_auth_login(payload: SenteroLoginPayload, request: Request, response: Response):
+    return auth_service.login(model_data(payload), response, request)
+
+
+@router.post("/api/sentero/auth/logout")
+def sentero_auth_logout(request: Request, response: Response):
+    return auth_service.logout(request, response)
+
+
+@router.get("/api/sentero/auth/me")
+def sentero_auth_me(request: Request):
+    return auth_service.me(request)
+
+
+@router.put("/api/sentero/auth/me")
+def sentero_auth_update_me(payload: UpdateMePayload, request: Request):
+    return auth_service.update_me(model_data(payload), request)
+
+
+@router.post("/api/sentero/auth/change-password")
+def sentero_auth_change_password(payload: ChangePasswordPayload, request: Request):
+    return auth_service.change_password(model_data(payload), request)
+
+
+@router.post("/api/sentero/auth/forgot-password")
+def sentero_auth_forgot_password(payload: ForgotPasswordPayload, request: Request):
+    return auth_service.forgot_password(model_data(payload), request)
+
+
+@router.post("/api/sentero/auth/reset-password")
+def sentero_auth_reset_password(payload: ResetPasswordPayload):
+    return auth_service.reset_password(model_data(payload))
 
 
 @router.get("/status")

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AuthProvider, useAuth } from '@shared/auth/AuthContext';
+import { SenteroAuthProvider, useSenteroAuth } from './auth/SenteroAuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -14,14 +14,14 @@ import './styles/seniorcare.css';
 
 export function App() {
   return (
-    <AuthProvider>
+    <SenteroAuthProvider>
       <SeniorCareContent />
-    </AuthProvider>
+    </SenteroAuthProvider>
   );
 }
 
 function SeniorCareContent() {
-  const { isAuthenticated, logout } = useAuth();
+  const { loading, setupRequired, isAuthenticated, logout } = useSenteroAuth();
   const [route, setRoute] = useState<SeniorCareRoute>(parseSeniorCareRoute());
 
   useEffect(() => {
@@ -36,8 +36,18 @@ function SeniorCareContent() {
     setRoute(next);
   };
 
-  if (!isAuthenticated) {
-    return <LoginPage onLoggedIn={() => setRoute(parseSeniorCareRoute())} />;
+  if (loading) {
+    return <main className="sc-login-page"><section className="sc-login-card"><p className="sc-muted-note">Sentero wird geladen...</p></section></main>;
+  }
+
+  if (setupRequired || !isAuthenticated) {
+    return <LoginPage mode={setupRequired ? 'setup' : 'login'} onLoggedIn={(target) => {
+      if (target === 'setup') {
+        navigate('setup');
+        return;
+      }
+      setRoute(parseSeniorCareRoute());
+    }} />;
   }
 
   return (

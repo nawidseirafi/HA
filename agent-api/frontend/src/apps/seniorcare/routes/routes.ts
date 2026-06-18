@@ -1,4 +1,4 @@
-export type SeniorCareSettingsTab = 'profile' | 'sensors' | 'contacts' | 'notifications' | 'system';
+export type SeniorCareSettingsTab = 'profile' | 'sensors' | 'contacts' | 'notifications' | 'account' | 'system';
 
 export type SeniorCareRoute =
   | { name: 'setup' }
@@ -11,7 +11,7 @@ export type SeniorCareRoute =
 export type SeniorCareRouteName = SeniorCareRoute['name'];
 
 const routeNames: SeniorCareRouteName[] = ['setup', 'dashboard', 'history', 'rooms', 'contacts', 'settings'];
-const settingsTabs: SeniorCareSettingsTab[] = ['profile', 'sensors', 'contacts', 'notifications', 'system'];
+const settingsTabs: SeniorCareSettingsTab[] = ['profile', 'sensors', 'contacts', 'notifications', 'account', 'system'];
 
 export function parseSeniorCareRoute(): SeniorCareRoute {
   const parts = window.location.pathname.split('/').filter(Boolean);

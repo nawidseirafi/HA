@@ -772,6 +772,37 @@ def ensure_schema(con: sqlite3.Connection) -> None:
         error_message text,
         created_at text not null
     )''')
+    con.execute('''create table if not exists sentero_users (
+        id integer primary key autoincrement,
+        email text not null unique,
+        password_hash text not null,
+        display_name text,
+        role text not null default 'viewer',
+        is_active integer not null default 1,
+        created_at text not null,
+        updated_at text not null,
+        last_login_at text
+    )''')
+    con.execute('''create table if not exists sentero_sessions (
+        id integer primary key autoincrement,
+        user_id integer not null,
+        token_hash text not null unique,
+        expires_at text not null,
+        created_at text not null,
+        foreign key(user_id) references sentero_users(id)
+    )''')
+    con.execute('create index if not exists idx_sentero_sessions_token_hash on sentero_sessions(token_hash)')
+    con.execute('create index if not exists idx_sentero_sessions_user_id on sentero_sessions(user_id)')
+    con.execute('''create table if not exists sentero_password_reset_tokens (
+        id integer primary key autoincrement,
+        user_id integer not null,
+        token_hash text not null unique,
+        expires_at text not null,
+        used_at text,
+        created_at text not null,
+        foreign key(user_id) references sentero_users(id)
+    )''')
+    con.execute('create index if not exists idx_sentero_password_reset_tokens_hash on sentero_password_reset_tokens(token_hash)')
     con.execute('''create table if not exists sensor_roles (id integer primary key autoincrement, role text not null, room text, entity_id text not null, device_id text, friendly_name text, device_class text, domain text, source text, confidence real, active integer not null default 1, created_at text not null, updated_at text not null)''')
     con.execute('create unique index if not exists idx_sensor_roles_active_role on sensor_roles(role) where active = 1')
     con.execute('''create table if not exists sensor_discovery_sessions (id integer primary key autoincrement, target_role text not null, target_room text, started_at text not null, ended_at text, status text not null, baseline_snapshot_json text, candidate_snapshot_json text, selected_entity_id text)''')
