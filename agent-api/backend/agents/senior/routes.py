@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
+from backend.services.update_service import UpdateService
 
 from .auth_service import SenteroAuthService
 from .commissioning_service import CommissioningService
@@ -31,6 +32,7 @@ senior_service = SeniorService(device_mapping_service)
 commissioning_service = CommissioningService(mapping=device_mapping_service)
 notification_service = NotificationService(device_mapping_service)
 auth_service = SenteroAuthService(device_mapping_service)
+update_service = UpdateService()
 
 
 class ProfilePayload(BaseModel):
@@ -120,6 +122,14 @@ class ResetPasswordPayload(BaseModel):
     password_confirm: str
 
 
+class UpdateCheckRequest(BaseModel):
+    channel: str | None = None
+
+
+class UpdateInstallRequest(BaseModel):
+    layer: str | None = None
+
+
 class UpdateMePayload(BaseModel):
     display_name: str | None = None
     name: str | None = None
@@ -189,6 +199,32 @@ def sentero_auth_forgot_password(payload: ForgotPasswordPayload, request: Reques
 @router.post("/api/sentero/auth/reset-password")
 def sentero_auth_reset_password(payload: ResetPasswordPayload):
     return auth_service.reset_password(model_data(payload))
+
+
+@router.get("/api/sentero/system/update/status")
+def sentero_update_status():
+    return update_service.status()
+
+
+@router.get("/api/sentero/system/update/check")
+def sentero_update_check(channel: str | None = None):
+    return update_service.check_for_updates(channel=channel)
+
+
+@router.post("/api/sentero/system/update/check")
+def sentero_update_check_post(payload: UpdateCheckRequest):
+    return update_service.check_for_updates(channel=payload.channel)
+
+
+@router.post("/api/sentero/system/update/install")
+def sentero_update_install(payload: UpdateInstallRequest, request: Request):
+    user = auth_service.user_from_request(request, required=True)
+    if str(user.get("role") or "") not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="Nur Inhaber und Administratoren dürfen Updates installieren.")
+    try:
+        return update_service.install_update(username=str(user.get("email") or "sentero"), layer=payload.layer or "auto")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/status")

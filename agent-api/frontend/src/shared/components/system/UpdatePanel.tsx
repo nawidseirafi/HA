@@ -15,9 +15,9 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
   const load = async () => {
     setError('');
     try {
-      const nextStatus = await api.updateStatus();
+      const nextStatus = await (variant === 'seniorcare' ? api.senteroUpdateStatus() : api.updateStatus());
       setStatus(nextStatus);
-      if (nextStatus.dev_mode) {
+      if (variant !== 'seniorcare' && nextStatus.dev_mode) {
         try {
           setAdminStatus(await api.adminUpdateStatus());
         } catch {
@@ -37,7 +37,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     setBusy('check');
     setError('');
     try {
-      await api.checkUpdates();
+      await (variant === 'seniorcare' ? api.senteroCheckUpdates() : api.checkUpdates());
       await load();
     } catch {
       setError('Die Update-Pruefung ist fehlgeschlagen. Bitte versuchen Sie es spaeter erneut.');
@@ -50,7 +50,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     setBusy('install');
     setError('');
     try {
-      const result = await api.installUpdate();
+      const result = await (variant === 'seniorcare' ? api.senteroInstallUpdate() : api.installUpdate());
       setStatus(result);
       await load();
     } catch {

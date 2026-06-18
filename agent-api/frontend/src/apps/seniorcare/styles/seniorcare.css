@@ -2578,8 +2578,25 @@ button:disabled {
 }
 
 .sc-channel-overview-card button {
-  width: fit-content;
   height: 40px;
+  width: fit-content;
+}
+
+.sc-channel-overview-card > button {
+  background: white;
+  border: 1px solid #dbe9e3;
+  border-radius: 999px;
+  color: #38594d;
+  font-size: 0.95rem;
+  min-height: 40px;
+  padding: 0 14px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.sc-channel-overview-card > button:hover {
+  background: #f6fbf8;
+  border-color: #b7d8cb;
+  color: var(--sc-green);
 }
 
 .sc-modal-backdrop {

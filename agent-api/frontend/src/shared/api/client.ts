@@ -1272,6 +1272,9 @@ export const api = {
   checkUpdates: () => request<UpdateCheckResult>('/api/system/update/check'),
   installUpdate: () => request<UpdateStatus>('/api/system/update/install', { method: 'POST', body: JSON.stringify({}) }),
   rollbackUpdate: () => request<UpdateStatus>('/api/system/update/rollback', { method: 'POST' }),
+  senteroUpdateStatus: () => request<UpdateStatus>('/api/sentero/system/update/status'),
+  senteroCheckUpdates: () => request<UpdateCheckResult>('/api/sentero/system/update/check'),
+  senteroInstallUpdate: () => request<UpdateStatus>('/api/sentero/system/update/install', { method: 'POST', body: JSON.stringify({}) }),
   login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request<{ user: { username: string } }>('/api/auth/me'),
