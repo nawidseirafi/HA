@@ -87,7 +87,7 @@ export function LoginPage({ mode, onLoggedIn }: { mode: 'setup' | 'login'; onLog
           {!isReset && (
             <label className="sc-floating-field">
               <input autoFocus={!isSetup} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder=" " />
-              <span>E-Mail-Adresse</span>
+              <span>E-Mail</span>
             </label>
           )}
           {!isForgot && (
@@ -124,9 +124,9 @@ export function LoginPage({ mode, onLoggedIn }: { mode: 'setup' | 'login'; onLog
         </form>
       </section>
       <footer className="sc-login-footer">
-        <a href="https://www.mma-plus.com/datenschutz" onClick={(event) => event.preventDefault()}>Datenschutz</a>
+        <a href="https://www.mma-plus.com/datenschutz" target="_blank" rel="noreferrer">Datenschutz</a>
         <span aria-hidden="true">·</span>
-        <a href="https://www.mma-plus.com/impressum" onClick={(event) => event.preventDefault()}>Impressum</a>
+        <a href="https://www.mma-plus.com/impressum" target="_blank" rel="noreferrer">Impressum</a>
       </footer>
     </main>
   );
