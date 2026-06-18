@@ -37,6 +37,7 @@ update_service = UpdateService()
 
 class ProfilePayload(BaseModel):
     name: str | None = None
+    birth_year: int | None = None
     age: int | None = None
     notes: str | None = None
 
@@ -239,7 +240,7 @@ def run_senior_agent():
 
 @router.get("/behavior/latest")
 def senior_behavior_latest():
-    return {"assessment": senior_service.latest_behavior()}
+    return {"assessment": senior_service.latest_behavior(), "learning": senior_service.behavior_learning_status()}
 
 
 @router.get("/behavior/history")

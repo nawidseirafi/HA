@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, type SeniorBehaviorAssessment, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
+import { api, type SeniorBehaviorAssessment, type SeniorBehaviorLearning, type SeniorSensorRole, type SeniorSetupStatus } from '@shared/api/client';
 
 export function DashboardPage() {
   const [status, setStatus] = useState<SeniorSetupStatus | null>(null);
   const [behavior, setBehavior] = useState<SeniorBehaviorAssessment | null>(null);
+  const [learning, setLearning] = useState<SeniorBehaviorLearning | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -12,11 +13,12 @@ export function DashboardPage() {
       try {
         const [next, latestBehavior] = await Promise.all([
           api.seniorSetupStatus(),
-          api.seniorBehaviorLatest().catch(() => ({ assessment: null })),
+          api.seniorBehaviorLatest().catch(() => ({ assessment: null, learning: undefined })),
         ]);
         if (active) {
           setStatus(next);
           setBehavior(latestBehavior.assessment);
+          setLearning(latestBehavior.learning || null);
           setError('');
         }
       } catch (err) {
@@ -56,6 +58,8 @@ export function DashboardPage() {
         </p>
       </header>
 
+      <BehaviorAnalysisCard behavior={behavior} learning={learning} hasSensors={hasSensors} />
+
       <article className="sc-simple-day-card" aria-label="Tagesverlauf">
         <div className="sc-simple-day-head">
           <strong>Tagesverlauf</strong>
@@ -80,6 +84,45 @@ export function DashboardPage() {
       </section>
     </section>
   );
+}
+
+function BehaviorAnalysisCard({ behavior, learning, hasSensors }: { behavior: SeniorBehaviorAssessment | null; learning: SeniorBehaviorLearning | null; hasSensors: boolean }) {
+  const status = behavior?.status || 'green';
+  const meta = behaviorMeta(status);
+  const learningText = !hasSensors
+    ? 'Noch keine Sensoren eingerichtet'
+    : learning?.completed
+      ? 'Verhaltensprofil vollständig gelernt'
+      : learning
+        ? `Sentero lernt aktuell den gewohnten Tagesablauf kennen. Tag ${learning.day} von ${learning.days}`
+        : 'Sentero lernt aktuell den gewohnten Tagesablauf kennen.';
+  const headline = !hasSensors ? 'Noch keine Bewertung möglich' : meta.label;
+  const summary = !hasSensors
+    ? 'Verbinden Sie zuerst Sensoren, damit Sentero persönliche Routinen erkennen kann.'
+    : behavior?.summary || 'Sentero baut ein persönliches Normalverhalten auf.';
+  return (
+    <article className={`sc-behavior-overview ${meta.tone}`} aria-label="Verhaltensanalyse">
+      <div>
+        <span aria-hidden="true">{meta.dot}</span>
+        <div>
+          <small>Verhaltensanalyse</small>
+          <strong>{headline}</strong>
+        </div>
+      </div>
+      <p>{summary}</p>
+      <footer>
+        <span>{learningText}</span>
+        {typeof behavior?.anomaly_score === 'number' && <em>Score {behavior.anomaly_score}/100</em>}
+      </footer>
+    </article>
+  );
+}
+
+function behaviorMeta(status?: string | null) {
+  if (status === 'red') return { tone: 'red', dot: '🔴', label: 'Kritisch' };
+  if (status === 'orange') return { tone: 'orange', dot: '🟠', label: 'Auffällig' };
+  if (status === 'yellow') return { tone: 'yellow', dot: '🟡', label: 'Leichte Abweichung' };
+  return { tone: 'green', dot: '🟢', label: 'Normal' };
 }
 
 function Fact({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {

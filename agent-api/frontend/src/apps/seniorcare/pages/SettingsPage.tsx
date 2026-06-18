@@ -31,7 +31,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
   const [saved, setSaved] = useState('');
   const [error, setError] = useState('');
   const [resetText, setResetText] = useState('');
-  const [profile, setProfile] = useState({ name: '', age: '', notes: '' });
+  const [profile, setProfile] = useState({ name: '', birthYear: '', notes: '' });
   const [contactForm, setContactForm] = useState(emptyContactForm());
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -78,7 +78,7 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
       }
       setProfile({
         name: nextStatus.profile?.name || '',
-        age: nextStatus.profile?.age ? String(nextStatus.profile.age) : '',
+        birthYear: nextStatus.profile?.birth_year ? String(nextStatus.profile.birth_year) : '',
         notes: nextStatus.profile?.notes || '',
       });
       setNotifications({
@@ -111,7 +111,8 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
 
   async function saveProfile() {
     try {
-      await api.saveSeniorProfile({ name: profile.name, age: profile.age ? Number(profile.age) : null, notes: profile.notes });
+      const calculatedAge = ageFromBirthYear(profile.birthYear);
+      await api.saveSeniorProfile({ name: profile.name, birth_year: profile.birthYear ? Number.parseInt(profile.birthYear, 10) : null, age: calculatedAge, notes: profile.notes });
       toast();
       await load();
     } catch (err) {
@@ -400,9 +401,16 @@ export function SettingsPage({ activeTab }: { activeTab: SeniorCareSettingsTab }
         <section className="sc-panel sc-settings-panel">
           <h2>Profil</h2>
           <div className="sc-form-grid">
-            <label>Name<input value={profile.name} onChange={(event) => setProfile((value) => ({ ...value, name: event.target.value }))} /></label>
-            <label>Alter<input inputMode="numeric" value={profile.age} onChange={(event) => setProfile((value) => ({ ...value, age: event.target.value }))} /></label>
-            <label className="sc-form-wide">Hinweise<textarea value={profile.notes} onChange={(event) => setProfile((value) => ({ ...value, notes: event.target.value }))} /></label>
+            <label>Name der betreuten Person<input value={profile.name} onChange={(event) => setProfile((value) => ({ ...value, name: event.target.value }))} /></label>
+            <label>
+              Geburtsjahr
+              <input inputMode="numeric" maxLength={4} value={profile.birthYear} onChange={(event) => setProfile((value) => ({ ...value, birthYear: event.target.value.replace(/\D+/g, '').slice(0, 4) }))} placeholder="1945" />
+            </label>
+            <label className="sc-form-wide">
+              Besondere Hinweise (optional)
+              <textarea value={profile.notes} onChange={(event) => setProfile((value) => ({ ...value, notes: event.target.value }))} placeholder="z.B. Eingeschränkte Mobilität, Rollator, regelmäßige Arzttermine ..." />
+              <small>Diese Informationen helfen Sentero, Auffälligkeiten besser einzuordnen.</small>
+            </label>
           </div>
           <button className="sc-primary-button" type="button" onClick={() => void saveProfile()}><Save size={20} /> Speichern</button>
         </section>
@@ -1068,6 +1076,13 @@ function primaryNotificationRecipient(contacts: NonNullable<SeniorSetupStatus['t
     relationship: contact.relationship || undefined,
     primary: Boolean(contact.primary_contact),
   };
+}
+
+function ageFromBirthYear(value: string) {
+  const year = Number.parseInt(value, 10);
+  const currentYear = new Date().getFullYear();
+  if (!Number.isFinite(year) || year < 1900 || year > currentYear) return null;
+  return currentYear - year;
 }
 
 function formatDateTime(value?: string | null) {

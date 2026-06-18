@@ -43,7 +43,7 @@ export function SensorWizard({ sensors, discovery, devMode, connected, total, ro
       <div className="sc-zigbee-intro">
         <span><Radio size={24} /></span>
         <div>
-          <h3>Zigbee-Sensor verbinden</h3>
+          <h3>Sensor verbinden</h3>
           <p>Klicken Sie auf ‚Sensor suchen‘. Versetzen Sie anschließend den Zigbee-Sensor in den Kopplungsmodus, z. B. indem Sie die Pairing-Taste 3–5 Sekunden gedrückt halten.</p>
         </div>
         <strong>{connected}/{total} Sensor verbunden</strong>

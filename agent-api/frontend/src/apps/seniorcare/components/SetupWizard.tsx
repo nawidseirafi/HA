@@ -5,8 +5,7 @@ import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './S
 
 type Profile = {
   name: string;
-  birthDate: string;
-  age: string;
+  birthYear: string;
   notes: string;
 };
 
@@ -18,6 +17,12 @@ type Contact = {
   email: string;
   channels: string[];
   primary: boolean;
+};
+
+type NotificationPreferences = {
+  anomalies: boolean;
+  critical: boolean;
+  daily_summary: boolean;
 };
 
 const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
@@ -38,7 +43,7 @@ const baseRoomLabel = Object.fromEntries(roomOptions.map((room) => [room.id, roo
 
 export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [step, setStep] = useState(0);
-  const [profile, setProfile] = useState<Profile>({ name: '', birthDate: '', age: '', notes: '' });
+  const [profile, setProfile] = useState<Profile>({ name: '', birthYear: '', notes: '' });
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
   const [customRooms, setCustomRooms] = useState<Record<string, string>>({});
   const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
@@ -46,7 +51,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['E-Mail'], primary: true });
   const [contactFormOpen, setContactFormOpen] = useState(false);
-  const [notification, setNotification] = useState({ from: '07:00', to: '22:00', nightCriticalOnly: true, sensitivity: 2 });
+  const [notification, setNotification] = useState<NotificationPreferences>({ anomalies: true, critical: true, daily_summary: false });
   const [confirmed, setConfirmed] = useState(false);
   const [emailSetupRequired, setEmailSetupRequired] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -72,7 +77,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
         setProfile((value) => ({
           ...value,
           name: status.profile?.name || '',
-          age: status.profile?.age ? String(status.profile.age) : '',
+          birthYear: status.profile?.birth_year ? String(status.profile.birth_year) : '',
           notes: status.profile?.notes || '',
         }));
       }
@@ -92,16 +97,8 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   }, []);
 
   const calculatedAge = useMemo(() => {
-    if (!profile.birthDate) return '';
-    const birth = new Date(profile.birthDate);
-    const today = new Date();
-    let years = today.getFullYear() - birth.getFullYear();
-    const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-    if (beforeBirthday) years -= 1;
-    return `${years} Jahre`;
-  }, [profile.birthDate]);
-
-  const displayAge = profile.age || (calculatedAge ? calculatedAge.replace(/\D+/g, '') : '');
+    return ageFromBirthYear(profile.birthYear);
+  }, [profile.birthYear]);
 
   const connectedSensors = sensorBindings.filter((sensor) => sensor.status === 'connected').length;
 
@@ -114,7 +111,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       await safeBackend(() => api.startSeniorSetup());
     }
     if (step === 1) {
-      await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), age: displayAge ? Number.parseInt(displayAge, 10) : null, notes: profile.notes }));
+      await safeBackend(() => api.saveSeniorProfile({ name: profile.name.trim(), birth_year: Number.parseInt(profile.birthYear, 10), age: calculatedAge, notes: profile.notes }));
     }
     if (step === 2) {
       const roomsWithSensors = selectedRoomsWithSensors(selectedRooms, sensorPlan);
@@ -137,7 +134,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       ));
     }
     if (step === 5) {
-      await safeBackend(() => api.saveSeniorNotifications({ anomalies: true, critical: true, daily_summary: false }));
+      await safeBackend(() => api.saveSeniorNotifications(notification));
     }
     if (step === steps.length - 1) {
       const ok = await completeSetup();
@@ -154,6 +151,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
 
   function validateStep() {
     if (step === 1 && !profile.name.trim()) return ['Bitte geben Sie den Namen ein.'];
+    if (step === 1 && !validBirthYear(profile.birthYear)) return ['Bitte geben Sie ein gültiges Geburtsjahr ein.'];
     if (step === 2 && selectedRooms.length === 0) return ['Bitte wählen Sie mindestens einen Raum aus.'];
     if (step === 2 && selectedRoomsWithSensors(selectedRooms, sensorPlan).length === 0) return ['Bitte wählen Sie mindestens einen Raum mit Sensor aus.'];
     if (step === 4 && contacts.length === 0) return ['Bitte fügen Sie mindestens eine vertraute Person hinzu.'];
@@ -315,7 +313,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
           return nextContacts;
         })} />}
         {step === 5 && <NotificationStep value={notification} onChange={setNotification} />}
-        {step === 6 && <SummaryStep profile={profile} age={displayAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} emailSetupRequired={emailSetupRequired} />}
+        {step === 6 && <SummaryStep profile={profile} age={calculatedAge} rooms={selectedRooms} roomLabel={roomLabel} contacts={contacts} sensors={connectedSensors} totalSensors={sensorBindings.length} notification={notification} confirmed={confirmed} onConfirm={setConfirmed} emailSetupRequired={emailSetupRequired} />}
       </div>
       <footer className="sc-wizard-actions">
         <button type="button" onClick={back} disabled={step === 0}><ArrowLeft size={20} /> Zurück</button>
@@ -362,13 +360,20 @@ function WelcomeStep() {
   );
 }
 
-function ProfileStep({ profile, calculatedAge, onChange }: { profile: Profile; calculatedAge: string; onChange: (profile: Profile) => void }) {
+function ProfileStep({ profile, calculatedAge, onChange }: { profile: Profile; calculatedAge: number | null; onChange: (profile: Profile) => void }) {
   return (
     <section className="sc-form-grid">
-      <label>Name<input required value={profile.name} onChange={(event) => onChange({ ...profile, name: event.target.value })} /></label>
-      <label>Geburtsdatum<input type="date" value={profile.birthDate} onChange={(event) => onChange({ ...profile, birthDate: event.target.value })} /></label>
-      <label>Alter<input inputMode="numeric" value={profile.age || calculatedAge.replace(/\D+/g, '')} onChange={(event) => onChange({ ...profile, age: event.target.value })} aria-label="Alter" /></label>
-      <label className="sc-form-wide">Hinweise<textarea value={profile.notes} onChange={(event) => onChange({ ...profile, notes: event.target.value })} placeholder="z.B. steht normalerweise früh auf, eingeschränkte Mobilität, wichtige Gewohnheiten" /></label>
+      <label>Name der betreuten Person<input required value={profile.name} onChange={(event) => onChange({ ...profile, name: event.target.value })} /></label>
+      <label>
+        Geburtsjahr
+        <input inputMode="numeric" maxLength={4} value={profile.birthYear} onChange={(event) => onChange({ ...profile, birthYear: event.target.value.replace(/\D+/g, '').slice(0, 4) })} placeholder="1945" />
+      </label>
+      <label className="sc-form-wide">
+        Besondere Hinweise (optional)
+        <textarea value={profile.notes} onChange={(event) => onChange({ ...profile, notes: event.target.value })} placeholder="z.B. Eingeschränkte Mobilität, Rollator, regelmäßige Arzttermine ..." />
+        <small>Diese Informationen helfen Sentero, Auffälligkeiten besser einzuordnen. Zum Beispiel eingeschränkte Mobilität, Rollator, Hörgerät, regelmäßige Arzttermine, Demenz, Parkinson oder Sehbeeinträchtigung.</small>
+      </label>
+      {calculatedAge && <p className="sc-muted-note">Das Alter wird intern automatisch berechnet: {calculatedAge} Jahre.</p>}
     </section>
   );
 }
@@ -448,22 +453,56 @@ function ContactsStep({ contacts, form, formOpen, onOpen, onClose, onFormChange,
   );
 }
 
-function NotificationStep({ value, onChange }: { value: { from: string; to: string; nightCriticalOnly: boolean; sensitivity: number }; onChange: (value: { from: string; to: string; nightCriticalOnly: boolean; sensitivity: number }) => void }) {
-  const labels = ['Nur bei langen Pausen (>4h)', 'Ungewöhnliche Aktivitätsmuster (>2h)', 'Bei jeder kleinen Auffälligkeit (>1h)'];
+function NotificationStep({ value, onChange }: { value: NotificationPreferences; onChange: (value: NotificationPreferences) => void }) {
+  const options = [
+    {
+      key: 'anomalies' as const,
+      title: 'Über ungewöhnliche Veränderungen informieren',
+      description: 'Wenn der Tagesablauf deutlich vom Gewohnten abweicht.',
+    },
+    {
+      key: 'critical' as const,
+      title: 'Wichtige Warnungen sofort senden',
+      description: 'Wenn Sentero eine potenziell kritische Situation erkennt.',
+    },
+    {
+      key: 'daily_summary' as const,
+      title: 'Tägliche Zusammenfassung erhalten',
+      description: 'Ein kurzer Überblick über den Tag.',
+    },
+  ];
   return (
     <section className="sc-notification-step">
-      <div className="sc-form-grid two">
-        <label>Von<input type="time" value={value.from} onChange={(event) => onChange({ ...value, from: event.target.value })} /></label>
-        <label>Bis<input type="time" value={value.to} onChange={(event) => onChange({ ...value, to: event.target.value })} /></label>
+      <div className="sc-wizard-section-copy">
+        <h3>Benachrichtigungen</h3>
+        <p>Legen Sie fest, wie Sentero Sie über wichtige Veränderungen informiert.</p>
       </div>
-      <label className={`sc-large-check${value.nightCriticalOnly ? ' active' : ''}`}><span>Nachts nur bei dringenden Alarmen</span><input type="checkbox" checked={value.nightCriticalOnly} onChange={(event) => onChange({ ...value, nightCriticalOnly: event.target.checked })} /><i aria-hidden="true" /></label>
-      <label className="sc-slider-label">Empfindlichkeit<strong>{labels[value.sensitivity - 1]}</strong><input type="range" min="1" max="3" value={value.sensitivity} onChange={(event) => onChange({ ...value, sensitivity: Number(event.target.value) })} /></label>
+      <div className="sc-preference-list">
+        {options.map((option) => {
+          const active = value[option.key];
+          return (
+            <label key={option.key} className={`sc-notification-preference${active ? ' active' : ''}`}>
+              <span>
+                <strong>{option.title}</strong>
+                <small>{option.description}</small>
+              </span>
+              <input type="checkbox" checked={active} onChange={(event) => onChange({ ...value, [option.key]: event.target.checked })} />
+              <i aria-hidden="true" />
+            </label>
+          );
+        })}
+      </div>
     </section>
   );
 }
 
-function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalSensors, notification, confirmed, onConfirm, emailSetupRequired }: { profile: Profile; age: string; rooms: string[]; roomLabel: (room: string) => string; contacts: Contact[]; sensors: number; totalSensors: number; notification: { from: string; to: string; sensitivity: number }; confirmed: boolean; onConfirm: (value: boolean) => void; emailSetupRequired: boolean }) {
+function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalSensors, notification, confirmed, onConfirm, emailSetupRequired }: { profile: Profile; age: number | null; rooms: string[]; roomLabel: (room: string) => string; contacts: Contact[]; sensors: number; totalSensors: number; notification: NotificationPreferences; confirmed: boolean; onConfirm: (value: boolean) => void; emailSetupRequired: boolean }) {
   const primary = contacts.find((contact) => contact.primary) || contacts[0];
+  const notificationSummary = [
+    notification.anomalies ? 'Ungewöhnliche Veränderungen' : '',
+    notification.critical ? 'Wichtige Warnungen' : '',
+    notification.daily_summary ? 'Tägliche Zusammenfassung' : '',
+  ].filter(Boolean).join(', ') || 'Keine Benachrichtigungen ausgewählt';
   return (
     <section className="sc-summary-step">
       {emailSetupRequired && (
@@ -474,13 +513,13 @@ function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalS
         </div>
       )}
       <div className="sc-summary-card">
-        <UserRound size={28} /><strong>{profile.name}</strong><span>{age ? `${age} Jahre` : 'Alter offen'}</span>
+        <UserRound size={28} /><strong>{profile.name}</strong><span>{age ? `${age} Jahre` : 'Geburtsjahr offen'}</span>
       </div>
       <div className="sc-summary-grid">
         <p><strong>Räume</strong>{rooms.map((room) => roomLabel(room)).join(', ')}</p>
         <p><strong>Sensoren</strong>{sensors} von {totalSensors} verbunden</p>
         <p><strong>Hauptansprechpartner</strong>{primary ? `${primary.name} (${primary.email})` : 'Noch nicht eingerichtet'}</p>
-        <p><strong>Benachrichtigungen</strong>{notification.from} - {notification.to}, Stufe {notification.sensitivity}</p>
+        <p><strong>Benachrichtigungen</strong>{notificationSummary}</p>
       </div>
       <label className={`sc-large-check${confirmed ? ' active' : ''}`}><span>Ich bestätige, dass alle Angaben korrekt sind.</span><input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} /><i aria-hidden="true" /></label>
     </section>
@@ -511,6 +550,17 @@ function selectedRoomsWithSensors(roomIds: string[], sensorPlan: Record<string, 
     const plan = sensorPlan[roomId] || defaultSensorPlan(roomId);
     return plan.motion || plan.door;
   });
+}
+
+function ageFromBirthYear(value: string) {
+  const year = Number.parseInt(value, 10);
+  const currentYear = new Date().getFullYear();
+  if (!Number.isFinite(year) || year < 1900 || year > currentYear) return null;
+  return currentYear - year;
+}
+
+function validBirthYear(value: string) {
+  return ageFromBirthYear(value) !== null;
 }
 
 function defaultSensorPlan(roomId: string) {

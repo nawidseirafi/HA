@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 from .device_mapping_service import DeviceMappingService, now
 
@@ -47,10 +48,12 @@ class SeniorSetupService:
     def profile(self, payload: dict[str, Any]) -> dict[str, Any]:
         timestamp = now()
         notes_provided = payload.get('notes') is not None
+        birth_year = normalize_birth_year(payload.get('birth_year'))
+        calculated_age = calculate_age(birth_year) if birth_year else None
         with self.mapping.connect() as con:
             existing = con.execute('select notes from senior_profile where id = 1').fetchone()
             notes = payload.get('notes') if notes_provided else (existing['notes'] if existing else None)
-            con.execute('''insert into senior_profile (id, name, age, notes, created_at, updated_at) values (1, ?, ?, ?, ?, ?) on conflict(id) do update set name = excluded.name, age = excluded.age, notes = excluded.notes, updated_at = excluded.updated_at''', (payload.get('name'), payload.get('age'), notes, timestamp, timestamp))
+            con.execute('''insert into senior_profile (id, name, birth_year, age, notes, created_at, updated_at) values (1, ?, ?, ?, ?, ?, ?) on conflict(id) do update set name = excluded.name, birth_year = excluded.birth_year, age = excluded.age, notes = excluded.notes, updated_at = excluded.updated_at''', (payload.get('name'), birth_year, calculated_age, notes, timestamp, timestamp))
             con.commit()
         return self.set_step('prepare_home', 'profile')
 
@@ -168,6 +171,24 @@ class SeniorSetupService:
 
 def normalize_email(value: Any) -> str:
     return str(value or '').strip().lower()
+
+
+def normalize_birth_year(value: Any) -> int | None:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        year = int(text)
+    except ValueError as exc:
+        raise ValueError('valid birth year is required') from exc
+    current_year = datetime.now().year
+    if year < 1900 or year > current_year:
+        raise ValueError('valid birth year is required')
+    return year
+
+
+def calculate_age(birth_year: int) -> int:
+    return max(0, datetime.now().year - birth_year)
 
 
 def normalize_text(value: Any) -> str:

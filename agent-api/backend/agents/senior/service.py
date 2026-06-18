@@ -50,6 +50,9 @@ class SeniorService:
     def latest_behavior(self) -> dict[str, Any] | None:
         return self.behavior.latest()
 
+    def behavior_learning_status(self) -> dict[str, Any]:
+        return self.behavior.learning_status()
+
     def behavior_history(self, limit: int = 20) -> list[dict[str, Any]]:
         return self.behavior.history(limit=limit)
 

@@ -1026,6 +1026,30 @@ button:disabled {
   margin: 0;
 }
 
+.sc-wizard-section-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.sc-wizard-section-copy h3,
+.sc-wizard-section-copy p {
+  margin: 0;
+}
+
+.sc-wizard-section-copy h3 {
+  color: var(--sc-text);
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  line-height: 1.08;
+}
+
+.sc-wizard-section-copy p {
+  color: var(--sc-muted);
+  font-size: 1.12rem;
+  font-weight: 750;
+  line-height: 1.45;
+  max-width: 620px;
+}
+
 .sc-room-choice-grid {
   display: grid;
   gap: 14px;
@@ -3926,6 +3950,102 @@ button:disabled {
 
 .sc-behavior-card.neutral > div > span {
   color: #7f8d86;
+}
+
+.sc-behavior-overview {
+  background: #fbfefc;
+  border: 1px solid #d8e8df;
+  border-radius: 28px;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.sc-behavior-overview > div {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sc-behavior-overview > div > span {
+  align-items: center;
+  background: #f3faf6;
+  border-radius: 18px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 1.45rem;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.sc-behavior-overview small,
+.sc-behavior-overview strong {
+  display: block;
+}
+
+.sc-behavior-overview small {
+  color: var(--sc-muted);
+  font-weight: 850;
+}
+
+.sc-behavior-overview strong {
+  color: var(--sc-text);
+  font-size: 1.22rem;
+  font-weight: 950;
+  margin-top: 3px;
+}
+
+.sc-behavior-overview p {
+  color: #596962;
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.sc-behavior-overview footer {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.sc-behavior-overview footer span,
+.sc-behavior-overview footer em {
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 850;
+  padding: 8px 12px;
+}
+
+.sc-behavior-overview footer span {
+  background: #eef7f3;
+  color: #416456;
+}
+
+.sc-behavior-overview footer em {
+  background: white;
+  border: 1px solid #dbe9e3;
+  color: #6a7b73;
+  font-style: normal;
+}
+
+.sc-behavior-overview.yellow {
+  background: #fffdf6;
+  border-color: #f2dfab;
+}
+
+.sc-behavior-overview.orange {
+  background: #fff8f2;
+  border-color: #efc7a6;
+}
+
+.sc-behavior-overview.red {
+  background: #fff7f7;
+  border-color: #f2c2c7;
 }
 
 .sc-simple-day-card {

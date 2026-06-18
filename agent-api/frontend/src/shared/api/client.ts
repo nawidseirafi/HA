@@ -130,11 +130,22 @@ export type SeniorBehaviorAssessment = {
   assessment_time: string;
   status: 'green' | 'yellow' | 'orange' | 'red' | string;
   confidence: number;
+  anomaly_score?: number;
+  learning_completed?: boolean;
+  learning_day?: number;
+  learning_days?: number;
   summary: string;
   findings: string[];
   recommendation: string;
   llm_response?: string | null;
   created_at?: string;
+};
+
+export type SeniorBehaviorLearning = {
+  completed: boolean;
+  day: number;
+  days: number;
+  remaining_days: number;
 };
 
 export type SeniorSensorRole = {
@@ -154,6 +165,7 @@ export type SeniorSensorRole = {
 
 export type SeniorProfileData = {
   name?: string | null;
+  birth_year?: number | null;
   age?: number | null;
   notes?: string | null;
 };
@@ -1466,10 +1478,10 @@ export const api = {
     request<{ metrics: MyWellnessHealthMetrics; missing: string[]; mapping_source?: string }>('/api/mywellness/health/withings/import', { method: 'POST' }),
   mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),
   seniorSetupStatus: () => request<SeniorSetupStatus>('/api/sentero/setup/status'),
-  seniorBehaviorLatest: () => request<{ assessment: SeniorBehaviorAssessment | null }>('/api/sentero/behavior/latest'),
+  seniorBehaviorLatest: () => request<{ assessment: SeniorBehaviorAssessment | null; learning?: SeniorBehaviorLearning }>('/api/sentero/behavior/latest'),
   seniorBehaviorTimeline: () => request<{ events: Array<{ event_time: string; room?: string | null; role?: string | null; state?: string | null }>; assessment: SeniorBehaviorAssessment | null }>('/api/sentero/behavior/timeline'),
   startSeniorSetup: () => request<SeniorSetupStatus>('/api/sentero/setup/start', { method: 'POST' }),
-  saveSeniorProfile: (payload: { name?: string; age?: number | null; notes?: string }) =>
+  saveSeniorProfile: (payload: { name?: string; birth_year?: number | null; age?: number | null; notes?: string }) =>
     request<SeniorSetupStatus>('/api/sentero/setup/profile', { method: 'POST', body: JSON.stringify(payload) }),
   saveSeniorSetupRooms: (rooms: string[]) =>
     request<SeniorSetupStatus>('/api/sentero/setup/rooms', { method: 'POST', body: JSON.stringify({ rooms }) }),

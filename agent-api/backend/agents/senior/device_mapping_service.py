@@ -741,6 +741,10 @@ def ensure_schema(con: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass
     con.execute('''create table if not exists senior_profile (id integer primary key check (id = 1), name text, age integer, notes text, created_at text not null, updated_at text not null)''')
+    try:
+        con.execute("alter table senior_profile add column birth_year integer")
+    except sqlite3.OperationalError:
+        pass
     con.execute('''create table if not exists trusted_contacts (id integer primary key autoincrement, name text not null, relationship text, email text, active integer not null default 1, created_at text not null, updated_at text not null)''')
     for statement in [
         "alter table trusted_contacts add column phone text",
