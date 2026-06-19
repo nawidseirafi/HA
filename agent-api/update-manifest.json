@@ -113,15 +113,15 @@
         }
       }
     },
-    "seniorcare": {
+    "sentero": {
       "channels": {
         "stable": {
           "latest_version": "0.1.0",
-          "download_url": "https://updates.example.com/seniorcare/stable/releases/seniorcare-0.1.0.zip",
+          "download_url": "https://updates.example.com/sentero/stable/releases/sentero-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
-            "Lokales Update-Manifest fuer SeniorCare.",
+            "Lokales Update-Manifest fuer Sentero.",
             "Struktur ist kompatibel zum spaeteren Update-Server."
           ],
           "artifacts": {
@@ -162,15 +162,15 @@
           },
           "sha256": "",
           "size_bytes": 0,
-          "product": "seniorcare"
+          "product": "sentero"
         },
         "beta": {
           "latest_version": "0.1.0",
-          "download_url": "https://updates.example.com/seniorcare/beta/releases/seniorcare-0.1.0.zip",
+          "download_url": "https://updates.example.com/sentero/beta/releases/sentero-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
-            "SeniorCare Beta-Kanal ist vorbereitet."
+            "Sentero Beta-Kanal ist vorbereitet."
           ],
           "artifacts": {},
           "components": {
@@ -189,15 +189,15 @@
           },
           "sha256": "",
           "size_bytes": 0,
-          "product": "seniorcare"
+          "product": "sentero"
         },
         "dev": {
           "latest_version": "0.1.0",
-          "download_url": "https://updates.example.com/seniorcare/dev/releases/seniorcare-0.1.0.zip",
+          "download_url": "https://updates.example.com/sentero/dev/releases/sentero-0.1.0.zip",
           "mandatory": false,
           "minimum_version": "0.1.0",
           "release_notes": [
-            "SeniorCare Dev-Kanal ist vorbereitet."
+            "Sentero Dev-Kanal ist vorbereitet."
           ],
           "artifacts": {},
           "components": {
@@ -216,7 +216,7 @@
           },
           "sha256": "",
           "size_bytes": 0,
-          "product": "seniorcare"
+          "product": "sentero"
         }
       }
     }

@@ -4909,7 +4909,7 @@ button.market-insight-card:hover {
   }
 }
 
-.seniorcare-shell {
+.sentero-shell {
   min-height: 100vh;
   padding: 34px;
   color: #153027;
@@ -4919,7 +4919,7 @@ button.market-insight-card:hover {
     linear-gradient(135deg, #f6f0e3 0%, #dfeade 58%, #b8d5c1 100%);
 }
 
-.seniorcare-hero {
+.sentero-hero {
   display: flex;
   justify-content: space-between;
   gap: 28px;
@@ -4933,7 +4933,7 @@ button.market-insight-card:hover {
   box-shadow: 0 24px 80px rgba(25, 64, 49, 0.16);
 }
 
-.seniorcare-hero h1 {
+.sentero-hero h1 {
   max-width: 760px;
   margin: 0 0 14px;
   font-size: clamp(2.2rem, 5vw, 4.8rem);
@@ -4941,14 +4941,14 @@ button.market-insight-card:hover {
   letter-spacing: -0.07em;
 }
 
-.seniorcare-hero p {
+.sentero-hero p {
   max-width: 620px;
   margin: 0;
   color: rgba(21, 48, 39, 0.72);
   font-size: 1.08rem;
 }
 
-.seniorcare-hero button {
+.sentero-hero button {
   border: 0;
   border-radius: 999px;
   padding: 12px 18px;
@@ -4956,7 +4956,7 @@ button.market-insight-card:hover {
   background: #153027;
 }
 
-.seniorcare-nav {
+.sentero-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -4964,7 +4964,7 @@ button.market-insight-card:hover {
   margin: 0 auto 22px;
 }
 
-.seniorcare-nav button {
+.sentero-nav button {
   align-items: center;
   border: 1px solid rgba(21, 48, 39, 0.13);
   border-radius: 999px;
@@ -4976,49 +4976,49 @@ button.market-insight-card:hover {
   padding: 11px 14px;
 }
 
-.seniorcare-nav button.active {
+.sentero-nav button.active {
   background: #153027;
   border-color: #153027;
   color: #fff8ec;
 }
 
-.seniorcare-page {
+.sentero-page {
   max-width: 1120px;
   margin: 0 auto;
 }
 
-.seniorcare-page h2 {
+.sentero-page h2 {
   font-size: clamp(1.8rem, 3.8vw, 3.4rem);
   letter-spacing: -0.05em;
   margin: 6px 0 8px;
 }
 
-.seniorcare-page-lead {
+.sentero-page-lead {
   color: rgba(21, 48, 39, 0.68);
   font-size: 1.05rem;
   margin: 0 0 18px;
 }
 
-.seniorcare-card-grid {
+.sentero-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
 }
 
-.seniorcare-card {
+.sentero-card {
   padding: 24px;
   border-radius: 24px;
   background: rgba(255, 252, 243, 0.64);
   border: 1px solid rgba(21, 48, 39, 0.14);
 }
 
-.seniorcare-card.prominent {
+.sentero-card.prominent {
   background: rgba(255, 252, 243, 0.86);
   box-shadow: 0 18px 50px rgba(25, 64, 49, 0.14);
 }
 
-.seniorcare-card span,
-.seniorcare-shell .eyebrow {
+.sentero-card span,
+.sentero-shell .eyebrow {
   align-items: center;
   display: inline-flex;
   gap: 7px;
@@ -5029,19 +5029,19 @@ button.market-insight-card:hover {
   color: #49765b;
 }
 
-.seniorcare-card h2,
-.seniorcare-card h3 {
+.sentero-card h2,
+.sentero-card h3 {
   margin: 12px 0 8px;
 }
 
-.seniorcare-card p {
+.sentero-card p {
   margin: 0;
   color: rgba(21, 48, 39, 0.68);
 }
 
-.seniorcare-card button,
-.seniorcare-contact-panel button,
-.seniorcare-login-form button {
+.sentero-card button,
+.sentero-contact-panel button,
+.sentero-login-form button {
   align-items: center;
   border: 0;
   border-radius: 999px;
@@ -5054,7 +5054,7 @@ button.market-insight-card:hover {
   padding: 11px 15px;
 }
 
-.seniorcare-status-banner {
+.sentero-status-banner {
   align-items: center;
   border-radius: 30px;
   display: flex;
@@ -5063,19 +5063,19 @@ button.market-insight-card:hover {
   padding: 26px;
 }
 
-.seniorcare-status-banner.normal {
+.sentero-status-banner.normal {
   background: linear-gradient(135deg, rgba(40, 139, 86, 0.16), rgba(255, 252, 243, 0.74));
   border: 1px solid rgba(40, 139, 86, 0.22);
 }
 
-.seniorcare-status-banner.attention {
+.sentero-status-banner.attention {
   background: linear-gradient(135deg, rgba(200, 89, 58, 0.16), rgba(255, 252, 243, 0.76));
   border: 1px solid rgba(200, 89, 58, 0.24);
 }
 
-.seniorcare-status-banner > span,
-.seniorcare-metric-card > span,
-.seniorcare-notification > span {
+.sentero-status-banner > span,
+.sentero-metric-card > span,
+.sentero-notification > span {
   align-items: center;
   background: rgba(255, 252, 243, 0.8);
   border-radius: 18px;
@@ -5086,56 +5086,56 @@ button.market-insight-card:hover {
   width: 52px;
 }
 
-.seniorcare-status-banner h2,
-.seniorcare-status-banner p {
+.sentero-status-banner h2,
+.sentero-status-banner p {
   margin: 0;
 }
 
-.seniorcare-overview-grid {
+.sentero-overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
 
-.seniorcare-metric-card,
-.seniorcare-panel,
-.seniorcare-notification {
+.sentero-metric-card,
+.sentero-panel,
+.sentero-notification {
   border: 1px solid rgba(21, 48, 39, 0.14);
   border-radius: 24px;
   background: rgba(255, 252, 243, 0.66);
   padding: 20px;
 }
 
-.seniorcare-metric-card {
+.sentero-metric-card {
   display: grid;
   gap: 8px;
 }
 
-.seniorcare-metric-card small {
+.sentero-metric-card small {
   color: #49765b;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
-.seniorcare-metric-card strong {
+.sentero-metric-card strong {
   font-size: 1.22rem;
 }
 
-.seniorcare-metric-card p,
-.seniorcare-panel p {
+.sentero-metric-card p,
+.sentero-panel p {
   color: rgba(21, 48, 39, 0.68);
   margin: 0;
 }
 
-.seniorcare-two-column {
+.sentero-two-column {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
   gap: 18px;
 }
 
-.seniorcare-timeline {
+.sentero-timeline {
   display: grid;
   gap: 10px;
   list-style: none;
@@ -5143,7 +5143,7 @@ button.market-insight-card:hover {
   padding: 0;
 }
 
-.seniorcare-timeline li {
+.sentero-timeline li {
   align-items: center;
   border-top: 1px solid rgba(21, 48, 39, 0.1);
   display: grid;
@@ -5152,33 +5152,33 @@ button.market-insight-card:hover {
   padding-top: 10px;
 }
 
-.seniorcare-timeline span {
+.sentero-timeline span {
   color: #49765b;
   font-weight: 800;
 }
 
-.seniorcare-notification-list {
+.sentero-notification-list {
   display: grid;
   gap: 12px;
 }
 
-.seniorcare-notification {
+.sentero-notification {
   align-items: flex-start;
   display: flex;
   gap: 14px;
 }
 
-.seniorcare-notification strong,
-.seniorcare-notification p {
+.sentero-notification strong,
+.sentero-notification p {
   margin: 0;
 }
 
-.seniorcare-notification p {
+.sentero-notification p {
   color: rgba(21, 48, 39, 0.68);
   margin-top: 4px;
 }
 
-.seniorcare-login {
+.sentero-login {
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -5189,7 +5189,7 @@ button.market-insight-card:hover {
     linear-gradient(135deg, #f6f0e3, #cfe0d1);
 }
 
-.seniorcare-login-card {
+.sentero-login-card {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1fr);
   gap: 26px;
@@ -5202,7 +5202,7 @@ button.market-insight-card:hover {
   padding: 30px;
 }
 
-.seniorcare-login-intro > span {
+.sentero-login-intro > span {
   align-items: center;
   background: #153027;
   border-radius: 18px;
@@ -5213,29 +5213,29 @@ button.market-insight-card:hover {
   width: 54px;
 }
 
-.seniorcare-login-intro h1 {
+.sentero-login-intro h1 {
   font-size: clamp(2.2rem, 5vw, 4rem);
   letter-spacing: -0.06em;
   line-height: 0.96;
   margin: 18px 0 12px;
 }
 
-.seniorcare-login-intro p {
+.sentero-login-intro p {
   color: rgba(21, 48, 39, 0.68);
 }
 
-.seniorcare-login-form {
+.sentero-login-form {
   display: grid;
   gap: 14px;
 }
 
-.seniorcare-login-form label {
+.sentero-login-form label {
   display: grid;
   gap: 7px;
   font-weight: 800;
 }
 
-.seniorcare-login-form input {
+.sentero-login-form input {
   border: 1px solid rgba(21, 48, 39, 0.2);
   border-radius: 16px;
   background: rgba(255, 252, 243, 0.86);
@@ -5244,13 +5244,13 @@ button.market-insight-card:hover {
   padding: 13px 14px;
 }
 
-.seniorcare-login-form .seniorcare-remember {
+.sentero-login-form .sentero-remember {
   align-items: center;
   display: flex;
   font-weight: 600;
 }
 
-.seniorcare-login-error {
+.sentero-login-error {
   border: 1px solid rgba(200, 89, 58, 0.26);
   border-radius: 16px;
   color: #8f3426;
@@ -5259,30 +5259,30 @@ button.market-insight-card:hover {
 }
 
 @media (max-width: 760px) {
-  .seniorcare-shell {
+  .sentero-shell {
     padding: 18px;
   }
-  .seniorcare-hero {
+  .sentero-hero {
     display: block;
     padding: 24px;
   }
-  .seniorcare-hero button {
+  .sentero-hero button {
     margin-top: 22px;
   }
-  .seniorcare-overview-grid,
-  .seniorcare-two-column,
-  .seniorcare-login-card {
+  .sentero-overview-grid,
+  .sentero-two-column,
+  .sentero-login-card {
     grid-template-columns: 1fr;
   }
 }
 
 .update-panel,
-.seniorcare-update-panel {
+.sentero-update-panel {
   display: grid;
   gap: 18px;
 }
 
-.seniorcare-update-panel {
+.sentero-update-panel {
   border: 1px solid rgba(21, 48, 39, 0.14);
   border-radius: 24px;
   background: rgba(255, 252, 243, 0.66);
@@ -5307,7 +5307,7 @@ button.market-insight-card:hover {
   margin-top: 6px;
 }
 
-.seniorcare-update-panel .update-panel-head p:not(.eyebrow) {
+.sentero-update-panel .update-panel-head p:not(.eyebrow) {
   color: rgba(21, 48, 39, 0.68);
 }
 
@@ -5330,7 +5330,7 @@ button.market-insight-card:hover {
   padding: 12px;
 }
 
-.seniorcare-update-panel .update-version-item {
+.sentero-update-panel .update-version-item {
   border-color: rgba(21, 48, 39, 0.12);
   background: rgba(255, 252, 243, 0.58);
 }
@@ -5344,11 +5344,11 @@ button.market-insight-card:hover {
   font-size: 0.82rem;
 }
 
-.seniorcare-update-panel .update-version-item span,
-.seniorcare-update-panel .update-release-card span,
-.seniorcare-update-panel .update-release-card small,
-.seniorcare-update-panel .update-step small,
-.seniorcare-update-panel .update-controls span {
+.sentero-update-panel .update-version-item span,
+.sentero-update-panel .update-release-card span,
+.sentero-update-panel .update-release-card small,
+.sentero-update-panel .update-step small,
+.sentero-update-panel .update-controls span {
   color: rgba(21, 48, 39, 0.64);
 }
 
@@ -5371,7 +5371,7 @@ button.market-insight-card:hover {
   padding: 11px 12px;
 }
 
-.seniorcare-update-panel .update-controls select {
+.sentero-update-panel .update-controls select {
   border-color: rgba(21, 48, 39, 0.18);
   background: rgba(255, 252, 243, 0.78);
   color: #153027;
@@ -5384,7 +5384,7 @@ button.market-insight-card:hover {
   padding: 16px;
 }
 
-.seniorcare-update-panel .update-release-card {
+.sentero-update-panel .update-release-card {
   border-color: rgba(21, 48, 39, 0.12);
   background: rgba(255, 252, 243, 0.58);
 }
@@ -5438,7 +5438,7 @@ button.market-insight-card:hover {
   padding-top: 14px;
 }
 
-.seniorcare-update-panel .update-wizard {
+.sentero-update-panel .update-wizard {
   border-top-color: rgba(21, 48, 39, 0.12);
 }
 
@@ -5459,7 +5459,7 @@ button.market-insight-card:hover {
   padding: 10px 12px;
 }
 
-.seniorcare-update-panel .update-step {
+.sentero-update-panel .update-step {
   border-color: rgba(21, 48, 39, 0.12);
 }
 
@@ -5509,11 +5509,11 @@ button.market-insight-card:hover {
   color: #9af0c9;
 }
 
-.seniorcare-update-panel .update-alert.error {
+.sentero-update-panel .update-alert.error {
   color: #8f3426;
 }
 
-.seniorcare-update-panel .update-alert.success {
+.sentero-update-panel .update-alert.success {
   color: #2c744d;
 }
 

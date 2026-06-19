@@ -541,7 +541,7 @@ class SchedulerStore:
             },
             {
                 "name": "System Updatepruefung",
-                "description": "Prueft, ob ein RoboterSteve/SeniorCare Update verfuegbar ist.",
+                "description": "Prueft, ob ein RoboterSteve/Sentero Update verfuegbar ist.",
                 "schedule_type": "cron",
                 "schedule": {"cron": "0 7 * * *", "timezone": "Europe/Berlin"},
                 "target_agent": "system",

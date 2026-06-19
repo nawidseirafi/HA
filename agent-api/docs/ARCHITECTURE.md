@@ -35,7 +35,7 @@ Das Frontend liegt unter:
 agent-api/frontend/
 ```
 
-Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber die Backend-Editionserkennung und als Fallback ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die private RoboterSteve-Anwendung; `seniorcare` ist eine eigene mobile-first Produktoberflaeche mit Onboarding, Dashboard, Verlauf, Raeumen, Kontakten und Einstellungen.
+Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber die Backend-Editionserkennung und als Fallback ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die private RoboterSteve-Anwendung; `sentero` ist eine eigene mobile-first Produktoberflaeche mit Onboarding, Dashboard, Verlauf, Raeumen, Kontakten und Einstellungen.
 
 Wichtige UI-Bereiche:
 
@@ -70,7 +70,7 @@ agent-api/
 │   │   ├── market/
 │   │   ├── mywellness/
 │   │   ├── scheduler/
-│   │   ├── senior/
+│   │   ├── sentero/
 │   │   └── vacation/
 │   ├── api/
 │   │   ├── auth_routes.py
@@ -103,7 +103,7 @@ agent-api/
 │   └── scheduler/
 ├── editions/
 │   ├── personal.yaml
-│   └── seniorcare.yaml
+│   └── sentero.yaml
 ├── tools/
 │   └── build_edition.py
 ├── frontend/
@@ -112,7 +112,7 @@ agent-api/
 │       ├── shared/
 │       └── apps/
 │           ├── personal/
-│           └── seniorcare/
+│           └── sentero/
 └── config.yaml
 ```
 
@@ -163,7 +163,7 @@ Dateien:
 
 ```text
 agent-api/editions/personal.yaml
-agent-api/editions/seniorcare.yaml
+agent-api/editions/sentero.yaml
 agent-api/backend/editions.py
 agent-api/tools/build_edition.py
 ```
@@ -1012,7 +1012,7 @@ frontend/src/
     │   ├── pages/
     │   ├── components/
     │   └── routes/
-    └── seniorcare/
+    └── sentero/
         ├── main.tsx
         ├── App.tsx
         ├── pages/
@@ -1024,7 +1024,7 @@ frontend/src/
 `frontend/src/main.tsx` waehlt die App ueber `VITE_ROBOTERSTEVE_EDITION`:
 
 - `personal`: bisherige private App mit Agent Console, Invoice, Market, MyWellness, Vacation, Scheduler, Wall Dashboard und Settings.
-- `seniorcare`: eigene Produkt-App mit Premium-/mobile-first UI fuer Setup, Dashboard, Verlauf, Raeume, Kontakte und Einstellungen.
+- `sentero`: eigene Produkt-App mit Premium-/mobile-first UI fuer Setup, Dashboard, Verlauf, Raeume, Kontakte und Einstellungen.
 
 Gemeinsame Bausteine gehoeren nach `src/shared/`. Produktnavigation, Produktseiten und edition-spezifische UI bleiben in `src/apps/<edition>/`. Dadurch muessen spaetere Produkteditionen keine verstreuten Edition-Abfragen in Personal-Komponenten einbauen.
 
@@ -1034,7 +1034,7 @@ Builds:
 cd agent-api/frontend
 npm run build
 VITE_ROBOTERSTEVE_EDITION=personal npm run build
-VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
+VITE_ROBOTERSTEVE_EDITION=sentero npm run build
 ```
 
 Der Edition Builder setzt `VITE_ROBOTERSTEVE_EDITION` automatisch anhand `frontend_app` der Edition.

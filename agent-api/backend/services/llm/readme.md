@@ -12,6 +12,6 @@ cd agent-api
 ## Editionen
 
 - `personal` kann OpenAI, Gemini oder lokale Llama/Ollama-Modelle verwenden.
-- `seniorcare` ist fuer lokale/produktnahe Deployments vorbereitet und nutzt im Beispiel `llm.provider: llama` mit Ollama.
+- `sentero` ist fuer lokale/produktnahe Deployments vorbereitet und nutzt im Beispiel `llm.provider: llama` mit Ollama.
 
 Secrets gehoeren in `.env` oder die Zielumgebung, nicht in README-Dateien oder Edition-Builds.

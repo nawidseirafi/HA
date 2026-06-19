@@ -8,7 +8,7 @@ export default defineConfig({
     alias: {
       '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
       '@personal': fileURLToPath(new URL('./src/apps/personal', import.meta.url)),
-      '@seniorcare': fileURLToPath(new URL('./src/apps/seniorcare', import.meta.url)),
+      '@sentero': fileURLToPath(new URL('./src/apps/sentero', import.meta.url)),
     },
   },
   server: {

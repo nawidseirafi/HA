@@ -616,7 +616,7 @@ Aktive Runtime-Edition:
 
 ```bash
 ROBOTERSTEVE_EDITION=personal
-ROBOTERSTEVE_EDITION=seniorcare
+ROBOTERSTEVE_EDITION=sentero
 ```
 
 Fallback-Reihenfolge:
@@ -632,7 +632,7 @@ Edition Builds:
 ```bash
 cd agent-api
 ../venv/bin/python tools/build_edition.py personal
-../venv/bin/python tools/build_edition.py seniorcare
+../venv/bin/python tools/build_edition.py sentero
 ```
 
 Diese Standard-Builds erzeugen beide Varianten unter `build/`:
@@ -650,20 +650,20 @@ build/<edition>/
 └── README_INSTALL.md
 ```
 
-`personal` ist fuer normales Python/systemd-Deployment vorgesehen und enthaelt bewusst keine `docker-compose.yml`. `seniorcare` enthaelt zusaetzlich eine einfache `docker-compose.yml`.
+`personal` ist fuer normales Python/systemd-Deployment vorgesehen und enthaelt bewusst keine `docker-compose.yml`. `sentero` enthaelt zusaetzlich eine einfache `docker-compose.yml`.
 
 Build mit expliziter Version und Update-Server-URL:
 
 ```bash
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Ergebnis:
 
 ```text
-build/seniorcare/                         # normales Installations-/Deployment-Paket
-build/updates/seniorcare/stable/latest.json        # Upload auf HTTPS-Update-Server
-build/updates/seniorcare/stable/releases/*.zip     # Upload auf HTTPS-Update-Server
+build/sentero/                         # normales Installations-/Deployment-Paket
+build/updates/sentero/stable/latest.json        # Upload auf HTTPS-Update-Server
+build/updates/sentero/stable/releases/*.zip     # Upload auf HTTPS-Update-Server
 ```
 
 Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache__/`, `venv/`, `.venv/`, `node_modules/`, `.DS_Store`.
@@ -689,7 +689,7 @@ frontend/src/
     │   ├── pages/
     │   ├── components/
     │   └── routes/
-    └── seniorcare/
+    └── sentero/
         ├── main.tsx
         ├── App.tsx
         ├── pages/
@@ -698,7 +698,7 @@ frontend/src/
         └── navigation/
 ```
 
-Personal ist die bisherige Anwendung mit allen vorhandenen Dashboards, Agent-Ansichten, Wall-Dashboard und Orchestrator-Ansichten. SeniorCare ist eine eigene Produkt-App mit Dashboard, Senior-Status, Aktivitaeten, Benachrichtigungen, Vertrauenspersonen, Einstellungen und eigener Login-Seite. Technische Personal-Ansichten wie Agent Console, Agent Map, OpenAI, Database und Entwickleransichten werden in SeniorCare nicht geroutet.
+Personal ist die bisherige Anwendung mit allen vorhandenen Dashboards, Agent-Ansichten, Wall-Dashboard und Orchestrator-Ansichten. Sentero ist eine eigene Produkt-App mit Dashboard, Sentero-Status, Aktivitaeten, Benachrichtigungen, Vertrauenspersonen, Einstellungen und eigener Login-Seite. Technische Personal-Ansichten wie Agent Console, Agent Map, OpenAI, Database und Entwickleransichten werden in Sentero nicht geroutet.
 
 Frontend Builds:
 
@@ -707,7 +707,7 @@ cd agent-api/frontend
 npm run dev
 npm run build
 VITE_ROBOTERSTEVE_EDITION=personal npm run build
-VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
+VITE_ROBOTERSTEVE_EDITION=sentero npm run build
 ```
 
 Neue Produkteditionen sollten als eigene App unter `src/apps/<edition>/` angelegt werden. Gemeinsame Bausteine gehoeren nach `src/shared/`; Edition-spezifische Navigation, Seiten und Produktlogik bleiben in der jeweiligen App.

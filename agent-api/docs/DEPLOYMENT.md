@@ -57,11 +57,11 @@ cd /Users/nawid/Projects/roboterSteve/agent-api
 ../venv/bin/python tools/build_edition.py personal
 ```
 
-Fuer SeniorCare:
+Fuer Sentero:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py seniorcare
+../venv/bin/python tools/build_edition.py sentero
 ```
 
 Kompatibilitaet: Das alte Script `deployment_build.py` ist nur noch ein Wrapper und ruft intern den Edition Builder auf.
@@ -97,7 +97,7 @@ rsync -av --delete \
   user@robotersteve.local:/opt/roboterSteve/agent-api/
 ```
 
-Fuer SeniorCare entsprechend:
+Fuer Sentero entsprechend:
 
 ```bash
 rsync -av --delete \
@@ -105,11 +105,11 @@ rsync -av --delete \
   --exclude 'logs' \
   --exclude '.env' \
   --exclude 'config.yaml' \
-  /Users/nawid/Projects/roboterSteve/agent-api/build/seniorcare/ \
+  /Users/nawid/Projects/roboterSteve/agent-api/build/sentero/ \
   user@robotersteve.local:/opt/roboterSteve/agent-api/
 ```
 
-Wenn du bestehende lokale Datenbanken auf dem Zielrechner behalten willst, schuetzt der empfohlene `rsync`-Befehl `data/`, `logs/`, `.env` und `config.yaml` explizit vor Loeschung. Der Edition-Build selbst enthaelt diese privaten Dateien nicht. Er enthaelt ausserdem `editions/edition.lock`, damit ein SeniorCare-Build nicht versehentlich als Personal startet.
+Wenn du bestehende lokale Datenbanken auf dem Zielrechner behalten willst, schuetzt der empfohlene `rsync`-Befehl `data/`, `logs/`, `.env` und `config.yaml` explizit vor Loeschung. Der Edition-Build selbst enthaelt diese privaten Dateien nicht. Er enthaelt ausserdem `editions/edition.lock`, damit ein Sentero-Build nicht versehentlich als Personal startet.
 
 Beim ersten Deployment auf einem leeren Zielsystem erzeugst du die echte Konfiguration aus den Beispieldateien:
 
@@ -161,7 +161,7 @@ python3 -m venv venv
 
 Normalerweise erledigt `tools/build_edition.py` den Frontend-Build automatisch. Dieser Abschnitt ist nur fuer manuelle Legacy-Deployments relevant.
 
-Wichtig: Das Frontend hat mehrere Apps. Fuer Personal muss `VITE_ROBOTERSTEVE_EDITION=personal` gesetzt sein, fuer SeniorCare `VITE_ROBOTERSTEVE_EDITION=seniorcare`. Wenn FastAPI `frontend/dist` ausliefert, ist immer der zuletzt gebaute Frontend-Stand aktiv.
+Wichtig: Das Frontend hat mehrere Apps. Fuer Personal muss `VITE_ROBOTERSTEVE_EDITION=personal` gesetzt sein, fuer Sentero `VITE_ROBOTERSTEVE_EDITION=sentero`. Wenn FastAPI `frontend/dist` ausliefert, ist immer der zuletzt gebaute Frontend-Stand aktiv.
 
 Moeglich sind zwei Varianten.
 
@@ -173,11 +173,11 @@ npm install
 VITE_ROBOTERSTEVE_EDITION=personal npm run build
 ```
 
-Fuer SeniorCare:
+Fuer Sentero:
 
 ```bash
 cd /opt/roboterSteve/agent-api/frontend
-VITE_ROBOTERSTEVE_EDITION=seniorcare npm run build
+VITE_ROBOTERSTEVE_EDITION=sentero npm run build
 ```
 
 Wenn `agent-api/frontend/dist` existiert, liefert FastAPI die GUI direkt unter Port `8080` aus.
@@ -192,7 +192,7 @@ npm install
 VITE_ROBOTERSTEVE_EDITION=personal npm run build
 ```
 
-Fuer SeniorCare entsprechend `VITE_ROBOTERSTEVE_EDITION=seniorcare`. Danach muss `dist/` mit auf den Zielrechner kopiert werden. Wichtig: Bei dieser Variante `frontend/dist` nicht vom Sync ausschliessen:
+Fuer Sentero entsprechend `VITE_ROBOTERSTEVE_EDITION=sentero`. Danach muss `dist/` mit auf den Zielrechner kopiert werden. Wichtig: Bei dieser Variante `frontend/dist` nicht vom Sync ausschliessen:
 
 ```bash
 rsync -av --delete \
@@ -263,7 +263,7 @@ Der bevorzugte Weg fuer produktionsnahe Artefakte ist der Edition Builder:
 ```bash
 cd agent-api
 ../venv/bin/python tools/build_edition.py personal
-../venv/bin/python tools/build_edition.py seniorcare
+../venv/bin/python tools/build_edition.py sentero
 ```
 
 Erzeugt wird:
@@ -278,22 +278,22 @@ agent-api/build/<edition>/
 └── README_INSTALL.md
 ```
 
-Hinweis: `personal` enthaelt keine `docker-compose.yml`; `seniorcare` enthaelt eine einfache Compose-Datei fuer API und Ollama.
+Hinweis: `personal` enthaelt keine `docker-compose.yml`; `sentero` enthaelt eine einfache Compose-Datei fuer API und Ollama.
 
 Diese Build-Verzeichnisse enthalten keine privaten Datenbanken, Logs, `.env`, `node_modules`, `venv` oder `__pycache__`.
 
 Update-Server-Artefakte werden parallel erzeugt:
 
 ```bash
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Dann gilt:
 
 ```text
-agent-api/build/seniorcare/                       # normales Deployment-Paket
-agent-api/build/updates/seniorcare/stable/latest.json      # Upload auf HTTPS-Server
-agent-api/build/updates/seniorcare/stable/releases/*.zip   # Upload auf HTTPS-Server
+agent-api/build/sentero/                       # normales Deployment-Paket
+agent-api/build/updates/sentero/stable/latest.json      # Upload auf HTTPS-Server
+agent-api/build/updates/sentero/stable/releases/*.zip   # Upload auf HTTPS-Server
 ```
 
 Deployment eines Edition-Builds:
@@ -311,10 +311,10 @@ UPDATE_SYSTEMD_SERVICE=agent-api
 UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
-Oder fuer SeniorCare:
+Oder fuer Sentero:
 
 ```ini
-ROBOTERSTEVE_EDITION=seniorcare
+ROBOTERSTEVE_EDITION=sentero
 ```
 
 Fuer Personal-Updates ueber die UI muss der systemd-Restart moeglich sein.
@@ -445,7 +445,7 @@ cd /opt/roboterSteve
 sudo systemctl restart agent-api
 ```
 
-Fuer SeniorCare `personal` durch `seniorcare` ersetzen und `ROBOTERSTEVE_EDITION=seniorcare` in `/etc/robotersteve-agent-api.env` setzen.
+Fuer Sentero `personal` durch `sentero` ersetzen und `ROBOTERSTEVE_EDITION=sentero` in `/etc/robotersteve-agent-api.env` setzen.
 
 ## Typische Fehler
 
@@ -499,9 +499,9 @@ ping robotersteve.local
 
 Falls es weiter nicht geht, pruefe Router, VLAN/Gastnetz und Firewall.
 
-## SeniorCare ZIP-Docker Deployment V1
+## Sentero ZIP-Docker Deployment V1
 
-SeniorCare wird fuer Produkt-/Kundeninstallationen als Docker-Edition betrieben, aber ohne Docker Registry. Die Anwendung wird lokal aus dem ZIP-Paket gebaut.
+Sentero wird fuer Produkt-/Kundeninstallationen als Docker-Edition betrieben, aber ohne Docker Registry. Die Anwendung wird lokal aus dem ZIP-Paket gebaut.
 
 ### Release bauen
 
@@ -509,28 +509,28 @@ Auf dem Entwicklungsrechner:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Ergebnis fuer den HTTPS-Update-Server:
 
 ```text
-build/updates/seniorcare/stable/latest.json
-build/updates/seniorcare/stable/deployment-manifest.json
-build/updates/seniorcare/stable/releases/seniorcare-0.2.0.zip
+build/updates/sentero/stable/latest.json
+build/updates/sentero/stable/deployment-manifest.json
+build/updates/sentero/stable/releases/sentero-0.2.0.zip
 ```
 
-`build/seniorcare/` ist parallel das normale installierbare Deployment-Verzeichnis. Es ist nicht der Upload-Ordner fuer den Update-Server.
+`build/sentero/` ist parallel das normale installierbare Deployment-Verzeichnis. Es ist nicht der Upload-Ordner fuer den Update-Server.
 
 Upload-Struktur:
 
 ```text
 robotersteve/
-└── seniorcare/
+└── sentero/
     └── stable/
         ├── latest.json
         └── releases/
-            └── seniorcare-0.2.0.zip
+            └── sentero-0.2.0.zip
 ```
 
 ### Erstinstallation auf Zielrechner
@@ -538,10 +538,10 @@ robotersteve/
 Empfohlener Installationspfad:
 
 ```text
-/opt/seniorcare/
+/opt/sentero/
 ```
 
-Kopiere initial den Inhalt von `build/seniorcare/` auf den Zielrechner:
+Kopiere initial den Inhalt von `build/sentero/` auf den Zielrechner:
 
 ```bash
 rsync -av --delete \
@@ -551,14 +551,14 @@ rsync -av --delete \
   --exclude 'tmp' \
   --exclude '.env' \
   --exclude 'config.yaml' \
-  /Users/nawid/Projects/roboterSteve/agent-api/build/seniorcare/ \
-  user@zielrechner:/opt/seniorcare/
+  /Users/nawid/Projects/roboterSteve/agent-api/build/sentero/ \
+  user@zielrechner:/opt/sentero/
 ```
 
 Auf dem Zielrechner:
 
 ```bash
-cd /opt/seniorcare
+cd /opt/sentero
 cp .env.example .env
 cp config.example.yaml config.yaml
 ```
@@ -566,13 +566,13 @@ cp config.example.yaml config.yaml
 Wichtige `.env`-Werte:
 
 ```ini
-ROBOTERSTEVE_EDITION=seniorcare
+ROBOTERSTEVE_EDITION=sentero
 UPDATE_EXECUTION_MODE=zip_docker
 UPDATE_BASE_URL=https://seirafi.de/robotersteve
-UPDATE_DEPLOYMENT_DIR=/opt/seniorcare
-UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare
+UPDATE_DEPLOYMENT_DIR=/opt/sentero
+UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero
 UPDATE_COMPOSE_FILE=docker-compose.yml
-ROBOTERSTEVE_BACKUP_DIR=/opt/seniorcare/backups
+ROBOTERSTEVE_BACKUP_DIR=/opt/sentero/backups
 ```
 
 Start:
@@ -583,11 +583,11 @@ docker compose up -d --build
 
 ### Updates
 
-Bei Klick auf `Update installieren` macht SeniorCare:
+Bei Klick auf `Update installieren` macht Sentero:
 
 1. `latest.json` laden
 2. ZIP herunterladen
-3. Backup unter `/opt/seniorcare/backups/` erstellen
+3. Backup unter `/opt/sentero/backups/` erstellen
 4. `docker compose down`
 5. neue Dateien aus ZIP kopieren
 6. `.env`, `config.yaml`, `data/`, `logs/`, `backups/` behalten

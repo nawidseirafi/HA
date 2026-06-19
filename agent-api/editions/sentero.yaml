@@ -1,0 +1,19 @@
+name: sentero
+description: Sentero Produktedition
+enabled_agents:
+  - scheduler
+  - sentero
+enabled_core_services:
+  - auth
+  - system
+  - settings
+  - messaging
+  - orchestrator
+  - homeassistant
+  - llm
+frontend_app: sentero
+include_frontend: true
+include_data: false
+include_files: []
+exclude_files: []
+config_template: sentero

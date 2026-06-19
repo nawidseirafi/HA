@@ -8,6 +8,7 @@ venv/
 agent-api/frontend/node_modules/
 agent-api/frontend/dist/
 agent-api/.env
+agent-api/.sentero_env
 agent-api/agent-api.service
 HA/secrets.yaml
 .idea/

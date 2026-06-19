@@ -18,4 +18,4 @@ RoboterSteve Wall Dashboard
 Edition-Hinweis
 - Das bestehende Wall Dashboard gehoert zur Personal App unter frontend/src/apps/personal.
 - Gemeinsame API/Auth/Styles liegen unter frontend/src/shared.
-- SeniorCare bekommt eine eigene App-Struktur und soll keine Personal-Wall-Komponenten direkt voraussetzen.
+- Sentero bekommt eine eigene App-Struktur und soll keine Personal-Wall-Komponenten direkt voraussetzen.

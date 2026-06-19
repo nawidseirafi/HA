@@ -1235,8 +1235,8 @@ class UpdateService(UpdateConfigMixin):
 
     def product_name(self) -> str:
         edition_name = active_edition().name
-        if edition_name == "seniorcare":
-            return "SeniorCare"
+        if edition_name == "sentero":
+            return "Sentero"
         if edition_name == "personal":
             return "RoboterSteve"
         return active_edition().description or edition_name.title()

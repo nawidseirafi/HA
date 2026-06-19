@@ -218,8 +218,8 @@ def build_or_copy_frontend(edition: dict[str, Any], target: Path) -> None:
 
 def write_config_example(edition: dict[str, Any], target: Path) -> None:
     name = str(edition.get("name") or "personal")
-    if name == "seniorcare":
-        config = seniorcare_config_example()
+    if name == "sentero":
+        config = sentero_config_example()
     else:
         config = personal_config_example()
     config["edition"] = {
@@ -274,7 +274,7 @@ def personal_config_example() -> dict[str, Any]:
     }
 
 
-def seniorcare_config_example() -> dict[str, Any]:
+def sentero_config_example() -> dict[str, Any]:
     return {
         "server": {"host": "0.0.0.0", "port": 8080},
         "logging": {"file": "./logs/agent-api.log", "level": "INFO"},
@@ -297,8 +297,8 @@ def seniorcare_config_example() -> dict[str, Any]:
             "manifest_path": "update-manifest.json",
             "execution_mode": "zip_docker",
             "backup_dir": "/opt/roboterSteve/backups",
-            "deployment_dir": "/opt/seniorcare",
-            "compose_project_dir": "/opt/seniorcare",
+            "deployment_dir": "/opt/sentero",
+            "compose_project_dir": "/opt/sentero",
             "compose_file": "docker-compose.yml",
             "healthcheck_url": "http://127.0.0.1:8080/health",
             "services": {
@@ -314,13 +314,13 @@ def seniorcare_config_example() -> dict[str, Any]:
             },
         },
         "scheduler": {"enabled": True},
-        "senior": {"enabled": True, "mode": "placeholder"},
+        "sentero": {"enabled": True, "mode": "placeholder"},
     }
 
 
 def write_env_example(edition: dict[str, Any], target: Path) -> None:
     name = str(edition.get("name") or "personal")
-    execution_mode = "zip_docker" if name == "seniorcare" else "local_systemd"
+    execution_mode = "zip_docker" if name == "sentero" else "local_systemd"
     lines = [
         f"ROBOTERSTEVE_EDITION={name}",
         "ROBOTERSTEVE_VERSION=0.1.0",
@@ -339,9 +339,9 @@ def write_env_example(edition: dict[str, Any], target: Path) -> None:
         "UPDATE_MANIFEST_PATH=update-manifest.json",
         "UPDATE_CHANNEL=stable",
         f"UPDATE_EXECUTION_MODE={execution_mode}",
-        "ROBOTERSTEVE_BACKUP_DIR=/opt/seniorcare/backups" if name == "seniorcare" else "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
-        "UPDATE_DEPLOYMENT_DIR=/opt/seniorcare" if name == "seniorcare" else "UPDATE_DEPLOYMENT_DIR=.",
-        "UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare" if name == "seniorcare" else "UPDATE_COMPOSE_PROJECT_DIR=.",
+        "ROBOTERSTEVE_BACKUP_DIR=/opt/sentero/backups" if name == "sentero" else "ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups",
+        "UPDATE_DEPLOYMENT_DIR=/opt/sentero" if name == "sentero" else "UPDATE_DEPLOYMENT_DIR=.",
+        "UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero" if name == "sentero" else "UPDATE_COMPOSE_PROJECT_DIR=.",
         "UPDATE_COMPOSE_FILE=docker-compose.yml",
         "UPDATE_HEALTHCHECK_URL=http://127.0.0.1:8080/health",
         "UPDATE_MANIFEST_PUBLIC_KEY=",
@@ -370,7 +370,7 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
             "restart": "unless-stopped",
             "working_dir": "/app",
             "volumes": [
-                ".:/opt/seniorcare",
+                ".:/opt/sentero",
                 "./config.yaml:/app/config.yaml",
                 "./.env:/app/.env",
                 "./data:/app/data",
@@ -381,8 +381,8 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
             "env_file": [".env"],
             "environment": {
                 "UPDATE_EXECUTION_MODE": "zip_docker",
-                "UPDATE_DEPLOYMENT_DIR": "/opt/seniorcare",
-                "UPDATE_COMPOSE_PROJECT_DIR": "/opt/seniorcare",
+                "UPDATE_DEPLOYMENT_DIR": "/opt/sentero",
+                "UPDATE_COMPOSE_PROJECT_DIR": "/opt/sentero",
                 "UPDATE_COMPOSE_FILE": "docker-compose.yml",
             },
             "ports": ["8080:8080"],
@@ -394,14 +394,14 @@ def write_docker_compose(edition: dict[str, Any], target: Path) -> None:
             },
         }
     }
-    if name == "seniorcare":
+    if name == "sentero":
         services["ollama"] = {
             "image": "ollama/ollama:latest",
             "ports": ["11434:11434"],
             "volumes": ["ollama:/root/.ollama"],
         }
     compose: dict[str, Any] = {"services": services}
-    if name == "seniorcare":
+    if name == "sentero":
         compose["volumes"] = {"ollama": None}
     (target / "docker-compose.yml").write_text(yaml.safe_dump(compose, sort_keys=False), encoding="utf-8")
 
@@ -489,8 +489,8 @@ Diese Edition ist fuer Docker-basierte Updates vorgesehen.
 
 ```env
 UPDATE_EXECUTION_MODE=zip_docker
-UPDATE_DEPLOYMENT_DIR=/opt/seniorcare
-UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare
+UPDATE_DEPLOYMENT_DIR=/opt/sentero
+UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero
 UPDATE_COMPOSE_FILE=docker-compose.yml
 ```
 
@@ -627,7 +627,7 @@ def update_latest_manifest(edition_name: str, version: str, deployment: dict[str
         "size_bytes": artifact["size_bytes"],
         "mandatory": False,
         "minimum_version": "0.1.0",
-        "update_strategy": "zip_docker" if edition_name == "seniorcare" else "zip",
+        "update_strategy": "zip_docker" if edition_name == "sentero" else "zip",
         "release_notes": [
             f"{edition_name} {version} Release.",
             "Application-Paket fuer Update Engine V1.",

@@ -64,11 +64,11 @@ sentero_auth_service = None
 
 def get_sentero_auth_service():
     global sentero_auth_service
-    if "senior" not in set(active_edition().enabled_agents):
+    if "sentero" not in set(active_edition().enabled_agents):
         return None
     if sentero_auth_service is None:
-        from backend.agents.senior.auth_service import SenteroAuthService
-        from backend.agents.senior.device_mapping_service import DeviceMappingService
+        from backend.agents.sentero.auth_service import SenteroAuthService
+        from backend.agents.sentero.device_mapping_service import DeviceMappingService
 
         sentero_auth_service = SenteroAuthService(DeviceMappingService())
     return sentero_auth_service

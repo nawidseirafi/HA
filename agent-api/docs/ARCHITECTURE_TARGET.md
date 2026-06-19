@@ -32,7 +32,7 @@ Umgesetzt:
   - `build/<edition>/` fuer normales Deployment
   - `build/updates/<edition>/stable/` fuer Update-Server-Dateien
 - Personal bleibt lokale/systemd Edition.
-- SeniorCare bleibt Docker-Edition mit ZIP-basierten Updates.
+- Sentero bleibt Docker-Edition mit ZIP-basierten Updates.
 
 Zielregel:
 
@@ -45,11 +45,11 @@ Umgesetzt:
 
 - Gemeinsamer Entry Point: `frontend/src/main.tsx`.
 - Personal App: `frontend/src/apps/personal/`.
-- SeniorCare App: `frontend/src/apps/seniorcare/`.
+- Sentero App: `frontend/src/apps/sentero/`.
 - Shared-Bereich: `frontend/src/shared/`.
 - `VITE_ROBOTERSTEVE_EDITION=personal` baut die Personal App.
-- `VITE_ROBOTERSTEVE_EDITION=seniorcare` baut die SeniorCare App.
-- SeniorCare besitzt eigene Navigation, eigene Seiten und eigenes Designsystem.
+- `VITE_ROBOTERSTEVE_EDITION=sentero` baut die Sentero App.
+- Sentero besitzt eigene Navigation, eigene Seiten und eigenes Designsystem.
 
 Zielregel:
 
@@ -226,27 +226,27 @@ Offen fuer Produktreife:
 - Update-Server-Konvention fuer mehrere Kunden/Editionen finalisieren.
 - Optionaler Support-Bundle-Export bei fehlgeschlagenen Updates.
 
-## SeniorCare
+## Sentero
 
 Umgesetzt:
 
-- Senior Agent Grundstruktur existiert im Backend.
-- SeniorCare Frontend ist eine getrennte App.
-- SeniorCare nutzt eine produktorientierte, nicht-technische UI.
-- SeniorCare besitzt Dashboard, Verlauf, Raeume, Kontakte, Einstellungen und Setup-Wizard-Struktur.
+- Sentero Agent Grundstruktur existiert im Backend.
+- Sentero Frontend ist eine getrennte App.
+- Sentero nutzt eine produktorientierte, nicht-technische UI.
+- Sentero besitzt Dashboard, Verlauf, Raeume, Kontakte, Einstellungen und Setup-Wizard-Struktur.
 - Mock-Daten sind gekapselt.
 
 Zielregel:
 
-- SeniorCare darf keine Personal-Agent-Console, Agent Map, OpenAI-, Database- oder technische Infrastrukturansichten zeigen.
+- Sentero darf keine Personal-Agent-Console, Agent Map, OpenAI-, Database- oder technische Infrastrukturansichten zeigen.
 - Sprache bleibt kundenfreundlich und nicht technisch.
 - Sensoren werden im Produkt als Raeume, Aktivitaet und Hinweise dargestellt, nicht als Entity-IDs.
 
 Offen:
 
 - Echte Sensor-Onboarding-API.
-- Persistente Senior-/Kontakt-/Wohnungsprofile.
-- Ereignismodell fuer SeniorCare-Aktivitaeten.
+- Persistente Sentero-/Kontakt-/Wohnungsprofile.
+- Ereignismodell fuer Sentero-Aktivitaeten.
 - Benachrichtigungsregeln fuer Angehoerige.
 
 # Zielmodelle fuer optionale Persistenz
@@ -288,15 +288,15 @@ Zweck:
 Wichtig:
 
 - `orchestrator.db` darf keine Fachhistorien besitzen.
-- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden und SeniorCare-Ereignisse bleiben in ihren owning Domains.
+- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden und Sentero-Ereignisse bleiben in ihren owning Domains.
 
 # Offene Architekturarbeit
 
 ## P1
 
 - Update-Rollback auf echtem Docker-Zielsystem und lokalem systemd-Zielsystem testen und dokumentieren.
-- SeniorCare Setup-Daten persistent machen.
-- Sensor-Onboarding fuer SeniorCare fachlich modellieren.
+- Sentero Setup-Daten persistent machen.
+- Sensor-Onboarding fuer Sentero fachlich modellieren.
 - Messaging-Zustellung an E-Mail/Push als echte Delivery-Schicht implementieren.
 - Secrets aus Service-Dateien konsequent entfernen und nur ueber `.env`/Environment laden.
 
@@ -319,8 +319,8 @@ Wichtig:
 # Nicht-Ziele
 
 - Kein neues Repo pro Edition.
-- Keine Kopie der kompletten Personal-App fuer SeniorCare.
+- Keine Kopie der kompletten Personal-App fuer Sentero.
 - Keine privaten Daten, Logs oder Secrets in Builds oder Update-ZIPs.
-- Keine Docker Registry als Pflicht fuer SeniorCare V1.
+- Keine Docker Registry als Pflicht fuer Sentero V1.
 - Kein `docker restart` als Standard-Updatepfad.
 - Keine KI- oder Agent-Komponente steuert direkt Smart-Home-Geraete ohne regelbasierte Freigabe.

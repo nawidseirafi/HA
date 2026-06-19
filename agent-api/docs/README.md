@@ -4,7 +4,7 @@ Diese Dokumentation ist nach Zweck getrennt. Fuer konkrete Deployments und Updat
 
 ## Betriebsdokumente
 
-- `DEPLOYMENT.md`: Installation, Edition-Builds, Personal/systemd, SeniorCare/Docker, Betrieb und Fehleranalyse.
+- `DEPLOYMENT.md`: Installation, Edition-Builds, Personal/systemd, Sentero/Docker, Betrieb und Fehleranalyse.
 - `UPDATE_SYSTEM.md`: Update Engine V1, statischer HTTPS-Update-Server, ZIP-Releases, local/systemd und ZIP-Docker Updates.
 
 ## Architektur
@@ -14,13 +14,13 @@ Diese Dokumentation ist nach Zweck getrennt. Fuer konkrete Deployments und Updat
 
 ## Konsolidierte Dokumente
 
-- `docker_create.md`: veraltete Proxmox-/Docker-Einzelanleitung. Inhalt wurde auf einen Verweis reduziert; aktuelle SeniorCare-Docker-Schritte stehen in `DEPLOYMENT.md`.
+- `docker_create.md`: veraltete Proxmox-/Docker-Einzelanleitung. Inhalt wurde auf einen Verweis reduziert; aktuelle Sentero-Docker-Schritte stehen in `DEPLOYMENT.md`.
 
 ## Aktuelle Deployment-Regeln
 
 ```text
 Personal = build/personal + systemd + UPDATE_EXECUTION_MODE=local_systemd
-SeniorCare = build/seniorcare + Docker Compose + UPDATE_EXECUTION_MODE=zip_docker
+Sentero = build/sentero + Docker Compose + UPDATE_EXECUTION_MODE=zip_docker
 Update-Server Upload = build/updates/<edition>/stable/
 ```
 

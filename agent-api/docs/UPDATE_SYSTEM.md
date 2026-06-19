@@ -15,13 +15,13 @@ UPDATE_SYSTEMD_SERVICE=agent-api
 UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
-SeniorCare ist eine Docker-Edition, wird aber per ZIP aktualisiert:
+Sentero ist eine Docker-Edition, wird aber per ZIP aktualisiert:
 
 ```ini
-ROBOTERSTEVE_EDITION=seniorcare
+ROBOTERSTEVE_EDITION=sentero
 UPDATE_EXECUTION_MODE=zip_docker
-UPDATE_DEPLOYMENT_DIR=/opt/seniorcare
-UPDATE_COMPOSE_PROJECT_DIR=/opt/seniorcare
+UPDATE_DEPLOYMENT_DIR=/opt/sentero
+UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero
 UPDATE_COMPOSE_FILE=docker-compose.yml
 ```
 
@@ -31,7 +31,7 @@ Unterstuetzte Modi:
 - `local`: Legacy-Alias fuer `local_systemd`, ZIP-Datei einspielen und danach den systemd-Service neu starten
 - `local_systemd`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen und danach den systemd-Service neu starten, fuer Personal
 - `local_no_restart`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, ohne automatischen Neustart
-- `zip_docker`: ZIP-Datei in eine Docker-Edition einspielen und lokal per Compose neu bauen, fuer SeniorCare
+- `zip_docker`: ZIP-Datei in eine Docker-Edition einspielen und lokal per Compose neu bauen, fuer Sentero
 
 V1-Regel:
 
@@ -48,11 +48,11 @@ Ein statischer HTTPS-Webserver reicht aus:
 
 ```text
 https://seirafi.de/robotersteve/
-└── seniorcare/
+└── sentero/
     └── stable/
         ├── latest.json
         └── releases/
-            └── seniorcare-0.2.0.zip
+            └── sentero-0.2.0.zip
 ```
 
 Konfiguration auf dem Zielrechner:
@@ -70,7 +70,7 @@ https://seirafi.de/robotersteve/<edition>/stable/latest.json
 Alternativ kann direkt gesetzt werden:
 
 ```ini
-UPDATE_MANIFEST_URL=https://seirafi.de/robotersteve/seniorcare/stable/latest.json
+UPDATE_MANIFEST_URL=https://seirafi.de/robotersteve/sentero/stable/latest.json
 ```
 
 Prioritaet:
@@ -87,7 +87,7 @@ Prioritaet:
 ```json
 {
   "latest_version": "0.2.0",
-  "download_url": "https://seirafi.de/robotersteve/seniorcare/stable/releases/seniorcare-0.2.0.zip",
+  "download_url": "https://seirafi.de/robotersteve/sentero/stable/releases/sentero-0.2.0.zip",
   "mandatory": false,
   "minimum_version": "0.1.0",
   "sha256": "...",
@@ -111,13 +111,13 @@ In V1 wird nur `components.application.update=true` umgesetzt. Home Assistant, O
 Optional koennen Manifeste signiert werden:
 
 ```ini
-UPDATE_MANIFEST_PUBLIC_KEY=/opt/seniorcare/keys/update-public.pem
+UPDATE_MANIFEST_PUBLIC_KEY=/opt/sentero/keys/update-public.pem
 ```
 
 Der Builder kann signieren:
 
 ```bash
-UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 ## ZIP-Inhalt
@@ -125,7 +125,7 @@ UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/
 Das Release-ZIP enthaelt ein vollstaendiges deploybares Edition-Paket:
 
 ```text
-seniorcare-0.2.0.zip
+sentero-0.2.0.zip
 ├── backend/
 ├── frontend/
 ├── requirements.txt
@@ -156,7 +156,7 @@ Bei `UPDATE_EXECUTION_MODE=zip_docker`:
 2. Version vergleichen
 3. ZIP aus `download_url` herunterladen
 4. SHA256 pruefen, falls gesetzt
-5. Backup erstellen unter `/opt/<edition>/backups/`, z. B. `/opt/seniorcare/backups/`
+5. Backup erstellen unter `/opt/<edition>/backups/`, z. B. `/opt/sentero/backups/`
 6. ZIP nach `/opt/<edition>/tmp/update-<version>/` entpacken
 7. Struktur validieren: `backend/`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `version.json`
 8. `docker compose down`
@@ -165,9 +165,9 @@ Bei `UPDATE_EXECUTION_MODE=zip_docker`:
 11. Healthcheck pruefen, standardmaessig `http://127.0.0.1:8080/health`
 12. Status und Audit-Log schreiben
 
-Die RoboterSteve/SeniorCare-Anwendung wird lokal aus dem ZIP gebaut. Es gibt kein `docker compose pull` fuer `robotersteve-api` und keine externe Docker Registry.
+Die RoboterSteve/Sentero-Anwendung wird lokal aus dem ZIP gebaut. Es gibt kein `docker compose pull` fuer `robotersteve-api` und keine externe Docker Registry.
 
-`docker-compose.yml` fuer SeniorCare baut lokal:
+`docker-compose.yml` fuer Sentero baut lokal:
 
 ```yaml
 services:
@@ -220,20 +220,20 @@ Die normale Kunden-UI zeigt keine technischen Details wie Docker, ZIP, Compose, 
 
 ## Release Build
 
-SeniorCare ZIP-Release bauen:
+Sentero ZIP-Release bauen:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py seniorcare --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Erzeugt:
 
 ```text
-build/seniorcare/                              # normales installierbares Deployment-Paket
-build/updates/seniorcare/stable/latest.json             # Upload auf HTTPS-Update-Server
-build/updates/seniorcare/stable/deployment-manifest.json # Upload auf HTTPS-Update-Server
-build/updates/seniorcare/stable/releases/seniorcare-0.2.0.zip
+build/sentero/                              # normales installierbares Deployment-Paket
+build/updates/sentero/stable/latest.json             # Upload auf HTTPS-Update-Server
+build/updates/sentero/stable/deployment-manifest.json # Upload auf HTTPS-Update-Server
+build/updates/sentero/stable/releases/sentero-0.2.0.zip
 ```
 
 Der Edition Builder erzeugt standardmaessig beide Varianten unter `build/`.
@@ -245,11 +245,11 @@ Diese Struktur kann direkt auf den HTTPS-Server hochgeladen werden:
 
 ```text
 robotersteve/
-└── seniorcare/
+└── sentero/
     └── stable/
         ├── latest.json
         └── releases/
-            └── seniorcare-0.2.0.zip
+            └── sentero-0.2.0.zip
 ```
 
 Personal bleibt moeglich:
