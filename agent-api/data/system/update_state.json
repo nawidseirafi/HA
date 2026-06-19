@@ -3,13 +3,13 @@
     "status": "idle",
     "steps": []
   },
-  "last_check": "2026-06-18T19:06:19+00:00",
+  "last_check": "2026-06-19T05:00:16+00:00",
   "latest": {
-    "latest_version": "0.1.24",
-    "download_url": "https://seirafi.de/robotersteve/personal/stable/releases/personal-0.1.24.zip",
+    "latest_version": "0.1.25",
+    "download_url": "https://seirafi.de/robotersteve/personal/stable/releases/personal-0.1.25.zip",
     "mandatory": false,
     "release_notes": [
-      "personal 0.1.24 Release.",
+      "personal 0.1.25 Release.",
       "Application-Paket fuer Update Engine V1."
     ],
     "channel": "stable",
@@ -32,8 +32,8 @@
     },
     "artifacts": {},
     "minimum_version": "0.1.0",
-    "sha256": "56a2888818ea80ad1e097d4058341d2cc0370b3c365d56cd1c2019f4950f2b2c",
-    "size_bytes": 2124110,
+    "sha256": "ec60f006330594e7b4b1ca45344eeb7679b39871d1f5f61f6113f954aacd0a9f",
+    "size_bytes": 2080969,
     "product": "personal",
     "source": "manifest_url",
     "manifest_url": "https://seirafi.de/robotersteve/personal/stable/latest.json"

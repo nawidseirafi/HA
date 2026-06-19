@@ -751,6 +751,16 @@ export type WallCover = WallEntity & {
   supported_features?: number | null;
 };
 
+export type WallFan = WallEntity & {
+  percentage?: number | null;
+  percentage_step?: number | null;
+  preset_mode?: string | null;
+  preset_modes?: string[];
+  oscillating?: boolean | null;
+  direction?: string | null;
+  supported_features?: number | null;
+};
+
 export type WallLightGroup = {
   area: string;
   total: number;
@@ -929,6 +939,7 @@ export type WallDashboardData = {
   covers?: WallCover[];
   sensors?: WallEntity[];
   switches: WallEntity[];
+  fans?: WallFan[];
   media_players?: WallEntity[];
   climate: WallClimate[];
   temperature_sensors: WallTemperatureSensor[];

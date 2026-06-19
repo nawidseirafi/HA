@@ -1786,6 +1786,133 @@ button.wall-room-card {
   font-size: 0.88rem;
 }
 
+.wall-fan-control {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--state-climate) 10%, #fff), rgba(255,255,255,0.88));
+}
+
+.wall-fan-control.active {
+  border-color: color-mix(in srgb, var(--state-climate) 30%, var(--border));
+}
+
+.wall-fan-status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+.wall-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--input);
+}
+
+.wall-status-dot.active {
+  background: var(--state-ok);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--state-ok) 16%, transparent);
+}
+
+.wall-fan-speed {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.58);
+}
+
+.wall-fan-speed > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: baseline;
+}
+
+.wall-fan-speed span {
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.wall-fan-speed strong {
+  color: var(--foreground);
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+.wall-fan-slider input {
+  height: 34px;
+  accent-color: var(--state-climate);
+}
+
+.wall-fan-control-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.wall-fan-control-row {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.46);
+}
+
+.wall-fan-control-row > span {
+  color: var(--foreground);
+  font-weight: 800;
+}
+
+.wall-fan-segment {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input) 58%, #fff);
+}
+
+.wall-fan-segment button {
+  min-height: 38px;
+  min-width: 92px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-weight: 800;
+}
+
+.wall-fan-segment button.active {
+  color: var(--primary-foreground);
+  background: var(--state-climate);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-climate) 24%, transparent);
+}
+
+.wall-fan-select {
+  margin: 0;
+}
+
+.wall-fan-select span {
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.wall-fan-select select {
+  min-height: 42px;
+  min-width: 150px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.72);
+  color: var(--foreground);
+  font-weight: 800;
+}
+
 .wall-battery-pill {
   display: inline-flex;
   align-items: center;
@@ -2074,6 +2201,9 @@ button.wall-room-card {
   .wall-list-panel { grid-column: auto; }
   .wall-light-control-main,
   .wall-cover-body { grid-template-columns: 1fr; }
+  .wall-fan-control-row { grid-template-columns: 1fr; }
+  .wall-fan-segment { width: 100%; }
+  .wall-fan-segment button { flex: 1; min-width: 0; }
   .wall-room-power { width: 100%; }
   .wall-cover-visual { width: 100%; height: 92px; }
   .agent-status-map {

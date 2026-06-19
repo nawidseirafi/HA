@@ -36,6 +36,7 @@ import {
     type WallCover,
     type WallDashboardData,
     type WallEntity,
+    type WallFan,
     type WallLight,
     type WallLightGroup,
     type WallLightRoom,
@@ -287,6 +288,7 @@ function WallDashboardContent() {
     const [messageCenterOpen, setMessageCenterOpen] = useState(false);
     const [now, setNow] = useState(new Date());
     const brightnessTimers = useRef<Record<string, number>>({});
+    const fanTimers = useRef<Record<string, number>>({});
     const refreshTimer = useRef<number | null>(null);
 
     const load = useCallback(async (silent = false) => {
@@ -355,6 +357,7 @@ function WallDashboardContent() {
             window.removeEventListener('unhandledrejection', onRejection);
             if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
             Object.values(brightnessTimers.current).forEach((timer) => window.clearTimeout(timer));
+            Object.values(fanTimers.current).forEach((timer) => window.clearTimeout(timer));
         };
     }, [load]);
 
@@ -417,6 +420,68 @@ function WallDashboardContent() {
     const turnSelected = async (on: boolean) => {
         const ids = allSelectedLights.map((light) => light.entity_id);
         if (ids.length) await callLight(on ? 'turn_on' : 'turn_off', ids);
+    };
+
+    const callFan = async (fan: WallFan, service: string, payload: Record<string, unknown> = {}, patch: Partial<WallFan> = {}) => {
+        setData((current) => patchWallFan(current, fan.entity_id, patch));
+        setBusyEntity(fan.entity_id);
+        setError('');
+        try {
+            await api.callHomeAssistantService({domain: 'fan', service, entity_id: fan.entity_id, data: payload});
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ventilator konnte nicht geschaltet werden.');
+            await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
+    const toggleFan = (fan: WallFan) => {
+        const nextOn = !deviceActive(fan);
+        void callFan(fan, nextOn ? 'turn_on' : 'turn_off', {}, {state: nextOn ? 'on' : 'off'});
+    };
+
+    const setFanPercentage = (fan: WallFan, value: number) => {
+        const percentage = clampPercent(value);
+        setData((current) => patchWallFan(current, fan.entity_id, {state: percentage > 0 ? 'on' : 'off', percentage}));
+        if (fanTimers.current[fan.entity_id]) {
+            window.clearTimeout(fanTimers.current[fan.entity_id]);
+        }
+        fanTimers.current[fan.entity_id] = window.setTimeout(async () => {
+            setBusyEntity(fan.entity_id);
+            setError('');
+            try {
+                await api.callHomeAssistantService({
+                    domain: 'fan',
+                    service: 'set_percentage',
+                    entity_id: fan.entity_id,
+                    data: {percentage},
+                });
+                delete fanTimers.current[fan.entity_id];
+                scheduleRefresh();
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Ventilatorleistung konnte nicht gesetzt werden.');
+                delete fanTimers.current[fan.entity_id];
+                await load(true);
+            } finally {
+                setBusyEntity('');
+            }
+        }, 260);
+    };
+
+    const setFanPreset = (fan: WallFan, presetMode: string) => {
+        void callFan(fan, 'set_preset_mode', {preset_mode: presetMode}, {state: 'on', preset_mode: presetMode});
+    };
+
+    const toggleFanOscillation = (fan: WallFan) => {
+        const oscillating = fan.oscillating !== true;
+        void callFan(fan, 'oscillate', {oscillating}, {oscillating});
+    };
+
+    const toggleFanDirection = (fan: WallFan) => {
+        const nextDirection = String(fan.direction || '').toLowerCase() === 'reverse' ? 'forward' : 'reverse';
+        void callFan(fan, 'set_direction', {direction: nextDirection}, {direction: nextDirection});
     };
 
     const clearPost = async () => {
@@ -667,6 +732,11 @@ function WallDashboardContent() {
                         onCoverPosition={setCoverPosition}
                         onClimateMode={(item, mode) => callClimate(item, 'set_hvac_mode', {hvac_mode: mode})}
                         onClimateTemperature={(item, temperature) => callClimate(item, 'set_temperature', {temperature})}
+                        onFanToggle={toggleFan}
+                        onFanPercentage={setFanPercentage}
+                        onFanPreset={setFanPreset}
+                        onFanOscillation={toggleFanOscillation}
+                        onFanDirection={toggleFanDirection}
                     />
                 )}
             </main>
@@ -823,6 +893,7 @@ function FloorSection({
             <div className="wall-room-grid">
                 {rooms.map((room) => {
                     const climateLine = roomClimateLine(data, room.area);
+                    const roomDeviceTotal = roomOverviewDeviceCount(data, room.area);
                     return (
                         <button className={`wall-room-card wall-click-card ${room.on ? 'room-active' : ''}`}
                                 type="button" key={`${selectedFloor}-${room.area}`}
@@ -831,13 +902,13 @@ function FloorSection({
                                 <span><Lightbulb size={24}/></span>
                                 <div>
                                     <h2>{room.area}</h2>
-                                    <p>{selectedFloor} · {room.on}/{room.total} Lampen
-                                        an{climateLine ? ` · ${climateLine}` : ''}</p>
+                                    <p>{selectedFloor} · {roomDeviceTotal} Geräte{room.total > 0 ? ` · ${room.on}/${room.total} Lampen an` : ''}
+                                        {climateLine ? ` · ${climateLine}` : ''}</p>
                                 </div>
                                 <ChevronRight size={20}/>
                             </div>
                             <div className="wall-room-summary">
-                                <strong>{room.items.length}</strong>
+                                <strong>{roomDeviceTotal}</strong>
                                 <span>Lampen und Geräte anzeigen</span>
                             </div>
                         </button>
@@ -861,6 +932,11 @@ function RoomSection({
                          onCoverPosition,
                          onClimateMode,
                          onClimateTemperature,
+                         onFanToggle,
+                         onFanPercentage,
+                         onFanPreset,
+                         onFanOscillation,
+                         onFanDirection,
                      }: {
     data: WallDashboardData;
     floor: string;
@@ -873,22 +949,29 @@ function RoomSection({
     onCoverPosition: (cover: WallCover, position: number) => void;
     onClimateMode: (item: WallDashboardData['climate'][number], mode: string) => void;
     onClimateTemperature: (item: WallDashboardData['climate'][number], temperature: number) => void;
+    onFanToggle: (fan: WallFan) => void;
+    onFanPercentage: (fan: WallFan, value: number) => void;
+    onFanPreset: (fan: WallFan, presetMode: string) => void;
+    onFanOscillation: (fan: WallFan) => void;
+    onFanDirection: (fan: WallFan) => void;
 }) {
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
+    const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const sensorChips = roomSensorChips(data, room);
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
+        ...fans.map((fan) => fan.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
     ]);
     const otherDevices = roomDevices(data, room, excluded);
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + sensorChips.length + otherDevices.length;
+    const deviceCount = lights.length + covers.length + climates.length + fans.length + sensorChips.length + otherDevices.length;
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
 
@@ -942,6 +1025,19 @@ function RoomSection({
                         onPosition={onCoverPosition}
                     />
                 ))}
+                {fans.map((fan) => (
+                    <RoomFanControl
+                        key={fan.entity_id}
+                        fan={fan}
+                        battery={batteryForDeviceName(data, room, fan.name)}
+                        busy={busyEntity === fan.entity_id}
+                        onToggle={onFanToggle}
+                        onPercentage={onFanPercentage}
+                        onPreset={onFanPreset}
+                        onOscillation={onFanOscillation}
+                        onDirection={onFanDirection}
+                    />
+                ))}
                 {sensorChips.length > 0 && (
                     <section className="wall-room-panel wall-room-sensors">
                         <div className="wall-room-panel-title">
@@ -970,7 +1066,7 @@ function RoomSection({
                         </div>
                     </section>
                 )}
-                {lights.length === 0 && climates.length === 0 && covers.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
                     <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
                 )}
             </div>
@@ -1133,13 +1229,116 @@ function RoomCoverControl({
     );
 }
 
-function RoomDeviceCard({device, battery}: { device: WallEntity; battery?: BatteryBadge | null }) {
+function RoomDeviceCard({
+                            device,
+                            battery,
+                        }: {
+    device: WallEntity;
+    battery?: BatteryBadge | null;
+}) {
     return (
         <article className="wall-room-device-card">
             <div className={`wall-dot ${deviceActive(device) ? 'on' : ''}`}/>
             <div>
                 <strong>{device.name}</strong>
                 <span>{deviceValue(device)}{battery && <BatteryPill battery={battery}/>}</span>
+            </div>
+        </article>
+    );
+}
+
+function RoomFanControl({
+                            fan,
+                            battery,
+                            busy,
+                            onToggle,
+                            onPercentage,
+                            onPreset,
+                            onOscillation,
+                            onDirection,
+                        }: {
+    fan: WallFan;
+    battery?: BatteryBadge | null;
+    busy?: boolean;
+    onToggle?: (fan: WallFan) => void;
+    onPercentage?: (fan: WallFan, value: number) => void;
+    onPreset?: (fan: WallFan, presetMode: string) => void;
+    onOscillation?: (fan: WallFan) => void;
+    onDirection?: (fan: WallFan) => void;
+}) {
+    const percentage = clampPercent(fan.percentage ?? (deviceActive(fan) ? 100 : 0));
+    const presetModes = fan.preset_modes ?? [];
+    const direction = String(fan.direction || 'forward').toLowerCase();
+    return (
+        <article className={`wall-room-panel wall-fan-control ${deviceActive(fan) ? 'active' : ''}`}>
+            <div className="wall-room-panel-title">
+                <span>{fan.name}</span>
+                <strong>{busy ? 'Schaltet...' : fanStatusLabel(fan)}{battery && <BatteryPill battery={battery}/>}</strong>
+            </div>
+            <div className="wall-fan-status-row">
+                <span className={`wall-status-dot ${deviceActive(fan) ? 'active' : ''}`}/>
+                <span>{deviceActive(fan) ? 'Aktiv' : 'Aus'}</span>
+            </div>
+            <div className="wall-fan-speed">
+                <div>
+                    <span>Geschwindigkeit</span>
+                    <strong>{percentage}%</strong>
+                </div>
+                <label className="wall-room-slider compact wall-fan-slider">
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step={fan.percentage_step || 1}
+                        value={percentage}
+                        disabled={busy}
+                        onChange={(event) => onPercentage?.(fan, Number(event.target.value))}
+                        aria-label="Ventilator Geschwindigkeit"
+                    />
+                </label>
+            </div>
+            <div className="wall-fan-control-list">
+                <div className="wall-fan-control-row">
+                    <span>Ventilator</span>
+                    <button type="button" className={`wall-switch ${deviceActive(fan) ? 'on' : ''}`}
+                            disabled={busy} onClick={() => onToggle?.(fan)}
+                            aria-pressed={deviceActive(fan)} aria-label="Ventilator ein- oder ausschalten"/>
+                </div>
+                {fanSupportsOscillation(fan) && (
+                    <div className="wall-fan-control-row">
+                        <span>Oszillation</span>
+                        <button type="button" className={`wall-switch ${fan.oscillating ? 'on' : ''}`}
+                                disabled={busy} onClick={() => onOscillation?.(fan)}
+                                aria-pressed={fan.oscillating === true} aria-label="Oszillation ein- oder ausschalten"/>
+                    </div>
+                )}
+                {fanSupportsDirection(fan) && (
+                    <div className="wall-fan-control-row">
+                        <span>Luftstrom</span>
+                        <div className="wall-fan-segment" role="group" aria-label="Luftstromrichtung">
+                            <button type="button" className={direction !== 'reverse' ? 'active' : ''}
+                                    disabled={busy || direction !== 'reverse'} onClick={() => onDirection?.(fan)}>
+                                Vorwärts
+                            </button>
+                            <button type="button" className={direction === 'reverse' ? 'active' : ''}
+                                    disabled={busy || direction === 'reverse'} onClick={() => onDirection?.(fan)}>
+                                Rückwärts
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {presetModes.length > 0 && (
+                    <label className="wall-fan-control-row wall-fan-select">
+                        <span>Modus</span>
+                        <select value={fan.preset_mode || ''} disabled={busy}
+                                onChange={(event) => onPreset?.(fan, event.target.value)}>
+                            {!fan.preset_mode && <option value="">Auswählen</option>}
+                            {presetModes.map((mode) => (
+                                <option key={mode} value={mode}>{labelFanPreset(mode)}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
             </div>
         </article>
     );
@@ -1710,6 +1909,7 @@ function allWallEntities(data: WallDashboardData): WallEntity[] {
         ...(data.health?.unavailable ?? []),
         ...(data.health?.batteries ?? []),
         ...(data.switches ?? []),
+        ...(data.fans ?? []),
         ...(data.media_players ?? []),
         ...(data.temperature_sensors ?? []),
     ] as WallEntity[];
@@ -1890,6 +2090,22 @@ function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>
     return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
+    const lights = data.lights.filter((light) => sameArea(light.area, room));
+    const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
+    const climates = data.climate.filter((item) => sameArea(item.area, room));
+    const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
+    const sensors = roomSensorChips(data, room);
+    const excluded = new Set([
+        ...lights.map((light) => light.entity_id),
+        ...covers.map((cover) => cover.entity_id),
+        ...climates.map((item) => item.entity_id),
+        ...fans.map((fan) => fan.entity_id),
+        ...sensors.map((sensor) => sensor.entity_id),
+    ]);
+    return lights.length + covers.length + climates.length + fans.length + sensors.length + roomDevices(data, room, excluded).length;
+}
+
 function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
     const classes: string[] = [];
     const chips: Array<{ label: string; tone: string }> = [];
@@ -2065,6 +2281,43 @@ function labelClimateMode(mode: string) {
     return labelState(mode);
 }
 
+function fanStatusLabel(fan: WallFan) {
+    if (!deviceActive(fan)) return 'Aus';
+    return 'Aktiv';
+}
+
+function labelFanPreset(mode: string) {
+    const normalized = String(mode || '').toLowerCase();
+    const labels: Record<string, string> = {
+        normal: 'Normal',
+        nature: 'Natur',
+        sleep: 'Schlaf',
+        favorite: 'Favorit',
+        auto: 'Auto',
+        silent: 'Leise',
+    };
+    return labels[normalized] || labelState(mode);
+}
+
+function labelFanDirection(direction: string) {
+    const normalized = String(direction || '').toLowerCase();
+    if (normalized === 'forward') return 'Vorwärts';
+    if (normalized === 'reverse') return 'Rückwärts';
+    return labelState(direction);
+}
+
+function fanSupportsOscillation(fan: WallFan) {
+    return fan.oscillating !== null && fan.oscillating !== undefined || fanHasFeature(fan, 2);
+}
+
+function fanSupportsDirection(fan: WallFan) {
+    return Boolean(fan.direction) || fanHasFeature(fan, 4);
+}
+
+function fanHasFeature(fan: WallFan, feature: number) {
+    return typeof fan.supported_features === 'number' && (fan.supported_features & feature) === feature;
+}
+
 function climateToneClass(mode: string) {
     if (mode === 'heat') return 'heat';
     if (mode === 'cool') return 'cool';
@@ -2122,6 +2375,10 @@ function deviceActive(device: WallEntity) {
     return false;
 }
 
+function isFanEntity(device: WallEntity) {
+    return String(device.entity_id || '').startsWith('fan.');
+}
+
 function deviceValue(device: WallEntity) {
     const item = device as WallEntity & {
         position?: number | null;
@@ -2155,7 +2412,21 @@ function normalizeArea(value?: string) {
 }
 
 function labelState(state: string) {
-    return state.replace(/_/g, ' ');
+    const normalized = String(state || '').toLowerCase();
+    const labels: Record<string, string> = {
+        on: 'An',
+        off: 'Aus',
+        open: 'Offen',
+        closed: 'Geschlossen',
+        opening: 'Öffnet',
+        closing: 'Schließt',
+        unavailable: 'Nicht verfügbar',
+        unknown: 'Unbekannt',
+        playing: 'Aktiv',
+        idle: 'Bereit',
+        paused: 'Pausiert',
+    };
+    return labels[normalized] || state.replace(/_/g, ' ');
 }
 
 function formatNumber(value?: number | null) {
@@ -2337,5 +2608,19 @@ function patchWallClimate(
                 target_temperature: typeof patch.temperature === 'number' ? patch.temperature : item.target_temperature,
             };
         }),
+    };
+}
+
+function patchWallFan(
+    current: WallDashboardData | null,
+    entityId: string,
+    patch: Partial<WallFan>,
+): WallDashboardData | null {
+    if (!current) return current;
+    return {
+        ...current,
+        fans: (current.fans ?? []).map((item) => (
+            item.entity_id === entityId ? {...item, ...patch} : item
+        )),
     };
 }

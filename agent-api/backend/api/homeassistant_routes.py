@@ -34,6 +34,7 @@ def wall_dashboard():
     covers = [_with_area_lookup(_cover_item(state), area_lookup) for state in states if _domain(state) == "cover"]
     sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "sensor"]
     switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "switch"]
+    fans = [_with_area_lookup(_fan_item(state), area_lookup) for state in states if _domain(state) == "fan"]
     media_players = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "media_player"]
     climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _domain(state) == "climate"]
     temperature_sensors = [_with_area_lookup(item, area_lookup) for item in _temperature_items(states)]
@@ -83,6 +84,7 @@ def wall_dashboard():
         "covers": covers,
         "sensors": sorted(sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "switches": switches,
+        "fans": sorted(fans, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "media_players": media_players,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
@@ -252,6 +254,20 @@ def _cover_item(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _fan_item(state: dict[str, Any]) -> dict[str, Any]:
+    attributes = state.get("attributes", {})
+    return {
+        **_simple_item(state),
+        "percentage": _numeric_value(attributes.get("percentage")),
+        "percentage_step": _numeric_value(attributes.get("percentage_step")),
+        "preset_mode": attributes.get("preset_mode"),
+        "preset_modes": attributes.get("preset_modes") or [],
+        "oscillating": attributes.get("oscillating"),
+        "direction": attributes.get("direction"),
+        "supported_features": attributes.get("supported_features"),
+    }
+
+
 def _climate_item(state: dict[str, Any]) -> dict[str, Any]:
     attributes = state.get("attributes", {})
     return {
@@ -394,12 +410,10 @@ def _group_lights_by_floor(lights: list[dict[str, Any]], floor_map: dict[str, di
         rooms: list[dict[str, Any]] = []
         for area, entity_ids in areas.items():
             room_lights = [by_entity[entity_id] for entity_id in entity_ids if entity_id in by_entity]
-            if not room_lights:
-                continue
             assigned.update(item["entity_id"] for item in room_lights)
             rooms.append(_light_room(area, room_lights))
         floor_lights = [light for room in rooms for light in room["items"]]
-        if not floor_lights:
+        if not rooms:
             continue
         groups.append(_light_group(floor, floor_lights, rooms=rooms))
 
@@ -568,9 +582,11 @@ def _climate_summary() -> dict[str, float | None]:
 def _floor_area_entity_map() -> dict[str, dict[str, list[str]]]:
     template = """
 {% set ns = namespace(items=[]) %}
+{% set assigned = namespace(ids=[]) %}
 {% for floor in floors() %}
   {% set floor_ns = namespace(areas=[]) %}
   {% for area in floor_areas(floor) %}
+    {% set assigned.ids = assigned.ids + [area] %}
     {% set area_ns = namespace(entities=[]) %}
     {% for entity_id in area_entities(area) %}
       {% set area_ns.entities = area_ns.entities + [entity_id] %}
@@ -580,6 +596,22 @@ def _floor_area_entity_map() -> dict[str, dict[str, list[str]]]:
   {% endfor %}
   {% set ns.items = ns.items + [{'floor': floor, 'areas': floor_ns.areas}] %}
 {% endfor %}
+{% set unassigned = namespace(areas=[]) %}
+{% for area in areas() %}
+  {% if area not in assigned.ids %}
+    {% set area_ns = namespace(entities=[]) %}
+    {% for entity_id in area_entities(area) %}
+      {% set area_ns.entities = area_ns.entities + [entity_id] %}
+    {% endfor %}
+    {% if area_ns.entities | length > 0 %}
+      {% set display_name = area_name(area) or area %}
+      {% set unassigned.areas = unassigned.areas + [{'area': display_name, 'area_id': area, 'entities': area_ns.entities}] %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{% if unassigned.areas | length > 0 %}
+  {% set ns.items = ns.items + [{'floor': 'Ohne Etage', 'areas': unassigned.areas}] %}
+{% endif %}
 {{ ns.items | to_json }}
 """
     try:
