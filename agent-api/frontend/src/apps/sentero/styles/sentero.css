@@ -1081,10 +1081,23 @@ button:disabled {
 }
 
 .sc-room-choice-card > button {
-  align-items: center;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
   justify-content: flex-start;
   min-height: 74px;
   width: 100%;
+}
+
+.sc-room-choice-card > button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.sc-room-choice-card > button small {
+  color: var(--sc-green);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .sc-room-choice-card.active,
@@ -1092,6 +1105,10 @@ button:disabled {
   background: var(--sc-green-soft);
   border-color: #84bea8;
   box-shadow: inset 0 0 0 2px rgba(47, 125, 95, 0.2);
+}
+
+.sc-room-choice-card.has-bound-sensor {
+  border-color: #78b89f;
 }
 
 .sc-room-sensor-toggles {
@@ -1113,6 +1130,23 @@ button:disabled {
   gap: 8px;
   min-height: 38px;
   padding: 0 10px;
+}
+
+.sc-room-sensor-toggles label.locked {
+  cursor: default;
+}
+
+.sc-room-sensor-toggles label span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.sc-room-sensor-toggles label small {
+  color: var(--sc-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .sc-room-sensor-toggles input {

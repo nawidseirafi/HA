@@ -1,4 +1,4 @@
-ROBOTERSTEVE_EDITION=seniorcare
+ROBOTERSTEVE_EDITION=sentero
 ROBOTERSTEVE_VERSION=0.1.0
 ROBOTERSTEVE_BUILD=2026.06.08
 ROBOTERSTEVE_COMMIT=development
@@ -11,7 +11,7 @@ UPDATE_MANIFEST_URL=https://seirafi.de/robotersteve/personal/stable/latest.json
 UPDATE_MANIFEST_PATH=update-manifest.json
 UPDATE_CHANNEL=stable
 UPDATE_EXECUTION_MODE=docker
-ROBOTERSTEVE_API_IMAGE=robotersteve/seniorcare-api:latest
+ROBOTERSTEVE_API_IMAGE=robotersteve/sentero-api:latest
 ROBOTERSTEVE_BACKUP_DIR=/opt/roboterSteve/backups
 UPDATE_COMPOSE_PROJECT_DIR=/opt/roboterSteve
 UPDATE_COMPOSE_FILE=docker-compose.yml

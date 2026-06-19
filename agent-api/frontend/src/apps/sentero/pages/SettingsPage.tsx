@@ -266,7 +266,7 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
   async function deleteRoom(room: string) {
     const roomSensors = sensors.filter((sensor) => sensor.room === room);
     const message = roomSensors.length
-      ? 'Raum wirklich löschen? Zugeordnete Sensoren werden auch aus Zigbee entfernt.'
+      ? 'Raum wirklich löschen? Zugeordnete Sensoren werden auch entfernt.'
       : 'Raum wirklich löschen?';
     if (!window.confirm(message)) return;
     try {
@@ -335,10 +335,10 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
   }
 
   async function deleteSensor(role: string) {
-    if (!window.confirm('Sensor wirklich aus Zigbee entfernen? Das Gerät muss danach neu gekoppelt werden.')) return;
+    if (!window.confirm('Sensor wirklich entfernen? Das Gerät muss danach neu gekoppelt werden.')) return;
     try {
       await api.deleteSenteroSensorRole(role);
-      toast('Sensor aus Zigbee entfernt');
+      toast('Sensor entfernt');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sensor konnte nicht entfernt werden.');

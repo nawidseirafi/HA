@@ -131,7 +131,7 @@ class DeviceMappingService:
             baseline = self.snapshot()
             ha_reachable = True
         except Exception:
-            logger.exception("Sentero Zigbee pairing baseline failed. ha_url=%s reachable=no", ha_url)
+            logger.exception("Sentero pairing baseline failed. ha_url=%s reachable=no", ha_url)
             raise
         detail = self._open_zigbee_permit_join(duration)
         status = 'pairing_started' if detail.get('ok') else 'pairing_needs_manual_action'
@@ -150,7 +150,7 @@ class DeviceMappingService:
             con.commit()
             session_id = int(cur.lastrowid)
         logger.info(
-            "Sentero Zigbee pairing start session=%s role=%s room=%s ha_url=%s reachable=%s baseline_states=%s status=%s provider=%s",
+            "Sentero pairing start session=%s role=%s room=%s ha_url=%s reachable=%s baseline_states=%s status=%s provider=%s",
             session_id,
             role,
             room,
@@ -161,7 +161,7 @@ class DeviceMappingService:
             detail.get('provider'),
         )
         if not detail.get('ok'):
-            logger.warning("Sentero Zigbee pairing unavailable session=%s detail=%s", session_id, detail)
+            logger.warning("Sentero pairing unavailable session=%s detail=%s", session_id, detail)
         return {'session_id': session_id, 'status': status, 'message': message, 'detail': detail}
 
     def candidates(self, session_id: int, dev: bool = False) -> dict[str, Any]:
@@ -332,7 +332,7 @@ class DeviceMappingService:
             raise ValueError('sensor role not found')
         removal = self._remove_zigbee_device(mapped)
         if not removal.get('ok'):
-            raise RuntimeError(removal.get('message') or 'Zigbee-Geraet konnte nicht entfernt werden.')
+            raise RuntimeError(removal.get('message') or 'Geraet konnte nicht entfernt werden.')
         with self.connect() as con:
             timestamp = now()
             device_id = str(mapped.get('device_id') or '').strip()
@@ -479,7 +479,7 @@ class DeviceMappingService:
                     return {'ok': True, 'provider': 'zha', 'ieee': ieee, 'response': response, 'attempts': attempts}
                 except Exception as exc:
                     attempts.append({'provider': 'zha', 'ieee': ieee, 'error': str(exc)})
-                    logger.info("Sentero Zigbee device remove failed provider=zha entity=%s device=%s ieee=%s error=%s", entity_id, device_id, ieee, exc)
+                    logger.info("Sentero device remove failed provider=zha entity=%s device=%s ieee=%s error=%s", entity_id, device_id, ieee, exc)
                 continue
             if provider == 'zigbee2mqtt':
                 for mqtt_id in mqtt_ids:
@@ -495,11 +495,11 @@ class DeviceMappingService:
                         return {'ok': True, 'provider': 'zigbee2mqtt', 'id': mqtt_id, 'response': response, 'attempts': attempts}
                     except Exception as exc:
                         attempts.append({'provider': 'zigbee2mqtt', 'id': mqtt_id, 'error': str(exc)})
-                        logger.info("Sentero Zigbee device remove failed provider=zigbee2mqtt entity=%s device=%s id=%s error=%s", entity_id, device_id, mqtt_id, exc)
+                        logger.info("Sentero device remove failed provider=zigbee2mqtt entity=%s device=%s id=%s error=%s", entity_id, device_id, mqtt_id, exc)
         return {
             'ok': False,
             'reason': 'zigbee_remove_unavailable',
-            'message': 'Zigbee-Geraet konnte nicht entfernt werden.',
+            'message': 'Geraet konnte nicht entfernt werden.',
             'entity_id': entity_id,
             'device_id': device_id or None,
             'identifiers': identifiers,

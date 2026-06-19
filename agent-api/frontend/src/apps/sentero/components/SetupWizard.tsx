@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, HeartHandshake, Mail, Plus, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
-import { api, type SenteroCandidates } from '@shared/api/client';
+import { api, type SenteroCandidates, type SenteroSensorRole } from '@shared/api/client';
 import { SensorWizard, type SensorBinding, type SensorDiscoveryState } from './SensorWizard';
 
 type Profile = {
@@ -25,6 +25,8 @@ type NotificationPreferences = {
   daily_summary: boolean;
 };
 
+type SensorPlan = { motion: boolean; door: boolean };
+
 const steps = ['Willkommen', 'Profil', 'Räume', 'Sensoren', 'Vertraute Personen', 'Benachrichtigungen', 'Abschluss'];
 const ZIGBEE_DISCOVERY_SECONDS = 180;
 
@@ -46,7 +48,8 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   const [profile, setProfile] = useState<Profile>({ name: '', birthYear: '', notes: '' });
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
   const [customRooms, setCustomRooms] = useState<Record<string, string>>({});
-  const [sensorPlan, setSensorPlan] = useState<Record<string, { motion: boolean; door: boolean }>>({});
+  const [sensorPlan, setSensorPlan] = useState<Record<string, SensorPlan>>({});
+  const [lockedSensorPlan, setLockedSensorPlan] = useState<Record<string, SensorPlan>>({});
   const [customRoom, setCustomRoom] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactForm, setContactForm] = useState<Contact>({ id: '', name: '', relation: 'Tochter', phone: '', email: '', channels: ['E-Mail'], primary: true });
@@ -66,13 +69,20 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
 
   useEffect(() => {
     void api.senteroSetupStatus().then((status) => {
-      if (status.selected_rooms.length) setSelectedRooms(status.selected_rooms);
+      const existingSensorRooms = Array.from(new Set((status.sensor_roles || []).map((role) => role.room).filter(Boolean))) as string[];
+      const nextRooms = uniqueValues([...status.selected_rooms, ...existingSensorRooms]);
+      if (nextRooms.length) setSelectedRooms(nextRooms);
       const unknownRooms = Object.fromEntries(
-        status.selected_rooms
+        nextRooms
           .filter((room) => !baseRoomLabel[room])
           .map((room) => [room, room]),
       );
       if (Object.keys(unknownRooms).length) setCustomRooms((current) => ({ ...unknownRooms, ...current }));
+      if (status.sensor_roles?.length) {
+        setLockedSensorPlan(lockedPlanFromRoles(status.sensor_roles));
+        setSensorPlan((current) => mergeSensorPlan(current, status.sensor_roles));
+        setSensorBindings((current) => mergeExistingSensorBindings(current, status.sensor_roles, unknownRooms));
+      }
       if (status.profile?.name) {
         setProfile((value) => ({
           ...value,
@@ -186,6 +196,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   }
 
   function toggleRoom(roomId: string) {
+    if (selectedRooms.includes(roomId) && roomHasLockedSensor(lockedSensorPlan, roomId)) return;
     setSelectedRooms((current) => {
       if (current.includes(roomId)) return current.filter((id) => id !== roomId);
       setSensorPlan((plans) => ({ ...plans, [roomId]: plans[roomId] || defaultSensorPlan(roomId) }));
@@ -208,6 +219,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
   }
 
   function toggleSensorType(roomId: string, type: 'motion' | 'door') {
+    if (lockedSensorPlan[roomId]?.[type]) return;
     setSensorPlan((current) => {
       const fallback = defaultSensorPlan(roomId);
       const next = { ...(current[roomId] || fallback), [type]: !(current[roomId] || fallback)[type] };
@@ -303,7 +315,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }) {
       <div className="sc-wizard-card">
         {step === 0 && <WelcomeStep />}
         {step === 1 && <ProfileStep profile={profile} calculatedAge={calculatedAge} onChange={setProfile} />}
-        {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
+        {step === 2 && <RoomsStep selected={selectedRooms} customRooms={customRooms} sensorPlan={sensorPlan} lockedSensorPlan={lockedSensorPlan} customRoom={customRoom} onToggle={toggleRoom} onCustomChange={setCustomRoom} onCustomAdd={addCustomRoom} onToggleSensorType={toggleSensorType} />}
         {step === 3 && <SensorWizard sensors={sensorBindings} discovery={discovery} roomLabel={roomLabel} devMode={devMode} connected={connectedSensors} total={sensorBindings.length} onChange={updateSensor} onSearch={searchSensor} />}
         {step === 4 && <ContactsStep contacts={contacts} form={contactForm} formOpen={contactFormOpen} onOpen={() => setContactFormOpen(true)} onClose={() => setContactFormOpen(false)} onFormChange={setContactForm} onAdd={addContact} onDelete={(id) => setContacts((current) => {
           const nextContacts = current.filter((contact) => contact.id !== id);
@@ -378,10 +390,11 @@ function ProfileStep({ profile, calculatedAge, onChange }: { profile: Profile; c
   );
 }
 
-function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, onCustomChange, onCustomAdd, onToggleSensorType }: {
+function RoomsStep({ selected, customRooms, sensorPlan, lockedSensorPlan, customRoom, onToggle, onCustomChange, onCustomAdd, onToggleSensorType }: {
   selected: string[];
   customRooms: Record<string, string>;
-  sensorPlan: Record<string, { motion: boolean; door: boolean }>;
+  sensorPlan: Record<string, SensorPlan>;
+  lockedSensorPlan: Record<string, SensorPlan>;
   customRoom: string;
   onToggle: (id: string) => void;
   onCustomChange: (value: string) => void;
@@ -396,15 +409,24 @@ function RoomsStep({ selected, customRooms, sensorPlan, customRoom, onToggle, on
         {visibleRooms.map((room) => {
           const active = selected.includes(room.id);
           const plan = sensorPlan[room.id] || defaultSensorPlan(room.id);
+          const locked = lockedSensorPlan[room.id] || { motion: false, door: false };
+          const roomLocked = roomHasLockedSensor(lockedSensorPlan, room.id);
           return (
-            <div key={room.id} className={`sc-room-choice-card ${active ? 'active' : ''}`}>
-              <button type="button" onClick={() => onToggle(room.id)}>
+            <div key={room.id} className={`sc-room-choice-card ${active ? 'active' : ''}${roomLocked ? ' has-bound-sensor' : ''}`}>
+              <button type="button" onClick={() => onToggle(room.id)} disabled={active && roomLocked}>
                 <strong>{room.label}</strong>
+                {active && roomLocked && <small>Sensor verbunden</small>}
               </button>
               {active && (
                 <div className="sc-room-sensor-toggles">
-                  <label className={plan.motion ? 'active' : ''}><input type="checkbox" checked={plan.motion} onChange={() => onToggleSensorType(room.id, 'motion')} /><i aria-hidden="true" /> Präsenzsensor</label>
-                  <label className={plan.door ? 'active' : ''}><input type="checkbox" checked={plan.door} onChange={() => onToggleSensorType(room.id, 'door')} /><i aria-hidden="true" /> Türsensor</label>
+                  <label className={`${plan.motion ? 'active' : ''}${locked.motion ? ' locked' : ''}`}>
+                    <input type="checkbox" checked={plan.motion} disabled={locked.motion} onChange={() => onToggleSensorType(room.id, 'motion')} />
+                    <i aria-hidden="true" /> <span>Präsenzsensor{locked.motion}</span>
+                  </label>
+                  <label className={`${plan.door ? 'active' : ''}${locked.door ? ' locked' : ''}`}>
+                    <input type="checkbox" checked={plan.door} disabled={locked.door} onChange={() => onToggleSensorType(room.id, 'door')} />
+                    <i aria-hidden="true" /> <span>Türsensor{locked.door}</span>
+                  </label>
                 </div>
               )}
             </div>
@@ -527,7 +549,7 @@ function SummaryStep({ profile, age, rooms, roomLabel, contacts, sensors, totalS
 }
 
 
-function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: boolean; door: boolean }>, customRooms: Record<string, string>, current: SensorBinding[]) {
+function buildBindings(roomIds: string[], sensorPlan: Record<string, SensorPlan>, customRooms: Record<string, string>, current: SensorBinding[]) {
   const byId = Object.fromEntries(current.map((sensor) => [sensor.id, sensor]));
   return roomIds.flatMap((roomId) => {
     const label = customRooms[roomId] || baseRoomLabel[roomId] || roomId;
@@ -545,7 +567,79 @@ function buildBindings(roomIds: string[], sensorPlan: Record<string, { motion: b
   });
 }
 
-function selectedRoomsWithSensors(roomIds: string[], sensorPlan: Record<string, { motion: boolean; door: boolean }>) {
+function mergeExistingSensorBindings(current: SensorBinding[], roles: SenteroSensorRole[], customRooms: Record<string, string>) {
+  const byId = Object.fromEntries(current.map((sensor) => [sensor.id, sensor]));
+  for (const role of roles) {
+    const type = sensorTypeFromRole(role.role);
+    const roomId = role.room || roomFromRole(role.role);
+    if (!type || !roomId) continue;
+    const label = customRooms[roomId] || baseRoomLabel[roomId] || roomId;
+    byId[role.role] = {
+      ...(byId[role.role] || {
+        id: role.role,
+        roomId,
+        type,
+        sensorId: '',
+        name: defaultSensorName(label, type),
+        status: 'idle' as const,
+      }),
+      roomId,
+      type,
+      name: role.label || byId[role.role]?.name || defaultSensorName(label, type),
+      status: role.configured ? 'connected' : byId[role.role]?.status || 'idle',
+    };
+  }
+  return Object.values(byId);
+}
+
+function mergeSensorPlan(current: Record<string, SensorPlan>, roles: SenteroSensorRole[]) {
+  const next = { ...current };
+  for (const role of roles) {
+    const type = sensorTypeFromRole(role.role);
+    const roomId = role.room || roomFromRole(role.role);
+    if (!type || !roomId) continue;
+    const plan = next[roomId] || { motion: false, door: false };
+    next[roomId] = { ...plan, [type]: true };
+  }
+  return next;
+}
+
+function lockedPlanFromRoles(roles: SenteroSensorRole[]) {
+  const plan: Record<string, SensorPlan> = {};
+  for (const role of roles) {
+    if (!role.configured) continue;
+    const type = sensorTypeFromRole(role.role);
+    const roomId = role.room || roomFromRole(role.role);
+    if (!type || !roomId) continue;
+    plan[roomId] = { ...(plan[roomId] || { motion: false, door: false }), [type]: true };
+  }
+  return plan;
+}
+
+function roomHasLockedSensor(lockedSensorPlan: Record<string, SensorPlan>, roomId: string) {
+  const locked = lockedSensorPlan[roomId];
+  return Boolean(locked?.motion || locked?.door);
+}
+
+function sensorTypeFromRole(role: string): SensorBinding['type'] | null {
+  if (role.endsWith('_presence') || role.endsWith('_motion')) return 'motion';
+  if (role.endsWith('_door') || role.endsWith('_contact')) return 'door';
+  return null;
+}
+
+function roomFromRole(role: string) {
+  return role.replace(/_(presence|motion|door|contact)$/, '');
+}
+
+function defaultSensorName(roomLabel: string, type: SensorBinding['type']) {
+  return type === 'motion' ? `${roomLabel} Präsenz` : `${roomLabel} Türkontakt`;
+}
+
+function uniqueValues(values: string[]) {
+  return values.filter((value, index) => value && values.indexOf(value) === index);
+}
+
+function selectedRoomsWithSensors(roomIds: string[], sensorPlan: Record<string, SensorPlan>) {
   return roomIds.filter((roomId) => {
     const plan = sensorPlan[roomId] || defaultSensorPlan(roomId);
     return plan.motion || plan.door;
