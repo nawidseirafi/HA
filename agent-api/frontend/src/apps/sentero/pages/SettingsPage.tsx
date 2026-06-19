@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Battery, CheckCircle2, KeyRound, Lightbulb, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, UserRound, Wifi, WifiOff, X } from 'lucide-react';
+import { Battery, CheckCircle2, DoorClosed, DoorOpen, KeyRound, Lightbulb, Mail, MessageCircle, Pencil, Plus, Save, Send, ShieldAlert, Trash2, UserRound, Wifi, WifiOff, X } from 'lucide-react';
 import { api, type SenteroNotificationChannel, type SenteroSensorRole, type SenteroSetupStatus } from '@shared/api/client';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
 import { useSenteroAuth } from '../auth/SenteroAuthContext';
@@ -54,6 +54,32 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'sensors') return;
+    let active = true;
+    let loading = false;
+
+    async function refreshSensors() {
+      if (loading) return;
+      loading = true;
+      try {
+        const nextSensors = await api.senteroSensorRoles(true);
+        if (active) setSensors(nextSensors.sensor_roles);
+      } catch {
+        // Keep the last known sensor state visible during transient refresh failures.
+      } finally {
+        loading = false;
+      }
+    }
+
+    void refreshSensors();
+    const timer = window.setInterval(() => void refreshSensors(), 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [activeTab]);
 
   useEffect(() => {
     setAccountForm({ display_name: user?.display_name || '', email: user?.email || '' });
@@ -443,6 +469,7 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
                         <div className="sc-sensor-settings-main">
                           <strong>{sensor.label || sensor.role}</strong>
                           <small>{sensorType(sensor)} · zuletzt {formatDateTime(sensor.last_changed || sensor.last_updated || sensor.updated_at)}</small>
+                          {isDoorContactSensor(sensor) && <DoorContactStatus sensor={sensor} />}
                           <div className="sc-sensor-health">
                             <span className={sensor.reachable === false ? 'offline' : 'online'}>
                               {sensor.reachable === false ? <WifiOff size={17} /> : <CheckCircle2 size={17} />}
@@ -881,11 +908,38 @@ function ChannelChecks({
   );
 }
 
+function DoorContactStatus({ sensor }: { sensor: SenteroSensorRole }) {
+  const status = doorContactStatus(sensor);
+  const Icon = status.open ? DoorOpen : DoorClosed;
+  return (
+    <div className={`sc-door-contact-status ${status.tone}`} aria-label={`Türkontakt ${status.label}`}>
+      <Icon size={24} />
+      <strong>{status.label}</strong>
+    </div>
+  );
+}
+
 function sensorType(sensor: SenteroSensorRole) {
-  if (sensor.role === 'main_door' || sensor.role.endsWith('_door') || ['door', 'window', 'opening', 'contact'].includes(String(sensor.device_class || ''))) return 'Türkontakt';
+  if (isDoorContactSensor(sensor)) return 'Türkontakt';
   if (String(sensor.device_class || '') === 'vibration') return 'Vibrationssensor';
   if (String(sensor.domain || '') === 'lock') return 'Türsensor';
   return 'Bewegung';
+}
+
+function isDoorContactSensor(sensor: SenteroSensorRole) {
+  return sensor.role === 'main_door' || sensor.role.endsWith('_door') || sensor.role.endsWith('_contact') || ['door', 'window', 'opening', 'contact'].includes(String(sensor.device_class || ''));
+}
+
+function doorContactStatus(sensor: SenteroSensorRole) {
+  const state = String(sensor.state || '').toLowerCase();
+  const changedAt = sensor.last_changed || sensor.last_updated || sensor.updated_at;
+  if (['open', 'on', 'opening', 'detected', 'true'].includes(state)) {
+    return { open: true, tone: 'open', label: changedAt ? `Offen seit ${formatRelativeDuration(changedAt)}` : 'Offen' };
+  }
+  if (['closed', 'off', 'closing', 'clear', 'false'].includes(state)) {
+    return { open: false, tone: 'closed', label: 'Geschlossen' };
+  }
+  return { open: false, tone: 'unknown', label: 'Status unbekannt' };
 }
 
 function batteryClass(value?: number | null) {
@@ -1090,4 +1144,18 @@ function formatDateTime(value?: string | null) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'noch keine Daten';
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function formatRelativeDuration(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'gerade eben';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} Min.`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} Std.`;
+  const days = Math.round(hours / 24);
+  return `${days} Tg.`;
 }

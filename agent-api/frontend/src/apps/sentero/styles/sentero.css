@@ -1934,6 +1934,44 @@ button:disabled {
   color: var(--sc-muted);
 }
 
+.sc-door-contact-status {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  display: inline-flex;
+  font-size: 1.08rem;
+  font-weight: 900;
+  gap: 10px;
+  justify-self: start;
+  line-height: 1.2;
+  margin-top: 8px;
+  min-height: 48px;
+  padding: 0 15px;
+}
+
+.sc-door-contact-status svg {
+  flex: 0 0 auto;
+}
+
+.sc-door-contact-status.closed {
+  background: linear-gradient(135deg, #edf8f3 0%, #f7fcfa 100%);
+  border-color: #b8dccd;
+  color: var(--sc-green);
+}
+
+.sc-door-contact-status.open {
+  background: linear-gradient(135deg, #fff1dd 0%, #fff8ed 100%);
+  border-color: #ffc96f;
+  box-shadow: 0 10px 24px rgba(184, 92, 22, 0.12);
+  color: #b85c16;
+}
+
+.sc-door-contact-status.unknown {
+  background: #edf2f0;
+  border-color: #dbe6e1;
+  color: var(--sc-muted);
+}
+
 .sc-sensor-settings-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3209,6 +3247,10 @@ button:disabled {
 
   .sc-sensor-settings-actions {
     justify-content: flex-start;
+  }
+
+  .sc-door-contact-status {
+    justify-self: stretch;
   }
 
   .sc-mobile-nav span {
