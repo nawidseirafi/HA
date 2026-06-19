@@ -467,10 +467,12 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
                     {roomSensors.map((sensor) => (
                       <div key={sensor.role}>
                         <div className="sc-sensor-settings-main">
-                          <strong>{sensor.label || sensor.role}</strong>
-                          <small>{sensorType(sensor)} · zuletzt {formatDateTime(sensor.last_changed || sensor.last_updated || sensor.updated_at)}</small>
-                          {isDoorContactSensor(sensor) && <DoorContactStatus sensor={sensor} />}
+                          <div className="sc-sensor-settings-head">
+                            <strong>{sensor.label || sensor.role}</strong>
+                            <small>{sensorType(sensor)} · zuletzt {formatDateTime(sensor.last_changed || sensor.last_updated || sensor.updated_at)}</small>
+                          </div>
                           <div className="sc-sensor-health">
+                            {isDoorContactSensor(sensor) && <DoorContactStatus sensor={sensor} />}
                             <span className={sensor.reachable === false ? 'offline' : 'online'}>
                               {sensor.reachable === false ? <WifiOff size={17} /> : <CheckCircle2 size={17} />}
                               {sensor.reachable === false ? 'Nicht erreichbar' : 'Erreichbar'}
@@ -479,7 +481,6 @@ export function SettingsPage({ activeTab }: { activeTab: SenteroSettingsTab }) {
                               <Battery size={17} />
                               Akku {sensor.battery_level ?? 'unbekannt'}{sensor.battery_level == null ? '' : '%'}
                             </span>
-                            <i aria-hidden="true"><b style={{ width: `${sensor.battery_level ?? 0}%` }} /></i>
                           </div>
                         </div>
                         <div className="sc-sensor-settings-actions">

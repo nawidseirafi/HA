@@ -1912,12 +1912,12 @@ button:disabled {
   align-items: start;
   background: white;
   border: 1px solid #e2eee9;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
-  gap: 10px;
+  gap: 14px;
   grid-template-columns: minmax(0, 1fr) auto;
   margin: 12px 18px 0;
-  padding: 14px;
+  padding: 16px;
 }
 
 .sc-sensor-settings-list > div:last-child {
@@ -1926,8 +1926,20 @@ button:disabled {
 
 .sc-sensor-settings-main {
   display: grid;
-  gap: 5px;
+  gap: 12px;
   min-width: 0;
+}
+
+.sc-sensor-settings-head {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sc-sensor-settings-head strong {
+  color: var(--sc-ink);
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .sc-sensor-settings-list small {
@@ -1937,32 +1949,32 @@ button:disabled {
 .sc-door-contact-status {
   align-items: center;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 999px;
   display: inline-flex;
-  font-size: 1.08rem;
-  font-weight: 900;
-  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  gap: 7px;
   justify-self: start;
   line-height: 1.2;
-  margin-top: 8px;
-  min-height: 48px;
-  padding: 0 15px;
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .sc-door-contact-status svg {
   flex: 0 0 auto;
+  height: 16px;
+  width: 16px;
 }
 
 .sc-door-contact-status.closed {
-  background: linear-gradient(135deg, #edf8f3 0%, #f7fcfa 100%);
-  border-color: #b8dccd;
+  background: #f4faf7;
+  border-color: #d5e9df;
   color: var(--sc-green);
 }
 
 .sc-door-contact-status.open {
-  background: linear-gradient(135deg, #fff1dd 0%, #fff8ed 100%);
-  border-color: #ffc96f;
-  box-shadow: 0 10px 24px rgba(184, 92, 22, 0.12);
+  background: #fff7ed;
+  border-color: #fed7aa;
   color: #b85c16;
 }
 
@@ -1988,64 +2000,55 @@ button:disabled {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
 }
 
 .sc-sensor-health > span {
   align-items: center;
+  border: 1px solid transparent;
   border-radius: 999px;
   display: inline-flex;
-  font-size: 0.92rem;
-  font-weight: 900;
+  font-size: 0.86rem;
+  font-weight: 800;
   gap: 6px;
-  min-height: 34px;
+  min-height: 30px;
   padding: 0 10px;
 }
 
 .sc-sensor-health .online {
-  background: var(--sc-green-soft);
+  background: #f4faf7;
+  border-color: #d5e9df;
   color: var(--sc-green);
 }
 
 .sc-sensor-health .offline {
   background: var(--sc-red-soft);
+  border-color: #f1c6c6;
   color: var(--sc-red);
 }
 
 .sc-sensor-health .battery {
-  background: #edf8f3;
+  background: #f4faf7;
+  border-color: #d5e9df;
   color: var(--sc-green);
 }
 
 .sc-sensor-health .battery.medium {
   background: var(--sc-yellow-soft);
+  border-color: #f3dfa5;
   color: var(--sc-yellow);
 }
 
 .sc-sensor-health .battery.low {
   background: var(--sc-red-soft);
+  border-color: #f1c6c6;
   color: var(--sc-red);
 }
 
 .sc-sensor-health .battery.unknown {
   background: #edf2f0;
+  border-color: #dbe6e1;
   color: var(--sc-muted);
-}
-
-.sc-sensor-health i {
-  background: #e5eee9;
-  border-radius: 999px;
-  flex: 1 1 140px;
-  height: 9px;
-  min-width: 120px;
-  overflow: hidden;
-}
-
-.sc-sensor-health i b {
-  background: var(--sc-green);
-  display: block;
-  height: 100%;
 }
 
 .sc-settings-contact-grid {
@@ -3250,7 +3253,7 @@ button:disabled {
   }
 
   .sc-door-contact-status {
-    justify-self: stretch;
+    justify-self: start;
   }
 
   .sc-mobile-nav span {
