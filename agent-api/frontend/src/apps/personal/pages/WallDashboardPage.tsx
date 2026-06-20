@@ -1000,6 +1000,7 @@ function RoomSection({
     const deviceCount = lights.length + covers.length + climates.length + fans.length + outlets.length + sensorChips.length + otherDevices.length;
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
+    const openingSummary = roomOpeningSummary(data, room);
 
     return (
         <div className="wall-page-stack wall-room-detail-page">
@@ -1014,7 +1015,7 @@ function RoomSection({
                         {roomTemp !== null ? `${formatNumber(roomTemp)}°C` : '--°C'}
                         {roomHumidityValue !== null ? ` · ${formatNumber(roomHumidityValue)}% Luftfeuchte` : ''}
                     </p>
-                    <p>{activeLights ? `${activeLights} Licht an` : 'Licht aus'} · {deviceCount} Geräte</p>
+                    <p>{activeLights ? `${activeLights} Licht an` : 'Licht aus'} · {deviceCount} Geräte{openingSummary ? ` · ${openingSummary}` : ''}</p>
                     {mood.chips.length > 0 && (
                         <div className="wall-room-mood-chips">
                             {mood.chips.map((chip) => <span key={chip.label} className={chip.tone}>{chip.label}</span>)}
@@ -2441,7 +2442,7 @@ function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
 function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
     const classes: string[] = [];
     const chips: Array<{ label: string; tone: string }> = [];
-    const hasOpenContact = data.security.openings.some((item) => sameArea(item.area, room) && item.state === 'on');
+    const hasOpenContact = data.security.openings.some((item) => roomEntityMatches(item, room) && item.state === 'on');
     const playing = (data.media_players ?? []).some((item) => sameArea(item.area, room) && String(item.state).toLowerCase() === 'playing');
     const vacation = vacationStatus(data);
     const climateMode = climates.map((item) => String(item.state || '').toLowerCase()).find((mode) => mode && mode !== 'off');
@@ -2473,6 +2474,81 @@ function roomMood(data: WallDashboardData, room: string, climates: WallDashboard
     }
 
     return {classes, chips};
+}
+
+function roomOpeningSummary(data: WallDashboardData, room: string) {
+    const openings = (data.security.openings ?? []).filter((item) => roomEntityMatches(item, room));
+    if (!openings.length) return '';
+    const openItems = openings.filter((item) => item.state === 'on');
+    if (openings.length === 1) {
+        const item = openings[0];
+        return `${openingKindLabel(item)} ${item.state === 'on' ? 'offen' : 'geschlossen'}`;
+    }
+    if (!openItems.length) return `${openings.length} Kontakte geschlossen`;
+    const openDoors = openItems.filter((item) => openingKind(item) === 'door').length;
+    const openWindows = openItems.filter((item) => openingKind(item) === 'window').length;
+    const openOther = openItems.length - openDoors - openWindows;
+    return [
+        openDoors ? `${openDoors} ${openDoors === 1 ? 'Tür' : 'Türen'} offen` : '',
+        openWindows ? `${openWindows} Fenster offen` : '',
+        openOther ? `${openOther} ${openOther === 1 ? 'Kontakt' : 'Kontakte'} offen` : '',
+    ].filter(Boolean).join(' · ');
+}
+
+function openingKindLabel(item: WallEntity) {
+    const kind = openingKind(item);
+    if (kind === 'door') return 'Tür';
+    if (kind === 'window') return 'Fenster';
+    return 'Kontakt';
+}
+
+function openingKind(item: WallEntity) {
+    const text = normalizeArea(`${item.name || ''} ${item.entity_id || ''}`);
+    if (/\b(fenster|window)\b/.test(text)) return 'window';
+    if (/\b(tür|tuer|tur|door|terrassentür|terrassentuer|terrassentur)\b/.test(text)) return 'door';
+    if (item.device_class === 'window') return 'window';
+    if (item.device_class === 'door') return 'door';
+    return 'contact';
+}
+
+function roomEntityMatches(entity: WallEntity, room: string) {
+    if (sameArea(entity.area, room)) return true;
+    const text = normalizeArea(`${entity.area || ''} ${entity.name || ''} ${entity.entity_id || ''}`);
+    return roomAliases(room).some((alias) => alias.length >= 2 && text.includes(alias));
+}
+
+function roomAliases(room: string) {
+    const normalized = normalizeArea(room);
+    const aliases: Record<string, string[]> = {
+        kitchen: ['kitchen', 'küche', 'kueche'],
+        'living room': ['living room', 'wohnzimmer'],
+        bathroom: ['bathroom', 'bad', 'badezimmer'],
+        bedroom: ['bedroom', 'schlafzimmer'],
+        hallway: ['hallway', 'flur', 'diele'],
+        entrance: ['entrance', 'eingang'],
+        office: ['office', 'büro', 'buero', 'arbeitszimmer'],
+        'home office': ['home office', 'office', 'büro', 'buero', 'arbeitszimmer'],
+        büro: ['büro', 'buero', 'office', 'arbeitszimmer'],
+        buero: ['buero', 'büro', 'office', 'arbeitszimmer'],
+        arbeitszimmer: ['arbeitszimmer', 'office', 'büro', 'buero'],
+        terrace: ['terrace', 'terrasse', 'teras', 'terasse', 'patio', 'balkon', 'balcony', 'garten', 'garden'],
+        terrasse: ['terrasse', 'terrace', 'teras', 'terasse', 'patio', 'balkon', 'balcony', 'garten', 'garden'],
+        terasse: ['terasse', 'terrasse', 'terrace', 'patio', 'balkon', 'garten'],
+        patio: ['patio', 'terrasse', 'terrace', 'balkon', 'garden', 'garten'],
+        balcony: ['balcony', 'balkon', 'terrasse', 'terrace'],
+        balkon: ['balkon', 'balcony', 'terrasse', 'terrace'],
+        garden: ['garden', 'garten', 'terrasse', 'terrace'],
+        garten: ['garten', 'garden', 'terrasse', 'terrace'],
+        toilet: ['toilet', 'wc', 'gaeste wc', 'gäste wc'],
+        wc: ['wc', 'toilet', 'gaeste wc', 'gäste wc'],
+    };
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    return Array.from(new Set([
+        normalized,
+        ...parts,
+        ...(aliases[normalized] ?? []),
+        ...parts.flatMap((part) => aliases[part] ?? []),
+    ].map(normalizeArea)));
 }
 
 function roomTemperatureClass(value: number | null) {
@@ -2515,10 +2591,10 @@ function roomSensorChips(data: WallDashboardData, room: string) {
     }
 
     for (const opening of data.security.openings ?? []) {
-        if (!sameArea(opening.area, room)) continue;
+        if (!roomEntityMatches(opening, room)) continue;
         add(
             opening.entity_id,
-            opening.device_class === 'door' ? 'Tür' : 'Fenster',
+            openingKindLabel(opening),
             opening.state === 'on' ? 'Offen' : 'Geschlossen',
             opening.state === 'on' ? 'warn' : 'ok',
             batteryForDeviceName(data, room, opening.name),
@@ -2740,7 +2816,7 @@ function sameArea(left?: string, right?: string) {
 }
 
 function normalizeArea(value?: string) {
-    return String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+    return String(value || '').trim().toLowerCase().replace(/[_\-/]+/g, ' ').replace(/\s+/g, ' ');
 }
 
 function labelState(state: string) {
