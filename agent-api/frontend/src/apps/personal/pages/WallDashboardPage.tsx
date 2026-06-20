@@ -19,6 +19,7 @@ import {
     Layers3,
     Minus,
     Plane,
+    Plug,
     Plus,
     Trash2,
     RefreshCw,
@@ -47,6 +48,9 @@ import '@shared/styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
 type BatteryBadge = { label: string; tone: string };
+type OutletPower = { watts: number; label: string };
+type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
+type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
 type InternetStatus = 'ok' | 'down' | 'unstable' | 'unknown';
 type FritzboxInfo = {
     status: InternetStatus;
@@ -484,6 +488,22 @@ function WallDashboardContent() {
         void callFan(fan, 'set_direction', {direction: nextDirection}, {direction: nextDirection});
     };
 
+    const toggleOutlet = async (outlet: WallEntity) => {
+        const nextOn = !deviceActive(outlet);
+        setData((current) => patchWallSwitch(current, outlet.entity_id, {state: nextOn ? 'on' : 'off'}));
+        setBusyEntity(outlet.entity_id);
+        setError('');
+        try {
+            await api.callHomeAssistantService({domain: 'switch', service: nextOn ? 'turn_on' : 'turn_off', entity_id: outlet.entity_id});
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Steckdose konnte nicht geschaltet werden.');
+            await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
     const clearPost = async () => {
         const entityId = data?.post?.entity_id;
         if (!entityId || data?.post?.state !== 'on') return;
@@ -737,6 +757,7 @@ function WallDashboardContent() {
                         onFanPreset={setFanPreset}
                         onFanOscillation={toggleFanOscillation}
                         onFanDirection={toggleFanDirection}
+                        onOutletToggle={toggleOutlet}
                     />
                 )}
             </main>
@@ -937,6 +958,7 @@ function RoomSection({
                          onFanPreset,
                          onFanOscillation,
                          onFanDirection,
+                         onOutletToggle,
                      }: {
     data: WallDashboardData;
     floor: string;
@@ -954,24 +976,28 @@ function RoomSection({
     onFanPreset: (fan: WallFan, presetMode: string) => void;
     onFanOscillation: (fan: WallFan) => void;
     onFanDirection: (fan: WallFan) => void;
+    onOutletToggle: (outlet: WallEntity) => void;
 }) {
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
+    const outlets = roomOutlets(data, room);
+    const outletGroups = groupRoomOutlets(outlets, room, data);
     const sensorChips = roomSensorChips(data, room);
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
         ...fans.map((fan) => fan.entity_id),
+        ...outlets.map((outlet) => outlet.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
     ]);
     const otherDevices = roomDevices(data, room, excluded);
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + fans.length + sensorChips.length + otherDevices.length;
+    const deviceCount = lights.length + covers.length + climates.length + fans.length + outlets.length + sensorChips.length + otherDevices.length;
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
 
@@ -1038,6 +1064,13 @@ function RoomSection({
                         onDirection={onFanDirection}
                     />
                 ))}
+                {outlets.length > 0 && (
+                    <RoomOutletControl
+                        groups={outletGroups}
+                        busyEntity={busyEntity}
+                        onToggle={onOutletToggle}
+                    />
+                )}
                 {sensorChips.length > 0 && (
                     <section className="wall-room-panel wall-room-sensors">
                         <div className="wall-room-panel-title">
@@ -1066,7 +1099,7 @@ function RoomSection({
                         </div>
                     </section>
                 )}
-                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
                     <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
                 )}
             </div>
@@ -1244,6 +1277,62 @@ function RoomDeviceCard({
                 <span>{deviceValue(device)}{battery && <BatteryPill battery={battery}/>}</span>
             </div>
         </article>
+    );
+}
+
+function RoomOutletControl({
+                               groups,
+                               busyEntity,
+                               onToggle,
+                           }: {
+    groups: OutletGroup[];
+    busyEntity: string;
+    onToggle: (outlet: WallEntity) => void;
+}) {
+    const outlets = groups.flatMap((group) => group.items);
+    const active = outlets.filter(deviceActive).length;
+    return (
+        <section className={`wall-room-panel wall-outlet-control ${active ? 'active' : ''}`}>
+            <div className="wall-room-panel-title">
+                <span>Steckdosen</span>
+                <strong>{active}/{outlets.length} an</strong>
+            </div>
+            <div className="wall-outlet-group-list">
+                {groups.map((group) => {
+                    const groupActive = group.items.filter(deviceActive).length;
+                    return (
+                        <article key={group.id} className={`wall-outlet-group ${groupActive ? 'active' : ''}`}>
+                            <div className="wall-outlet-group-head">
+                                <span><Plug size={22}/></span>
+                                <div>
+                                    <strong>{group.name}{group.power && <b>{group.power.label}</b>}</strong>
+                                    <small>{group.items.length > 1 ? `${groupActive}/${group.items.length} Ausgänge an` : outletStateLabel(group.items[0])}</small>
+                                </div>
+                            </div>
+                            <div className="wall-outlet-list">
+                                {group.items.map((outlet) => {
+                                    const isOn = deviceActive(outlet);
+                                    const busy = busyEntity === outlet.entity_id;
+                                    return (
+                                        <button
+                                            key={outlet.entity_id}
+                                            type="button"
+                                            className={`wall-outlet-button ${isOn ? 'on' : ''}`}
+                                            disabled={busy}
+                                            onClick={() => onToggle(outlet)}
+                                            aria-pressed={isOn}
+                                        >
+                                            <span>{outletDisplayName(outlet, group.name)}{outletPowerLabel(outlet) && <small>{outletPowerLabel(outlet)}</small>}</span>
+                                            <i className={`wall-switch ${isOn ? 'on' : ''}`} aria-hidden="true"/>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </article>
+                    );
+                })}
+            </div>
+        </section>
     );
 }
 
@@ -2079,7 +2168,7 @@ function floorTemperature(data: WallDashboardData, floor: string) {
 
 function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
     const devices: WallEntity[] = [
-        ...(data.switches ?? []),
+        ...(data.switches ?? []).filter((device) => !isOutletDevice(device)),
         ...(data.media_players ?? []),
     ];
     const unique = new Map<string, WallEntity>();
@@ -2090,20 +2179,223 @@ function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>
     return [...unique.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function roomOutlets(data: WallDashboardData, room: string) {
+    return (data.switches ?? [])
+        .filter((device) => sameArea(device.area, room) && isOutletDevice(device))
+        .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function isOutletDevice(device: WallEntity) {
+    const deviceClass = String(device.device_class || '').toLowerCase();
+    const text = `${device.entity_id} ${device.name}`.toLowerCase();
+    return deviceClass === 'outlet' || [
+        'steckdose',
+        'mehrfachsteckdose',
+        'zwischenstecker',
+        'socket',
+        'outlet',
+        'plug',
+        'power strip',
+        'powerstrip',
+    ].some((needle) => text.includes(needle));
+}
+
+function groupRoomOutlets(outlets: WallEntity[], room: string, data: WallDashboardData): OutletGroup[] {
+    const buckets = new Map<string, OutletEntity[]>();
+    for (const outlet of outlets) {
+        const key = outletGroupKey(outlet, room);
+        buckets.set(key, [...(buckets.get(key) ?? []), {...outlet, outlet_power: outletPower(data, room, outlet)}]);
+    }
+    return [...buckets.entries()]
+        .map(([key, items]) => {
+            const sorted = items.sort((left, right) => outletSortValue(left) - outletSortValue(right) || left.name.localeCompare(right.name));
+            const itemPowers = sorted.map((item) => item.outlet_power).filter((power): power is OutletPower => Boolean(power));
+            const groupPower = itemPowers.length
+                ? outletPowerFromWatts(itemPowers.reduce((sum, power) => sum + power.watts, 0))
+                : outletGroupPower(data, room, key, sorted);
+            return {
+                id: key,
+                name: sorted.length > 1 ? outletGroupName(sorted[0], room) : sorted[0].name,
+                items: sorted,
+                power: groupPower,
+            };
+        })
+        .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function outletGroupKey(outlet: WallEntity, room: string) {
+    const normalized = normalizeOutletName(outlet.name, room);
+    const base = normalized
+        .replace(/\b(steckdose|mehrfachsteckdose|zwischenstecker|socket|outlet|plug|power strip|powerstrip)\b/g, ' ')
+        .replace(/\b(port|kanal|channel|gang|outlet|socket)?\s*\d+$/g, ' ')
+        .replace(/\b(l|r|left|right|links|rechts)$/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return base || 'steckdosen';
+}
+
+function outletGroupName(outlet: WallEntity, room: string) {
+    const normalized = normalizeOutletName(outlet.name, room);
+    const base = normalized
+        .replace(/\b(steckdose|socket|outlet|plug)\b/g, ' ')
+        .replace(/\b(port|kanal|channel|gang|outlet|socket)?\s*\d+$/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return titleCase(base || 'Mehrfachsteckdose');
+}
+
+function outletDisplayName(outlet: WallEntity, groupName: string) {
+    const name = outlet.name.trim();
+    const group = groupName.trim();
+    if (group && normalizeOutletName(name, '') !== normalizeOutletName(group, '')) {
+        const shortened = name.replace(new RegExp(escapeRegExp(group), 'i'), '').replace(/^[-–—:\s]+|[-–—:\s]+$/g, '').trim();
+        if (shortened && shortened.length >= 2) return shortened;
+    }
+    const suffix = name.match(/(?:^|[\s_-])(?:port|kanal|channel|gang|outlet|socket)?\s*(\d+)\s*$/i);
+    if (suffix) return `Ausgang ${suffix[1]}`;
+    return name;
+}
+
+function outletSortValue(outlet: WallEntity) {
+    const match = `${outlet.name} ${outlet.entity_id}`.match(/(?:^|[\s_-])(\d+)(?:\D*)$/);
+    return match ? Number(match[1]) : 999;
+}
+
+function outletStateLabel(outlet: WallEntity) {
+    return deviceActive(outlet) ? 'Eingeschaltet' : labelState(outlet.state);
+}
+
+function outletPowerLabel(outlet: OutletEntity) {
+    return outlet.outlet_power?.label || '';
+}
+
+function outletPower(data: WallDashboardData, room: string, outlet: WallEntity): OutletPower | null {
+    const outletTokens = outletMatchTokens(outlet, room);
+    if (!outletTokens.length) return null;
+    const candidates = roomPowerSensors(data, room)
+        .map((sensor) => {
+            const sensorTokens = powerSensorMatchTokens(sensor, room);
+            const overlap = sensorTokens.filter((token) => outletTokens.includes(token));
+            const contains = normalizedEntityBase(sensor).includes(normalizedEntityBase(outlet))
+                || normalizedEntityBase(outlet).includes(normalizedEntityBase(sensor));
+            return {
+                sensor,
+                score: overlap.length * 4 + (contains ? 6 : 0) + (sameArea(sensor.area, outlet.area) ? 2 : 0),
+            };
+        })
+        .filter((item) => item.score >= 6)
+        .sort((left, right) => right.score - left.score);
+    return candidates[0] ? powerFromSensor(candidates[0].sensor) : null;
+}
+
+function outletGroupPower(data: WallDashboardData, room: string, groupKey: string, outlets: OutletEntity[]): OutletPower | null {
+    const sensors = roomPowerSensors(data, room)
+        .filter((sensor) => !outlets.some((outlet) => outlet.outlet_power && outletPower(data, room, outlet)?.label === outlet.outlet_power?.label));
+    const match = sensors
+        .map((sensor) => {
+            const tokens = powerSensorMatchTokens(sensor, room);
+            const score = tokens.includes(groupKey) ? 10 : tokens.filter((token) => groupKey.includes(token) || token.includes(groupKey)).length * 3;
+            return {sensor, score};
+        })
+        .filter((item) => item.score > 0)
+        .sort((left, right) => right.score - left.score)[0];
+    return match ? powerFromSensor(match.sensor) : null;
+}
+
+function roomPowerSensors(data: WallDashboardData, room: string) {
+    return (data.sensors ?? []).filter((sensor) => sameArea(sensor.area, room) && isPowerSensor(sensor));
+}
+
+function isPowerSensor(sensor: WallEntity) {
+    const deviceClass = String(sensor.device_class || '').toLowerCase();
+    const unit = String(sensor.unit || '').trim().toLowerCase();
+    const text = `${sensor.entity_id} ${sensor.name}`.toLowerCase();
+    return _numericWallState(sensor) !== null && (
+        deviceClass === 'power' ||
+        unit === 'w' ||
+        unit === 'kw' ||
+        text.includes('leistung') ||
+        text.includes('power')
+    );
+}
+
+function powerFromSensor(sensor: WallEntity): OutletPower | null {
+    const raw = _numericWallState(sensor);
+    if (raw === null) return null;
+    const unit = String(sensor.unit || '').trim().toLowerCase();
+    const watts = unit === 'kw' ? raw * 1000 : raw;
+    return outletPowerFromWatts(watts);
+}
+
+function outletPowerFromWatts(watts: number): OutletPower | null {
+    if (!Number.isFinite(watts)) return null;
+    const clean = Math.max(0, watts);
+    return {
+        watts: clean,
+        label: clean >= 1000 ? `${formatNumber(clean / 1000)} kW` : `${formatNumber(clean)} W`,
+    };
+}
+
+function outletMatchTokens(outlet: WallEntity, room: string) {
+    return uniqueTokens(`${normalizeOutletName(outlet.name, room)} ${normalizedEntityBase(outlet)}`)
+        .filter((token) => !outletNoiseTokens().has(token));
+}
+
+function powerSensorMatchTokens(sensor: WallEntity, room: string) {
+    return uniqueTokens(`${normalizeOutletName(sensor.name, room)} ${normalizedEntityBase(sensor)}`)
+        .filter((token) => !outletNoiseTokens().has(token) && !new Set(['leistung', 'power', 'energy', 'verbrauch', 'watt', 'w']).has(token));
+}
+
+function normalizedEntityBase(entity: WallEntity) {
+    return normalizeArea(String(entity.entity_id || '').split('.', 2)[1] || entity.entity_id);
+}
+
+function uniqueTokens(value: string) {
+    return Array.from(new Set(normalizeArea(value).split(/\s+/).filter((token) => token.length >= 2)));
+}
+
+function outletNoiseTokens() {
+    return new Set(['switch', 'sensor', 'steckdose', 'mehrfachsteckdose', 'zwischenstecker', 'socket', 'outlet', 'plug', 'powerstrip', 'power', 'strip']);
+}
+
+function _numericWallState(entity: WallEntity) {
+    const value = Number.parseFloat(String(entity.state || '').replace(',', '.'));
+    return Number.isFinite(value) ? value : null;
+}
+
+function normalizeOutletName(value: string, room: string) {
+    let text = normalizeArea(value)
+        .replace(/\./g, ' ')
+        .replace(/\b(switch)\b/g, ' ');
+    const roomText = normalizeArea(room);
+    if (roomText) text = text.replace(new RegExp(`\\b${escapeRegExp(roomText)}\\b`, 'g'), ' ');
+    return text.replace(/\s+/g, ' ').trim();
+}
+
+function titleCase(value: string) {
+    return value.split(' ').filter(Boolean).map((part) => part.slice(0, 1).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
     const lights = data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
+    const outlets = roomOutlets(data, room);
     const sensors = roomSensorChips(data, room);
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
         ...fans.map((fan) => fan.entity_id),
+        ...outlets.map((outlet) => outlet.entity_id),
         ...sensors.map((sensor) => sensor.entity_id),
     ]);
-    return lights.length + covers.length + climates.length + fans.length + sensors.length + roomDevices(data, room, excluded).length;
+    return lights.length + covers.length + climates.length + fans.length + outlets.length + sensors.length + roomDevices(data, room, excluded).length;
 }
 
 function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
@@ -2177,7 +2469,7 @@ function roomSensorChips(data: WallDashboardData, room: string) {
     for (const sensor of data.sensors ?? []) {
         if (!sameArea(sensor.area, room)) continue;
         const deviceClass = String(sensor.device_class || '').toLowerCase();
-        if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery') continue;
+        if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery' || isPowerSensor(sensor)) continue;
         const label = sensorLabel(sensor);
         add(sensor.entity_id, label, sensorValue(sensor), sensorTone(sensor), batteryForDeviceName(data, room, sensor.name));
     }
@@ -2620,6 +2912,20 @@ function patchWallFan(
     return {
         ...current,
         fans: (current.fans ?? []).map((item) => (
+            item.entity_id === entityId ? {...item, ...patch} : item
+        )),
+    };
+}
+
+function patchWallSwitch(
+    current: WallDashboardData | null,
+    entityId: string,
+    patch: Partial<WallEntity>,
+): WallDashboardData | null {
+    if (!current) return current;
+    return {
+        ...current,
+        switches: (current.switches ?? []).map((item) => (
             item.entity_id === entityId ? {...item, ...patch} : item
         )),
     };

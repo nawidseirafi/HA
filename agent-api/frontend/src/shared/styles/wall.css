@@ -1786,6 +1786,134 @@ button.wall-room-card {
   font-size: 0.88rem;
 }
 
+.wall-outlet-control {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 9%, #fff), rgba(255, 255, 255, 0.96));
+}
+
+.wall-outlet-control.active {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+}
+
+.wall-outlet-group-list {
+  display: grid;
+  gap: 12px;
+}
+
+.wall-outlet-group {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.wall-outlet-group.active {
+  background: color-mix(in srgb, var(--primary) 8%, #fff);
+}
+
+.wall-outlet-group-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.wall-outlet-group-head > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 13%, #fff);
+}
+
+.wall-outlet-group-head strong,
+.wall-outlet-group-head small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-outlet-group-head strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.wall-outlet-group-head strong b {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, #fff);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.wall-outlet-group-head small {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.wall-outlet-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wall-outlet-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: 0 8px 20px oklch(0.45 0.04 250 / 0.08);
+  font: inherit;
+  font-weight: 850;
+  text-align: left;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.wall-outlet-button span {
+  display: grid;
+  gap: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-outlet-button span small {
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.wall-outlet-button.on {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+  background: color-mix(in srgb, var(--primary) 11%, #fff);
+}
+
+.wall-outlet-button:not(:disabled):active {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+.wall-outlet-button:disabled {
+  opacity: 0.62;
+}
+
 .wall-fan-control {
   background: linear-gradient(145deg, color-mix(in srgb, var(--state-climate) 10%, #fff), rgba(255,255,255,0.88));
 }
@@ -2156,6 +2284,7 @@ button.wall-room-card {
   .wall-room-control-grid { grid-template-columns: 1fr; }
   .wall-light-control { grid-column: auto; }
   .wall-room-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
+  .wall-outlet-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agent-status-map {
     min-height: auto;
     grid-template-rows: 640px auto;
@@ -2201,6 +2330,7 @@ button.wall-room-card {
   .wall-list-panel { grid-column: auto; }
   .wall-light-control-main,
   .wall-cover-body { grid-template-columns: 1fr; }
+  .wall-outlet-list { grid-template-columns: 1fr; }
   .wall-fan-control-row { grid-template-columns: 1fr; }
   .wall-fan-segment { width: 100%; }
   .wall-fan-segment button { flex: 1; min-width: 0; }
