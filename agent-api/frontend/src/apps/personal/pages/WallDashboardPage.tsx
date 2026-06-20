@@ -2168,7 +2168,7 @@ function floorTemperature(data: WallDashboardData, floor: string) {
 
 function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>) {
     const devices: WallEntity[] = [
-        ...(data.switches ?? []).filter((device) => !isOutletDevice(device)),
+        ...(data.switches ?? []).filter((device) => !isOutletDevice(device, data, room)),
         ...(data.media_players ?? []),
     ];
     const unique = new Map<string, WallEntity>();
@@ -2181,22 +2181,62 @@ function roomDevices(data: WallDashboardData, room: string, exclude: Set<string>
 
 function roomOutlets(data: WallDashboardData, room: string) {
     return (data.switches ?? [])
-        .filter((device) => sameArea(device.area, room) && isOutletDevice(device))
+        .filter((device) => sameArea(device.area, room) && isOutletDevice(device, data, room))
         .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function isOutletDevice(device: WallEntity) {
+function isOutletDevice(device: WallEntity, data?: WallDashboardData, room?: string) {
     const deviceClass = String(device.device_class || '').toLowerCase();
     const text = `${device.entity_id} ${device.name}`.toLowerCase();
-    return deviceClass === 'outlet' || [
+    if (isNonOutletSwitch(device)) return false;
+    const explicitOutlet = [
         'steckdose',
         'mehrfachsteckdose',
         'zwischenstecker',
         'socket',
         'outlet',
-        'plug',
         'power strip',
         'powerstrip',
+    ].some((needle) => text.includes(needle));
+    if (explicitOutlet) return true;
+    return deviceClass === 'outlet' && Boolean(data && room && outletPower(data, room, device));
+}
+
+function isNonOutletSwitch(device: WallEntity) {
+    const text = `${device.entity_id} ${device.name}`.toLowerCase();
+    return [
+        'internet',
+        'internetzugang',
+        'access',
+        'zugang',
+        'wlan',
+        'wifi',
+        'wi-fi',
+        'fritz',
+        'auto off',
+        'auto_off',
+        'button lock',
+        'button_lock',
+        'child lock',
+        'child_lock',
+        'led disabled',
+        'led_disabled',
+        'led disable',
+        'indicator mode',
+        'power outage memory',
+        'power_outage_memory',
+        'restore power',
+        'restore_power',
+        'startup behavior',
+        'startup_behaviour',
+        'startup behavior',
+        'startup_behaviour',
+        'guest',
+        'gast',
+        'parental',
+        'vpn',
+        'reboot',
+        'restart',
     ].some((needle) => text.includes(needle));
 }
 
