@@ -10,6 +10,7 @@ import {
     BatteryWarning,
     Bell,
     Bot,
+    CalendarClock,
     ChevronRight,
     CloudSun,
     DoorOpen,
@@ -801,21 +802,7 @@ function HomeSection({
     const internetInfo = fritzboxInfo(data);
     return (
         <div className="wall-home-grid">
-            <MetricCard
-                icon={<CloudSun size={24}/>}
-                label="Wetter"
-                value={data.weather?.state ? labelState(data.weather.state) : 'Keine Daten'}
-                detail={`${formatNumber(data.weather?.temperature)}°C · ${formatNumber(data.weather?.humidity)}%`}
-                tone={weatherTone(data)}
-            />
-            <MetricCard
-                icon={<Thermometer size={24}/>}
-                label="Haus ohne Keller"
-                value={`Ø ${formatNumber(climate.houseTemp)}°C · ${formatNumber(climate.houseHumidity)}%`}
-                detail={`Keller Ø ${formatNumber(climate.basementTemp)}°C · ${formatNumber(climate.basementHumidity)}%`}
-                tone="climate"
-                onClick={onClimate}
-            />
+            <ClimateOverviewCard data={data} climate={climate} onClick={onClimate}/>
             <MetricCard
                 icon={<Trash2 size={24}/>}
                 label="Müllabfuhr"
@@ -859,6 +846,7 @@ function HomeSection({
                 detail={internetInfo.cardDetail}
                 tone={internetMetricTone(internetInfo.status)}
             />
+            <CalendarAgendaCard calendar={data.calendar ?? data.household?.calendar ?? null} now={new Date()}/>
             <section className="wall-panel wall-span-2">
                 <div className="wall-section-title">
                     <span>Etagen</span>
@@ -874,6 +862,91 @@ function HomeSection({
                 </div>
             </section>
         </div>
+    );
+}
+
+function ClimateOverviewCard({data, climate, onClick}: {
+    data: WallDashboardData;
+    climate: ReturnType<typeof houseClimateSummary>;
+    onClick: () => void;
+}) {
+    const weatherLabel = data.weather?.state ? labelState(data.weather.state) : 'Keine Daten';
+    return (
+        <button className={`wall-panel wall-click-card wall-climate-overview ${weatherTone(data)}`} type="button" onClick={onClick}>
+            <div className="wall-climate-overview-head">
+                <span><CloudSun size={22}/></span>
+                <div>
+                    <small>Klima</small>
+                    <strong>{weatherLabel}</strong>
+                </div>
+            </div>
+            <div className="wall-climate-overview-grid">
+                <div>
+                    <small>Draußen</small>
+                    <strong>{formatNumber(data.weather?.temperature)}°C</strong>
+                    <span>{formatNumber(data.weather?.humidity)}%</span>
+                </div>
+                <div>
+                    <small>Haus</small>
+                    <strong>Ø {formatNumber(climate.houseTemp)}°C</strong>
+                    <span>{formatNumber(climate.houseHumidity)}%</span>
+                </div>
+                <div>
+                    <small>Keller</small>
+                    <strong>Ø {formatNumber(climate.basementTemp)}°C</strong>
+                    <span>{formatNumber(climate.basementHumidity)}%</span>
+                </div>
+            </div>
+        </button>
+    );
+}
+
+function CalendarAgendaCard({calendar, now}: { calendar: WallDashboardData['calendar'] | null; now: Date }) {
+    const nextEvent = calendar?.next_event ?? null;
+    const upcoming = (calendar?.upcoming ?? []).slice(0, 3);
+    const visibleUpcoming = nextEvent
+        ? upcoming.filter((event) => event.start !== nextEvent.start || event.title !== nextEvent.title).slice(0, 2)
+        : upcoming.slice(0, 2);
+    const todayCount = Number(calendar?.today_count ?? upcoming.length ?? 0);
+    const otherCount = Math.max(todayCount - (nextEvent ? 1 : 0), 0);
+
+    return (
+        <section className={`wall-panel wall-calendar-card ${nextEvent ? 'has-event' : 'is-empty'}`}>
+            <div className="wall-calendar-head">
+                <span><CalendarClock size={22}/></span>
+                <div>
+                    <small>Heute</small>
+                    <strong>Termine</strong>
+                </div>
+                <b>{todayCount}</b>
+            </div>
+            {nextEvent ? (
+                <>
+                    <div className="wall-calendar-next">
+                        <time>{formatEventTime(nextEvent.start)}</time>
+                        <div>
+                            <strong title={nextEvent.title}>{nextEvent.title}</strong>
+                            <span>{relativeEventTime(nextEvent.start, now)}{otherCount ? ` · ${otherCount} weitere` : ''}</span>
+                        </div>
+                    </div>
+                    {visibleUpcoming.length > 0 && (
+                        <div className="wall-calendar-list">
+                            {visibleUpcoming.map((event, index) => (
+                                <div key={`${event.start}-${event.title}-${index}`}>
+                                    <time>{formatEventTime(event.start)}</time>
+                                    <span title={event.title}>{event.title}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            ) : (
+                <div className="wall-calendar-empty">
+                    <strong>Keine Termine heute</strong>
+                    <span>{calendar?.error ? 'Kalenderdaten nicht verfügbar' : 'Agenda ist frei'}</span>
+                </div>
+            )}
+        </section>
     );
 }
 
@@ -2899,6 +2972,23 @@ function formatTime(value: string) {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return '--:--';
     return formatClock(date);
+}
+
+function formatEventTime(value: string) {
+    return formatTime(value);
+}
+
+function relativeEventTime(value: string, now: Date) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return 'Zeit offen';
+    const minutes = Math.round((date.getTime() - now.getTime()) / 60000);
+    if (minutes < -5) return 'läuft';
+    if (minutes <= 0) return 'jetzt';
+    if (minutes < 60) return `in ${minutes} Min.`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (rest < 10) return `in ${hours} Std.`;
+    return `in ${hours} Std. ${rest} Min.`;
 }
 
 function formatDateTime(value: string) {

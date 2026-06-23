@@ -830,6 +830,24 @@ export type HouseholdReminder = {
   source?: string;
 };
 
+export type CalendarEventSummary = {
+  title: string;
+  start: string;
+  end?: string | null;
+  location?: string | null;
+  source?: string;
+};
+
+export type CalendarSummary = {
+  ok?: boolean;
+  updated_at?: string;
+  today_count: number;
+  next_event: CalendarEventSummary | null;
+  upcoming: CalendarEventSummary[];
+  source?: string;
+  error?: string;
+};
+
 export type HouseholdStatus = {
   ok: boolean;
   updated_at: string;
@@ -849,20 +867,24 @@ export type HouseholdStatus = {
     error?: string;
   };
   infrastructure: InfrastructureSummary;
+  calendar?: CalendarSummary;
   reminders: HouseholdReminder[];
 };
 
 export type HouseholdSummary = Pick<HouseholdStatus, 'ok' | 'updated_at' | 'waste' | 'post' | 'vacation' | 'reminders'> & {
   infrastructure: InfrastructureSummary;
+  calendar?: CalendarSummary;
   counts: {
     reminders: number;
     high_priority: number;
     waste_items: number;
+    calendar_events_today?: number;
   };
   state: {
     mailbox_has_mail?: boolean | null;
     vacation_mode?: boolean | null;
     next_waste?: WasteItem | null;
+    next_calendar_event?: CalendarEventSummary | null;
     infrastructure_status?: InfrastructureStatus;
   };
 };
@@ -934,6 +956,7 @@ export type WallDashboardData = {
   weather: WallWeather | null;
   post?: WallEntity | null;
   waste?: WasteStatus | null;
+  calendar?: CalendarSummary | null;
   lights: WallLight[];
   light_groups: WallLightGroup[];
   covers?: WallCover[];

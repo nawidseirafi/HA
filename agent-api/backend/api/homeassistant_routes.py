@@ -73,6 +73,7 @@ def wall_dashboard():
     climate_summary = _climate_summary()
     household = _household_summary()
     waste = household.get("waste") or _waste_status()
+    calendar = household.get("calendar") or _calendar_summary()
     post = (household.get("post") or {}).get("entity") or post
 
     return {
@@ -104,6 +105,7 @@ def wall_dashboard():
         "agents": agents,
         "post": post,
         "waste": waste,
+        "calendar": calendar,
         "household": household,
     }
 
@@ -190,6 +192,14 @@ def _waste_status() -> dict[str, Any]:
         return WasteService(ha_service).status()
     except Exception as exc:
         return {"ok": False, "items": [], "reminders": [], "error": str(exc)}
+
+
+def _calendar_summary() -> dict[str, Any]:
+    try:
+        CalendarService = import_module("backend.services.calendar_service").CalendarService
+        return CalendarService().today_summary()
+    except Exception as exc:
+        return {"ok": False, "today_count": 0, "next_event": None, "upcoming": [], "source": "stub", "error": str(exc)}
 
 
 def _domain(state: dict[str, Any]) -> str:

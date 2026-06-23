@@ -512,6 +512,212 @@
   padding: 20px;
 }
 
+.wall-climate-overview {
+  grid-column: span 2;
+  min-height: 126px;
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.wall-climate-overview-head {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.wall-climate-overview-head > span {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-xl);
+  color: var(--primary-foreground);
+  background: var(--state-weather-cloudy);
+}
+
+.wall-climate-overview.weather-sunny .wall-climate-overview-head > span {
+  color: #1f2937;
+  background: #facc15;
+}
+
+.wall-climate-overview.weather-rainy .wall-climate-overview-head > span {
+  background: var(--state-active);
+}
+
+.wall-climate-overview.weather-night .wall-climate-overview-head > span {
+  background: var(--state-weather-night);
+}
+
+.wall-climate-overview-head small,
+.wall-climate-overview-grid small {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wall-climate-overview-head strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 1.35rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-climate-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wall-climate-overview-grid div {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--muted);
+}
+
+.wall-climate-overview-grid strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 1.35rem;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-climate-overview-grid span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.wall-calendar-card {
+  grid-column: span 2;
+  min-height: 126px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.wall-calendar-head {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.wall-calendar-head > span {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-xl);
+  color: var(--primary-foreground);
+  background: var(--state-active);
+}
+
+.wall-calendar-card.is-empty .wall-calendar-head > span {
+  background: var(--state-neutral);
+}
+
+.wall-calendar-head small {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wall-calendar-head strong {
+  display: block;
+  color: var(--foreground);
+  font-size: 1.1rem;
+}
+
+.wall-calendar-head b {
+  min-width: 40px;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--foreground);
+  font-size: 1.2rem;
+  background: var(--muted);
+}
+
+.wall-calendar-next {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.wall-calendar-next time {
+  color: var(--foreground);
+  font-size: 2rem;
+  font-weight: 850;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.wall-calendar-next strong,
+.wall-calendar-list span,
+.wall-calendar-empty strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-calendar-next strong {
+  font-size: 1.35rem;
+}
+
+.wall-calendar-next span,
+.wall-calendar-empty span {
+  color: var(--muted-foreground);
+  font-size: 0.92rem;
+}
+
+.wall-calendar-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wall-calendar-list div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.wall-calendar-list time {
+  color: var(--muted-foreground);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wall-calendar-empty {
+  display: grid;
+  gap: 4px;
+}
+
+.wall-calendar-empty strong {
+  font-size: 1.45rem;
+}
+
 .wall-agents-grid {
   align-items: start;
 }
@@ -2327,7 +2533,10 @@ button.wall-room-card {
   .wall-room-grid,
   .wall-area-strip { grid-template-columns: 1fr; }
   .wall-span-2,
-  .wall-list-panel { grid-column: auto; }
+  .wall-list-panel,
+  .wall-climate-overview,
+  .wall-calendar-card { grid-column: auto; }
+  .wall-climate-overview-grid { grid-template-columns: 1fr; }
   .wall-light-control-main,
   .wall-cover-body { grid-template-columns: 1fr; }
   .wall-outlet-list { grid-template-columns: 1fr; }

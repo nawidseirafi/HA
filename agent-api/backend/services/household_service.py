@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from backend.services.calendar_service import CalendarService
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.infrastructure_service import InfrastructureService
 from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
@@ -11,11 +12,13 @@ class HouseholdService:
         ha_service: HomeAssistantService | None = None,
         waste_service: WasteService | None = None,
         infrastructure_service: InfrastructureService | None = None,
+        calendar_service: CalendarService | None = None,
         vacation_status_provider: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self.ha_service = ha_service or HomeAssistantService()
         self.waste_service = waste_service or WasteService(self.ha_service)
         self.infrastructure_service = infrastructure_service or InfrastructureService(self.ha_service)
+        self.calendar_service = calendar_service or CalendarService()
         self.vacation_status_provider = vacation_status_provider
 
     def status(self) -> dict[str, Any]:
@@ -23,6 +26,7 @@ class HouseholdService:
         post = self._post_status()
         vacation = self._vacation_status()
         infrastructure = self._infrastructure_status()
+        calendar = self._calendar_status()
         reminders = self._reminders(waste, post, vacation, infrastructure)
         return {
             "ok": not any(item.get("priority") == "critical" for item in reminders),
@@ -34,6 +38,7 @@ class HouseholdService:
             "post": post,
             "vacation": vacation,
             "infrastructure": infrastructure,
+            "calendar": calendar,
             "reminders": reminders,
         }
 
@@ -43,6 +48,7 @@ class HouseholdService:
         post = status["post"]
         vacation = status["vacation"]
         infrastructure = status["infrastructure"]
+        calendar = status["calendar"]
         return {
             "ok": status["ok"],
             "updated_at": status["updated_at"],
@@ -50,16 +56,19 @@ class HouseholdService:
             "post": post,
             "vacation": vacation,
             "infrastructure": infrastructure,
+            "calendar": calendar,
             "reminders": status["reminders"],
             "counts": {
                 "reminders": len(status["reminders"]),
                 "high_priority": len([item for item in status["reminders"] if item.get("priority") == "high"]),
                 "waste_items": len(waste.get("items", [])) if isinstance(waste, dict) else 0,
+                "calendar_events_today": int(calendar.get("today_count") or 0) if isinstance(calendar, dict) else 0,
             },
             "state": {
                 "mailbox_has_mail": post.get("has_mail"),
                 "vacation_mode": vacation.get("vacation_mode"),
                 "next_waste": waste.get("next") if isinstance(waste, dict) else None,
+                "next_calendar_event": calendar.get("next_event") if isinstance(calendar, dict) else None,
                 "infrastructure_status": infrastructure.get("status") if isinstance(infrastructure, dict) else "unknown",
             },
         }
@@ -144,6 +153,20 @@ class HouseholdService:
                 "connected_devices": None,
                 "wifi": "unknown",
                 "checks": {},
+                "error": str(exc),
+            }
+
+    def _calendar_status(self) -> dict[str, Any]:
+        try:
+            return self.calendar_service.today_summary()
+        except Exception as exc:
+            return {
+                "ok": False,
+                "updated_at": self._now(),
+                "today_count": 0,
+                "next_event": None,
+                "upcoming": [],
+                "source": "stub",
                 "error": str(exc),
             }
 

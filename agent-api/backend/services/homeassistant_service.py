@@ -63,7 +63,7 @@ class HomeAssistantService:
         self.base_url = (
             os.getenv("HA_URL")
             or env_values.get("HA_URL")
-            or str(config.get("url") or "").strip()
+            or _resolve_secret(config.get("url"), env_values)
         ).rstrip("/")
         self.token = (
             os.getenv("HA_TOKEN")
@@ -129,6 +129,39 @@ class HomeAssistantService:
         if value in (None, "", "unknown", "unavailable"):
             return None
         return state
+
+    def get_calendars(self) -> list[dict[str, Any]]:
+        if not self.configured():
+            raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
+        try:
+            with httpx.Client(timeout=8) as client:
+                response = client.get(self._api_url("/api/calendars"), headers=self._headers())
+                response.raise_for_status()
+                data = response.json()
+        except Exception as exc:
+            raise self._runtime_error("Home Assistant Kalender konnten nicht geladen werden", exc) from exc
+        return data if isinstance(data, list) else []
+
+    def get_calendar_events(self, entity_id: str, start: str, end: str) -> list[dict[str, Any]]:
+        clean_entity_id = str(entity_id or "").strip()
+        if not clean_entity_id:
+            return []
+        if not self.configured():
+            raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
+        try:
+            with httpx.Client(timeout=8) as client:
+                response = client.get(
+                    self._api_url(f"/api/calendars/{clean_entity_id}"),
+                    headers=self._headers(),
+                    params={"start": start, "end": end},
+                )
+                if response.status_code == 404:
+                    return []
+                response.raise_for_status()
+                data = response.json()
+        except Exception as exc:
+            raise self._runtime_error(f"Home Assistant Kalender {clean_entity_id} konnte nicht gelesen werden", exc) from exc
+        return data if isinstance(data, list) else []
 
     def call_service(self, domain: str, service: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.configured():
