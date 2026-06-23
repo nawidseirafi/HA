@@ -31,12 +31,14 @@ REQUEST_TIMEOUT = 3  # Erhöht: externe Services brauchen manchmal länger
 from backend.services.core.ha_client import HomeAssistantClient
 from backend.agents.mywellness.store import (
     delete_prepared_courses,
+    list_prepared_courses,
     load_agent_settings,
     prepared_course_ids,
     record_run,
     replace_prepared_courses,
     save_booking_history,
 )
+from backend.agents.mywellness.calendar import add_course_to_calendar
 
 agent_settings = load_agent_settings()
 desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES
@@ -67,6 +69,7 @@ def mywellness_config() -> dict:
         "token":resolve_config_value(config.get("token", "")),
         "user_id": resolve_config_value(config.get("user_id", "")),
         "facility_id": resolve_config_value(config.get("facility_id", "")),
+        "calendar_entity": resolve_config_value(config.get("calendar_entity", "")) or os.getenv("MYWELLNESS_CALENDAR_ENTITY") or os.getenv("WALL_CALENDAR_ENTITY") or "calendar.devcal",
     }
     
 headers = {
@@ -236,6 +239,7 @@ def try_booking_course(course_name, course_id, target_date):
 def book_saved_course_ids():
     _, target_date = get_dates()
     course_ids = load_course_ids(target_date)
+    prepared_courses = {str(course.get("id")): course for course in list_prepared_courses(target_date)}
     if not course_ids:
         msg = "Buchung abgebrochen: Keine Kurs-IDs verfügbar."
         log(msg)
@@ -273,6 +277,12 @@ def book_saved_course_ids():
                             )
                         except Exception as history_error:
                             log(f"{course_name}: Buchungshistorie konnte nicht gespeichert werden: {history_error}")
+                        try:
+                            course = prepared_courses.get(str(course_ids[result["course_name"]])) or {"id": course_ids[result["course_name"]], "title": result["course_name"]}
+                            calendar_result = add_course_to_calendar(course, ha, calendar_entity=mywellness_config().get("calendar_entity"))
+                            log(f"{course_name}: Kalendereintrag Ergebnis: {calendar_result}")
+                        except Exception as calendar_error:
+                            log(f"{course_name}: Kalendereintrag konnte nicht erstellt werden: {calendar_error}")
             except Exception as e:
                 all_results.append(f"{course_name}: Fehler: {e}")
     log("\n\n".join(all_results))

@@ -5,6 +5,7 @@ my_wellness:
     facility_id: MY_WELLNESS_FACILITY_ID
     database_path: data/mywellness/mywellness.db
     log_path: logs/my_wellness.log
+    calendar_entity: calendar.devcal
     desired_courses:
       - Cross-Power
       - Body Workout

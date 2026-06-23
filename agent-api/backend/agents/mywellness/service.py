@@ -13,6 +13,7 @@ import httpx
 from fastapi import HTTPException
 from backend.config import load_agent_section, resolve_api_path
 from backend.paths import PROJECT_DIR, API_DIR, AGENTS_DIR
+from backend.services.homeassistant_service import HomeAssistantService
 
 AGENT_SCRIPT = AGENTS_DIR / "mywellness" / "mywellness.py"
 if str(API_DIR) not in sys.path:
@@ -26,6 +27,7 @@ from .store import (
     save_booking_history,
     save_course_history,
 )
+from .calendar import add_course_to_calendar
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -569,6 +571,18 @@ class MyWellnessService:
         self._agent_log(message)
         if action == "book":
             delete_prepared_courses(str(course.get("partitionDate") or ""), [course_id])
+            try:
+                calendar_result = add_course_to_calendar(
+                    course,
+                    HomeAssistantService(),
+                    calendar_entity=self._mywellness_config().get("calendar_entity"),
+                )
+                self._agent_log(f"Kalendereintrag fuer {course.get('title')} erstellt: {calendar_result}")
+            except Exception as exc:
+                calendar_result = {"ok": False, "error": str(exc)}
+                self._agent_log(f"Kalendereintrag konnte nicht erstellt werden: {exc}")
+        else:
+            calendar_result = None
         try:
             save_booking_history(
                 booking_id=str(course.get("bookingUserStatus") or course.get("id") or ""),
@@ -584,7 +598,10 @@ class MyWellnessService:
         state["current_bookings"] = self._bookings_from_courses(refreshed)
         state["last_error"] = None
         self._write_status(state)
-        return {"ok": True, "message": message, "course": next((item for item in refreshed if item.get("id") == course_id), course)}
+        result = {"ok": True, "message": message, "course": next((item for item in refreshed if item.get("id") == course_id), course)}
+        if calendar_result is not None:
+            result["calendar"] = calendar_result
+        return result
 
     def _fetch_courses(self, force_refresh: bool = False) -> list[dict[str, Any]]:
         # Cache-Check
@@ -894,10 +911,12 @@ class MyWellnessService:
         token = resolve_secret(api_config.get("token"), env_values)
         user_id = resolve_secret(api_config.get("user_id"), env_values)
         facility_id = resolve_secret(api_config.get("facility_id"), env_values)
+        calendar_entity = resolve_secret(api_config.get("calendar_entity"), env_values) or os.getenv("MYWELLNESS_CALENDAR_ENTITY") or os.getenv("WALL_CALENDAR_ENTITY") or "calendar.devcal"
         return {
             "token": token,
             "user_id": user_id,
             "facility_id": facility_id,
+            "calendar_entity": calendar_entity,
             "desired_courses": settings.get("desired_courses") or api_config.get("desired_courses") or ["Cross-Power", "Body Workout", "Functional Training"],
             "days": int(settings.get("days") or api_config.get("days", 2)),
         }
