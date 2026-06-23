@@ -1,6 +1,6 @@
 # LLM Service
 
-Der LLM-Service ist ein Core-Baustein und kann von mehreren RoboterSteve Editionen genutzt werden.
+Der LLM-Service ist ein Core-Baustein von RoboterSteve.
 
 ## Entwicklung
 
@@ -9,9 +9,8 @@ cd agent-api
 ../venv/bin/python -m pip install -r requirements.txt
 ```
 
-## Editionen
+## Konfiguration
 
-- `personal` kann OpenAI, Gemini oder lokale Llama/Ollama-Modelle verwenden.
-- `sentero` ist fuer lokale/produktnahe Deployments vorbereitet und nutzt im Beispiel `llm.provider: llama` mit Ollama.
+RoboterSteve kann OpenAI, Gemini oder lokale Llama/Ollama-Modelle verwenden.
 
-Secrets gehoeren in `.env` oder die Zielumgebung, nicht in README-Dateien oder Edition-Builds.
+Secrets gehoeren in `.env` oder die Zielumgebung, nicht in README-Dateien oder Build-Artefakte.

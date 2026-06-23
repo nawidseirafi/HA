@@ -12,21 +12,6 @@ export type AuthResponse = {
   expires_at: number;
   user: { username: string };
 };
-
-export type SenteroUser = {
-  id: number;
-  email: string;
-  display_name?: string | null;
-  role: 'owner' | 'admin' | 'viewer' | string;
-  last_login_at?: string | null;
-};
-
-export type SenteroAuthStatus = {
-  setup_required: boolean;
-  authenticated: boolean;
-  user?: SenteroUser | null;
-};
-
 export function getAuthToken() {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(SESSION_TOKEN_KEY);
 }
@@ -108,197 +93,14 @@ export type AgentsResponse = {
   agents: AgentManifest[];
 };
 
-export type EditionInfo = {
+export type ProductInfo = {
+  id: string;
   name: string;
   description: string;
-  enabled_agents: string[];
-  enabled_core_services: string[];
   frontend_app: string;
 };
-
-export type SenteroStatus = {
-  status: string;
-  enabled: boolean;
-  message: string;
-  sensor_roles?: SenteroSensorRole[];
-  behavior_assessment?: SenteroBehaviorAssessment | null;
-  updated_at: string;
-};
-
-export type SenteroBehaviorAssessment = {
-  id?: number;
-  assessment_time: string;
-  status: 'green' | 'yellow' | 'orange' | 'red' | string;
-  confidence: number;
-  anomaly_score?: number;
-  learning_completed?: boolean;
-  learning_day?: number;
-  learning_days?: number;
-  summary: string;
-  findings: string[];
-  recommendation: string;
-  llm_response?: string | null;
-  created_at?: string;
-};
-
-export type SenteroBehaviorLearning = {
-  completed: boolean;
-  day: number;
-  days: number;
-  remaining_days: number;
-};
-
-export type SenteroSensorRole = {
-  role: string;
-  room?: string | null;
-  label: string;
-  configured: boolean;
-  updated_at?: string | null;
-  state?: string | null;
-  reachable?: boolean | null;
-  last_changed?: string | null;
-  last_updated?: string | null;
-  battery_level?: number | null;
-  device_class?: string | null;
-  domain?: string | null;
-};
-
-export type SenteroProfileData = {
-  name?: string | null;
-  birth_year?: number | null;
-  age?: number | null;
-  notes?: string | null;
-};
-
-export type SenteroTrustedContact = {
-  id: number;
-  name: string;
-  relationship?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  telegram_chat_id?: string | null;
-  whatsapp_phone_number?: string | null;
-  preferred_channels?: string | string[] | null;
-  notification_enabled?: number | boolean;
-  primary_contact?: number | boolean;
-  active?: number;
-};
-
-export type SenteroNotifications = {
-  anomalies: number | boolean;
-  critical: number | boolean;
-  daily_summary: number | boolean;
-};
-
-export type SenteroSetupStatus = {
-  current_step: string;
-  completed_steps: string[];
-  selected_rooms: string[];
-  is_complete: boolean;
-  home: { connected: boolean; sensor_ready: boolean; system_ready: boolean };
-  has_profile: boolean;
-  profile?: SenteroProfileData | null;
-  trusted_contacts_count: number;
-  trusted_contacts?: SenteroTrustedContact[];
-  notifications?: SenteroNotifications | null;
-  sensor_roles: SenteroSensorRole[];
-  updated_at: string;
-};
-
-export type SenteroNotificationChannel = {
-  channel: 'email' | 'telegram' | 'whatsapp' | string;
-  enabled: boolean;
-  configured: boolean;
-  config: Record<string, unknown>;
-  updated_at?: string | null;
-};
-
-export type SenteroNotificationLog = {
-  id: number;
-  contact_id?: number | null;
-  channel: string;
-  severity: string;
-  status: 'sent' | 'failed' | 'fallback_sent' | string;
-  message_title?: string | null;
-  error_message?: string | null;
-  created_at: string;
-};
-
-export type SenteroContactPayload = {
-  name: string;
-  relationship?: string;
-  email?: string;
-  phone?: string;
-  telegram_chat_id?: string;
-  whatsapp_phone_number?: string;
-  preferred_channels?: string[];
-  notification_enabled?: boolean;
-  primary_contact?: boolean;
-};
-
-export type SenteroCandidate = {
-  label: string;
-  confidence: number;
-  score?: number;
-  entity_id: string;
-  reasons?: string[];
-  device_class?: string | null;
-  domain?: string | null;
-};
-
-export type SenteroPairingStart = {
-  session_id: number;
-  status: 'waiting_for_signal' | 'pairing_started' | 'pairing_needs_manual_action' | string;
-  message: string;
-  detail?: { ok?: boolean; provider?: string; reason?: string; message?: string; attempts?: unknown[] } | null;
-};
-
-export type SenteroCandidates = {
-  session_id: number;
-  status: 'signal_detected' | 'no_signal_detected' | 'waiting_for_signal' | string;
-  message: string;
-  candidate: SenteroCandidate | null;
-  candidates: SenteroCandidate[];
-  elapsed_seconds?: number;
-  remaining_seconds?: number;
-  changed_count?: number | null;
-  current_state_count?: number | null;
-  baseline_state_count?: number | null;
-};
-
-export type SenteroMatterStatus = {
-  status: 'waiting' | 'commissioning' | 'completed' | 'failed' | string;
-  commissioning_status?: string;
-  setup_payload?: string;
-  ha_response?: unknown;
-  error?: string | null;
-  logs?: unknown[];
-};
-
-export type SenteroMatterDevice = {
-  device_detected: boolean;
-  friendly_name: string;
-  suggestions: Array<{ role?: string; kind?: string; label: string; score?: number }>;
-  device_id?: string | null;
-  entity_ids?: string[];
-  suggestions_raw?: unknown[];
-  home_assistant_response?: unknown;
-  logs?: unknown[];
-};
-
-export type SenteroMatterCapabilities = {
-  home_assistant: boolean;
-  matter_integration: boolean;
-  matter_server: boolean;
-  commissioning_available: boolean;
-  ipv6_available: boolean;
-  thread_available: boolean;
-  message: string;
-  details?: unknown;
-};
-
 export type SystemVersion = {
-  edition: string;
+  product: string;
   app_version?: string;
   version: string;
   build: string;
@@ -1311,35 +1113,15 @@ async function download(path: string): Promise<{ blob: Blob; filename: string }>
 }
 
 export const api = {
-  edition: () => request<EditionInfo>('/api/edition'),
+  product: () => request<ProductInfo>('/api/product'),
   systemVersion: () => request<SystemVersion>('/api/system/version'),
   updateStatus: () => request<UpdateStatus>('/api/system/update/status'),
   adminUpdateStatus: () => request<UpdateStatus>('/api/system/update/admin/status'),
   checkUpdates: () => request<UpdateCheckResult>('/api/system/update/check'),
   installUpdate: () => request<UpdateStatus>('/api/system/update/install', { method: 'POST', body: JSON.stringify({}) }),
-  rollbackUpdate: () => request<UpdateStatus>('/api/system/update/rollback', { method: 'POST' }),
-  senteroUpdateStatus: () => request<UpdateStatus>('/api/sentero/system/update/status'),
-  senteroCheckUpdates: () => request<UpdateCheckResult>('/api/sentero/system/update/check'),
-  senteroInstallUpdate: () => request<UpdateStatus>('/api/sentero/system/update/install', { method: 'POST', body: JSON.stringify({}) }),
-  login: (username: string, password: string) =>
+  rollbackUpdate: () => request<UpdateStatus>('/api/system/update/rollback', { method: 'POST' }),  login: (username: string, password: string) =>
     request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  me: () => request<{ user: { username: string } }>('/api/auth/me'),
-  senteroAuthStatus: () => request<SenteroAuthStatus>('/api/sentero/auth/status'),
-  senteroSetup: (payload: { name: string; email: string; password: string; password_confirm: string }) =>
-    request<{ authenticated: boolean; user: SenteroUser }>('/api/sentero/auth/setup', { method: 'POST', body: JSON.stringify(payload) }),
-  senteroLogin: (email: string, password: string) =>
-    request<{ authenticated: boolean; user: SenteroUser }>('/api/sentero/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  senteroLogout: () => request<{ ok: boolean }>('/api/sentero/auth/logout', { method: 'POST' }),
-  senteroMe: () => request<{ user: SenteroUser }>('/api/sentero/auth/me'),
-  updateSenteroMe: (payload: { display_name: string; email: string }) =>
-    request<{ user: SenteroUser }>('/api/sentero/auth/me', { method: 'PUT', body: JSON.stringify(payload) }),
-  changeSenteroPassword: (payload: { current_password: string; new_password: string; new_password_confirm: string }) =>
-    request<{ ok: boolean }>('/api/sentero/auth/change-password', { method: 'POST', body: JSON.stringify(payload) }),
-  senteroForgotPassword: (email: string) =>
-    request<{ message: string }>('/api/sentero/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
-  senteroResetPassword: (payload: { token: string; password: string; password_confirm: string }) =>
-    request<{ ok: boolean }>('/api/sentero/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) }),
-  settings: () => request<SettingsInfo>('/api/settings'),
+  me: () => request<{ user: { username: string } }>('/api/auth/me'),  settings: () => request<SettingsInfo>('/api/settings'),
   agents: async () => (await request<AgentsResponse>('/api/agents')).agents,
   orchestratorMap: () => request<OrchestratorMapData>('/api/orchestrator/map'),
   messages: (limit = 100) => request<{ messages: MessageCenterItem[] }>(`/api/messages?limit=${limit}`),
@@ -1418,10 +1200,7 @@ export const api = {
   updateSchedulerTask: (id: number, payload: Partial<SchedulerTask>) =>
     request<SchedulerTask>(`/api/scheduler/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   enableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/enable`, { method: 'POST' }),
-  disableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/disable`, { method: 'POST' }),
-  senteroStatus: () => request<SenteroStatus>('/api/sentero/status'),
-  runSenteroAgent: () => request<SenteroStatus & { action: string; dry_run: boolean }>('/api/sentero/run', { method: 'POST' }),
-  summary: () => request<Summary>('/api/invoices/summary'),
+  disableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/disable`, { method: 'POST' }),  summary: () => request<Summary>('/api/invoices/summary'),
   financeSummary: () => request<FinanceSummary>('/api/invoices/finance/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),
@@ -1510,68 +1289,7 @@ export const api = {
     request<{ candidates: WithingsEntityCandidate[]; error?: string }>('/api/mywellness/health/withings/discover', { method: 'POST' }),
   importMywellnessWithings: () =>
     request<{ metrics: MyWellnessHealthMetrics; missing: string[]; mapping_source?: string }>('/api/mywellness/health/withings/import', { method: 'POST' }),
-  mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),
-  senteroSetupStatus: () => request<SenteroSetupStatus>('/api/sentero/setup/status'),
-  senteroBehaviorLatest: () => request<{ assessment: SenteroBehaviorAssessment | null; learning?: SenteroBehaviorLearning }>('/api/sentero/behavior/latest'),
-  senteroBehaviorTimeline: () => request<{ events: Array<{ event_time: string; room?: string | null; role?: string | null; state?: string | null }>; assessment: SenteroBehaviorAssessment | null }>('/api/sentero/behavior/timeline'),
-  startSenteroSetup: () => request<SenteroSetupStatus>('/api/sentero/setup/start', { method: 'POST' }),
-  saveSenteroProfile: (payload: { name?: string; birth_year?: number | null; age?: number | null; notes?: string }) =>
-    request<SenteroSetupStatus>('/api/sentero/setup/profile', { method: 'POST', body: JSON.stringify(payload) }),
-  saveSenteroSetupRooms: (rooms: string[]) =>
-    request<SenteroSetupStatus>('/api/sentero/setup/rooms', { method: 'POST', body: JSON.stringify({ rooms }) }),
-  startSenteroDiscovery: (payload: { role: string; room?: string | null; pairing_code?: string }) =>
-    request<SenteroPairingStart>('/api/sentero/setup/discovery/start', { method: 'POST', body: JSON.stringify(payload) }),
-  startSenteroPairing: (payload: { role: string; room?: string | null; pairing_code?: string }) =>
-    request<SenteroPairingStart>('/api/sentero/setup/pairing/matter/start', { method: 'POST', body: JSON.stringify(payload) }),
-  startSenteroZigbeePairing: (payload: { role: string; room?: string | null; duration?: number }) =>
-    request<SenteroPairingStart>('/api/sentero/setup/pairing/zigbee/start', { method: 'POST', body: JSON.stringify(payload) }),
-  senteroDiscoveryCandidates: (sessionId: number, dev = false) =>
-    request<SenteroCandidates>(`/api/sentero/setup/discovery/${sessionId}/candidates${dev ? '?dev=true' : ''}`),
-  startSenteroMatter: (payload: { setup_code?: string; qr_payload?: string }) =>
-    request<{ commissioning_id: string }>('/api/sentero/matter/start', { method: 'POST', body: JSON.stringify(payload) }),
-  senteroMatterCapabilities: (dev = false) =>
-    request<SenteroMatterCapabilities>(`/api/sentero/matter/capabilities${dev ? '?dev=true' : ''}`),
-  senteroMatterStatus: (commissioningId: string, dev = false) =>
-    request<SenteroMatterStatus>(`/api/sentero/matter/status/${encodeURIComponent(commissioningId)}${dev ? '?dev=true' : ''}`),
-  senteroMatterDevice: (commissioningId: string, dev = false) =>
-    request<SenteroMatterDevice>(`/api/sentero/matter/device/${encodeURIComponent(commissioningId)}${dev ? '?dev=true' : ''}`),
-  assignSenteroMatterDevice: (commissioningId: string, payload: { room: string; role: string }) =>
-    request<{ status: string; room: string; role: SenteroSensorRole }>(`/api/sentero/matter/device/${encodeURIComponent(commissioningId)}/assign`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  confirmSenteroDiscovery: (sessionId: number, entityId: string, payload?: { name?: string; room?: string }) =>
-    request<{ status: string; role: SenteroSensorRole }>(`/api/sentero/setup/discovery/${sessionId}/confirm`, {
-      method: 'POST',
-      body: JSON.stringify({ entity_id: entityId, ...(payload || {}) }),
-    }),
-  saveSenteroSetupSensors: () => request<SenteroSetupStatus>('/api/sentero/setup/sensors', { method: 'POST' }),
-  saveSenteroContact: (payload: SenteroContactPayload) =>
-    request<SenteroSetupStatus>('/api/sentero/setup/contact', { method: 'POST', body: JSON.stringify(payload) }),
-  updateSenteroContact: (contactId: number, payload: SenteroContactPayload) =>
-    request<SenteroSetupStatus>(`/api/sentero/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  deleteSenteroContact: (contactId: number) =>
-    request<SenteroSetupStatus>(`/api/sentero/setup/contact/${encodeURIComponent(String(contactId))}`, { method: 'DELETE' }),
-  saveSenteroNotifications: (payload: { anomalies: boolean; critical: boolean; daily_summary: boolean }) =>
-    request<SenteroSetupStatus>('/api/sentero/setup/notifications', { method: 'POST', body: JSON.stringify(payload) }),
-  senteroNotificationChannels: () => request<{ channels: SenteroNotificationChannel[] }>('/api/sentero/notifications/channels'),
-  saveSenteroNotificationChannel: (channel: 'email' | 'telegram' | 'whatsapp', payload: { enabled: boolean; config: Record<string, unknown> }) =>
-    request<{ channels: SenteroNotificationChannel[] }>(`/api/sentero/notifications/channels/${channel}`, { method: 'POST', body: JSON.stringify(payload) }),
-  testSenteroNotificationChannel: (channel: 'email' | 'telegram' | 'whatsapp') =>
-    request<{ ok: boolean; message: string; detail?: string }>(`/api/sentero/notifications/test/${channel}`, { method: 'POST' }),
-  senteroNotificationLogs: () => request<{ logs: SenteroNotificationLog[] }>('/api/sentero/notifications/logs'),
-  completeSenteroSetup: () => request<SenteroSetupStatus>('/api/sentero/setup/complete', { method: 'POST' }),
-  senteroSensorRoles: (includeState = false) => request<{ sensor_roles: SenteroSensorRole[] }>(`/api/sentero/sensor-roles${includeState ? '?include_state=true' : ''}`),
-  renameSenteroSensorRole: (role: string, name: string) =>
-    request<{ status: string; role: SenteroSensorRole }>(`/api/sentero/sensor-roles/${encodeURIComponent(role)}/name`, {
-      method: 'PUT',
-      body: JSON.stringify({ name }),
-    }),
-  testSenteroSensorRole: (role: string) =>
-    request<{ ok: boolean; mode: string; message: string; entity_id?: string; state?: string }>(`/api/sentero/sensor-roles/${encodeURIComponent(role)}/test`, { method: 'POST' }),
-  deleteSenteroSensorRole: (role: string) =>
-    request<{ deleted: boolean; role: string }>(`/api/sentero/sensor-roles/${encodeURIComponent(role)}`, { method: 'DELETE' }),
-  upload: async (file: File) => {
+  mywellnessLatestWithings: () => request<{ metrics: MyWellnessHealthMetrics | null }>('/api/mywellness/health/withings/latest'),  upload: async (file: File) => {
     const data = new FormData();
     data.append('file', file);
     const token = getAuthToken();

@@ -3,7 +3,7 @@ import { Activity, CheckCircle2, History, RefreshCw, ShieldAlert } from 'lucide-
 import { api, type UpdateStatus, type UpdateStep } from '@shared/api/client';
 
 type Props = {
-  variant?: 'personal' | 'sentero';
+  variant?: 'personal';
 };
 
 export function UpdatePanel({ variant = 'personal' }: Props) {
@@ -15,9 +15,9 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
   const load = async () => {
     setError('');
     try {
-      const nextStatus = await (variant === 'sentero' ? api.senteroUpdateStatus() : api.updateStatus());
+      const nextStatus = await api.updateStatus();
       setStatus(nextStatus);
-      if (variant !== 'sentero' && nextStatus.dev_mode) {
+      if (nextStatus.dev_mode) {
         try {
           setAdminStatus(await api.adminUpdateStatus());
         } catch {
@@ -37,7 +37,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     setBusy('check');
     setError('');
     try {
-      await (variant === 'sentero' ? api.senteroCheckUpdates() : api.checkUpdates());
+      await api.checkUpdates();
       await load();
     } catch {
       setError('Die Update-Pruefung ist fehlgeschlagen. Bitte versuchen Sie es spaeter erneut.');
@@ -50,7 +50,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     setBusy('install');
     setError('');
     try {
-      const result = await (variant === 'sentero' ? api.senteroInstallUpdate() : api.installUpdate());
+      const result = await api.installUpdate();
       setStatus(result);
       await load();
     } catch {
@@ -60,7 +60,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
     }
   };
 
-  const product = status?.product || (variant === 'sentero' ? 'Sentero' : 'RoboterSteve');
+  const product = status?.product || 'RoboterSteve';
   const uiState = status?.status || status?.state || 'idle';
   const isRunning = busy === 'install' || uiState === 'running';
   const isSuccess = uiState === 'success' || uiState === 'completed';
@@ -68,7 +68,7 @@ export function UpdatePanel({ variant = 'personal' }: Props) {
   const updateAvailable = Boolean(status?.update_available);
   const title = titleForState(uiState, updateAvailable);
   const text = textForState(product, status, uiState, updateAvailable);
-  const rootClass = variant === 'sentero' ? 'sentero-update-panel' : 'panel settings-card update-panel';
+  const rootClass = 'panel settings-card update-panel';
 
   return (
     <section className={rootClass}>

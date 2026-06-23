@@ -1,5 +1,0 @@
-sentero:
-  enabled: true
-  mode: placeholder
-  behavior:
-    learning_days: 14

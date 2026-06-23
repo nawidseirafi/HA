@@ -9,9 +9,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.agents.registry import agent_runtime_services, include_agent_routers
 from backend.agents.routes import router as agents_router
-from backend.editions import active_edition, is_core_service_enabled
 from backend.logging_config import configure_logging
 from backend.paths import FRONTEND_DIST
+from backend.product import active_product, is_core_service_enabled
 from backend.services.auth_service import user_from_request
 from backend.services.messaging.routes import router as messaging_router
 
@@ -50,42 +50,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_API_PATHS = {"/health", "/api/auth/login", "/api/edition"}
-PUBLIC_SENTERO_AUTH_PATHS = {
-    "/api/sentero/auth/status",
-    "/api/sentero/auth/setup",
-    "/api/sentero/auth/login",
-    "/api/sentero/auth/logout",
-    "/api/sentero/auth/forgot-password",
-    "/api/sentero/auth/reset-password",
-}
-sentero_auth_service = None
-
-
-def get_sentero_auth_service():
-    global sentero_auth_service
-    if "sentero" not in set(active_edition().enabled_agents):
-        return None
-    if sentero_auth_service is None:
-        from backend.agents.sentero.auth_service import SenteroAuthService
-        from backend.agents.sentero.device_mapping_service import DeviceMappingService
-
-        sentero_auth_service = SenteroAuthService(DeviceMappingService())
-    return sentero_auth_service
+PUBLIC_API_PATHS = {"/health", "/api/auth/login", "/api/product"}
 
 
 @app.middleware("http")
 async def require_api_auth(request, call_next):
     path = request.url.path
-    if path.startswith("/api/sentero/") and path not in PUBLIC_SENTERO_AUTH_PATHS:
-        auth_service = get_sentero_auth_service()
-        if auth_service is None:
-            return JSONResponse({"detail": "Sentero ist in dieser Edition nicht verfuegbar."}, status_code=404)
-        try:
-            auth_service.user_from_request(request)
-        except Exception as exc:
-            return JSONResponse({"detail": getattr(exc, "detail", "Nicht angemeldet.")}, status_code=getattr(exc, "status_code", 401))
-    elif path.startswith("/api/") and path not in PUBLIC_API_PATHS and not path.startswith("/api/sentero/"):
+    if path.startswith("/api/") and path not in PUBLIC_API_PATHS:
         try:
             user_from_request(request)
         except Exception as exc:
@@ -115,9 +86,9 @@ include_agent_routers(app)
 include_core_router("settings", "backend.api.settings_routes")
 
 
-@app.get("/api/edition")
-def edition_info() -> dict[str, object]:
-    return active_edition().public_dict()
+@app.get("/api/product")
+def product_info() -> dict[str, object]:
+    return active_product().public_dict()
 
 
 SECURITY_SCHEME_NAME = "BearerAuth"

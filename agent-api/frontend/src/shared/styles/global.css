@@ -4908,386 +4908,9 @@ button.market-insight-card:hover {
     animation: none;
   }
 }
-
-.sentero-shell {
-  min-height: 100vh;
-  padding: 34px;
-  color: #153027;
-  background:
-    radial-gradient(circle at 12% 10%, rgba(112, 176, 137, 0.28), transparent 32%),
-    radial-gradient(circle at 86% 14%, rgba(238, 176, 118, 0.22), transparent 28%),
-    linear-gradient(135deg, #f6f0e3 0%, #dfeade 58%, #b8d5c1 100%);
-}
-
-.sentero-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 28px;
-  align-items: flex-start;
-  max-width: 1120px;
-  margin: 0 auto 18px;
-  padding: 36px;
-  border: 1px solid rgba(21, 48, 39, 0.16);
-  border-radius: 32px;
-  background: rgba(255, 252, 243, 0.72);
-  box-shadow: 0 24px 80px rgba(25, 64, 49, 0.16);
-}
-
-.sentero-hero h1 {
-  max-width: 760px;
-  margin: 0 0 14px;
-  font-size: clamp(2.2rem, 5vw, 4.8rem);
-  line-height: 0.95;
-  letter-spacing: -0.07em;
-}
-
-.sentero-hero p {
-  max-width: 620px;
-  margin: 0;
-  color: rgba(21, 48, 39, 0.72);
-  font-size: 1.08rem;
-}
-
-.sentero-hero button {
-  border: 0;
-  border-radius: 999px;
-  padding: 12px 18px;
-  color: #f8f3e8;
-  background: #153027;
-}
-
-.sentero-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  max-width: 1120px;
-  margin: 0 auto 22px;
-}
-
-.sentero-nav button {
-  align-items: center;
-  border: 1px solid rgba(21, 48, 39, 0.13);
-  border-radius: 999px;
-  background: rgba(255, 252, 243, 0.58);
-  color: rgba(21, 48, 39, 0.74);
-  cursor: pointer;
-  display: flex;
-  gap: 8px;
-  padding: 11px 14px;
-}
-
-.sentero-nav button.active {
-  background: #153027;
-  border-color: #153027;
-  color: #fff8ec;
-}
-
-.sentero-page {
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.sentero-page h2 {
-  font-size: clamp(1.8rem, 3.8vw, 3.4rem);
-  letter-spacing: -0.05em;
-  margin: 6px 0 8px;
-}
-
-.sentero-page-lead {
-  color: rgba(21, 48, 39, 0.68);
-  font-size: 1.05rem;
-  margin: 0 0 18px;
-}
-
-.sentero-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
-}
-
-.sentero-card {
-  padding: 24px;
-  border-radius: 24px;
-  background: rgba(255, 252, 243, 0.64);
-  border: 1px solid rgba(21, 48, 39, 0.14);
-}
-
-.sentero-card.prominent {
-  background: rgba(255, 252, 243, 0.86);
-  box-shadow: 0 18px 50px rgba(25, 64, 49, 0.14);
-}
-
-.sentero-card span,
-.sentero-shell .eyebrow {
-  align-items: center;
-  display: inline-flex;
-  gap: 7px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.74rem;
-  font-weight: 800;
-  color: #49765b;
-}
-
-.sentero-card h2,
-.sentero-card h3 {
-  margin: 12px 0 8px;
-}
-
-.sentero-card p {
-  margin: 0;
-  color: rgba(21, 48, 39, 0.68);
-}
-
-.sentero-card button,
-.sentero-contact-panel button,
-.sentero-login-form button {
-  align-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: #153027;
-  color: #fff8ec;
-  cursor: pointer;
-  display: inline-flex;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 11px 15px;
-}
-
-.sentero-status-banner {
-  align-items: center;
-  border-radius: 30px;
-  display: flex;
-  gap: 18px;
-  margin-bottom: 18px;
-  padding: 26px;
-}
-
-.sentero-status-banner.normal {
-  background: linear-gradient(135deg, rgba(40, 139, 86, 0.16), rgba(255, 252, 243, 0.74));
-  border: 1px solid rgba(40, 139, 86, 0.22);
-}
-
-.sentero-status-banner.attention {
-  background: linear-gradient(135deg, rgba(200, 89, 58, 0.16), rgba(255, 252, 243, 0.76));
-  border: 1px solid rgba(200, 89, 58, 0.24);
-}
-
-.sentero-status-banner > span,
-.sentero-metric-card > span,
-.sentero-notification > span {
-  align-items: center;
-  background: rgba(255, 252, 243, 0.8);
-  border-radius: 18px;
-  color: #49765b;
-  display: inline-flex;
-  height: 52px;
-  justify-content: center;
-  width: 52px;
-}
-
-.sentero-status-banner h2,
-.sentero-status-banner p {
-  margin: 0;
-}
-
-.sentero-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.sentero-metric-card,
-.sentero-panel,
-.sentero-notification {
-  border: 1px solid rgba(21, 48, 39, 0.14);
-  border-radius: 24px;
-  background: rgba(255, 252, 243, 0.66);
-  padding: 20px;
-}
-
-.sentero-metric-card {
-  display: grid;
-  gap: 8px;
-}
-
-.sentero-metric-card small {
-  color: #49765b;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.sentero-metric-card strong {
-  font-size: 1.22rem;
-}
-
-.sentero-metric-card p,
-.sentero-panel p {
-  color: rgba(21, 48, 39, 0.68);
-  margin: 0;
-}
-
-.sentero-two-column {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
-  gap: 18px;
-}
-
-.sentero-timeline {
-  display: grid;
-  gap: 10px;
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
-}
-
-.sentero-timeline li {
-  align-items: center;
-  border-top: 1px solid rgba(21, 48, 39, 0.1);
-  display: grid;
-  grid-template-columns: 70px 1fr;
-  gap: 12px;
-  padding-top: 10px;
-}
-
-.sentero-timeline span {
-  color: #49765b;
-  font-weight: 800;
-}
-
-.sentero-notification-list {
-  display: grid;
-  gap: 12px;
-}
-
-.sentero-notification {
-  align-items: flex-start;
-  display: flex;
-  gap: 14px;
-}
-
-.sentero-notification strong,
-.sentero-notification p {
-  margin: 0;
-}
-
-.sentero-notification p {
-  color: rgba(21, 48, 39, 0.68);
-  margin-top: 4px;
-}
-
-.sentero-login {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  color: #153027;
-  background:
-    radial-gradient(circle at 24% 16%, rgba(112, 176, 137, 0.3), transparent 34%),
-    linear-gradient(135deg, #f6f0e3, #cfe0d1);
-}
-
-.sentero-login-card {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1fr);
-  gap: 26px;
-  max-width: 860px;
-  width: 100%;
-  border: 1px solid rgba(21, 48, 39, 0.14);
-  border-radius: 34px;
-  background: rgba(255, 252, 243, 0.76);
-  box-shadow: 0 28px 90px rgba(25, 64, 49, 0.17);
-  padding: 30px;
-}
-
-.sentero-login-intro > span {
-  align-items: center;
-  background: #153027;
-  border-radius: 18px;
-  color: #fff8ec;
-  display: inline-flex;
-  height: 54px;
-  justify-content: center;
-  width: 54px;
-}
-
-.sentero-login-intro h1 {
-  font-size: clamp(2.2rem, 5vw, 4rem);
-  letter-spacing: -0.06em;
-  line-height: 0.96;
-  margin: 18px 0 12px;
-}
-
-.sentero-login-intro p {
-  color: rgba(21, 48, 39, 0.68);
-}
-
-.sentero-login-form {
-  display: grid;
-  gap: 14px;
-}
-
-.sentero-login-form label {
-  display: grid;
-  gap: 7px;
-  font-weight: 800;
-}
-
-.sentero-login-form input {
-  border: 1px solid rgba(21, 48, 39, 0.2);
-  border-radius: 16px;
-  background: rgba(255, 252, 243, 0.86);
-  color: #153027;
-  font: inherit;
-  padding: 13px 14px;
-}
-
-.sentero-login-form .sentero-remember {
-  align-items: center;
-  display: flex;
-  font-weight: 600;
-}
-
-.sentero-login-error {
-  border: 1px solid rgba(200, 89, 58, 0.26);
-  border-radius: 16px;
-  color: #8f3426;
-  background: rgba(200, 89, 58, 0.1);
-  padding: 11px 12px;
-}
-
-@media (max-width: 760px) {
-  .sentero-shell {
-    padding: 18px;
-  }
-  .sentero-hero {
-    display: block;
-    padding: 24px;
-  }
-  .sentero-hero button {
-    margin-top: 22px;
-  }
-  .sentero-overview-grid,
-  .sentero-two-column,
-  .sentero-login-card {
-    grid-template-columns: 1fr;
-  }
-}
-
-.update-panel,
-.sentero-update-panel {
+.update-panel {
   display: grid;
   gap: 18px;
-}
-
-.sentero-update-panel {
-  border: 1px solid rgba(21, 48, 39, 0.14);
-  border-radius: 24px;
-  background: rgba(255, 252, 243, 0.66);
-  margin-top: 18px;
-  padding: 22px;
 }
 
 .update-panel-head {
@@ -5305,10 +4928,6 @@ button.market-insight-card:hover {
 .update-panel-head p:not(.eyebrow) {
   color: var(--muted);
   margin-top: 6px;
-}
-
-.sentero-update-panel .update-panel-head p:not(.eyebrow) {
-  color: rgba(21, 48, 39, 0.68);
 }
 
 .update-version-grid {
@@ -5330,11 +4949,6 @@ button.market-insight-card:hover {
   padding: 12px;
 }
 
-.sentero-update-panel .update-version-item {
-  border-color: rgba(21, 48, 39, 0.12);
-  background: rgba(255, 252, 243, 0.58);
-}
-
 .update-version-item span,
 .update-release-card span,
 .update-release-card small,
@@ -5342,14 +4956,6 @@ button.market-insight-card:hover {
 .update-controls span {
   color: var(--muted);
   font-size: 0.82rem;
-}
-
-.sentero-update-panel .update-version-item span,
-.sentero-update-panel .update-release-card span,
-.sentero-update-panel .update-release-card small,
-.sentero-update-panel .update-step small,
-.sentero-update-panel .update-controls span {
-  color: rgba(21, 48, 39, 0.64);
 }
 
 .update-controls {
@@ -5371,22 +4977,11 @@ button.market-insight-card:hover {
   padding: 11px 12px;
 }
 
-.sentero-update-panel .update-controls select {
-  border-color: rgba(21, 48, 39, 0.18);
-  background: rgba(255, 252, 243, 0.78);
-  color: #153027;
-}
-
 .update-release-card {
   border: 1px solid rgba(153, 168, 195, 0.16);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
   padding: 16px;
-}
-
-.sentero-update-panel .update-release-card {
-  border-color: rgba(21, 48, 39, 0.12);
-  background: rgba(255, 252, 243, 0.58);
 }
 
 .update-release-card h3,
@@ -5438,10 +5033,6 @@ button.market-insight-card:hover {
   padding-top: 14px;
 }
 
-.sentero-update-panel .update-wizard {
-  border-top-color: rgba(21, 48, 39, 0.12);
-}
-
 .update-wizard-title {
   align-items: center;
   display: flex;
@@ -5457,10 +5048,6 @@ button.market-insight-card:hover {
   grid-template-columns: 34px 1fr;
   gap: 10px;
   padding: 10px 12px;
-}
-
-.sentero-update-panel .update-step {
-  border-color: rgba(21, 48, 39, 0.12);
 }
 
 .update-step > span {
@@ -5507,14 +5094,6 @@ button.market-insight-card:hover {
 .update-alert.success {
   background: rgba(52, 211, 153, 0.1);
   color: #9af0c9;
-}
-
-.sentero-update-panel .update-alert.error {
-  color: #8f3426;
-}
-
-.sentero-update-panel .update-alert.success {
-  color: #2c744d;
 }
 
 @media (max-width: 760px) {

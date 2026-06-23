@@ -242,7 +242,7 @@ class SchedulerService:
 
         control = get_agent_control(target_agent)
         if not control:
-            return "Ziel-Agent ist in der aktiven Edition nicht verfuegbar"
+            return "Ziel-Agent ist in diesem Produkt nicht verfuegbar"
         if "status" in control.capabilities() and self._agent_is_disabled(target_agent):
             return "Ziel-Agent ist deaktiviert"
         return ""

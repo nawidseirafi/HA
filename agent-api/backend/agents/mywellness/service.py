@@ -27,7 +27,7 @@ from .store import (
     save_booking_history,
     save_course_history,
 )
-from .calendar import add_course_to_calendar
+from .calendar_service import add_course_to_calendar
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")

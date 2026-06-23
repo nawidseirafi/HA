@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.agents.registry import discover_agent_manifests, get_agent_control
-from backend.editions import active_edition, is_core_service_enabled
+from backend.product import active_product, is_core_service_enabled
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.orchestrator_control_service import OrchestratorControlService
 
@@ -25,7 +25,6 @@ class ControlPayload(BaseModel):
 
 @router.get("/map")
 def orchestrator_map() -> dict[str, Any]:
-    edition = active_edition()
     agents = [_agent_node(manifest.public_dict()) for manifest in discover_agent_manifests()]
     agent_ids = {agent["id"] for agent in agents}
     services = _service_nodes()
@@ -105,7 +104,7 @@ def orchestrator_map() -> dict[str, Any]:
         })
     return {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
-        "edition": edition.public_dict(),
+        "product": active_product().public_dict(),
         "summary": _summary(agents),
         "nodes": nodes,
         "edges": edges,

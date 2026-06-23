@@ -38,7 +38,7 @@ from backend.agents.mywellness.store import (
     replace_prepared_courses,
     save_booking_history,
 )
-from backend.agents.mywellness.calendar import add_course_to_calendar
+from backend.agents.mywellness.calendar_service import add_course_to_calendar
 
 agent_settings = load_agent_settings()
 desired_courses = agent_settings["desired_courses"] or DEFAULT_DESIRED_COURSES

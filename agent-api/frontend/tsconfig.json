@@ -14,8 +14,7 @@
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
-      "@personal/*": ["src/apps/personal/*"],
-      "@sentero/*": ["src/apps/sentero/*"]
+      "@personal/*": ["src/apps/personal/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

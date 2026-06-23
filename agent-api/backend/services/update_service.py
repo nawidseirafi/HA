@@ -23,8 +23,8 @@ from typing import Any
 
 import yaml
 
-from backend.editions import active_edition
 from backend.paths import API_CONFIG_PATH, API_DIR, ENV_PATH, PROJECT_DIR
+from backend.product import PRODUCT_ID, PRODUCT_NAME
 
 VERSION_FILE = API_DIR / "version.json"
 UPDATE_MANIFEST_FILE = API_DIR / "update-manifest.json"
@@ -196,7 +196,7 @@ class UpdateConfigMixin:
             path = Path(str(raw)).expanduser()
             return path if path.is_absolute() else self.paths.api_dir / path
         if self.execution_mode() == "zip_docker":
-            return Path("/opt") / active_edition().name
+            return Path("/opt") / PRODUCT_ID
         return self.paths.api_dir
 
     def compose_file(self) -> Path:
@@ -258,7 +258,7 @@ class VersionService(UpdateConfigMixin):
         build = str(self._env("ROBOTERSTEVE_BUILD") or metadata.get("build") or version_config.get("build") or datetime.now().strftime("%Y.%m.%d"))
         commit = str(self._env("ROBOTERSTEVE_COMMIT") or metadata.get("commit") or version_config.get("commit") or "unknown")
         return {
-            "edition": active_edition().name,
+            "product": PRODUCT_ID,
             "app_version": app_version,
             "version": app_version,
             "build": build,
@@ -358,7 +358,7 @@ class UpdateCheckService(UpdateConfigMixin):
             return latest
         base_url = self.update_base_url()
         if base_url:
-            url = f"{base_url.rstrip('/')}/{active_edition().name}/{channel}/latest.json"
+            url = f"{base_url.rstrip('/')}/{PRODUCT_ID}/{channel}/latest.json"
             latest = self._fetch_static_manifest(url, channel, current)
             latest["source"] = "base_url"
             latest["manifest_url"] = url
@@ -372,7 +372,7 @@ class UpdateCheckService(UpdateConfigMixin):
             latest["source"] = "manifest_url"
             latest["manifest_url"] = server_url
             return latest
-        query = urllib.parse.urlencode({"edition": active_edition().name, "channel": channel, "version": current["app_version"]})
+        query = urllib.parse.urlencode({"product": PRODUCT_ID, "channel": channel, "version": current["app_version"]})
         url = f"{server_url.rstrip('/')}/latest?{query}"
         request = urllib.request.Request(url, headers={"Accept": "application/json"})
         try:
@@ -414,12 +414,11 @@ class UpdateCheckService(UpdateConfigMixin):
         return latest
 
     def _select_manifest_entry(self, manifest: dict[str, Any], channel: str) -> dict[str, Any] | None:
-        edition_name = active_edition().name
-        editions = manifest.get("editions")
-        if isinstance(editions, dict):
-            edition_block = editions.get(edition_name)
-            if isinstance(edition_block, dict):
-                entry = self._select_channel_entry(edition_block, channel)
+        products = manifest.get("products")
+        if isinstance(products, dict):
+            product_block = products.get(PRODUCT_ID)
+            if isinstance(product_block, dict):
+                entry = self._select_channel_entry(product_block, channel)
                 if entry is not None:
                     return entry
         entry = self._select_channel_entry(manifest, channel)
@@ -472,7 +471,7 @@ class UpdateCheckService(UpdateConfigMixin):
             "minimum_version": str(data.get("minimum_version") or ""),
             "sha256": str(data.get("sha256") or ""),
             "size_bytes": int(data.get("size_bytes") or 0),
-            "product": str(data.get("product") or data.get("edition") or ""),
+            "product": str(data.get("product") or ""),
         }
 
     def _layers_from_components(self, components: dict[str, Any]) -> list[str]:
@@ -543,7 +542,7 @@ class BackupEngine(UpdateConfigMixin):
         metadata = {
             "version": version.get("app_version") or version.get("version"),
             "created": utc_now(),
-            "edition": active_edition().name,
+            "product": PRODUCT_ID,
             "execution_mode": self.execution_mode(),
         }
         include_paths = self._backup_sources()
@@ -595,7 +594,6 @@ class BackupEngine(UpdateConfigMixin):
                 root / ".env",
                 root / "data",
                 root / "settings",
-                root / "editions",
             ]
             application_sources = [
                 root / name
@@ -614,7 +612,6 @@ class BackupEngine(UpdateConfigMixin):
             self.paths.config_path,
             self.paths.env_path,
             self.paths.api_dir / "data",
-            self.paths.api_dir / "editions",
             self.paths.api_dir / "settings",
             self.paths.api_dir / "backend" / "agents",
         ]
@@ -1227,19 +1224,14 @@ class UpdateService(UpdateConfigMixin):
 
     def _validate_latest_for_install(self, latest: dict[str, Any], current_version: str) -> None:
         product = str(latest.get("product") or "").strip().lower()
-        if product and product not in {active_edition().name.lower(), self.product_name().lower()}:
+        if product and product not in {PRODUCT_ID.lower(), self.product_name().lower()}:
             raise RuntimeError("Update-Manifest passt nicht zu dieser Installation.")
         minimum_version = str(latest.get("minimum_version") or "").strip()
         if minimum_version and compare_versions(current_version, minimum_version) < 0:
             raise RuntimeError("Diese Installation ist fuer ein Direktupdate zu alt. Bitte kontaktieren Sie den Support.")
 
     def product_name(self) -> str:
-        edition_name = active_edition().name
-        if edition_name == "sentero":
-            return "Sentero"
-        if edition_name == "personal":
-            return "RoboterSteve"
-        return active_edition().description or edition_name.title()
+        return PRODUCT_NAME
 
     def dev_mode_enabled(self) -> bool:
         return str(self._env("ROBOTERSTEVE_DEV_MODE") or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -1320,7 +1312,7 @@ class UpdateService(UpdateConfigMixin):
 
     def _audit(self, action: str, username: str, from_version: str, to_version: str, result: str, payload: dict[str, Any]) -> None:
         self.paths.audit_log.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"timestamp": utc_now(), "user": username, "edition": active_edition().name, "action": action, "from_version": from_version, "to_version": to_version, "result": result, "payload": payload}
+        entry = {"timestamp": utc_now(), "user": username, "product": PRODUCT_ID, "action": action, "from_version": from_version, "to_version": to_version, "result": result, "payload": payload}
         with self.paths.audit_log.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
         try:

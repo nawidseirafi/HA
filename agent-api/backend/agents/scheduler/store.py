@@ -9,8 +9,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 
 from backend.config import load_agent_section, resolve_api_path
-from backend.editions import active_edition, is_core_service_enabled
 from backend.paths import AGENTS_DIR
+from backend.product import is_core_service_enabled
 
 
 VALID_SCHEDULE_TYPES = {"once", "recurring", "cron", "condition"}
@@ -488,12 +488,9 @@ class SchedulerStore:
 
     def _manifest_default_tasks(self) -> list[dict[str, Any]]:
         tasks: list[dict[str, Any]] = []
-        allowed_agents = set(active_edition().enabled_agents)
         for manifest_path in sorted(AGENTS_DIR.glob("*/manifest.yaml")):
             data = self._read_yaml(manifest_path)
             agent_id = str(data.get("id") or manifest_path.parent.name).strip()
-            if agent_id not in allowed_agents:
-                continue
             scheduler = data.get("scheduler") if isinstance(data.get("scheduler"), dict) else {}
             raw_tasks = scheduler.get("tasks") if isinstance(scheduler.get("tasks"), list) else []
             for index, raw_task in enumerate(raw_tasks):
@@ -541,7 +538,7 @@ class SchedulerStore:
             },
             {
                 "name": "System Updatepruefung",
-                "description": "Prueft, ob ein RoboterSteve/Sentero Update verfuegbar ist.",
+                "description": "Prueft, ob ein RoboterSteve Update verfuegbar ist.",
                 "schedule_type": "cron",
                 "schedule": {"cron": "0 7 * * *", "timezone": "Europe/Berlin"},
                 "target_agent": "system",

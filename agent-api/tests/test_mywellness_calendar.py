@@ -1,4 +1,4 @@
-from backend.agents.mywellness.calendar import add_course_to_calendar
+from backend.agents.mywellness.calendar_service import add_course_to_calendar
 
 
 class FakeHomeAssistant:
