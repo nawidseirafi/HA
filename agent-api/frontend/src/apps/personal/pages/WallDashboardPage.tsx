@@ -1,5 +1,5 @@
 import {Component, useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import type {ErrorInfo, ReactNode} from 'react';
+import type {DragEvent, ErrorInfo, PointerEvent, ReactNode} from 'react';
 import {
     Activity,
     ArrowDown,
@@ -14,6 +14,7 @@ import {
     ChevronRight,
     CloudSun,
     DoorOpen,
+    GripVertical,
     Home,
     Lightbulb,
     Mailbox,
@@ -78,6 +79,77 @@ type MetricTone =
     | 'waste-paper'
     | 'waste-yellow'
     | 'waste-rest';
+
+type HomeCardId =
+    | 'climate'
+    | 'waste'
+    | 'vacation'
+    | 'lights'
+    | 'security'
+    | 'post'
+    | 'garage'
+    | 'batteries'
+    | 'fritzbox'
+    | 'calendar'
+    | 'floors';
+
+const WALL_HOME_CARD_ORDER_KEY = 'robotersteve.wall.home.cardOrder';
+const WALL_HOME_LONG_PRESS_MS = 650;
+const DEFAULT_HOME_CARD_ORDER: HomeCardId[] = [
+    'climate',
+    'waste',
+    'vacation',
+    'lights',
+    'security',
+    'post',
+    'garage',
+    'batteries',
+    'fritzbox',
+    'calendar',
+    'floors',
+];
+const HOME_CARD_SPANS: Partial<Record<HomeCardId, 2>> = {
+    climate: 2,
+    calendar: 2,
+    floors: 2,
+};
+
+function normalizeHomeCardOrder(value: unknown): HomeCardId[] {
+    const known = new Set<HomeCardId>(DEFAULT_HOME_CARD_ORDER);
+    const fromStorage = Array.isArray(value)
+        ? value.filter((item): item is HomeCardId => known.has(item as HomeCardId))
+        : [];
+    return [...fromStorage, ...DEFAULT_HOME_CARD_ORDER.filter((item) => !fromStorage.includes(item))];
+}
+
+function readHomeCardOrder(): HomeCardId[] {
+    if (typeof window === 'undefined') return DEFAULT_HOME_CARD_ORDER;
+    try {
+        return normalizeHomeCardOrder(JSON.parse(window.localStorage.getItem(WALL_HOME_CARD_ORDER_KEY) || '[]'));
+    } catch {
+        return DEFAULT_HOME_CARD_ORDER;
+    }
+}
+
+function moveHomeCard(order: HomeCardId[], source: HomeCardId, target: HomeCardId) {
+    if (source === target) return order;
+    const next = [...order];
+    const sourceIndex = next.indexOf(source);
+    const targetIndex = next.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0) return order;
+    next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, source);
+    return next;
+}
+
+function shiftHomeCard(order: HomeCardId[], id: HomeCardId, offset: -1 | 1) {
+    const index = order.indexOf(id);
+    const targetIndex = index + offset;
+    if (index < 0 || targetIndex < 0 || targetIndex >= order.length) return order;
+    const next = [...order];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    return next;
+}
 
 export function WallDashboardPage() {
     return (
@@ -800,9 +872,23 @@ function HomeSection({
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
-    return (
-        <div className="wall-home-grid">
-            <ClimateOverviewCard data={data} climate={climate} onClick={onClimate}/>
+    const [layoutEditing, setLayoutEditing] = useState(false);
+    const [cardOrder, setCardOrder] = useState<HomeCardId[]>(readHomeCardOrder);
+
+    useEffect(() => {
+        window.localStorage.setItem(WALL_HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
+    }, [cardOrder]);
+
+    const moveCard = useCallback((source: HomeCardId, target: HomeCardId) => {
+        setCardOrder((current) => moveHomeCard(current, source, target));
+    }, []);
+    const shiftCard = useCallback((cardId: HomeCardId, offset: -1 | 1) => {
+        setCardOrder((current) => shiftHomeCard(current, cardId, offset));
+    }, []);
+
+    const cards: Record<HomeCardId, ReactNode> = {
+        climate: <ClimateOverviewCard data={data} climate={climate} onClick={onClimate}/>,
+        waste: (
             <MetricCard
                 icon={<Trash2 size={24}/>}
                 label="Müllabfuhr"
@@ -810,6 +896,8 @@ function HomeSection({
                 detail={wasteDetail(data)}
                 tone={wasteTone(data)}
             />
+        ),
+        vacation: (
             <MetricCard
                 icon={<Plane size={24}/>}
                 label="Vacation Mode"
@@ -818,11 +906,17 @@ function HomeSection({
                 tone={vacation ? 'warn' : 'neutral'}
                 onClick={onToggleVacation}
             />
+        ),
+        lights: (
             <MetricCard icon={<Lightbulb size={24}/>} label="Lampen" value={`${activeLights}/${data.lights.length}`}
                         detail="aktiv" tone={activeLights ? 'light' : 'neutral'} onClick={onLights}/>
+        ),
+        security: (
             <MetricCard icon={<DoorOpen size={24}/>} label="Fenster & Türen"
                         value={`${open}/${data.security.openings_total}`} detail="offen"
                         tone={open ? 'critical' : 'ok'}/>
+        ),
+        post: (
             <MetricCard
                 icon={<Mailbox size={24}/>}
                 label="Posteingang"
@@ -831,14 +925,20 @@ function HomeSection({
                 tone={hasPost ? 'critical' : hasPost ? 'warn' : 'neutral'}
                 onClick={hasPost ? onClearPost : undefined}
             />
+        ),
+        garage: (
             <GarageDoorCard
                 cover={garage}
                 busy={garage ? busyEntity === garage.entity_id : false}
                 onCommand={onGarageCommand}
             />
+        ),
+        batteries: (
             <MetricCard icon={batterySummary.icon} label="Batterien" value={`${wallLowBatteries.length}`}
                         detail={`${wallBatteries.length} gesamt`} tone={batterySummary.tone}
                         onClick={onBatteries}/>
+        ),
+        fritzbox: (
             <MetricCard
                 icon={<Wifi size={24}/>}
                 label="Fritzbox"
@@ -846,7 +946,9 @@ function HomeSection({
                 detail={internetInfo.cardDetail}
                 tone={internetMetricTone(internetInfo.status)}
             />
-            <CalendarAgendaCard calendar={data.calendar ?? data.household?.calendar ?? null} now={new Date()}/>
+        ),
+        calendar: <CalendarAgendaCard calendar={data.calendar ?? data.household?.calendar ?? null} now={new Date()}/>,
+        floors: (
             <section className="wall-panel wall-span-2">
                 <div className="wall-section-title">
                     <span>Etagen</span>
@@ -861,6 +963,145 @@ function HomeSection({
                     ))}
                 </div>
             </section>
+        ),
+    };
+
+    return (
+        <div className={`wall-home-grid ${layoutEditing ? 'is-editing' : ''}`}>
+            {cardOrder.map((cardId, index) => (
+                <HomeCardSlot
+                    key={cardId}
+                    id={cardId}
+                    span={HOME_CARD_SPANS[cardId]}
+                    editing={layoutEditing}
+                    canShiftBack={index > 0}
+                    canShiftForward={index < cardOrder.length - 1}
+                    onMove={moveCard}
+                    onShift={shiftCard}
+                    onBeginEdit={() => setLayoutEditing(true)}
+                    onFinishEdit={() => setLayoutEditing(false)}
+                >
+                    {cards[cardId]}
+                </HomeCardSlot>
+            ))}
+        </div>
+    );
+}
+
+function HomeCardSlot({
+                          id,
+                          span,
+                          editing,
+                          canShiftBack,
+                          canShiftForward,
+                          onMove,
+                          onShift,
+                          onBeginEdit,
+                          onFinishEdit,
+                          children,
+                      }: {
+    id: HomeCardId;
+    span?: 2;
+    editing: boolean;
+    canShiftBack: boolean;
+    canShiftForward: boolean;
+    onMove: (source: HomeCardId, target: HomeCardId) => void;
+    onShift: (id: HomeCardId, offset: -1 | 1) => void;
+    onBeginEdit: () => void;
+    onFinishEdit: () => void;
+    children: ReactNode;
+}) {
+    const [dragOver, setDragOver] = useState(false);
+    const longPressTimer = useRef<number | null>(null);
+    const ignoreNextClick = useRef(false);
+
+    const clearLongPressTimer = () => {
+        if (longPressTimer.current === null) return;
+        window.clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+    };
+
+    const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+        if (editing || event.button !== 0) return;
+        longPressTimer.current = window.setTimeout(() => {
+            longPressTimer.current = null;
+            ignoreNextClick.current = true;
+            onBeginEdit();
+        }, WALL_HOME_LONG_PRESS_MS);
+    };
+
+    const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+        if (!editing) return;
+        clearLongPressTimer();
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+    };
+
+    const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+        if (!editing) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDragOver(true);
+    };
+
+    const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+        if (!editing) return;
+        event.preventDefault();
+        setDragOver(false);
+        const source = event.dataTransfer.getData('text/plain') as HomeCardId;
+        onMove(source, id);
+    };
+
+    return (
+        <div
+            className={`wall-home-card-slot ${span === 2 ? 'span-2' : ''} ${editing ? 'is-editing' : ''} ${dragOver ? 'is-over' : ''}`}
+            draggable={editing}
+            onPointerDown={handlePointerDown}
+            onPointerUp={clearLongPressTimer}
+            onPointerCancel={clearLongPressTimer}
+            onPointerLeave={clearLongPressTimer}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onDragEnd={() => setDragOver(false)}
+            onClickCapture={(event) => {
+                if (!editing) return;
+                const target = event.target as HTMLElement;
+                if (target.closest('.wall-drag-control')) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (ignoreNextClick.current) {
+                    ignoreNextClick.current = false;
+                    return;
+                }
+                onFinishEdit();
+            }}
+        >
+            {editing && (
+                <div className="wall-drag-handle" aria-label="Kachel verschieben">
+                    <button
+                        type="button"
+                        className="wall-drag-control"
+                        aria-label="Kachel nach vorne"
+                        disabled={!canShiftBack}
+                        onClick={() => onShift(id, -1)}
+                    >
+                        <ArrowUp size={15}/>
+                    </button>
+                    <GripVertical size={18}/>
+                    <button
+                        type="button"
+                        className="wall-drag-control"
+                        aria-label="Kachel nach hinten"
+                        disabled={!canShiftForward}
+                        onClick={() => onShift(id, 1)}
+                    >
+                        <ArrowDown size={15}/>
+                    </button>
+                </div>
+            )}
+            {children}
         </div>
     );
 }
