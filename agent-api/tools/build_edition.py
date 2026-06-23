@@ -53,7 +53,11 @@ CORE_SERVICE_FILES = {
     "settings": ["backend/services/settings_service.py"],
     "orchestrator": ["backend/services/orchestrator_control_service.py"],
     "homeassistant": ["backend/services/homeassistant_service.py", "backend/services/core"],
-    "household": ["backend/services/household_service.py", "backend/services/waste_service.py"],
+    "household": [
+        "backend/services/household_service.py",
+        "backend/services/calendar_service.py",
+        "backend/services/waste_service.py",
+    ],
     "infrastructure": ["backend/services/infrastructure_service.py", "backend/services/infrastructure_store.py"],
     "waste": ["backend/services/waste_service.py"],
     "messaging": ["backend/services/messaging"],
