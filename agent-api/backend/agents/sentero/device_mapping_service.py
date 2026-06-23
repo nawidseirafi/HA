@@ -13,10 +13,11 @@ from backend.paths import API_DIR
 from backend.services.homeassistant_service import HomeAssistantService
 
 DB_PATH = API_DIR / 'data' / 'sentero' / 'sentero.db'
+DB_TIMEOUT_SECONDS = 30
 DISCOVERY_TIMEOUT_SECONDS = 180
 DISCOVERY_CONFIDENCE_THRESHOLD = 50
 PRESENCE_CLASSES = {'occupancy', 'motion', 'presence'}
-CONTACT_CLASSES = {'door', 'window', 'opening', 'contact', 'vibration'}
+CONTACT_CLASSES = {'door', 'window', 'opening', 'contact'}
 logger = logging.getLogger(__name__)
 ROOM_TERMS = {
     'living_room': ['wohnzimmer', 'living', 'living_room'],
@@ -40,6 +41,12 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 
+def configure_sqlite_connection(con: sqlite3.Connection) -> None:
+    con.execute('pragma busy_timeout = 30000')
+    con.execute('pragma journal_mode = WAL')
+    con.execute('pragma foreign_keys = ON')
+
+
 class DeviceMappingService:
     def __init__(self, database_path: Path | None = None, ha: HomeAssistantService | None = None) -> None:
         self.database_path = database_path or DB_PATH
@@ -48,8 +55,9 @@ class DeviceMappingService:
 
     def connect(self) -> sqlite3.Connection:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        con = sqlite3.connect(self.database_path)
+        con = sqlite3.connect(self.database_path, timeout=DB_TIMEOUT_SECONDS)
         con.row_factory = sqlite3.Row
+        configure_sqlite_connection(con)
         return con
 
     def ensure_schema(self) -> None:
@@ -259,10 +267,19 @@ class DeviceMappingService:
             session = con.execute('select * from sensor_discovery_sessions where id = ?', (session_id,)).fetchone()
         if not session:
             raise ValueError('session not found')
+        baseline = json.loads(session['baseline_snapshot_json'] or '[]')
         current = json.loads(session['candidate_snapshot_json'] or '[]') or self.snapshot()
-        entity = next((item for item in current if item.get('entity_id') == entity_id), None)
+        scored = score_candidates(baseline, current, session['target_role'], session['target_room'], session['started_at'])
+        entity = next(
+            (
+                item for item in scored
+                if item.get('entity_id') == entity_id
+                and item.get('confidence', 0) >= DISCOVERY_CONFIDENCE_THRESHOLD
+            ),
+            None,
+        )
         if not entity:
-            entity = {'entity_id': entity_id, 'domain': entity_id.split('.')[0], 'attributes': {}}
+            raise ValueError('entity does not match this pairing session')
         attrs = entity.get('attributes') or {}
         target_room = str(room or session['target_room'] or '').strip() or None
         desired_name = str(name or '').strip() or attrs.get('friendly_name') or entity.get('friendly_name') or 'Sensor'
@@ -840,9 +857,11 @@ def score_candidates(baseline: list[dict[str, Any]], current: list[dict[str, Any
             continue
         old = before.get(entity_id, {})
         is_new = entity_id not in before
+        if not is_new:
+            continue
         device_id = str(item.get('device_id') or '')
         is_new_device = bool(is_new and device_id and device_id not in baseline_device_ids)
-        if not role_candidate_matches(role, item, allow_device_class_mismatch=is_new or is_new_device):
+        if not role_candidate_matches(role, item, allow_device_class_mismatch=False):
             continue
         state_changed = bool(old) and item.get('state') != old.get('state')
         last_changed_updated = is_after(item.get('last_changed'), started)
@@ -970,7 +989,7 @@ def role_keyword_matches(role: str, item: dict[str, Any], include_model: bool = 
     if role_is_presence(role):
         return any(term in haystack for term in ['occupy', 'occupancy', 'motion', 'presence', 'bewegung', 'praesenz', 'präsenz'])
     if role_is_contact(role):
-        return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tür', 'tuerschloss', 'türschloss', 'fenster', 'vibration', 'vibrate', 'erschuetterung'])
+        return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tür', 'tuerschloss', 'türschloss', 'fenster'])
     return False
 
 
@@ -988,7 +1007,7 @@ def contact_sensor_candidate_matches(item: dict[str, Any], include_model: bool =
         item.get('device_name'),
     ]))
     haystack = f"{haystack} {normalize(str(item.get('model') or ''))}"
-    return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tuerschloss', 'fenster', 'vibration', 'vibrate', 'erschuetterung'])
+    return any(term in haystack for term in ['contact', 'door', 'window', 'opening', 'tuer', 'tuerschloss', 'fenster'])
 
 
 def candidate_entity_priority(role: str, item: dict[str, Any]) -> int:
@@ -1015,9 +1034,9 @@ def candidate_entity_priority(role: str, item: dict[str, Any]) -> int:
     if role_is_contact(role):
         if domain == 'binary_sensor' and class_matches(role, device_class):
             return 40
-        if domain == 'lock' and any(term in haystack for term in ['turschloss', 'tuerschloss', 'türschloss', 'door', 'lock', 'vibration']):
+        if domain == 'lock' and any(term in haystack for term in ['turschloss', 'tuerschloss', 'türschloss', 'door', 'lock']):
             return 35
-        if domain == 'switch' and any(term in haystack for term in ['vibration', 'door', 'tuer', 'tür']):
+        if domain == 'switch' and any(term in haystack for term in ['door', 'tuer', 'tür']):
             return 20
     return 0
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .device_discovery_service import DeviceDiscoveryService
-from .device_mapping_service import DB_PATH, DeviceMappingService, now
+from .device_mapping_service import DB_PATH, DB_TIMEOUT_SECONDS, DeviceMappingService, configure_sqlite_connection, now
 from .matter_service import MatterCommissioningUnavailable, MatterService
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,9 @@ class CommissioningService:
 
     def connect(self) -> sqlite3.Connection:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        con = sqlite3.connect(self.database_path)
+        con = sqlite3.connect(self.database_path, timeout=DB_TIMEOUT_SECONDS)
         con.row_factory = sqlite3.Row
+        configure_sqlite_connection(con)
         return con
 
     def ensure_schema(self) -> None:
