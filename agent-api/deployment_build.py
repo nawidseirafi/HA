@@ -11,6 +11,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import hashlib
 
 
 ROOT = Path(__file__).resolve().parent
@@ -60,16 +61,23 @@ def main() -> int:
     write_readme()
     write_config_example()
     write_env_example()
-    write_update_manifest(version=version, base_url=args.base_url.strip())
     write_readme_install()
     if not args.no_zip:
         create_update_artifacts(version=version, base_url=args.base_url.strip())
+    else:
+        write_update_manifest(version=version, base_url=args.base_url.strip())
 
     print(f"Built RoboterSteve deployment in {TARGET_DIR}")
     if not args.no_zip:
         print(f"Update artifacts in {UPDATE_DIR}")
     return 0
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 def clean_build_dir() -> None:
     if TARGET_DIR.exists():
@@ -290,16 +298,31 @@ def write_update_manifest(version: str, base_url: str) -> None:
 def latest_manifest(version: str, zip_path: Path, base_url: str) -> dict[str, Any]:
     filename = zip_path.name
     download_url = f"{base_url.rstrip('/')}/stable/releases/{filename}" if base_url else str(zip_path)
+    sha256 = sha256_file(zip_path) if zip_path.exists() else ""
+
     return {
+        "latest_version": version,
+        "download_url": download_url,
+        "mandatory": False,
+        "minimum_version": "0.1.0",
+        "sha256": sha256,
+        "release_notes": [f"RoboterSteve {version} deployment build."],
+        "components": {
+            "application": {"update": True},
+            "homeassistant": {"update": False},
+            "ollama": {"update": False},
+            "system": {"update": False},
+        },
         "channels": {
             "stable": {
                 "latest_version": version,
                 "download_url": download_url,
                 "mandatory": False,
+                "sha256": sha256,
                 "release_notes": [f"RoboterSteve {version} deployment build."],
                 "layers": ["application"],
             }
-        }
+        },
     }
 
 
