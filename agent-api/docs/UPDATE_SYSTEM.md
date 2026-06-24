@@ -106,7 +106,7 @@ Prioritaet:
 
 In V1 wird nur `components.application.update=true` umgesetzt. Home Assistant, Ollama und System sind im Manifest vorbereitet, werden aber nicht automatisch aktualisiert.
 
-`sha256` wird geprueft, wenn gesetzt. Wenn `sha256` leer ist, wird das Update fuer V1/Dev erlaubt, aber das ist fuer produktive Releases nicht empfohlen.
+`sha256` ist fuer ZIP-basierte Produktiv-Updates Pflicht. Fehlt die Pruefsumme oder passt sie nicht zur heruntergeladenen ZIP-Datei, bricht die Installation vor dem Entpacken ab. Wenn `size_bytes` gesetzt ist, wird zusaetzlich die Dateigroesse geprueft.
 
 Optional koennen Manifeste signiert werden:
 
@@ -155,7 +155,7 @@ Bei `UPDATE_EXECUTION_MODE=zip_docker`:
 1. `latest.json` laden
 2. Version vergleichen
 3. ZIP aus `download_url` herunterladen
-4. SHA256 pruefen, falls gesetzt
+4. SHA256 zwingend pruefen und `size_bytes` pruefen, falls gesetzt
 5. Backup erstellen unter `/opt/<edition>/backups/`, z. B. `/opt/sentero/backups/`
 6. ZIP nach `/opt/<edition>/tmp/update-<version>/` entpacken
 7. Struktur validieren: `backend/`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `version.json`

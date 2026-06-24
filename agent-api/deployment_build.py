@@ -287,7 +287,12 @@ def create_update_artifacts(version: str, base_url: str) -> None:
                 "product": "robotersteve",
                 "version": version,
                 "created_at": utc_now(),
-                "artifact": str(zip_path.relative_to(BUILD_DIR)),
+                "artifact": str(zip_path.relative_to(UPDATE_DIR)),
+                "artifact_url": f"{base_url.rstrip('/')}/stable/releases/{zip_path.name}",
+                "sha256": sha256_file(zip_path),
+                "size_bytes": zip_path.stat().st_size,
+                "manifest": "latest.json",
+                "manifest_url": f"{base_url.rstrip('/')}/stable/latest.json",
                 "target": str(TARGET_DIR.relative_to(BUILD_DIR)),
             },
             ensure_ascii=False,
@@ -312,6 +317,7 @@ def latest_manifest(version: str, zip_path: Path, base_url: str) -> dict[str, An
             "UPDATE_BASE_URL fehlt. Setze z.B. UPDATE_BASE_URL=https://seirafi.de/robotersteve/robotersteve")
     download_url = f"{base_url.rstrip('/')}/stable/releases/{filename}"
     sha256 = sha256_file(zip_path) if zip_path.exists() else ""
+    size_bytes = zip_path.stat().st_size if zip_path.exists() else 0
 
     return {
         "latest_version": version,
@@ -319,6 +325,7 @@ def latest_manifest(version: str, zip_path: Path, base_url: str) -> dict[str, An
         "mandatory": False,
         "minimum_version": "0.1.0",
         "sha256": sha256,
+        "size_bytes": size_bytes,
         "release_notes": [f"RoboterSteve {version} deployment build."],
         "components": {
             "application": {"update": True},
@@ -332,6 +339,7 @@ def latest_manifest(version: str, zip_path: Path, base_url: str) -> dict[str, An
                 "download_url": download_url,
                 "mandatory": False,
                 "sha256": sha256,
+                "size_bytes": size_bytes,
                 "release_notes": [f"RoboterSteve {version} deployment build."],
                 "layers": ["application"],
             }

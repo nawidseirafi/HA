@@ -773,6 +773,7 @@ class ZipDockerInstaller(UpdateConfigMixin):
         try:
             self._download(str(latest.get("download_url") or ""), zip_path)
             actual_sha256 = self._verify_sha256(zip_path, str(latest.get("sha256") or "").strip().lower())
+            self._verify_size(zip_path, int(latest.get("size_bytes") or 0))
             extract_dir.mkdir(parents=True, exist_ok=True)
             ApplicationZipInstaller(self.paths)._safe_extract_zip(zip_path, extract_dir)
             source_root = ApplicationZipInstaller(self.paths)._payload_root(extract_dir)
@@ -814,10 +815,16 @@ class ZipDockerInstaller(UpdateConfigMixin):
     def _verify_sha256(self, path: Path, expected_sha256: str) -> str:
         actual_sha256 = ApplicationZipInstaller(self.paths)._sha256(path)
         if not expected_sha256:
-            return actual_sha256
+            raise RuntimeError("Release-ZIP ohne sha256 wird aus Sicherheitsgruenden nicht installiert.")
+        if len(expected_sha256) != 64 or any(char not in "0123456789abcdef" for char in expected_sha256):
+            raise RuntimeError("Release-ZIP Pruefsumme ist ungueltig formatiert.")
         if actual_sha256 != expected_sha256:
             raise RuntimeError("Release-ZIP Pruefsumme ist ungueltig.")
         return actual_sha256
+
+    def _verify_size(self, path: Path, expected_size: int) -> None:
+        if expected_size and path.stat().st_size != expected_size:
+            raise RuntimeError("Release-ZIP Dateigroesse ist ungueltig.")
 
     def _validate_payload(self, source_root: Path) -> None:
         missing = sorted(name for name in ZIP_DOCKER_REQUIRED_NAMES if not (source_root / name).exists())

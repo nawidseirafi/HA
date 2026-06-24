@@ -96,8 +96,8 @@ class UpdateServiceTests(unittest.TestCase):
             paths.manifest_file.write_text(
                 json.dumps({
                     "schema_version": 1,
-                    "editions": {
-                        "personal": {
+                    "products": {
+                        "robotersteve": {
                             "channels": {
                                 "stable": {
                                     "latest_version": "1.4.0",
@@ -184,7 +184,7 @@ class UpdateServiceTests(unittest.TestCase):
             )
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "download_url": source_zip.as_uri(),
                     "sha256": sha256,
@@ -224,7 +224,7 @@ class UpdateServiceTests(unittest.TestCase):
             )
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "download_url": source_zip.as_uri(),
                     "sha256": sha256,
@@ -262,7 +262,7 @@ class UpdateServiceTests(unittest.TestCase):
             )
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "download_url": source_zip.as_uri(),
                     "sha256": sha256,
@@ -317,7 +317,7 @@ class UpdateServiceTests(unittest.TestCase):
             paths.config_path.write_text("updates:\n  execution_mode: local\n  manifest_path: update-manifest.json\n", encoding="utf-8")
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "minimum_version": "1.3.0",
                     "download_url": source_zip.as_uri(),
@@ -373,7 +373,7 @@ class UpdateServiceTests(unittest.TestCase):
             paths.config_path.write_text("updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n", encoding="utf-8")
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "download_url": "file:///tmp/app.zip",
                     "sha256": "0" * 64,
@@ -414,6 +414,7 @@ class UpdateServiceTests(unittest.TestCase):
                 archive.writestr("sentero-1.4.0/.env", "SECRET=replace")
                 archive.writestr("sentero-1.4.0/config.yaml", "secret: replace")
                 archive.writestr("sentero-1.4.0/data/local.db", "replace")
+            sha256 = hashlib.sha256(source_zip.read_bytes()).hexdigest()
             paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
             paths.config_path.write_text(
                 f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n  healthcheck_url: http://127.0.0.1:8080/health\n",
@@ -421,10 +422,11 @@ class UpdateServiceTests(unittest.TestCase):
             )
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "personal",
+                    "product": "robotersteve",
                     "latest_version": "1.4.0",
                     "download_url": source_zip.as_uri(),
-                    "sha256": "",
+                    "sha256": sha256,
+                    "size_bytes": source_zip.stat().st_size,
                     "components": {"application": {"update": True}},
                 }),
                 encoding="utf-8",
@@ -468,6 +470,81 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertIn(["docker", "compose", "up", "-d", "--build"], commands)
             self.assertNotIn(["docker", "restart", "robotersteve-api"], commands)
             self.assertFalse(any(command[-1:] == ["restart"] or "restart" in command for command in commands))
+
+    def test_zip_docker_update_requires_sha256(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            root = Path(tmp)
+            deploy = root / "deploy"
+            deploy.mkdir()
+            (deploy / "docker-compose.yml").write_text("services: {}", encoding="utf-8")
+            source_zip = paths.api_dir / "sentero.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("sentero-1.4.0/backend/main.py", "new")
+                archive.writestr("sentero-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("sentero-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("sentero-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("sentero-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            paths.config_path.write_text(
+                f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n",
+                encoding="utf-8",
+            )
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "robotersteve",
+                    "latest_version": "1.4.0",
+                    "download_url": source_zip.as_uri(),
+                    "sha256": "",
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+
+            with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/docker"), \
+                 patch("backend.services.update_service.subprocess.run", return_value=type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()):
+                with self.assertRaisesRegex(RuntimeError, "sha256"):
+                    service.install_update(username="admin")
+
+    def test_zip_docker_update_rejects_size_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            root = Path(tmp)
+            deploy = root / "deploy"
+            deploy.mkdir()
+            (deploy / "docker-compose.yml").write_text("services: {}", encoding="utf-8")
+            source_zip = paths.api_dir / "sentero.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("sentero-1.4.0/backend/main.py", "new")
+                archive.writestr("sentero-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("sentero-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("sentero-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("sentero-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+            paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
+            paths.config_path.write_text(
+                f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n",
+                encoding="utf-8",
+            )
+            paths.manifest_file.write_text(
+                json.dumps({
+                    "product": "robotersteve",
+                    "latest_version": "1.4.0",
+                    "download_url": source_zip.as_uri(),
+                    "sha256": hashlib.sha256(source_zip.read_bytes()).hexdigest(),
+                    "size_bytes": source_zip.stat().st_size + 1,
+                    "components": {"application": {"update": True}},
+                }),
+                encoding="utf-8",
+            )
+            service = UpdateService(paths)
+            service.check_for_updates()
+
+            with patch("backend.services.update_service.shutil.which", return_value="/usr/bin/docker"), \
+                 patch("backend.services.update_service.subprocess.run", return_value=type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()):
+                with self.assertRaisesRegex(RuntimeError, "Dateigroesse"):
+                    service.install_update(username="admin")
 
     def _paths(self, tmp: str) -> UpdatePaths:
         root = Path(tmp)
