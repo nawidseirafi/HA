@@ -163,13 +163,26 @@ class UpdateConfigMixin:
         update_config = self._update_config()
         return str(self._env("UPDATE_BASE_URL") or update_config.get("base_url") or "").strip()
 
+    def update_manifest_url(self, channel: str | None = None) -> str:
+        update_config = self._update_config()
+
+        explicit = str(self._env("UPDATE_MANIFEST_URL") or update_config.get("manifest_url") or "").strip()
+        if explicit:
+            return explicit
+
+        base_url = self.update_base_url()
+        if base_url:
+            selected_channel = channel or self.channel()
+            return f"{base_url.rstrip('/')}/{selected_channel}/latest.json"
+
+        return ""
+
     def update_server_url(self) -> str:
         update_config = self._update_config()
-        return str(self._env("UPDATE_SERVER_URL") or update_config.get("server_url") or "").strip()
-
-    def update_manifest_url(self) -> str:
-        update_config = self._update_config()
-        return str(self._env("UPDATE_MANIFEST_URL") or update_config.get("manifest_url") or "").strip()
+        explicit = str(self._env("UPDATE_SERVER_URL") or update_config.get("server_url") or "").strip()
+        if explicit:
+            return explicit
+        return self.update_manifest_url()
 
     def update_manifest_path(self) -> Path:
         update_config = self._update_config()
@@ -350,18 +363,11 @@ class UpdateCheckService(UpdateConfigMixin):
             }
 
     def _fetch_latest(self, channel: str, current: dict[str, Any]) -> dict[str, Any]:
-        manifest_url = self.update_manifest_url()
+        manifest_url = self.update_manifest_url(channel)
         if manifest_url:
             latest = self._fetch_static_manifest(manifest_url, channel, current)
             latest["source"] = "manifest_url"
             latest["manifest_url"] = manifest_url
-            return latest
-        base_url = self.update_base_url()
-        if base_url:
-            url = f"{base_url.rstrip('/')}/{PRODUCT_ID}/{channel}/latest.json"
-            latest = self._fetch_static_manifest(url, channel, current)
-            latest["source"] = "base_url"
-            latest["manifest_url"] = url
             return latest
         server_url = self.update_server_url()
         if not server_url:

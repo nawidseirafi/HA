@@ -47,13 +47,13 @@ NEVER_COPY_SUFFIXES = {".pyc", ".pyo", ".db", ".db-shm", ".db-wal", ".sqlite", "
 
 
 def main() -> int:
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Build RoboterSteve deployment artifacts")
     parser.add_argument("--version", default="", help="Override version.json version")
-    parser.add_argument("--base-url", default=os.environ.get("ROBOTERSTEVE_UPDATE_BASE_URL", ""), help="Public base URL for generated update manifest")
+    parser.add_argument("--base-url", default=os.getenv("UPDATE_BASE_URL", ""), help="Public base URL for generated update manifest")
     parser.add_argument("--no-zip", action="store_true", help="Only create build/robotersteve without update ZIP artifacts")
     parser.add_argument("--skip-frontend-build", action="store_true", help="Reuse frontend/dist instead of running npm run build")
     args = parser.parse_args()
-
     version = args.version.strip() or current_version()
     clean_build_dir()
     build_frontend(skip=args.skip_frontend_build)
@@ -71,6 +71,16 @@ def main() -> int:
     if not args.no_zip:
         print(f"Update artifacts in {UPDATE_DIR}")
     return 0
+
+def load_dotenv(path: Path = ROOT / ".env") -> None:
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -297,7 +307,10 @@ def write_update_manifest(version: str, base_url: str) -> None:
 
 def latest_manifest(version: str, zip_path: Path, base_url: str) -> dict[str, Any]:
     filename = zip_path.name
-    download_url = f"{base_url.rstrip('/')}/stable/releases/{filename}" if base_url else str(zip_path)
+    if not base_url:
+        raise RuntimeError(
+            "UPDATE_BASE_URL fehlt. Setze z.B. UPDATE_BASE_URL=https://seirafi.de/robotersteve/robotersteve")
+    download_url = f"{base_url.rstrip('/')}/stable/releases/{filename}"
     sha256 = sha256_file(zip_path) if zip_path.exists() else ""
 
     return {
