@@ -1888,12 +1888,15 @@ function ClimateSection({
                         <p>{room.humidity !== null ? `${formatNumber(room.humidity)}% Luftfeuchtigkeit` : 'Luftfeuchtigkeit --'}</p>
                         <div className="wall-climate-sensor-chips">
                           {[
-                            ...room.climate.map((item) => ({
-                              name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
-                              value: item.current_temperature,
-                            })),
+                            ...room.climate
+                                .filter((item) => item.current_temperature !== null && item.current_temperature !== undefined)
+                                .map((item) => ({
+                                  name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
+                                  value: item.current_temperature,
+                                })),
                             ...room.items
                                 .filter(isRoomTemperatureSensor)
+                                .filter((item) => item.temperature !== null && item.temperature !== undefined)
                                 .map((item) => ({
                                   name: item.name.replace(/ Temperatur| Sensor| Gerä/gi, '').trim(),
                                   value: item.temperature,
@@ -1904,9 +1907,13 @@ function ClimateSection({
                             </span>
                           ))}
 
-                          {room.climate.length + room.items.length > 2 && (
-                            <span>+{room.climate.length + room.items.length - 2}</span>
-                          )}
+                          {(() => {
+                            const visibleTemperatureChips = [
+                                ...room.climate.filter((item) => item.current_temperature !== null && item.current_temperature !== undefined),
+                                ...room.items.filter((item) => item.temperature !== null && item.temperature !== undefined),
+                            ].length;
+                            return visibleTemperatureChips > 2 ? <span>+{visibleTemperatureChips - 2}</span> : null;
+                          })()}
                         </div>
                     </section>
                 ))}
@@ -3168,25 +3175,32 @@ function temperatureRooms(data: WallDashboardData, selectedFloor: string) {
 
     const areas = new Set<string>();
     for (const sensor of data.temperature_sensors ?? []) {
-        if (sensor.temperature !== null && sensor.temperature !== undefined) areas.add(sensor.area || 'Haus');
+        const hasTemperature = sensor.temperature !== null && sensor.temperature !== undefined;
+        const hasHumidity = sensor.humidity !== null && sensor.humidity !== undefined;
+        if (hasTemperature || hasHumidity) areas.add(sensor.area || 'Haus');
     }
     for (const item of data.climate) {
-        if (item.current_temperature !== null && item.current_temperature !== undefined) areas.add(item.area || 'Haus');
+        const hasTemperature = item.current_temperature !== null && item.current_temperature !== undefined;
+        const hasHumidity = item.humidity !== null && item.humidity !== undefined;
+        if (hasTemperature || hasHumidity) areas.add(item.area || 'Haus');
     }
 
     return [...areas]
         .map((area) => {
             const floor = roomToFloor.get(normalizeArea(area)) || 'Haus';
             const items = (data.temperature_sensors ?? [])
-                .filter((sensor) =>
-    sameArea(sensor.area, area) &&
-    sensor.temperature !== null &&
-    sensor.temperature !== undefined &&
-    isRoomTemperatureSensor(sensor)
-)
+                .filter((sensor) => {
+                    const hasTemperature = sensor.temperature !== null && sensor.temperature !== undefined;
+                    const hasHumidity = sensor.humidity !== null && sensor.humidity !== undefined;
+                    return sameArea(sensor.area, area) && (hasTemperature || hasHumidity) && isRoomTemperatureSensor(sensor);
+                })
                 .sort((left, right) => left.name.localeCompare(right.name));
             const climate = data.climate
-                .filter((item) => sameArea(item.area, area) && item.current_temperature !== null && item.current_temperature !== undefined)
+                .filter((item) => {
+                    const hasTemperature = item.current_temperature !== null && item.current_temperature !== undefined;
+                    const hasHumidity = item.humidity !== null && item.humidity !== undefined;
+                    return sameArea(item.area, area) && (hasTemperature || hasHumidity);
+                })
                 .sort((left, right) => left.name.localeCompare(right.name));
             const temperatures = [
                 ...items.map((item) => item.temperature),
