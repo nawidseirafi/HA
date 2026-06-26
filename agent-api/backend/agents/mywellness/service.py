@@ -27,7 +27,7 @@ from .store import (
     save_booking_history,
     save_course_history,
 )
-from .calendar_service import add_course_to_calendar
+from .calendar_service import add_course_to_calendar, remove_course_from_calendar
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -569,6 +569,7 @@ class MyWellnessService:
         verb = "gebucht" if action == "book" else "storniert"
         message = f"{course.get('title')} erfolgreich {verb}."
         self._agent_log(message)
+        calendar_result = None
         if action == "book":
             delete_prepared_courses(str(course.get("partitionDate") or ""), [course_id])
             try:
@@ -582,7 +583,16 @@ class MyWellnessService:
                 calendar_result = {"ok": False, "error": str(exc)}
                 self._agent_log(f"Kalendereintrag konnte nicht erstellt werden: {exc}")
         else:
-            calendar_result = None
+            try:
+                calendar_result = remove_course_from_calendar(
+                    course,
+                    HomeAssistantService(),
+                    calendar_entity=self._mywellness_config().get("calendar_entity"),
+                )
+                self._agent_log(f"Kalendereintrag fuer {course.get('title')} geloescht: {calendar_result}")
+            except Exception as exc:
+                calendar_result = {"ok": False, "error": str(exc)}
+                self._agent_log(f"Kalendereintrag konnte nicht geloescht werden: {exc}")
         try:
             save_booking_history(
                 booking_id=str(course.get("bookingUserStatus") or course.get("id") or ""),

@@ -1,4 +1,4 @@
-from backend.agents.mywellness.calendar_service import add_course_to_calendar
+from backend.agents.mywellness.calendar_service import add_course_to_calendar, remove_course_from_calendar
 
 
 class FakeHomeAssistant:
@@ -68,4 +68,55 @@ def test_add_course_to_calendar_skips_course_without_start_time():
     result = add_course_to_calendar({"title": "Body Workout"}, ha, calendar_entity="calendar.devcal")
 
     assert result == {"ok": False, "skipped": True, "reason": "missing_start_time", "entity_id": "calendar.devcal"}
+    assert ha.calls == []
+
+
+def test_remove_course_from_calendar_deletes_matching_homeassistant_event():
+    ha = FakeHomeAssistant(events=[
+        {"summary": "Body Workout", "start": {"dateTime": "2026-06-23T18:00:00"}, "uid": "event-123"},
+    ])
+
+    result = remove_course_from_calendar(
+        {"title": "Body Workout", "startTime": "2026-06-23T18:00:00", "endTime": "2026-06-23T19:00:00"},
+        ha,
+        calendar_entity="calendar.devcal",
+    )
+
+    assert result["ok"] is True
+    assert result["skipped"] is False
+    assert result["uid"] == "event-123"
+    assert ha.calls == [
+        {
+            "domain": "calendar",
+            "service": "delete_event",
+            "payload": {"entity_id": "calendar.devcal", "uid": "event-123"},
+        }
+    ]
+
+
+def test_remove_course_from_calendar_skips_when_event_is_not_found():
+    ha = FakeHomeAssistant()
+
+    result = remove_course_from_calendar(
+        {"title": "Body Workout", "startTime": "2026-06-23T18:00:00", "endTime": "2026-06-23T19:00:00"},
+        ha,
+        calendar_entity="calendar.devcal",
+    )
+
+    assert result == {"ok": True, "skipped": True, "reason": "not_found", "entity_id": "calendar.devcal"}
+    assert ha.calls == []
+
+
+def test_remove_course_from_calendar_requires_homeassistant_event_uid():
+    ha = FakeHomeAssistant(events=[
+        {"summary": "Body Workout", "start": {"dateTime": "2026-06-23T18:00:00"}},
+    ])
+
+    result = remove_course_from_calendar(
+        {"title": "Body Workout", "startTime": "2026-06-23T18:00:00", "endTime": "2026-06-23T19:00:00"},
+        ha,
+        calendar_entity="calendar.devcal",
+    )
+
+    assert result == {"ok": False, "skipped": True, "reason": "missing_event_uid", "entity_id": "calendar.devcal"}
     assert ha.calls == []

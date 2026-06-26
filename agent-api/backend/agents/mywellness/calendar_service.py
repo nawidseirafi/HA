@@ -8,12 +8,7 @@ DEFAULT_MYWELLNESS_CALENDAR_ENTITY = "calendar.devcal"
 
 
 def add_course_to_calendar(course: dict[str, Any], ha_service: Any, calendar_entity: str | None = None) -> dict[str, Any]:
-    entity_id = normalize_calendar_entity(
-        calendar_entity
-        or os.getenv("MYWELLNESS_CALENDAR_ENTITY")
-        or os.getenv("WALL_CALENDAR_ENTITY")
-        or DEFAULT_MYWELLNESS_CALENDAR_ENTITY
-    )
+    entity_id = resolve_calendar_entity(calendar_entity)
     title = str(course.get("title") or course.get("name") or "MyWellness Kurs").strip()
     start = normalize_datetime(course.get("startTime") or course.get("starts_at") or course.get("start_time"))
     end = normalize_datetime(course.get("endTime") or course.get("ends_at") or course.get("end_time"))
@@ -36,10 +31,37 @@ def add_course_to_calendar(course: dict[str, Any], ha_service: Any, calendar_ent
     if location:
         payload["location"] = location
     response = ha_service.call_service("calendar", "create_event", payload)
-    return {"ok": True, "skipped": False, "entity_id": entity_id, "response": response}
+    verified = calendar_event_exists(ha_service, entity_id, title, start, end)
+    return {"ok": True, "skipped": False, "entity_id": entity_id, "verified": verified, "response": response}
+
+
+def remove_course_from_calendar(course: dict[str, Any], ha_service: Any, calendar_entity: str | None = None) -> dict[str, Any]:
+    entity_id = resolve_calendar_entity(calendar_entity)
+    title = str(course.get("title") or course.get("name") or "MyWellness Kurs").strip()
+    start = normalize_datetime(course.get("startTime") or course.get("starts_at") or course.get("start_time"))
+    end = normalize_datetime(course.get("endTime") or course.get("ends_at") or course.get("end_time"))
+    if not start:
+        return {"ok": False, "skipped": True, "reason": "missing_start_time", "entity_id": entity_id}
+    if not end:
+        end = (parse_datetime(start) + timedelta(hours=1)).isoformat(timespec="minutes")
+
+    event = find_calendar_event(ha_service, entity_id, title, start, end)
+    if not event:
+        return {"ok": True, "skipped": True, "reason": "not_found", "entity_id": entity_id}
+
+    uid = event_uid(event)
+    if not uid:
+        return {"ok": False, "skipped": True, "reason": "missing_event_uid", "entity_id": entity_id}
+
+    response = ha_service.call_service("calendar", "delete_event", {"entity_id": entity_id, "uid": uid})
+    return {"ok": True, "skipped": False, "entity_id": entity_id, "uid": uid, "response": response}
 
 
 def calendar_event_exists(ha_service: Any, entity_id: str, title: str, start: str, end: str) -> bool:
+    return find_calendar_event(ha_service, entity_id, title, start, end) is not None
+
+
+def find_calendar_event(ha_service: Any, entity_id: str, title: str, start: str, end: str) -> dict[str, Any] | None:
     try:
         start_dt = parse_datetime(start)
         end_dt = parse_datetime(end)
@@ -49,7 +71,7 @@ def calendar_event_exists(ha_service: Any, entity_id: str, title: str, start: st
             (end_dt + timedelta(minutes=2)).isoformat(),
         )
     except Exception:
-        return False
+        return None
     expected_start = parse_datetime(start)
     normalized_title = normalize_title(title)
     for event in events if isinstance(events, list) else []:
@@ -58,8 +80,17 @@ def calendar_event_exists(ha_service: Any, entity_id: str, title: str, start: st
         event_title = normalize_title(event.get("summary") or event.get("title") or event.get("message"))
         event_start = parse_calendar_event_time(event.get("start"))
         if event_title == normalized_title and event_start and abs((comparable_datetime(event_start) - comparable_datetime(expected_start)).total_seconds()) < 120:
-            return True
-    return False
+            return event
+    return None
+
+
+def resolve_calendar_entity(value: Any) -> str:
+    return normalize_calendar_entity(
+        value
+        or os.getenv("MYWELLNESS_CALENDAR_ENTITY")
+        or os.getenv("WALL_CALENDAR_ENTITY")
+        or DEFAULT_MYWELLNESS_CALENDAR_ENTITY
+    )
 
 
 def normalize_calendar_entity(value: Any) -> str:
@@ -104,3 +135,11 @@ def normalize_title(value: Any) -> str:
 
 def comparable_datetime(value: datetime) -> datetime:
     return value.replace(tzinfo=None)
+
+
+def event_uid(event: dict[str, Any]) -> str:
+    for key in ("uid", "id", "event_id"):
+        value = str(event.get(key) or "").strip()
+        if value:
+            return value
+    return ""
