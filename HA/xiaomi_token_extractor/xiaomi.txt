@@ -1,16 +1,16 @@
 Devices found for server "de" @ home "445001048926":
    ---------
-   NAME:     Schlafzimmer Fan
+   NAME:     Ventilator Nawid
    ID:       534237341
    MAC:      7C:C2:94:F2:0E:9D
    IP:       192.168.178.97
-   TOKEN:    4b6298a29540524d49787c40ba082a61
+   TOKEN:    ebfcfc56b814bae40a69eaa4a356d646
    MODEL:    zhimi.fan.za5
    ---------
-   NAME:     Nika Fan
+   NAME:     Ventilator Nika
    ID:       553307971
    MAC:      68:AB:BC:6B:2C:55
    IP:       192.168.178.31
-   TOKEN:    49b952c01e281fbcf54f172538700b3b
+   TOKEN:    169c3fcd092a96bd822a9d98f15b81c7
    MODEL:    zhimi.fan.za5
    ---------
