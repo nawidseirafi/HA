@@ -14,6 +14,8 @@ import {
     ChevronRight,
     CloudSun,
     DoorOpen,
+    Fan,
+    DoorClosed,
     GripVertical,
     Home,
     Lightbulb,
@@ -48,7 +50,7 @@ import {
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
 
-type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'agents' | 'floor' | 'room' | 'batteries';
+type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries';
 type BatteryBadge = { label: string; tone: string };
 type OutletPower = { watts: number; label: string };
 type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
@@ -709,6 +711,12 @@ function WallDashboardContent() {
         setSection('batteries');
     };
 
+    const openOpenings = () => {
+        setFloorView('');
+        setRoomView('');
+        setSection('openings');
+    };
+
     const openClimates = () => {
         setFloorView('');
         setRoomView('');
@@ -745,7 +753,7 @@ function WallDashboardContent() {
                     <Lightbulb size={24}/></button>
                 <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')}
                         aria-label="Klima"><Thermometer size={24}/></button>
-                <button className={section === 'security' ? 'active' : ''} onClick={() => goSection('security')}
+                <button className={section === 'security' || section === 'openings' ? 'active' : ''} onClick={() => goSection('security')}
                         aria-label="Sicherheit"><ShieldAlert size={24}/></button>
                 <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')}
                         aria-label="Agenten"><Bot size={24}/></button>
@@ -783,6 +791,7 @@ function WallDashboardContent() {
                 {data && section === 'home' &&
                     <HomeSection data={data} busyEntity={busyEntity} onLights={openLights} onFloor={openFloor}
                                  onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates}
+                                 onOpenings={openOpenings}
                                  onClearPost={clearPost} onToggleVacation={toggleVacation}
                                  onGarageCommand={callCover}/>}
                 {data && section === 'lights' && (
@@ -801,6 +810,7 @@ function WallDashboardContent() {
                 {data && section === 'climate' &&
                     <ClimateSection data={data} selectedFloor={selectedFloor} onFloor={setSelectedFloor}/>}
                 {data && section === 'security' && <SecuritySection data={data}/>}
+                {data && section === 'openings' && <OpeningsSection data={data} onBack={() => goSection('home')}/>}
                 {data && section === 'agents' && <AgentsSection data={data}/>}
                 {data && section === 'batteries' && <BatteriesSection data={data} onBack={() => goSection('home')}/>}
                 {data && section === 'floor' && (
@@ -845,6 +855,7 @@ function HomeSection({
                          onBatteries,
                          onAgents,
                          onClimate,
+                         onOpenings,
                          onClearPost,
                          onToggleVacation,
                          onGarageCommand,
@@ -857,6 +868,7 @@ function HomeSection({
     onBatteries: () => void;
     onAgents: () => void;
     onClimate: () => void;
+    onOpenings: () => void;
     onClearPost: () => void;
     onToggleVacation: () => void;
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
@@ -912,9 +924,9 @@ function HomeSection({
                         detail="aktiv" tone={activeLights ? 'light' : 'neutral'} onClick={onLights}/>
         ),
         security: (
-            <MetricCard icon={<DoorOpen size={24}/>} label="Fenster & Türen"
+            <MetricCard icon={open ? <DoorOpen size={24}/> : <DoorClosed size={24}/>} label="Fenster & Türen"
                         value={`${open}/${data.security.openings_total}`} detail="offen"
-                        tone={open ? 'critical' : 'ok'}/>
+                        tone={open ? 'critical' : 'ok'} onClick={onOpenings}/>
         ),
         post: (
             <MetricCard
@@ -1673,16 +1685,31 @@ function RoomFanControl({
     const percentage = clampPercent(fan.percentage ?? (deviceActive(fan) ? 100 : 0));
     const presetModes = fan.preset_modes ?? [];
     const direction = String(fan.direction || 'forward').toLowerCase();
+    const isOn = deviceActive(fan);
+    const fanSpinDuration = percentage >= 75 ? '0.55s' : percentage >= 45 ? '1s' : percentage > 0 ? '1.8s' : '0s';
     return (
-        <article className={`wall-room-panel wall-fan-control ${deviceActive(fan) ? 'active' : ''}`}>
-            <div className="wall-room-panel-title">
-                <span>{fan.name}</span>
-                <strong>{busy ? 'Schaltet...' : fanStatusLabel(fan)}{battery && <BatteryPill battery={battery}/>}</strong>
-            </div>
-            <div className="wall-fan-status-row">
-                <span className={`wall-status-dot ${deviceActive(fan) ? 'active' : ''}`}/>
-                <span>{deviceActive(fan) ? 'Aktiv' : 'Aus'}</span>
-            </div>
+        <article className={`wall-room-panel wall-fan-control ${isOn ? 'active' : ''}`}>
+            <button
+                type="button"
+                className="wall-fan-homekit-card"
+                disabled={busy}
+                onClick={() => onToggle?.(fan)}
+                aria-pressed={isOn}
+                aria-label={`${fan.name} ein- oder ausschalten`}
+            >
+                <span className="wall-fan-icon-shell">
+                    <Fan
+                        size={34}
+                        className="wall-fan-icon"
+                        style={{animationDuration: fanSpinDuration}}
+                        aria-hidden="true"
+                    />
+                </span>
+                <span className="wall-fan-homekit-copy">
+                    <span>{fan.name}</span>
+                    <strong>{busy ? 'Schaltet...' : fanStatusLabel(fan)}{battery && <BatteryPill battery={battery}/>}</strong>
+                </span>
+            </button>
             <div className="wall-fan-speed">
                 <div>
                     <span>Geschwindigkeit</span>
@@ -1704,9 +1731,9 @@ function RoomFanControl({
             <div className="wall-fan-control-list">
                 <div className="wall-fan-control-row">
                     <span>Ventilator</span>
-                    <button type="button" className={`wall-switch ${deviceActive(fan) ? 'on' : ''}`}
+                    <button type="button" className={`wall-switch ${isOn ? 'on' : ''}`}
                             disabled={busy} onClick={() => onToggle?.(fan)}
-                            aria-pressed={deviceActive(fan)} aria-label="Ventilator ein- oder ausschalten"/>
+                            aria-pressed={isOn} aria-label="Ventilator ein- oder ausschalten"/>
                 </div>
                 {fanSupportsOscillation(fan) && (
                     <div className="wall-fan-control-row">
@@ -1942,6 +1969,114 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <ListPanel title="Offene Fenster & Türen" items={openItems}/>
             <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
+        </div>
+    );
+}
+
+function OpeningsSection({data, onBack}: { data: WallDashboardData; onBack: () => void }) {
+    const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
+    const openings = [...(data.security.openings ?? [])].sort((a, b) => {
+        const openDiff = Number(openingIsOpen(b)) - Number(openingIsOpen(a));
+        if (openDiff) return openDiff;
+        return `${a.area || ''}${a.name || ''}`.localeCompare(`${b.area || ''}${b.name || ''}`, 'de');
+    });
+    const openItems = openings.filter(openingIsOpen);
+    const closedItems = openings.filter((item) => !openingIsOpen(item));
+    const visibleItems = filter === 'open' ? openItems : filter === 'closed' ? closedItems : openings;
+    const groups = groupOpeningsByArea(visibleItems);
+    const openWindows = openItems.filter((item) => openingKind(item) === 'window').length;
+    const openDoors = openItems.filter((item) => openingKind(item) === 'door').length;
+    const allClosed = openItems.length === 0;
+
+    return (
+        <div className="wall-page-stack">
+            <section className={`wall-openings-hero ${allClosed ? 'secure' : 'alert'}`}>
+                <div className="wall-openings-hero-icon">
+                    {allClosed ? <DoorClosed size={34}/> : <DoorOpen size={34}/>}
+                </div>
+                <div className="wall-openings-hero-copy">
+                    <small>Fenster & Türen</small>
+                    <h2>{allClosed ? 'Alles geschlossen' : `${openItems.length} offen`}</h2>
+                    <p>
+                        {allClosed
+                            ? `${closedItems.length} Kontakte sind geschlossen.`
+                            : [
+                                openDoors ? `${openDoors} ${openDoors === 1 ? 'Tür' : 'Türen'}` : '',
+                                openWindows ? `${openWindows} Fenster` : '',
+                                openItems.length - openDoors - openWindows > 0 ? `${openItems.length - openDoors - openWindows} Kontakte` : '',
+                            ].filter(Boolean).join(' · ') + ' offen'}
+                    </p>
+                </div>
+                <button type="button" onClick={onBack}>Zurück</button>
+            </section>
+
+            <div className="wall-openings-summary">
+                <article>
+                    <span>Offen</span>
+                    <strong>{openItems.length}</strong>
+                </article>
+                <article>
+                    <span>Geschlossen</span>
+                    <strong>{closedItems.length}</strong>
+                </article>
+                <article>
+                    <span>Gesamt</span>
+                    <strong>{openings.length}</strong>
+                </article>
+            </div>
+
+            <div className="wall-openings-filter" role="group" aria-label="Fenster und Türen filtern">
+                <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
+                    Alle
+                </button>
+                <button type="button" className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>
+                    Offen
+                </button>
+                <button type="button" className={filter === 'closed' ? 'active' : ''} onClick={() => setFilter('closed')}>
+                    Geschlossen
+                </button>
+            </div>
+
+            {groups.length === 0 ? (
+                <section className="wall-panel wall-openings-empty">
+                    Keine passenden Fenster oder Türen gefunden.
+                </section>
+            ) : (
+                <div className="wall-openings-groups">
+                    {groups.map((group) => {
+                        const groupOpen = group.items.filter(openingIsOpen).length;
+                        return (
+                            <section className="wall-openings-group" key={group.area}>
+                                <div className="wall-openings-group-head">
+                                    <div>
+                                        <span>{group.area}</span>
+                                        <strong>{groupOpen ? `${groupOpen} offen` : 'geschlossen'}</strong>
+                                    </div>
+                                    <small>{group.items.length} Kontakte</small>
+                                </div>
+                                <div className="wall-openings-list">
+                                    {group.items.map((item) => {
+                                        const isOpen = openingIsOpen(item);
+                                        const kind = openingKind(item);
+                                        return (
+                                            <article className={`wall-opening-card ${isOpen ? 'open' : 'closed'}`} key={item.entity_id}>
+                                                <span className="wall-opening-icon">
+                                                    {isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
+                                                </span>
+                                                <div>
+                                                    <strong>{item.name}</strong>
+                                                    <small>{openingKindLabel(item)} · {item.entity_id}</small>
+                                                </div>
+                                                <b>{isOpen ? 'Offen' : 'Zu'}</b>
+                                            </article>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
@@ -2346,6 +2481,7 @@ function titleFor(section: WallSection) {
     if (section === 'lights') return 'Lampen';
     if (section === 'climate') return 'Klima';
     if (section === 'security') return 'Sicherheit';
+    if (section === 'openings') return 'Fenster & Türen';
     if (section === 'agents') return 'Agenten';
     if (section === 'batteries') return 'Batterien';
     return 'Zuhause';
@@ -2357,6 +2493,7 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
     if (section === 'room') return 'Geräte in diesem Raum';
     if (section === 'batteries') return 'Batteriestände und Status aller Batterie-Geräte';
     if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
+    if (section === 'openings' && data) return data.security.openings_open ? `${data.security.openings_open} Kontakte offen` : 'Alle Fenster und Türen geschlossen';
     if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
     if (section === 'climate') return 'Temperaturen, Luftfeuchte und Thermostate';
     if (section === 'home' && data) return `Aktualisiert ${formatTime(data.updated_at)} · ${data.home_assistant.entity_count} Home-Assistant-Entities`;
@@ -2821,6 +2958,25 @@ function openingKindLabel(item: WallEntity) {
     if (kind === 'door') return 'Tür';
     if (kind === 'window') return 'Fenster';
     return 'Kontakt';
+}
+
+function openingIsOpen(item: WallEntity) {
+    return String(item.state).toLowerCase() === 'on';
+}
+
+function groupOpeningsByArea(items: WallEntity[]) {
+    const groups = new Map<string, WallEntity[]>();
+    for (const item of items) {
+        const area = item.area || 'Ohne Raum';
+        groups.set(area, [...(groups.get(area) ?? []), item]);
+    }
+    return [...groups.entries()]
+        .map(([area, groupItems]) => ({area, items: groupItems}))
+        .sort((a, b) => {
+            const openDiff = b.items.filter(openingIsOpen).length - a.items.filter(openingIsOpen).length;
+            if (openDiff) return openDiff;
+            return a.area.localeCompare(b.area, 'de');
+        });
 }
 
 function openingKind(item: WallEntity) {
