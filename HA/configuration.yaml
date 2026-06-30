@@ -16,21 +16,18 @@ mqtt:
       state_class: measurement
   binary_sensor:
     - name: "Tasche Bewegung"
-      unique_id: tasche_bewegung
+      unique_id: tasche_bewegung_mqtt
       state_topic: "zigbee2mqtt/Diebstahlsensor"
-      payload_on: "on"
-      payload_off: "off"
       device_class: motion
       off_delay: 120
-      payload_available: "online"
-      payload_not_available: "offline"
-      availability_topic: "zigbee2mqtt/bridge/state"
       value_template: >
-        {% if value_json.action in ['movement', 'vibration'] %}
-          on
+        {% if value_json.action | default('') in ['movement', 'vibration'] %}
+          ON
         {% else %}
-          off
+          OFF
         {% endif %}
+      payload_on: "ON"
+      payload_off: "OFF"
 command_line:
   - sensor:
       name: "Abfall naechster Termin"
@@ -73,21 +70,6 @@ lovelace:
             filename: dashboards/iphone-dashboard.yaml
 
 template:
-  - switch:
-    - turn_on:
-      - entity_id:
-        - input_boolean.garageSwitch_switch
-        action: input_boolean.turn_on
-      - entity_id:
-        - input_boolean.garageSwitch_switch
-        action: input_boolean.turn_off
-      turn_off:
-      - entity_id:
-        - input_boolean.garageSwitch_switch
-        action: input_boolean.turn_off
-      default_entity_id: switch.garageSwitch
-      state: '{{ is_state(''input_boolean.dummy_switch'', ''on'') }}'
-      name: garageSwitch
   - sensor:
       - name: "Abfall naechste Art"
         unique_id: abfall_naechste_art
