@@ -810,7 +810,7 @@ function WallDashboardContent() {
                 {data && section === 'climate' &&
                     <ClimateSection data={data} selectedFloor={selectedFloor} onFloor={setSelectedFloor}/>}
                 {data && section === 'security' && <SecuritySection data={data}/>}
-                {data && section === 'openings' && <OpeningsSection data={data} onBack={() => goSection('home')}/>}
+                {data && section === 'openings' && <OpeningsSection data={data}/>}
                 {data && section === 'agents' && <AgentsSection data={data}/>}
                 {data && section === 'batteries' && <BatteriesSection data={data} onBack={() => goSection('home')}/>}
                 {data && section === 'floor' && (
@@ -1973,70 +1973,16 @@ function SecuritySection({data}: { data: WallDashboardData }) {
     );
 }
 
-function OpeningsSection({data, onBack}: { data: WallDashboardData; onBack: () => void }) {
-    const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
+function OpeningsSection({data}: { data: WallDashboardData }) {
     const openings = [...(data.security.openings ?? [])].sort((a, b) => {
         const openDiff = Number(openingIsOpen(b)) - Number(openingIsOpen(a));
         if (openDiff) return openDiff;
         return `${a.area || ''}${a.name || ''}`.localeCompare(`${b.area || ''}${b.name || ''}`, 'de');
     });
-    const openItems = openings.filter(openingIsOpen);
-    const closedItems = openings.filter((item) => !openingIsOpen(item));
-    const visibleItems = filter === 'open' ? openItems : filter === 'closed' ? closedItems : openings;
-    const groups = groupOpeningsByArea(visibleItems);
-    const openWindows = openItems.filter((item) => openingKind(item) === 'window').length;
-    const openDoors = openItems.filter((item) => openingKind(item) === 'door').length;
-    const allClosed = openItems.length === 0;
+    const groups = groupOpeningsByRoom(openings, data);
 
     return (
         <div className="wall-page-stack">
-            <section className={`wall-openings-hero ${allClosed ? 'secure' : 'alert'}`}>
-                <div className="wall-openings-hero-icon">
-                    {allClosed ? <DoorClosed size={34}/> : <DoorOpen size={34}/>}
-                </div>
-                <div className="wall-openings-hero-copy">
-                    <small>Fenster & Türen</small>
-                    <h2>{allClosed ? 'Alles geschlossen' : `${openItems.length} offen`}</h2>
-                    <p>
-                        {allClosed
-                            ? `${closedItems.length} Kontakte sind geschlossen.`
-                            : [
-                                openDoors ? `${openDoors} ${openDoors === 1 ? 'Tür' : 'Türen'}` : '',
-                                openWindows ? `${openWindows} Fenster` : '',
-                                openItems.length - openDoors - openWindows > 0 ? `${openItems.length - openDoors - openWindows} Kontakte` : '',
-                            ].filter(Boolean).join(' · ') + ' offen'}
-                    </p>
-                </div>
-                <button type="button" onClick={onBack}>Zurück</button>
-            </section>
-
-            <div className="wall-openings-summary">
-                <article>
-                    <span>Offen</span>
-                    <strong>{openItems.length}</strong>
-                </article>
-                <article>
-                    <span>Geschlossen</span>
-                    <strong>{closedItems.length}</strong>
-                </article>
-                <article>
-                    <span>Gesamt</span>
-                    <strong>{openings.length}</strong>
-                </article>
-            </div>
-
-            <div className="wall-openings-filter" role="group" aria-label="Fenster und Türen filtern">
-                <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
-                    Alle
-                </button>
-                <button type="button" className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>
-                    Offen
-                </button>
-                <button type="button" className={filter === 'closed' ? 'active' : ''} onClick={() => setFilter('closed')}>
-                    Geschlossen
-                </button>
-            </div>
-
             {groups.length === 0 ? (
                 <section className="wall-panel wall-openings-empty">
                     Keine passenden Fenster oder Türen gefunden.
@@ -2045,14 +1991,15 @@ function OpeningsSection({data, onBack}: { data: WallDashboardData; onBack: () =
                 <div className="wall-openings-groups">
                     {groups.map((group) => {
                         const groupOpen = group.items.filter(openingIsOpen).length;
+                        const groupClosed = group.items.length - groupOpen;
                         return (
-                            <section className="wall-openings-group" key={group.area}>
+                            <section className={`wall-openings-room-card ${groupOpen ? 'has-open' : 'all-closed'}`} key={group.area}>
                                 <div className="wall-openings-group-head">
                                     <div>
                                         <span>{group.area}</span>
-                                        <strong>{groupOpen ? `${groupOpen} offen` : 'geschlossen'}</strong>
+                                        <strong>{groupOpen ? `${groupOpen} offen` : 'alles geschlossen'}</strong>
                                     </div>
-                                    <small>{group.items.length} Kontakte</small>
+                                    <small>{groupClosed}/{group.items.length} zu</small>
                                 </div>
                                 <div className="wall-openings-list">
                                     {group.items.map((item) => {
@@ -2061,11 +2008,13 @@ function OpeningsSection({data, onBack}: { data: WallDashboardData; onBack: () =
                                         return (
                                             <article className={`wall-opening-card ${isOpen ? 'open' : 'closed'}`} key={item.entity_id}>
                                                 <span className="wall-opening-icon">
-                                                    {isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
+                                                    {kind === 'window'
+                                                        ? <Square size={22}/>
+                                                        : isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
                                                 </span>
                                                 <div>
                                                     <strong>{item.name}</strong>
-                                                    <small>{openingKindLabel(item)} · {item.entity_id}</small>
+                                                    <small>{openingKindLabel(item)}</small>
                                                 </div>
                                                 <b>{isOpen ? 'Offen' : 'Zu'}</b>
                                             </article>
@@ -2964,10 +2913,12 @@ function openingIsOpen(item: WallEntity) {
     return String(item.state).toLowerCase() === 'on';
 }
 
-function groupOpeningsByArea(items: WallEntity[]) {
+function groupOpeningsByRoom(items: WallEntity[], data: WallDashboardData) {
+    const knownRooms = data.light_groups.flatMap((group) => floorRooms(data, group.area).map((room) => room.area));
     const groups = new Map<string, WallEntity[]>();
     for (const item of items) {
-        const area = item.area || 'Ohne Raum';
+        const matchedRoom = knownRooms.find((room) => roomEntityMatches(item, room));
+        const area = matchedRoom || item.area || 'Ohne Raum';
         groups.set(area, [...(groups.get(area) ?? []), item]);
     }
     return [...groups.entries()]
@@ -3003,6 +2954,9 @@ function roomAliases(room: string) {
         bedroom: ['bedroom', 'schlafzimmer'],
         hallway: ['hallway', 'flur', 'diele'],
         entrance: ['entrance', 'eingang'],
+        hobby: ['hobby', 'hobbyraum', 'hobby room'],
+        hobbyraum: ['hobbyraum', 'hobby', 'hobby room'],
+        'hobby room': ['hobby room', 'hobby', 'hobbyraum'],
         office: ['office', 'büro', 'buero', 'arbeitszimmer'],
         'home office': ['home office', 'office', 'büro', 'buero', 'arbeitszimmer'],
         büro: ['büro', 'buero', 'office', 'arbeitszimmer'],
