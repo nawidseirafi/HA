@@ -1,4 +1,5 @@
 import type { Contract, ContractAnalysis, ContractReminder, FinanceSummary, Invoice, MonthSummary, Summary, YearSummary } from '@shared/types/invoice';
+import type {LawnMowerEntity} from '@shared/types/robotDevices';
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const API_BASE = normalizeApiBase(RAW_API_BASE);
@@ -765,6 +766,7 @@ export type WallDashboardData = {
   sensors?: WallEntity[];
   switches: WallEntity[];
   fans?: WallFan[];
+  lawn_mowers?: LawnMowerEntity[];
   media_players?: WallEntity[];
   climate: WallClimate[];
   temperature_sensors: WallTemperatureSensor[];

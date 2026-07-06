@@ -47,6 +47,7 @@ import {
     type WallLightRoom,
     type WallTemperatureSensor
 } from '@shared/api/client';
+import {WallMowerCard} from '../components/wall/WallMowerCard';
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
 
@@ -94,6 +95,8 @@ type HomeCardId =
     | 'fritzbox'
     | 'calendar'
     | 'floors';
+type MowerHomeCardId = `mower:${string}`;
+type WallHomeCardId = HomeCardId | MowerHomeCardId;
 
 const WALL_HOME_CARD_ORDER_KEY = 'robotersteve.wall.home.cardOrder';
 const WALL_HOME_LONG_PRESS_MS = 650;
@@ -116,24 +119,40 @@ const HOME_CARD_SPANS: Partial<Record<HomeCardId, 2>> = {
     floors: 2,
 };
 
-function normalizeHomeCardOrder(value: unknown): HomeCardId[] {
-    const known = new Set<HomeCardId>(DEFAULT_HOME_CARD_ORDER);
-    const fromStorage = Array.isArray(value)
-        ? value.filter((item): item is HomeCardId => known.has(item as HomeCardId))
-        : [];
-    return [...fromStorage, ...DEFAULT_HOME_CARD_ORDER.filter((item) => !fromStorage.includes(item))];
+function isMowerHomeCardId(value: string): value is MowerHomeCardId {
+    return value.startsWith('mower:') && value.length > 'mower:'.length;
 }
 
-function readHomeCardOrder(): HomeCardId[] {
+function normalizeHomeCardOrder(value: unknown, mowerIds: MowerHomeCardId[] = []): WallHomeCardId[] {
+    const known = new Set<HomeCardId>(DEFAULT_HOME_CARD_ORDER);
+    const knownMowers = new Set<MowerHomeCardId>(mowerIds);
+    const fromStorage = Array.isArray(value)
+        ? value.filter((item): item is WallHomeCardId => (
+            known.has(item as HomeCardId) || (typeof item === 'string' && knownMowers.has(item as MowerHomeCardId))
+        ))
+        : [];
+    return [
+        ...fromStorage,
+        ...mowerIds.filter((item) => !fromStorage.includes(item)),
+        ...DEFAULT_HOME_CARD_ORDER.filter((item) => !fromStorage.includes(item)),
+    ];
+}
+
+function readHomeCardOrder(): WallHomeCardId[] {
     if (typeof window === 'undefined') return DEFAULT_HOME_CARD_ORDER;
     try {
-        return normalizeHomeCardOrder(JSON.parse(window.localStorage.getItem(WALL_HOME_CARD_ORDER_KEY) || '[]'));
+        const parsed = JSON.parse(window.localStorage.getItem(WALL_HOME_CARD_ORDER_KEY) || '[]');
+        return Array.isArray(parsed)
+            ? parsed.filter((item): item is WallHomeCardId => (
+                DEFAULT_HOME_CARD_ORDER.includes(item as HomeCardId) || (typeof item === 'string' && isMowerHomeCardId(item))
+            ))
+            : DEFAULT_HOME_CARD_ORDER;
     } catch {
         return DEFAULT_HOME_CARD_ORDER;
     }
 }
 
-function moveHomeCard(order: HomeCardId[], source: HomeCardId, target: HomeCardId) {
+function moveHomeCard(order: WallHomeCardId[], source: WallHomeCardId, target: WallHomeCardId) {
     if (source === target) return order;
     const next = [...order];
     const sourceIndex = next.indexOf(source);
@@ -144,7 +163,7 @@ function moveHomeCard(order: HomeCardId[], source: HomeCardId, target: HomeCardI
     return next;
 }
 
-function shiftHomeCard(order: HomeCardId[], id: HomeCardId, offset: -1 | 1) {
+function shiftHomeCard(order: WallHomeCardId[], id: WallHomeCardId, offset: -1 | 1) {
     const index = order.indexOf(id);
     const targetIndex = index + offset;
     if (index < 0 || targetIndex < 0 || targetIndex >= order.length) return order;
@@ -793,6 +812,7 @@ function WallDashboardContent() {
                                  onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates}
                                  onOpenings={openOpenings}
                                  onClearPost={clearPost} onToggleVacation={toggleVacation}
+                                 onMowerUpdated={scheduleRefresh}
                                  onGarageCommand={callCover}/>}
                 {data && section === 'lights' && (
                     <LightsSection
@@ -841,6 +861,7 @@ function WallDashboardContent() {
                         onFanOscillation={toggleFanOscillation}
                         onFanDirection={toggleFanDirection}
                         onOutletToggle={toggleOutlet}
+                        onMowerUpdated={scheduleRefresh}
                     />
                 )}
             </main>
@@ -858,6 +879,7 @@ function HomeSection({
                          onOpenings,
                          onClearPost,
                          onToggleVacation,
+                         onMowerUpdated,
                          onGarageCommand,
                          busyEntity,
                      }: {
@@ -871,6 +893,7 @@ function HomeSection({
     onOpenings: () => void;
     onClearPost: () => void;
     onToggleVacation: () => void;
+    onMowerUpdated: () => void;
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
 }) {
     const hasPost = postStatus(data);
@@ -885,18 +908,23 @@ function HomeSection({
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
     const [layoutEditing, setLayoutEditing] = useState(false);
-    const [cardOrder, setCardOrder] = useState<HomeCardId[]>(readHomeCardOrder);
+    const [cardOrder, setCardOrder] = useState<WallHomeCardId[]>(readHomeCardOrder);
+    const mowerCardIds = useMemo(
+        () => (data.lawn_mowers ?? []).map((mower) => mowerHomeCardId(mower.entity_id)),
+        [data.lawn_mowers],
+    );
+    const orderedCardIds = normalizeHomeCardOrder(cardOrder, mowerCardIds);
 
     useEffect(() => {
-        window.localStorage.setItem(WALL_HOME_CARD_ORDER_KEY, JSON.stringify(cardOrder));
-    }, [cardOrder]);
+        window.localStorage.setItem(WALL_HOME_CARD_ORDER_KEY, JSON.stringify(orderedCardIds));
+    }, [orderedCardIds]);
 
-    const moveCard = useCallback((source: HomeCardId, target: HomeCardId) => {
-        setCardOrder((current) => moveHomeCard(current, source, target));
-    }, []);
-    const shiftCard = useCallback((cardId: HomeCardId, offset: -1 | 1) => {
-        setCardOrder((current) => shiftHomeCard(current, cardId, offset));
-    }, []);
+    const moveCard = useCallback((source: WallHomeCardId, target: WallHomeCardId) => {
+        setCardOrder((current) => moveHomeCard(normalizeHomeCardOrder(current, mowerCardIds), source, target));
+    }, [mowerCardIds]);
+    const shiftCard = useCallback((cardId: WallHomeCardId, offset: -1 | 1) => {
+        setCardOrder((current) => shiftHomeCard(normalizeHomeCardOrder(current, mowerCardIds), cardId, offset));
+    }, [mowerCardIds]);
 
     const cards: Record<HomeCardId, ReactNode> = {
         climate: <ClimateOverviewCard data={data} climate={climate} onClick={onClimate}/>,
@@ -980,24 +1008,47 @@ function HomeSection({
 
     return (
         <div className={`wall-home-grid ${layoutEditing ? 'is-editing' : ''}`}>
-            {cardOrder.map((cardId, index) => (
+            {orderedCardIds.map((cardId, index) => (
                 <HomeCardSlot
                     key={cardId}
                     id={cardId}
-                    span={HOME_CARD_SPANS[cardId]}
+                    span={homeCardSpan(cardId)}
                     editing={layoutEditing}
                     canShiftBack={index > 0}
-                    canShiftForward={index < cardOrder.length - 1}
+                    canShiftForward={index < orderedCardIds.length - 1}
                     onMove={moveCard}
                     onShift={shiftCard}
                     onBeginEdit={() => setLayoutEditing(true)}
                     onFinishEdit={() => setLayoutEditing(false)}
                 >
-                    {cards[cardId]}
+                    {renderHomeCard(cardId, cards, data, onMowerUpdated)}
                 </HomeCardSlot>
             ))}
         </div>
     );
+}
+
+function mowerHomeCardId(entityId: string): MowerHomeCardId {
+    return `mower:${entityId}`;
+}
+
+function homeCardSpan(cardId: WallHomeCardId): 2 | undefined {
+    if (isMowerHomeCardId(cardId)) return 2;
+    return HOME_CARD_SPANS[cardId];
+}
+
+function renderHomeCard(
+    cardId: WallHomeCardId,
+    cards: Record<HomeCardId, ReactNode>,
+    data: WallDashboardData,
+    onMowerUpdated: () => void,
+) {
+    if (isMowerHomeCardId(cardId)) {
+        const entityId = cardId.slice('mower:'.length);
+        const mower = (data.lawn_mowers ?? []).find((item) => item.entity_id === entityId);
+        return mower ? <WallMowerCard mower={mower} onUpdated={onMowerUpdated}/> : null;
+    }
+    return cards[cardId];
 }
 
 function HomeCardSlot({
@@ -1012,13 +1063,13 @@ function HomeCardSlot({
                           onFinishEdit,
                           children,
                       }: {
-    id: HomeCardId;
+    id: WallHomeCardId;
     span?: 2;
     editing: boolean;
     canShiftBack: boolean;
     canShiftForward: boolean;
-    onMove: (source: HomeCardId, target: HomeCardId) => void;
-    onShift: (id: HomeCardId, offset: -1 | 1) => void;
+    onMove: (source: WallHomeCardId, target: WallHomeCardId) => void;
+    onShift: (id: WallHomeCardId, offset: -1 | 1) => void;
     onBeginEdit: () => void;
     onFinishEdit: () => void;
     children: ReactNode;
@@ -1060,7 +1111,7 @@ function HomeCardSlot({
         if (!editing) return;
         event.preventDefault();
         setDragOver(false);
-        const source = event.dataTransfer.getData('text/plain') as HomeCardId;
+        const source = event.dataTransfer.getData('text/plain') as WallHomeCardId;
         onMove(source, id);
     };
 
@@ -1285,6 +1336,7 @@ function RoomSection({
                          onFanOscillation,
                          onFanDirection,
                          onOutletToggle,
+                         onMowerUpdated,
                      }: {
     data: WallDashboardData;
     floor: string;
@@ -1303,11 +1355,13 @@ function RoomSection({
     onFanOscillation: (fan: WallFan) => void;
     onFanDirection: (fan: WallFan) => void;
     onOutletToggle: (outlet: WallEntity) => void;
+    onMowerUpdated: () => void;
 }) {
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
+    const mowers = (data.lawn_mowers ?? []).filter((mower) => sameArea(mower.area, room));
     const outlets = roomOutlets(data, room);
     const outletGroups = groupRoomOutlets(outlets, room, data);
     const sensorChips = roomSensorChips(data, room);
@@ -1316,6 +1370,7 @@ function RoomSection({
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
         ...fans.map((fan) => fan.entity_id),
+        ...mowers.map((mower) => mower.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
     ]);
@@ -1323,7 +1378,7 @@ function RoomSection({
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + fans.length + outlets.length + sensorChips.length + otherDevices.length;
+    const deviceCount = lights.length + covers.length + climates.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length;
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
     const openingSummary = roomOpeningSummary(data, room);
@@ -1398,6 +1453,9 @@ function RoomSection({
                         onToggle={onOutletToggle}
                     />
                 )}
+                {mowers.map((mower) => (
+                    <WallMowerCard key={mower.entity_id} mower={mower} onUpdated={onMowerUpdated}/>
+                ))}
                 {sensorChips.length > 0 && (
                     <section className="wall-room-panel wall-room-sensors">
                         <div className="wall-room-panel-title">
@@ -1426,7 +1484,7 @@ function RoomSection({
                         </div>
                     </section>
                 )}
-                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && mowers.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
                     <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
                 )}
             </div>
@@ -2405,6 +2463,7 @@ function allWallEntities(data: WallDashboardData): WallEntity[] {
         ...(data.health?.batteries ?? []),
         ...(data.switches ?? []),
         ...(data.fans ?? []),
+        ...(data.lawn_mowers ?? []),
         ...(data.media_players ?? []),
         ...(data.temperature_sensors ?? []),
     ] as WallEntity[];

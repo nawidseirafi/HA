@@ -35,6 +35,7 @@ def wall_dashboard():
     sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "sensor"]
     switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "switch"]
     fans = [_with_area_lookup(_fan_item(state), area_lookup) for state in states if _domain(state) == "fan"]
+    lawn_mowers = [_with_area_lookup(_lawn_mower_item(state), area_lookup) for state in states if _domain(state) == "lawn_mower"]
     media_players = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "media_player"]
     climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _domain(state) == "climate"]
     temperature_sensors = [_with_area_lookup(item, area_lookup) for item in _temperature_items(states)]
@@ -86,6 +87,7 @@ def wall_dashboard():
         "sensors": sorted(sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "switches": switches,
         "fans": sorted(fans, key=lambda item: (item.get("area") or "", item.get("name") or "")),
+        "lawn_mowers": sorted(lawn_mowers, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "media_players": media_players,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
@@ -278,6 +280,19 @@ def _fan_item(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _lawn_mower_item(state: dict[str, Any]) -> dict[str, Any]:
+    attributes = state.get("attributes", {})
+    supported_features = attributes.get("supported_features")
+    return {
+        **_simple_item(state),
+        "battery_level": _lawn_mower_battery_level(attributes),
+        "raw_status": attributes.get("status"),
+        "supported_features": supported_features if isinstance(supported_features, int) else _numeric_int(supported_features),
+        "last_updated": state.get("last_updated") or state.get("last_changed"),
+        "available": state.get("state") not in {"unavailable", "unknown"},
+    }
+
+
 def _climate_item(state: dict[str, Any]) -> dict[str, Any]:
     attributes = state.get("attributes", {})
     return {
@@ -388,6 +403,21 @@ def _numeric_value(value: Any) -> float | None:
     if not _is_numeric_state(text):
         return None
     return float(text)
+
+
+def _numeric_int(value: Any) -> int | None:
+    numeric = _numeric_value(value)
+    if numeric is None:
+        return None
+    return int(numeric)
+
+
+def _lawn_mower_battery_level(attributes: dict[str, Any]) -> float | None:
+    for key in ("battery_level", "battery", "battery_percent", "battery_percentage"):
+        value = _numeric_value(attributes.get(key))
+        if value is not None and 0 <= value <= 100:
+            return value
+    return None
 
 
 def _is_numeric_state(value: str) -> bool:

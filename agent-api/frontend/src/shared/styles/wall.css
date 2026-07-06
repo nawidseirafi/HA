@@ -390,7 +390,8 @@
 
 .wall-home-card-slot > .wall-metric,
 .wall-home-card-slot > .wall-panel,
-.wall-home-card-slot > .wall-click-card {
+.wall-home-card-slot > .wall-click-card,
+.wall-home-card-slot > .wall-robot-card {
   width: 100%;
   height: 100%;
 }
@@ -2004,6 +2005,197 @@ button.wall-room-card {
   gap: 6px;
 }
 
+.wall-robot-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.wall-mower-card {
+  min-height: 264px;
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.wall-mower-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.wall-mower-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background: var(--gradient-energy);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--state-ok) 22%, transparent);
+}
+
+.wall-mower-head small,
+.wall-mower-metric-row span,
+.wall-mower-battery span {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.wall-mower-head h3 {
+  margin: 3px 0 0;
+  color: var(--foreground);
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.wall-mower-status {
+  padding: 8px 11px;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.wall-mower-status.ok {
+  color: color-mix(in srgb, var(--state-ok) 70%, #111827);
+  background: color-mix(in srgb, var(--state-ok) 13%, #fff);
+}
+
+.wall-mower-status.active {
+  color: color-mix(in srgb, var(--state-active) 75%, #111827);
+  background: color-mix(in srgb, var(--state-active) 12%, #fff);
+}
+
+.wall-mower-status.warn {
+  color: color-mix(in srgb, var(--state-warn) 70%, #111827);
+  background: color-mix(in srgb, var(--state-warn) 16%, #fff);
+}
+
+.wall-mower-status.critical,
+.wall-mower-status.offline {
+  color: color-mix(in srgb, var(--state-critical) 75%, #111827);
+  background: color-mix(in srgb, var(--state-critical) 12%, #fff);
+}
+
+.wall-mower-body {
+  display: grid;
+  gap: 10px;
+}
+
+.wall-mower-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wall-mower-metric-row strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground);
+  font-size: 0.98rem;
+}
+
+.wall-mower-metric-row strong.online {
+  color: color-mix(in srgb, var(--state-ok) 72%, #111827);
+}
+
+.wall-mower-metric-row strong.offline {
+  color: var(--state-critical);
+}
+
+.wall-mower-metric-row.subtle strong {
+  color: var(--muted-foreground);
+}
+
+.wall-mower-battery {
+  display: grid;
+  gap: 9px;
+}
+
+.wall-mower-battery > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wall-mower-battery strong {
+  color: var(--foreground);
+  font-size: 1.35rem;
+}
+
+.wall-mower-battery i {
+  height: 18px;
+  display: block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--input);
+}
+
+.wall-mower-battery b {
+  height: 100%;
+  min-width: 4px;
+  display: block;
+  border-radius: inherit;
+  background: var(--state-ok);
+  transition: width 180ms ease;
+}
+
+.wall-mower-battery.warn b {
+  background: var(--state-warn);
+}
+
+.wall-mower-battery.danger b {
+  background: var(--state-critical);
+}
+
+.wall-mower-battery.unknown b {
+  background: var(--state-neutral);
+}
+
+.wall-mower-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wall-mower-actions button {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--foreground);
+  background: var(--secondary);
+  font-weight: 800;
+}
+
+.wall-mower-actions button.primary {
+  color: #fff;
+  border-color: transparent;
+  background: var(--state-ok);
+}
+
+.wall-mower-actions button:disabled {
+  cursor: not-allowed;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  opacity: 0.54;
+}
+
+.wall-mower-actions button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
 .wall-sensor-chip-grid,
 .wall-device-card-grid {
   display: grid;
@@ -2978,6 +3170,9 @@ button.wall-room-card {
   .wall-fan-control-row { grid-template-columns: 1fr; }
   .wall-fan-segment { width: 100%; }
   .wall-fan-segment button { flex: 1; min-width: 0; }
+  .wall-mower-head { grid-template-columns: auto minmax(0, 1fr); }
+  .wall-mower-status { grid-column: 1 / -1; justify-self: start; }
+  .wall-mower-actions { grid-template-columns: 1fr; }
   .wall-room-power { width: 100%; }
   .wall-cover-visual { width: 100%; height: 92px; }
   .agent-status-map {
