@@ -380,20 +380,48 @@ def _is_battery_state(state: dict[str, Any]) -> bool:
     attributes = state.get("attributes", {})
     unit = str(attributes.get("unit_of_measurement") or "").strip()
     state_value = str(state.get("state") or "").strip().lower()
-    return unit == "%" or _is_numeric_state(state_value) or state_value in {"low", "normal", "high", "ok", "unknown", "unavailable"}
+    return unit == "%" or _is_numeric_state(state_value) or state_value in {
+        "critical",
+        "empty",
+        "low",
+        "medium",
+        "normal",
+        "high",
+        "full",
+        "ok",
+        "charging",
+        "unknown",
+        "unavailable",
+    }
 
 
 def _battery_level(state: dict[str, Any]) -> float | None:
     raw_state = state.get("state")
     value = _numeric_value(raw_state)
     if value is None:
-        return None
+        return _text_battery_level(raw_state)
     unit = str(state.get("attributes", {}).get("unit_of_measurement") or "").strip().lower()
     if unit in {"v", "mv"}:
         return None
     if 0 <= value <= 100:
         return value
     return None
+
+
+def _text_battery_level(value: Any) -> float | None:
+    text = str(value or "").strip().lower()
+    mapping = {
+        "critical": 5.0,
+        "empty": 5.0,
+        "low": 10.0,
+        "medium": 50.0,
+        "normal": 75.0,
+        "high": 100.0,
+        "full": 100.0,
+        "ok": 100.0,
+        "charging": 100.0,
+    }
+    return mapping.get(text)
 
 
 def _numeric_value(value: Any) -> float | None:

@@ -1,6 +1,7 @@
 import {Bot, Home, Pause, Play, Wifi, WifiOff} from 'lucide-react';
 import type {LawnMowerEntity} from '@shared/types/robotDevices';
 import {useLawnMower} from '../../hooks/useLawnMower';
+import {WallBatteryStatus} from '../common/WallBatteryStatus';
 
 type WallMowerCardProps = {
   mower: LawnMowerEntity;
@@ -11,7 +12,7 @@ export function WallMowerCard({mower, onUpdated}: WallMowerCardProps) {
   const {actions, busyAction, offline, call} = useLawnMower(mower, onUpdated);
   const [statusLabel, statusTone] = lawnMowerStatus(mower.raw_status || mower.state);
   const batteryLevel = mowerBatteryLevel(mower);
-  const batteryWidth = batteryLevel === null ? 100 : batteryLevel;
+  const charging = mowerStateIsCharging(mower);
   const connectionLabel = offline ? 'Nicht erreichbar' : 'Verbunden';
   const updated = formatMowerUpdate(mower.last_updated);
 
@@ -54,14 +55,9 @@ export function WallMowerCard({mower, onUpdated}: WallMowerCardProps) {
         )}
       </div>
 
-      <div className={`wall-mower-battery ${batteryTone(batteryLevel)}`}>
-        <div>
-          <span>Akku</span>
-          <strong>{batteryLevel === null ? '-- %' : `${Math.round(batteryLevel)} %`}</strong>
-        </div>
-        <i aria-hidden="true">
-          <b style={{width: `${batteryWidth}%`}}/>
-        </i>
+      <div className="wall-mower-battery">
+        <span>Akku</span>
+        <WallBatteryStatus level={batteryLevel} charging={charging} size="lg"/>
       </div>
 
       <div className="wall-mower-actions">
@@ -119,15 +115,29 @@ function labelState(value: string) {
 
 function mowerBatteryLevel(mower: LawnMowerEntity) {
   const value = Number(mower.battery_level);
-  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(value)) return textBatteryLevel(mower.state);
   return Math.max(0, Math.min(100, value));
 }
 
-function batteryTone(level: number | null) {
-  if (level === null) return 'unknown';
-  if (level <= 15) return 'danger';
-  if (level < 40) return 'warn';
-  return 'ok';
+function textBatteryLevel(value?: string | null) {
+  const state = String(value || '').trim().toLowerCase();
+  const levels: Record<string, number> = {
+    critical: 5,
+    empty: 5,
+    low: 10,
+    medium: 50,
+    normal: 75,
+    high: 100,
+    full: 100,
+    ok: 100,
+    charging: 100,
+  };
+  return levels[state] ?? null;
+}
+
+function mowerStateIsCharging(mower: LawnMowerEntity) {
+  const state = String(mower.raw_status || mower.state || '').toLowerCase();
+  return state === 'charging';
 }
 
 function formatMowerUpdate(value?: string | null) {

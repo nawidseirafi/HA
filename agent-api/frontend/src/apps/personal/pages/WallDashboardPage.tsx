@@ -47,12 +47,13 @@ import {
     type WallLightRoom,
     type WallTemperatureSensor
 } from '@shared/api/client';
+import {WallBatteryStatus} from '../components/common/WallBatteryStatus';
 import {WallMowerCard} from '../components/wall/WallMowerCard';
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries';
-type BatteryBadge = { label: string; tone: string };
+type BatteryBadge = { level: number | null; charging?: boolean };
 type OutletPower = { watts: number; label: string };
 type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
 type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
@@ -1834,7 +1835,7 @@ function RoomFanControl({
 }
 
 function BatteryPill({battery}: { battery: BatteryBadge }) {
-    return <em className={`wall-battery-pill ${battery.tone}`}>{battery.label}</em>;
+    return <WallBatteryStatus level={battery.level} charging={battery.charging} size="sm"/>;
 }
 
 function LightsSection({
@@ -2104,12 +2105,7 @@ function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () 
                             <strong>{battery.name}</strong>
                             <span>{battery.area || 'Haus'} · {battery.entity_id}</span>
                         </div>
-                        <div className="wall-battery-status">
-                            <b>{formatBatteryLevel(battery)}</b>
-                            <span className={`wall-battery-bar ${batteryTone(battery)}`}>
-                <i style={{width: `${batteryBarWidth(battery)}%`}}/>
-              </span>
-                        </div>
+                        <WallBatteryStatus level={batteryLevelValue(battery)} size="md"/>
                     </article>
                 ))}
             </section>
@@ -2509,8 +2505,31 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
 }
 
 function formatBatteryLevel(battery: WallEntity & { level?: number | null }) {
-    if (battery.level !== null && battery.level !== undefined) return `${Math.round(battery.level)}%`;
+    const level = batteryLevelValue(battery);
+    if (level !== null) return `${Math.round(level)}%`;
     return labelState(battery.state);
+}
+
+function batteryLevelValue(battery: WallEntity & { level?: number | null }) {
+    const value = Number(battery.level);
+    if (!Number.isFinite(value)) return textBatteryLevel(battery.state);
+    return Math.max(0, Math.min(100, value));
+}
+
+function textBatteryLevel(value?: string | null) {
+    const state = String(value || '').trim().toLowerCase();
+    const levels: Record<string, number> = {
+        critical: 5,
+        empty: 5,
+        low: 10,
+        medium: 50,
+        normal: 75,
+        high: 100,
+        full: 100,
+        ok: 100,
+        charging: 100,
+    };
+    return levels[state] ?? null;
 }
 
 function homeBatterySummary(data: WallDashboardData): { tone: MetricTone; icon: ReactNode } {
@@ -2538,9 +2557,9 @@ function wallBatteryEntities(items: Array<WallEntity & { level?: number | null }
 
 function wallLowBatteryEntities(items: Array<WallEntity & { level?: number | null }>) {
     return wallBatteryEntities(items).filter((battery) => {
-        const level = battery.level;
+        const level = batteryLevelValue(battery);
         return String(battery.state || '').toLowerCase() === 'low'
-            || (level !== null && level !== undefined && Number.isFinite(Number(level)) && Number(level) < LOW_BATTERY_THRESHOLD);
+            || (level !== null && Number(level) < LOW_BATTERY_THRESHOLD);
     });
 }
 
@@ -2586,18 +2605,11 @@ function coverPositionDetail(cover: WallCover) {
     return labelState(cover.state);
 }
 
-function batteryBarWidth(battery: WallEntity & { level?: number | null }) {
-    if (battery.level === null || battery.level === undefined || !Number.isFinite(Number(battery.level))) {
-        return battery.state?.toLowerCase() === 'low' ? 12 : 100;
-    }
-    return Math.max(0, Math.min(100, Math.round(Number(battery.level))));
-}
-
 function batteryTone(battery: WallEntity & { level?: number | null }) {
-    const level = battery.level;
+    const level = batteryLevelValue(battery);
     if (battery.state?.toLowerCase() === 'low') return 'warn';
-    if (level === null || level === undefined) return 'unknown';
-    if (level <= 15) return 'danger';
+    if (level === null) return 'unknown';
+    if (level < 15) return 'danger';
     if (level < LOW_BATTERY_THRESHOLD) return 'warn';
     return 'ok';
 }
@@ -3110,10 +3122,8 @@ function batteryForDeviceName(data: WallDashboardData, room: string, deviceName:
     }).filter(({score}) => score >= 15);
     const match = candidates.sort((left, right) => right.score - left.score)[0]?.battery;
     if (!match) return null;
-    const tone = batteryTone(match);
     return {
-        label: `Batterie ${formatBatteryLevel(match)}`,
-        tone: tone === 'danger' ? 'critical' : tone,
+        level: batteryLevelValue(match),
     };
 }
 

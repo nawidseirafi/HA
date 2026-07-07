@@ -2039,7 +2039,7 @@ button.wall-room-card {
 
 .wall-mower-head small,
 .wall-mower-metric-row span,
-.wall-mower-battery span {
+.wall-mower-battery > span {
   color: var(--muted-foreground);
   font-size: 0.82rem;
   font-weight: 700;
@@ -2115,49 +2115,10 @@ button.wall-room-card {
 }
 
 .wall-mower-battery {
-  display: grid;
-  gap: 9px;
-}
-
-.wall-mower-battery > div {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.wall-mower-battery strong {
-  color: var(--foreground);
-  font-size: 1.35rem;
-}
-
-.wall-mower-battery i {
-  height: 18px;
-  display: block;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--input);
-}
-
-.wall-mower-battery b {
-  height: 100%;
-  min-width: 4px;
-  display: block;
-  border-radius: inherit;
-  background: var(--state-ok);
-  transition: width 180ms ease;
-}
-
-.wall-mower-battery.warn b {
-  background: var(--state-warn);
-}
-
-.wall-mower-battery.danger b {
-  background: var(--state-critical);
-}
-
-.wall-mower-battery.unknown b {
-  background: var(--state-neutral);
 }
 
 .wall-mower-actions {
@@ -2873,33 +2834,99 @@ button.wall-room-card {
   font-weight: 800;
 }
 
-.wall-battery-pill {
+.wall-battery-status {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   min-height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--state-neutral) 10%, #fff);
-  font-size: 0.72rem;
-  font-style: normal;
   font-weight: 850;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.wall-battery-pill.ok {
+.wall-battery-status.sm {
+  gap: 4px;
+  font-size: 0.78rem;
+  --wall-battery-icon-size: 24px;
+}
+
+.wall-battery-status.md {
+  font-size: 0.94rem;
+  --wall-battery-icon-size: 30px;
+}
+
+.wall-battery-status.lg {
+  gap: 7px;
+  font-size: 1.12rem;
+  --wall-battery-icon-size: 37px;
+}
+
+.wall-battery-icon {
+  position: relative;
+  width: var(--wall-battery-icon-size, 34px);
+  height: calc(var(--wall-battery-icon-size, 34px) * 0.5625);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.wall-battery-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wall-battery-shell {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.wall-battery-cap,
+.wall-battery-fill {
+  fill: currentColor;
+}
+
+.wall-battery-fill {
+  transition: width 260ms ease;
+}
+
+.wall-battery-bolt {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--wall-battery-icon-size, 34px) * 0.38);
+  height: calc(var(--wall-battery-icon-size, 34px) * 0.38);
+  transform: translate(-50%, -50%);
+  color: var(--card);
+  filter: drop-shadow(0 0 1px color-mix(in srgb, currentColor 72%, transparent));
+}
+
+.wall-battery-label {
+  color: currentColor;
+}
+
+.wall-battery-status.normal {
   color: var(--state-ok);
-  background: color-mix(in srgb, var(--state-ok) 10%, #fff);
 }
 
-.wall-battery-pill.warn {
-  color: var(--state-warn);
-  background: color-mix(in srgb, var(--state-warn) 12%, #fff);
+.wall-battery-status.warn {
+  color: #eab308;
 }
 
-.wall-battery-pill.critical {
-  color: var(--state-critical);
-  background: color-mix(in srgb, var(--state-critical) 10%, #fff);
+.wall-battery-status.orange {
+  color: #f59e0b;
+}
+
+.wall-battery-status.critical {
+  color: color-mix(in srgb, var(--state-critical) 82%, var(--foreground));
+}
+
+.wall-battery-status.unknown {
+  color: var(--muted-foreground);
 }
 
 .wall-device-row {
@@ -2953,41 +2980,15 @@ button.wall-room-card {
   font-size: 0.82rem;
 }
 
-.wall-battery-status {
-  display: grid;
-  gap: 8px;
+.wall-battery-row .wall-battery-status,
+.wall-battery-row .wall-battery-status span {
+  display: inline-flex;
+  margin-top: 0;
 }
 
-.wall-battery-status b {
-  color: var(--foreground);
-  text-align: right;
-}
-
-.wall-battery-bar {
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--input);
-}
-
-.wall-battery-bar i {
-  display: block;
-  height: 100%;
-  min-width: 4px;
-  border-radius: inherit;
-  background: var(--state-ok);
-}
-
-.wall-battery-bar.warn i {
-  background: var(--state-warn);
-}
-
-.wall-battery-bar.danger i {
-  background: var(--state-critical);
-}
-
-.wall-battery-bar.unknown i {
-  background: var(--state-neutral);
+.wall-battery-row .wall-battery-status span {
+  color: inherit;
+  font-size: inherit;
 }
 
 .wall-light-row strong,
