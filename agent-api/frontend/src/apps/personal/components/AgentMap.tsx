@@ -25,6 +25,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Sprout,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -67,6 +68,7 @@ const iconMap: Record<string, LucideIcon> = {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Sprout,
   Zap,
 };
 
@@ -232,6 +234,7 @@ function positionForNode(node: OrchestratorMapNode, index: number) {
     vacation: { x: 390, y: 380 },
     household: { x: 660, y: 380 },
     mywellness: { x: 930, y: 380 },
+    garden: { x: 1200, y: 380 },
     openai: { x: -120, y: 590 },
     database: { x: 330, y: 590 },
     homeassistant: { x: 780, y: 590 },

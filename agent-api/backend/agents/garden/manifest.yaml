@@ -1,0 +1,24 @@
+id: garden
+name: Garden-Agent
+description: Bodenfeuchte, Mähroboter und Bewässerung aus Home Assistant überwachen und bewerten.
+status: draft
+api:
+  prefix: /api/garden
+  route_module: backend.agents.garden.routes
+runtime:
+  service_object: garden_service
+ui:
+  icon: Sprout
+  dashboard_route: null
+settings:
+  role: garden_automation
+  dry_run_default: true
+scheduler:
+  tasks:
+    - default_key: garden:status-check:0700
+      name: Garden Statusprüfung
+      description: Prüft Bodenfeuchte, Mähroboter und Bewässerung.
+      schedule_type: recurring
+      schedule:
+        time: "07:00"
+      target_action: run

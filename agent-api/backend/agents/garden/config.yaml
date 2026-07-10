@@ -1,0 +1,14 @@
+garden:
+  enabled: true
+  dry_run_default: true
+  database_path: data/garden/garden.db
+  thresholds:
+    soil_moisture_low: 25
+    soil_moisture_target: 45
+  schedule:
+    - "07:00"
+  entities:
+    soil_moisture: auto
+    lawn_mowers: auto
+    irrigation: auto
+    weather: auto

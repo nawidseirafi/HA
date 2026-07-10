@@ -6,6 +6,7 @@ enabled_agents:
   - market
   - mywellness
   - vacation
+  - garden
 enabled_core_services:
   - auth
   - system

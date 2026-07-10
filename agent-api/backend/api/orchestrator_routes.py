@@ -56,7 +56,7 @@ def orchestrator_map() -> dict[str, Any]:
             }
             for agent in agents
             for agent_id in [agent["id"]]
-            if agent_id in {"invoices", "mywellness", "market", "vacation"}
+            if agent_id in {"invoices", "mywellness", "market", "vacation", "garden"}
         ],
         *[
             {
@@ -69,7 +69,7 @@ def orchestrator_map() -> dict[str, Any]:
             }
             for agent in agents
             for agent_id in [agent["id"]]
-            if agent_id in {"invoices", "mywellness", "market"}
+            if agent_id in {"invoices", "mywellness", "market", "garden"}
         ],
     ]
     if "vacation" in agent_ids:
@@ -101,6 +101,16 @@ def orchestrator_map() -> dict[str, Any]:
             "kind": "secondary",
             "active": _is_active(mywellness["status"]),
             "status": mywellness["status"],
+        })
+    if "garden" in agent_ids:
+        garden = next(agent for agent in agents if agent["id"] == "garden")
+        edges.append({
+            "id": "garden-homeassistant",
+            "from": "garden",
+            "to": "homeassistant",
+            "kind": "secondary",
+            "active": _is_active(garden["status"]),
+            "status": garden["status"],
         })
     return {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
@@ -207,7 +217,7 @@ def _primary_edges(agents: list[dict[str, Any]], services: list[dict[str, Any]],
             "active": True,
             "status": messaging["status"],
         })
-    scheduled_targets = {"market", "invoices", "vacation", "mywellness"}
+    scheduled_targets = {"market", "invoices", "vacation", "mywellness", "garden"}
     for agent in agents:
         if agent["id"] in scheduled_targets:
             edges.append({
@@ -310,5 +320,11 @@ def _agent_icon(agent_id: str, manifest: dict[str, Any]) -> str:
 
 
 def _next_action(agent_id: str) -> str:
-    actions = {"invoices": "22:00 Uhr", "mywellness": "17:00 Uhr", "market": "Bereit", "vacation": "Home Assistant synchronisieren"}
+    actions = {
+        "invoices": "22:00 Uhr",
+        "mywellness": "17:00 Uhr",
+        "market": "Bereit",
+        "vacation": "Home Assistant synchronisieren",
+        "garden": "07:00 Uhr",
+    }
     return actions.get(agent_id, "Bereit")
