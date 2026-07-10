@@ -652,7 +652,7 @@ Verantwortung:
 - Home-Assistant-Entitaeten fuer Gartenkontext automatisch erkennen
 - Mähroboter ueber die Domain `lawn_mower` erfassen
 - Bodenfeuchte-Sensoren ueber Entity-Namen, Friendly Names und typische Device Classes erkennen
-- Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug erkennen
+- Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug erkennen, inklusive Eve-Aqua-Entities wie `switch.eve_aqua_123a`
 - Wetter-Entitaeten ueber `weather` erfassen
 - Gartenstatus regelbasiert bewerten
 - Snapshots historisieren

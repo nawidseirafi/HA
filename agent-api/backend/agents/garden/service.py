@@ -12,6 +12,19 @@ from backend.services.homeassistant_service import HomeAssistantService
 from .store import GardenStore
 
 
+IRRIGATION_ENTITY_TOKENS = (
+    "irrigation",
+    "watering",
+    "sprinkler",
+    "bewässer",
+    "bewasser",
+    "garten",
+    "ventil",
+    "eve_aqua",
+    "eve aqua",
+)
+
+
 class GardenService:
     agent_id = "garden"
 
@@ -219,7 +232,7 @@ def _irrigation_entities(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
         attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         name = str(attrs.get("friendly_name") or entity_id).lower()
         haystack = f"{entity_id.lower()} {name}"
-        if not any(token in haystack for token in ("irrigation", "watering", "sprinkler", "bewässer", "bewasser", "garten", "ventil")):
+        if not any(token in haystack for token in IRRIGATION_ENTITY_TOKENS):
             continue
         result.append(_entity_summary(state))
     return result

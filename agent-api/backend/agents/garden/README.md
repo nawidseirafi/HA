@@ -12,7 +12,7 @@ Automatische Steuerung ist noch nicht aktiv. Bewaesserung, Mähroboter oder ande
 
 - `lawn_mower.*` fuer Mähroboter
 - Bodenfeuchte-Sensoren ueber typische Namen, Friendly Names und Device Classes
-- Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug
+- Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug, z. B. `switch.eve_aqua_123a`
 - `weather.*` fuer Wetterkontext
 
 ## Architektur

@@ -194,7 +194,7 @@ Zielregel:
 Offen:
 
 - Bodenfeuchte-Sensoren fachlich anbinden und Schwellenwerte je Zone modellieren.
-- Bewaesserungszonen und Ventile sauber konfigurieren.
+- Bewaesserungszonen, Ventile und Bewaesserungsschalter wie Eve Aqua sauber konfigurieren.
 - Wetter-/Regenprognose in die Bewertung aufnehmen.
 - Mähroboter-Status und Bewaesserung gegenseitig verriegeln.
 - KI-Analyse erst nach stabiler Datensammlung aktivieren.
