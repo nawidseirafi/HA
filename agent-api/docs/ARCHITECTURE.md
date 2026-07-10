@@ -2,7 +2,7 @@
 
 Stand: 2026-06-09
 
-Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Service V1, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness/Invoice-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
+Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infrastructure Service V1, P2.5 Agent-Control, zentralem Messaging Service sowie Vacation/MyWellness/Invoice/Garden-Erweiterungen. Es ist keine Zielarchitektur und keine Umbauanleitung, sondern eine technische Bestandsaufnahme des laufenden Systems.
 
 # Systemuebersicht
 
@@ -66,6 +66,7 @@ agent-api/
 │   │   ├── control.py
 │   │   ├── registry.py
 │   │   ├── routes.py
+│   │   ├── garden/
 │   │   ├── invoices/
 │   │   ├── market/
 │   │   ├── mywellness/
@@ -95,6 +96,7 @@ agent-api/
 │   ├── main.py
 │   └── paths.py
 ├── data/
+│   ├── garden/
 │   ├── invoices/
 │   ├── infrastructure/
 │   ├── market/
@@ -284,6 +286,7 @@ Standard-Tasks:
 - Market Analyse um 18:00
 - Infrastructure Health Check taeglich um 07:00
 - Vacation Statuspruefung taeglich
+- Garden Statuspruefung taeglich um 07:00
 - Household Fensterpruefung um 22:00
 - Invoice Agent Lauf um 22:00
 - MyWellness Prepare um 17:00 und Book um 20:59
@@ -404,6 +407,7 @@ Aktuell erkannte Capabilities:
 
 ```text
 invoices:    status, start, stop, enable, disable, toggle, run
+garden:      status, enable, disable, toggle, run
 market:      status, enable, disable, toggle, run
 mywellness:  status, start, stop, enable, disable, toggle, run
 vacation:    status, start, stop, enable, disable, toggle, run
@@ -630,6 +634,69 @@ Control:
 - `status`
 - `start`
 - `stop`
+- `enable`
+- `disable`
+- `toggle`
+- `run`
+
+# Garden Agent
+
+Ordner:
+
+```text
+agent-api/backend/agents/garden/
+```
+
+Verantwortung:
+
+- Home-Assistant-Entitaeten fuer Gartenkontext automatisch erkennen
+- Mähroboter ueber die Domain `lawn_mower` erfassen
+- Bodenfeuchte-Sensoren ueber Entity-Namen, Friendly Names und typische Device Classes erkennen
+- Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug erkennen
+- Wetter-Entitaeten ueber `weather` erfassen
+- Gartenstatus regelbasiert bewerten
+- Snapshots historisieren
+- Empfehlungen erzeugen, ohne Geraete automatisch zu steuern
+
+Datenbank:
+
+```text
+agent-api/data/garden/garden.db
+```
+
+Tabelle:
+
+- `garden_snapshots`
+
+Konfiguration:
+
+```text
+agent-api/backend/agents/garden/config.yaml
+```
+
+Standard-Scheduler:
+
+- Garden Statuspruefung taeglich um 07:00 Uhr
+
+Agent Map:
+
+- `scheduler -> garden`
+- `garden -> homeassistant`
+- `garden -> database`
+- `garden -> openai`
+
+Architekturhinweis:
+
+- Garden ist ein eigener Fachagent, nicht Teil von Household.
+- Household bleibt Fassade fuer allgemeinen Haushaltsstatus.
+- Garden besitzt die Fachhistorie fuer Garten, Mähroboter, Bodenfeuchte und Bewaesserung.
+- Die OpenAI-Kante ist vorbereitet. Aktuell erzeugt der Garden Agent noch keine aktive KI-Analyse.
+- Automatische Steuerung von Bewaesserung oder Mähroboter ist bewusst nicht aktiv. Der aktuelle Stand ist advisory/dry-run.
+- KI-gestuetzte Empfehlungen sollen erst aktiviert werden, wenn Bodenfeuchte-, Wetter- und Bewaesserungsdaten stabil vorliegen.
+
+Control:
+
+- `status`
 - `enable`
 - `disable`
 - `toggle`

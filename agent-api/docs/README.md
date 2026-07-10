@@ -12,6 +12,12 @@ Diese Dokumentation ist nach Zweck getrennt. Fuer konkrete Deployments und Updat
 - `ARCHITECTURE.md`: aktueller Ist-Zustand der Anwendung.
 - `ARCHITECTURE_TARGET.md`: Zielbild und Leitlinien fuer weitere Entwicklung.
 
+Aktuell wichtige Fachagenten der Personal Edition:
+
+- Scheduler: zentrale Zeitsteuerung.
+- Invoice, Market, MyWellness und Vacation: bestehende Fachagenten.
+- Garden: vorbereitender Garten-Agent fuer Mähroboter, Bodenfeuchte, Bewaesserung und Wetter. Der Agent arbeitet aktuell beratend und sammelt Snapshots; automatische Gartensteuerung und KI-Entscheidungen folgen erst nach stabiler Sensorbasis.
+
 ## Konsolidierte Dokumente
 
 - `docker_create.md`: veraltete Proxmox-/Docker-Einzelanleitung. Inhalt wurde auf einen Verweis reduziert; aktuelle Sentero-Docker-Schritte stehen in `DEPLOYMENT.md`.

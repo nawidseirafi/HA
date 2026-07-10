@@ -112,6 +112,7 @@ Umgesetzt:
 - Platform-Routine-Erfolge erzeugen keine Message-Center-Flut mehr.
 - Infrastructure Health Check laeuft als Default taeglich um 07:00 Uhr.
 - Market hat als Default nur noch eine Analyse um 18:00 Uhr.
+- Garden hat als Default eine Statuspruefung um 07:00 Uhr.
 
 Aktuelle Zielregel:
 
@@ -168,6 +169,36 @@ Offen:
 
 - Dedizierte `household.db` nur einfuehren, wenn echte Haushaltsereignisse historisiert werden muessen.
 - Wall-Dashboard langfristig weiter auf `HouseholdService.summary()` konsolidieren.
+
+## Garden Agent
+
+Umgesetzt:
+
+- Garden Agent als eigener manifestbasierter Fachagent.
+- Eigene Konfiguration unter `backend/agents/garden/config.yaml`.
+- Eigene Persistenz unter `data/garden/garden.db`.
+- Automatische Home-Assistant-Erkennung fuer `lawn_mower`, Bodenfeuchte-, Bewaesserungs- und Wetter-Entitaeten.
+- Regelbasierte Bewertung und Snapshot-Historie.
+- Einbindung in Agent-Control mit `status`, `enable`, `disable`, `toggle` und `run`.
+- Einbindung in die Agent Map mit Scheduler-, Home-Assistant-, Datenbank- und OpenAI-Bezug.
+- Standard-Scheduler-Lauf taeglich um 07:00 Uhr.
+
+Zielregel:
+
+- Garden bleibt der owning Agent fuer Gartenautomatisierung, Mähroboter, Bodenfeuchte, Bewaesserung und Gartenhistorie.
+- Household darf Garden-Zusammenfassungen spaeter anzeigen, besitzt aber keine Garten-Fachlogik und keine Gartenhistorie.
+- KI darf im Garden-Kontext Empfehlungen, Plaene, Warnungen und Zusammenfassungen erzeugen.
+- KI oder Agenten duerfen Bewaesserung, Mähroboter oder andere Smart-Home-Geraete erst nach regelbasierter Freigabe und klarer Sicherheitslogik steuern.
+- Bis ausreichend Sensorbasis vorhanden ist, bleibt Garden advisory/dry-run.
+
+Offen:
+
+- Bodenfeuchte-Sensoren fachlich anbinden und Schwellenwerte je Zone modellieren.
+- Bewaesserungszonen und Ventile sauber konfigurieren.
+- Wetter-/Regenprognose in die Bewertung aufnehmen.
+- Mähroboter-Status und Bewaesserung gegenseitig verriegeln.
+- KI-Analyse erst nach stabiler Datensammlung aktivieren.
+- Optional Garden-Zusammenfassung im Household-/Wall-Kontext anzeigen.
 
 ## Infrastructure Monitoring
 
@@ -288,7 +319,7 @@ Zweck:
 Wichtig:
 
 - `orchestrator.db` darf keine Fachhistorien besitzen.
-- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden und Sentero-Ereignisse bleiben in ihren owning Domains.
+- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden, Garden-Snapshots und Sentero-Ereignisse bleiben in ihren owning Domains.
 
 # Offene Architekturarbeit
 
@@ -305,6 +336,7 @@ Wichtig:
 - Household-Fassade weiter stabilisieren und Wall-Dashboard schrittweise darauf konsolidieren.
 - Orchestrator-Statusereignisse entwerfen, bevor `orchestrator.db` eingefuehrt wird.
 - Scheduler-Abhaengigkeiten und Task-Ketten fachlich definieren.
+- Garden-Bodenfeuchte, Bewaesserungszonen und Wetterkontext fachlich modellieren.
 - LLM-Factory und Provider-Konfiguration bereinigen.
 - Home-Assistant-Client-Pfade konsolidieren.
 
