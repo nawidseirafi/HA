@@ -91,7 +91,7 @@ class HouseholdComfortService:
         auto = bool(config["auto_discovery"])
         person = self._configured_or_auto(states, config["person_entity"], self._is_person, auto)
         temperature = self._configured_or_auto(states, config["temperature_entity"], self._is_bedroom_temperature, auto)
-        fan = self._configured_or_auto(states, config["fan_entity"], self._is_bedroom_fan, auto)
+        fan = self._configured_or_auto_bedroom_fan(states, config["fan_entity"], auto)
         presence = self._configured_or_auto(states, config["presence_entity"], self._is_bedroom_presence, auto)
         window = self._configured_or_auto(states, config["window_entity"], self._is_bedroom_window, auto)
 
@@ -251,6 +251,16 @@ class HouseholdComfortService:
             return None
         return next((state for state in states if predicate(state)), None)
 
+    def _configured_or_auto_bedroom_fan(self, states: list[dict[str, Any]], entity_id: str, auto_discovery: bool) -> dict[str, Any] | None:
+        if entity_id:
+            return next((state for state in states if state.get("entity_id") == entity_id), None)
+        if not auto_discovery:
+            return None
+        candidates = [(self._bedroom_fan_score(state), state) for state in states]
+        candidates = [(score, state) for score, state in candidates if score > 0]
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1] if candidates else None
+
     def _is_person(self, state: dict[str, Any]) -> bool:
         return str(state.get("entity_id") or "").startswith("person.")
 
@@ -268,12 +278,41 @@ class HouseholdComfortService:
         )
 
     def _is_bedroom_fan(self, state: dict[str, Any]) -> bool:
+        return self._bedroom_fan_score(state) > 0
+
+    def _bedroom_fan_score(self, state: dict[str, Any]) -> int:
         entity_id = str(state.get("entity_id") or "").lower()
         attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         name = str(attrs.get("friendly_name") or "").lower()
         haystack = f"{entity_id} {name}"
         domain = entity_id.split(".", 1)[0]
-        return domain in {"fan", "switch"} and _has_bedroom_token(haystack) and any(token in haystack for token in ("fan", "ventilator", "luefter", "lüfter"))
+        if domain not in {"fan", "switch"}:
+            return 0
+        if not _has_bedroom_token(haystack):
+            return 0
+        if not any(token in haystack for token in ("fan", "ventilator", "luefter", "lüfter")):
+            return 0
+        if any(token in haystack for token in (
+            "internetzugang",
+            "internet access",
+            "kindersicherung",
+            "ionisator",
+            "summer",
+            "lock",
+            "reverse",
+            "loudness",
+            "autoplay",
+            "gruppierung",
+            "uberblenden",
+            "überblenden",
+        )):
+            return 0
+        score = 100 if domain == "fan" else 40
+        if "schlafzimmer" in haystack or "bedroom" in haystack:
+            score += 20
+        if "ventilator" in haystack or "fan" in haystack:
+            score += 10
+        return score
 
     def _is_bedroom_presence(self, state: dict[str, Any]) -> bool:
         entity_id = str(state.get("entity_id") or "").lower()

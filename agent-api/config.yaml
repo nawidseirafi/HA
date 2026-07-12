@@ -36,9 +36,9 @@ household:
       control_enabled: true
       ai_enabled: true
       auto_discovery: true
-      person_entity: ""
-      temperature_entity: ""
-      fan_entity: ""
+      person_entity: "person.nawid"
+      temperature_entity: "sensor.bedroom_schlafzimmer_temperatur"
+      fan_entity: "fan.bedroom_bedroom_ventilator"
       presence_entity: ""
       window_entity: ""
       turn_on_above_c: 24.5
