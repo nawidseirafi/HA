@@ -761,20 +761,79 @@ Verwendet:
 - `HomeAssistantService`
 - Vacation Status Provider
 - `InfrastructureService`
+- `HouseholdComfortService`
 
 Liefert:
 
 - `status()`
 - `summary()`
 - `reminders()`
+- `comfort_bedroom_fan()`
 
 API:
 
 - `GET /api/household/status`
 - `GET /api/household/summary`
 - `GET /api/household/reminders`
+- `GET /api/household/comfort/bedroom-fan`
+- `POST /api/household/comfort/bedroom-fan/evaluate`
 
 Es gibt aktuell keine `household.db`.
+
+## HouseholdComfortService
+
+Datei:
+
+```text
+agent-api/backend/services/household/comfort_service.py
+```
+
+Rolle:
+
+Regelbasierte Komfortsteuerung fuer Haushaltsgeraete mit optionaler KI-Einschaetzung.
+
+Aktuell umgesetzt:
+
+- Schlafzimmer-Ventilator nach Anwesenheit, Schlafzeit und Temperatur bewerten
+- Entitaeten automatisch erkennen oder ueber `config.yaml` fest konfigurieren
+- Hysterese nutzen: Einschalten oberhalb `turn_on_above_c`, Ausschalten unterhalb `turn_off_below_c`
+- Mindestlaufzeit beachten, damit der Ventilator nicht staendig an/aus schaltet
+- Fensterkontakt optional beruecksichtigen
+- KI-Einschaetzung optional abrufen
+
+Sicherheitsregel:
+
+- KI erzeugt keine Home-Assistant-Aktionen.
+- KI darf die regelbasierte Freigabe nicht ueberstimmen.
+- Schalten erfolgt nur ueber `HomeAssistantService.call_service()` und nur, wenn `control_enabled` aktiv ist.
+
+Konfiguration:
+
+```yaml
+household:
+  comfort:
+    bedroom_fan:
+      enabled: true
+      control_enabled: true
+      ai_enabled: true
+      auto_discovery: true
+      person_entity: ""
+      temperature_entity: ""
+      fan_entity: ""
+      presence_entity: ""
+      window_entity: ""
+      turn_on_above_c: 24.5
+      turn_off_below_c: 23.5
+      sleep_start: "21:30"
+      sleep_end: "07:30"
+      min_runtime_minutes: 15
+```
+
+Scheduler:
+
+- Platform-Task `Schlafzimmer Ventilator Komfortregel`
+- laeuft alle 5 Minuten
+- ruft `household_check` mit `comfort=bedroom_fan`, `apply=true` und `include_ai=true` auf
 
 ## InfrastructureService
 

@@ -205,6 +205,12 @@ class SchedulerService:
         if action_type == "household_check":
             from backend.services.household_service import HouseholdService
 
+            payload = task.get("action_payload") if isinstance(task.get("action_payload"), dict) else {}
+            if payload.get("comfort") == "bedroom_fan":
+                return HouseholdService().comfort_bedroom_fan(
+                    apply=bool(payload.get("apply", True)),
+                    include_ai=payload.get("include_ai") if "include_ai" in payload else None,
+                )
             return HouseholdService().summary()
         if action_type == "update_check":
             from backend.services.update_service import UpdateService

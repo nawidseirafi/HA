@@ -29,6 +29,24 @@ infrastructure:
     external_ip: ""
     uptime: ""
 
+household:
+  comfort:
+    bedroom_fan:
+      enabled: true
+      control_enabled: true
+      ai_enabled: true
+      auto_discovery: true
+      person_entity: ""
+      temperature_entity: ""
+      fan_entity: ""
+      presence_entity: ""
+      window_entity: ""
+      turn_on_above_c: 24.5
+      turn_off_below_c: 23.5
+      sleep_start: "21:30"
+      sleep_end: "07:30"
+      min_runtime_minutes: 15
+
 llm:
   provider: "openai"  # Options: gemini, openai, claude, llama
   gemini:

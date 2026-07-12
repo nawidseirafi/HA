@@ -176,6 +176,10 @@ KI darf niemals
 
 ohne regelbasierte Freigabe.
 
+Beispiel:
+
+Der Household Comfort Service darf einen Schlafzimmer-Ventilator nur dann ueber Home Assistant schalten, wenn die regelbasierte Freigabe erteilt wurde. Die KI darf dazu eine Einschaetzung und Begruendung liefern, aber keinen Service-Call erzeugen und keine Regel ueberstimmen.
+
 ---
 
 # 10. Lernen
@@ -257,6 +261,10 @@ Market
 Sentero
 
 → sentero.db
+
+Household Comfort
+
+→ Household Service / optional spaeter household.db
 
 Keine globale Monolith-Datenbank.
 

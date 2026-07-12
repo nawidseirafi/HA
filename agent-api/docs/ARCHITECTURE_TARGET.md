@@ -164,11 +164,14 @@ Zielregel:
 - `WasteService` liefert weiterhin alle Waste-Daten.
 - Vacation und Household entscheiden, welche Waste-Termine wirklich handlungsrelevant sind.
 - Haushaltszustand darf nicht direkt aus UI-Komponenten zusammengesucht werden.
+- Comfort-Regeln wie Schlafzimmer-Ventilator gehoeren in Household, bleiben aber regelbasiert und duerfen KI nur beratend verwenden.
+- Smart-Home-Schaltungen laufen ausschliesslich ueber Home Assistant und nur nach expliziter regelbasierter Freigabe.
 
 Offen:
 
 - Dedizierte `household.db` nur einfuehren, wenn echte Haushaltsereignisse historisiert werden muessen.
 - Wall-Dashboard langfristig weiter auf `HouseholdService.summary()` konsolidieren.
+- Comfort-Historie in `household.db` aufnehmen, wenn mehrere Komfortregeln produktiv laufen.
 
 ## Garden Agent
 

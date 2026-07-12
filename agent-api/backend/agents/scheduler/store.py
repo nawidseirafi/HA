@@ -537,6 +537,18 @@ class SchedulerStore:
                 "default_key": "platform:household:window-check",
             },
             {
+                "name": "Schlafzimmer Ventilator Komfortregel",
+                "description": "Schaltet den Schlafzimmer-Ventilator regelbasiert nach Anwesenheit, Schlafzeit und Temperatur.",
+                "schedule_type": "cron",
+                "schedule": {"cron": "*/5 * * * *", "timezone": "Europe/Berlin"},
+                "target_agent": "household",
+                "target_action": "comfort_bedroom_fan",
+                "action_type": "household_check",
+                "action_payload": {"comfort": "bedroom_fan", "apply": True, "include_ai": True},
+                "source": "platform",
+                "default_key": "platform:household:bedroom-fan-comfort",
+            },
+            {
                 "name": "System Updatepruefung",
                 "description": "Prueft, ob ein RoboterSteve Update verfuegbar ist.",
                 "schedule_type": "cron",
