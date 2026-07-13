@@ -833,7 +833,8 @@ Scheduler:
 
 - Platform-Task `Schlafzimmer Ventilator Komfortregel`
 - laeuft alle 5 Minuten
-- ruft `household_check` mit `comfort=bedroom_fan`, `apply=true` und `include_ai=true` auf
+- ruft `household_check` mit `comfort=bedroom_fan`, `apply=true` und `include_ai=false` auf
+- KI bleibt fuer manuelle Pruefung oder spaetere gezielte Sonderfaelle verfuegbar, wird aber nicht alle 5 Minuten im Routinecheck aufgerufen
 
 ## InfrastructureService
 

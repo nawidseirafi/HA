@@ -137,8 +137,6 @@ class HouseholdComfortService:
             return _decision("incomplete", "none", f"Pflicht-Entitaeten fehlen: {', '.join(missing)}.", False)
         if not context["at_home"]:
             return _decision("away", "turn_off" if context["fan_on"] else "none", "Niemand ist zuhause.", True)
-        if not context["in_sleep_window"] and context["bedroom_present"] is not True:
-            return _decision("outside_window", "turn_off" if context["fan_on"] else "none", "Nicht in Schlafzeit und keine Schlafzimmerpraesenz.", True)
         temperature = context.get("temperature_c")
         if temperature is None:
             return _decision("no_temperature", "none", "Schlafzimmer-Temperatur ist nicht verfuegbar.", False)
@@ -149,7 +147,7 @@ class HouseholdComfortService:
         if temperature >= config["turn_on_above_c"]:
             action = "none" if fan_on else "turn_on"
             allowed = self._runtime_allows_change(context, config, now) if action != "none" else False
-            reason = f"Schlafzimmer ist mit {temperature:.1f} °C zu warm."
+            reason = self._comfort_reason(context, f"Schlafzimmer ist mit {temperature:.1f} °C zu warm.")
             return _decision("too_warm", action, reason, allowed)
         if temperature <= config["turn_off_below_c"]:
             action = "turn_off" if fan_on else "none"
@@ -157,6 +155,16 @@ class HouseholdComfortService:
             reason = f"Schlafzimmer ist mit {temperature:.1f} °C wieder kuehl genug."
             return _decision("cool_enough", action, reason, allowed)
         return _decision("hold", "none", "Temperatur liegt innerhalb der Hysterese.", False)
+
+    def _comfort_reason(self, context: dict[str, Any], base: str) -> str:
+        details = []
+        if context.get("in_sleep_window") is True:
+            details.append("Schlafzeit aktiv")
+        if context.get("bedroom_present") is True:
+            details.append("Schlafzimmerpraesenz erkannt")
+        if not details:
+            details.append("Person ist zuhause")
+        return f"{base} ({', '.join(details)}.)"
 
     def _runtime_allows_change(self, context: dict[str, Any], config: dict[str, Any], now: datetime) -> bool:
         fan = context["entities"].get("fan") or {}

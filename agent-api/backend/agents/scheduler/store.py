@@ -544,7 +544,7 @@ class SchedulerStore:
                 "target_agent": "household",
                 "target_action": "comfort_bedroom_fan",
                 "action_type": "household_check",
-                "action_payload": {"comfort": "bedroom_fan", "apply": True, "include_ai": True},
+                "action_payload": {"comfort": "bedroom_fan", "apply": True, "include_ai": False},
                 "source": "platform",
                 "default_key": "platform:household:bedroom-fan-comfort",
             },
