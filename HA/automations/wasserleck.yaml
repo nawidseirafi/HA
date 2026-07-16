@@ -1,5 +1,5 @@
-- alias: Wasser erkannt - Apple TV Notification an alle TVs
-  description: Erkennt automatisch alle Feuchtigkeitssensoren und sendet eine Notification an alle Apple TVs
+- alias: Wasser erkannt - Handy Notification
+  description: Erkennt automatisch alle Feuchtigkeitssensoren und sendet eine Notification ans Handy
   mode: single
 
   trigger:
@@ -16,18 +16,12 @@
     # Manueller Test über Entwicklerwerkzeuge → Ereignisse
     - platform: event
       id: test
-      event_type: test_apple_tv_wasser_notification
+      event_type: test_handy_wasser_notification
 
   condition: []
 
   action:
     - variables:
-        apple_tvs: >
-          {{ states.media_player
-            | selectattr('attributes.friendly_name', 'search', 'Apple TV')
-            | map(attribute='entity_id')
-            | list }}
-
         wasser_sensoren_aktiv: >
           {{ states.binary_sensor
             | selectattr('attributes.device_class', 'eq', 'moisture')
@@ -44,17 +38,7 @@
             TEST: Automation manuell gestartet
           {% endif %}
 
-    # Apple TVs / Fernseher einschalten
-    - service: media_player.turn_on
-      target:
-        entity_id: "{{ apple_tvs }}"
-
-    # Zeit geben, bis Apple TV / Fernseher wach ist
-    - delay: "00:00:07"
-
-    # Notification senden
-    # WICHTIG: notify.apple_tv durch deinen echten Apple-TV-Notify-Service ersetzen
-    - service: notify.apple_tv
+    - service: notify.mobile_app_system_error_404
       data:
         title: "💧 Wasser erkannt"
         message: "{{ nachricht }}"

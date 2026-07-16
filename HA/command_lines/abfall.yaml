@@ -1,0 +1,19 @@
+- sensor:
+    name: "Abfall naechster Termin"
+    unique_id: abfall_naechster_termin
+    command: >
+      python3 /config/scripts/abfall_ha.py
+      --file /config/scripts/abfall.plist
+      --days 60
+      --limit 20
+    scan_interval: 21600
+    value_template: "{{ value_json.state }}"
+    json_attributes:
+      - next
+      - appointments
+      - next_by_type
+      - count
+      - source
+      - lastchanged
+      - timestamp
+      - last_run

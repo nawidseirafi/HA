@@ -1,4 +1,4 @@
-input_boolean: !include input_booleans.yaml
+input_boolean: !include_dir_merge_named input_booleans
 default_config:
 mqtt:
   sensor:
@@ -28,26 +28,8 @@ mqtt:
         {% endif %}
       payload_on: "ON"
       payload_off: "OFF"
-command_line:
-  - sensor:
-      name: "Abfall naechster Termin"
-      unique_id: abfall_naechster_termin
-      command: >
-        python3 /config/scripts/abfall_ha.py
-        --file /config/scripts/abfall.plist
-        --days 60
-        --limit 20
-      scan_interval: 21600
-      value_template: "{{ value_json.state }}"
-      json_attributes:
-        - next
-        - appointments
-        - next_by_type
-        - count
-        - source
-        - lastchanged
-        - timestamp
-        - last_run
+command_line: !include_dir_merge_list command_lines
+rest: !include_dir_merge_list rest
 frontend:
   themes: !include_dir_merge_named themes
 automation: !include_dir_merge_list automations
@@ -61,47 +43,11 @@ lovelace:
             title: IPad
             icon: mdi:tablet
             show_in_sidebar: true
-            filename: dashboards/ipad-dashboard.yaml
+            filename: dashboard/ipad-dashboard.yaml
         iphone-dashboard:
             mode: yaml
             title: iPhone
             icon: mdi:phone
             show_in_sidebar: true
-            filename: dashboards/iphone-dashboard.yaml
-
-template:
-  - sensor:
-      - name: "Abfall naechste Art"
-        unique_id: abfall_naechste_art
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').type if state_attr('sensor.abfall_naechster_termin', 'next') else 'Keine Termine' }}"
-      - name: "Abfall nächstes Datum"
-        unique_id: abfall_naechstes_datum
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').date_de if state_attr('sensor.abfall_naechster_termin', 'next') else 'unbekannt' }}"
-      - name: "Abfall Tage bis Abholung"
-        unique_id: abfall_tage_bis_abholung
-        unit_of_measurement: "d"
-        state: "{{ state_attr('sensor.abfall_naechster_termin', 'next').days_until if state_attr('sensor.abfall_naechster_termin', 'next') else 0 }}"
-      - name: "Abfall Restmüll"
-        unique_id: abfall_restmuell
-        state: >
-          {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Restmüll') or data.get('Restmuell') or data.get('Restabfall') or data.get('Restabfall 14-tägig') or data.get('Restabfall 4-wöchentlich') %}
-          {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
-      - name: "Abfall Bio"
-        unique_id: abfall_bio
-        state: >
-          {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Bioabfall') or data.get('Biomüll') or data.get('Biomuell') or data.get('Bio') %}
-          {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
-      - name: "Abfall Gelber Sack"
-        unique_id: abfall_gelber_sack
-        state: >
-          {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Gelber Sack') or data.get('Gelbe Tonne') or data.get('Leichtverpackungen') %}
-          {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
-      - name: "Abfall Papier"
-        unique_id: abfall_papier
-        state: >
-          {% set data = state_attr('sensor.abfall_naechster_termin', 'next_by_type') or {} %}
-          {% set item = data.get('Papier') or data.get('Papierabfall') or data.get('Altpapier') or data.get('Blaue Tonne') %}
-          {{ item.date_de ~ ' (' ~ item.days_until ~ ' d)' if item else 'Kein Termin' }}
+            filename: dashboard/iphone-dashboard.yaml
+template: !include_dir_merge_list templates
