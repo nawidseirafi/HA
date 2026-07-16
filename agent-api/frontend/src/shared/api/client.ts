@@ -191,7 +191,84 @@ export type UpdateCheckResult = {
   error?: string;
 };
 
-export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard';
+export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard' | 'gardenDashboard';
+
+export type GardenEntityBinding = {
+  entity_id: string | null;
+  source: 'configured' | 'discovered' | 'unresolved' | 'ambiguous';
+  available: boolean;
+};
+
+export type GardenReason = {
+  code: string;
+  message: string;
+};
+
+export type GardenDecision = {
+  zone_id: string;
+  status: 'healthy' | 'dry' | 'critically_dry' | 'wet' | 'unknown' | 'error';
+  decision: 'no_action' | 'monitor' | 'irrigate' | 'stop_irrigation' | 'blocked';
+  recommended_duration_minutes: number | null;
+  apply_allowed: boolean;
+  reasons: GardenReason[];
+  blocks: GardenReason[];
+  evaluated_at: string;
+  input_snapshot?: Record<string, unknown>;
+};
+
+export type GardenIrrigationRun = {
+  id: number;
+  zone_id: string;
+  started_at: string;
+  planned_end_at?: string | null;
+  ended_at?: string | null;
+  planned_duration_minutes?: number | null;
+  actual_duration_seconds?: number | null;
+  start_moisture?: number | null;
+  end_moisture?: number | null;
+  source?: string | null;
+  status: string;
+  stop_reason?: string | null;
+};
+
+export type GardenZoneStatus = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  entities: Record<string, GardenEntityBinding>;
+  values: {
+    moisture: number | null;
+    temperature: number | null;
+    battery: number | null;
+    soil_warning: boolean | null;
+    irrigation_active: boolean | null;
+    mower_status: string;
+    rain_active: boolean | null;
+    rain_probability: number | null;
+  };
+  decision: GardenDecision;
+  automatic_enabled: boolean;
+  latest_irrigation_run?: GardenIrrigationRun | null;
+  open_irrigation_run?: GardenIrrigationRun | null;
+};
+
+export type GardenStatus = {
+  agent: {
+    id: string;
+    enabled: boolean;
+    control_enabled: boolean;
+    auto_discovery: boolean;
+    dry_run_default?: boolean;
+  };
+  zones: GardenZoneStatus[];
+  summary: {
+    zones: number;
+    dry_zones: number;
+    active_irrigation_runs: number;
+    actionable_zones: number;
+  };
+  history?: unknown[];
+};
 
 export type MyWellnessHealthSettings = {
   id?: number;
@@ -1203,6 +1280,32 @@ export const api = {
     request<SchedulerTask>(`/api/scheduler/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   enableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/enable`, { method: 'POST' }),
   disableSchedulerTask: (id: number) => request<SchedulerTask>(`/api/scheduler/tasks/${id}/disable`, { method: 'POST' }),  summary: () => request<Summary>('/api/invoices/summary'),
+  gardenStatus: () => request<GardenStatus>('/api/garden/status'),
+  gardenZones: () => request<{ zones: GardenZoneStatus[] }>('/api/garden/zones'),
+  gardenZone: (zoneId: string) => request<GardenZoneStatus>(`/api/garden/zones/${encodeURIComponent(zoneId)}`),
+  evaluateGarden: (save = true) => request<{ zones: GardenZoneStatus[] }>('/api/garden/evaluate', {
+    method: 'POST',
+    body: JSON.stringify({ save }),
+  }),
+  evaluateGardenZone: (zoneId: string, save = true) =>
+    request<GardenZoneStatus>(`/api/garden/zones/${encodeURIComponent(zoneId)}/evaluate`, {
+      method: 'POST',
+      body: JSON.stringify({ save }),
+    }),
+  startGardenIrrigation: (zoneId: string, durationMinutes?: number) =>
+    request<{ ok: boolean; zone_id: string; decision: GardenDecision; irrigation_run: GardenIrrigationRun }>(
+      `/api/garden/zones/${encodeURIComponent(zoneId)}/irrigation/start`,
+      { method: 'POST', body: JSON.stringify({ duration_minutes: durationMinutes ?? undefined }) },
+    ),
+  stopGardenIrrigation: (zoneId: string) =>
+    request<{ ok: boolean; zone_id: string; irrigation_run: GardenIrrigationRun | null; action: unknown }>(
+      `/api/garden/zones/${encodeURIComponent(zoneId)}/irrigation/stop`,
+      { method: 'POST', body: JSON.stringify({ source: 'manual', stop_reason: 'manual' }) },
+    ),
+  gardenDecisions: (zoneId: string, limit = 50) =>
+    request<{ decisions: GardenDecision[] }>(`/api/garden/zones/${encodeURIComponent(zoneId)}/decisions?limit=${limit}`),
+  gardenIrrigationRuns: (zoneId: string, limit = 50) =>
+    request<{ irrigation_runs: GardenIrrigationRun[] }>(`/api/garden/zones/${encodeURIComponent(zoneId)}/irrigation-runs?limit=${limit}`),
   financeSummary: () => request<FinanceSummary>('/api/invoices/finance/summary'),
   years: async () => (await request<{ years: YearSummary[] }>('/api/invoices/years')).years,
   year: (year: number) => request<{ year: number; months: MonthSummary[] }>(`/api/invoices/years/${year}`),

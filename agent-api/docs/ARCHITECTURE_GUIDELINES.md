@@ -109,6 +109,26 @@ Falls möglich erfolgt jede Kommunikation über Home Assistant.
 
 ---
 
+# 6a. Garden
+
+Garden ist der owning Agent fuer Rasen, Bodenfeuchte, Bewaesserung, Mähroboter und Gartenhistorie.
+
+Home Assistant bleibt die einzige Quelle fuer Sensorzustände und die einzige Schnittstelle zur Gerätesteuerung.
+
+Der Orchestrator enthaelt keine Garden-Fachlogik.
+
+Der Scheduler enthaelt keine Garden-Imports und fuehrt Garden nur ueber den generischen Agent-Control-Vertrag aus.
+
+Die Garden-Decision-Engine bewertet regelbasiert und fuehrt keine Home-Assistant-Service-Calls aus.
+
+KI darf Garden-Empfehlungen begruenden, aber keine Geräte direkt steuern und keine regelbasierte Safety-Freigabe ueberstimmen.
+
+Kalibrierungs-, Sampling- und Diagnose-Entities duerfen nicht fuer fachliche Bewaesserungsentscheidungen verwendet werden.
+
+Mähroboter und Bewaesserung muessen gegenseitig verriegelt bleiben.
+
+---
+
 # 7. Wall Dashboard
 
 Wall ist ein Smart-Home Dashboard.

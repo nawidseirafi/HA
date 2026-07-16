@@ -182,6 +182,13 @@ Umgesetzt:
 - Eigene Persistenz unter `data/garden/garden.db`.
 - Automatische Home-Assistant-Erkennung fuer `lawn_mower`, Bodenfeuchte-, Bewaesserungs- und Wetter-Entitaeten.
 - Regelbasierte Bewertung und Snapshot-Historie.
+- Zonenmodell mit `lawn` / `Rasen`.
+- Decision Engine mit strukturierten Gruenden und Safety-Blocks.
+- Migrationssichere Tabellen fuer Zonen, Entscheidungen, Aktionen und Bewaesserungslaeufe.
+- Eve-Aqua-/Bewaesserungsadapter fuer `switch`, `valve` und `input_boolean` ueber Home Assistant.
+- Gegenseitige Verriegelung von Mähroboter und Bewaesserung.
+- Einmaliges Scheduler-Ausschalten gestarteter Bewaesserungslaeufe ueber generisches Agent-Control `garden/run`.
+- Personal Garden Dashboard unter `/garden`.
 - Einbindung in Agent-Control mit `status`, `enable`, `disable`, `toggle` und `run`.
 - Einbindung in die Agent Map mit Scheduler-, Home-Assistant-, Datenbank- und OpenAI-Bezug.
 - Standard-Scheduler-Lauf taeglich um 07:00 Uhr.
@@ -191,15 +198,16 @@ Zielregel:
 - Garden bleibt der owning Agent fuer Gartenautomatisierung, Mähroboter, Bodenfeuchte, Bewaesserung und Gartenhistorie.
 - Household darf Garden-Zusammenfassungen spaeter anzeigen, besitzt aber keine Garten-Fachlogik und keine Gartenhistorie.
 - KI darf im Garden-Kontext Empfehlungen, Plaene, Warnungen und Zusammenfassungen erzeugen.
-- KI oder Agenten duerfen Bewaesserung, Mähroboter oder andere Smart-Home-Geraete erst nach regelbasierter Freigabe und klarer Sicherheitslogik steuern.
-- Bis ausreichend Sensorbasis vorhanden ist, bleibt Garden advisory/dry-run.
+- KI darf keine Geraete direkt steuern und keine Safety-Entscheidung ueberstimmen.
+- Automatische Bewaesserung bleibt standardmaessig deaktiviert und wird nur bei `control_enabled: true`, `automatic_enabled: true` und vollstaendiger Safety-Freigabe ausgefuehrt.
+- Home Assistant bleibt die einzige Geraeteschnittstelle.
+- Kalibrierungs-, Sampling- und Diagnose-Entities duerfen nicht in die fachliche Bewaesserungsentscheidung einfliessen.
 
 Offen:
 
-- Bodenfeuchte-Sensoren fachlich anbinden und Schwellenwerte je Zone modellieren.
-- Bewaesserungszonen, Ventile und Bewaesserungsschalter wie Eve Aqua sauber konfigurieren.
-- Wetter-/Regenprognose in die Bewertung aufnehmen.
-- Mähroboter-Status und Bewaesserung gegenseitig verriegeln.
+- Erweiterte Wetterprognose mit echten Forecast-APIs statt nur gebundener Regen-/Wahrscheinlichkeitssensoren.
+- Optionale Mähroboter-Start-/Dock-Aktionen ueber offiziell unterstuetzte Home-Assistant-Services.
+- Mehrere Gartenzonen produktiv konfigurieren.
 - KI-Analyse erst nach stabiler Datensammlung aktivieren.
 - Optional Garden-Zusammenfassung im Household-/Wall-Kontext anzeigen.
 

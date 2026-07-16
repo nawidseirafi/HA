@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, BarChart3, Bell, BellRing, Bot, BrainCircuit, CalendarDays, Dumbbell, FileText, Gauge, GitBranch, HeartPulse, LineChart, ListChecks, LogOut, Plane, Play, Settings, Upload, X } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Bell, BellRing, Bot, BrainCircuit, CalendarDays, Dumbbell, FileText, Gauge, GitBranch, HeartPulse, LineChart, ListChecks, LogOut, Plane, Play, Settings, Sprout, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api } from '@shared/api/client';
@@ -118,6 +118,11 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
                 <CalendarDays size={18} /> Zeitsteuerung
               </button>
             )}
+            {agentContext.kind === 'garden' && (
+              <button className={route.name === 'gardenDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'gardenDashboard' })}>
+                <Sprout size={18} /> Garten
+              </button>
+            )}
             <button onClick={onLogout}>
               <LogOut size={18} /> Abmelden
             </button>
@@ -154,7 +159,7 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
 }
 
 type AgentContext = {
-  kind: 'invoice' | 'market' | 'mywellness' | 'vacation' | 'scheduler';
+  kind: 'invoice' | 'market' | 'mywellness' | 'vacation' | 'scheduler' | 'garden';
   label: string;
   subtitle: string;
 };
@@ -174,6 +179,9 @@ function getAgentContext(route: Route): AgentContext | null {
   }
   if (route.name === 'schedulerDashboard') {
     return { kind: 'scheduler', label: 'Scheduler Agent', subtitle: 'Zeitsteuerung' };
+  }
+  if (route.name === 'gardenDashboard') {
+    return { kind: 'garden', label: 'Garden Agent', subtitle: 'Rasen & Bewässerung' };
   }
   return null;
 }

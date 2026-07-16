@@ -15,6 +15,7 @@ export type Route =
   | { name: 'marketSymbol'; symbol: string }
   | { name: 'vacationDashboard' }
   | { name: 'schedulerDashboard' }
+  | { name: 'gardenDashboard' }
   | { name: 'invoiceDashboard' }
   | { name: 'contracts'; category?: string }
   | { name: 'contract'; id: number }

@@ -9,7 +9,7 @@ runtime:
   service_object: garden_service
 ui:
   icon: Sprout
-  dashboard_route: null
+  dashboard_route: gardenDashboard
 settings:
   role: garden_automation
   dry_run_default: true

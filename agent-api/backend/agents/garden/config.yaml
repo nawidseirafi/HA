@@ -1,5 +1,7 @@
 garden:
   enabled: true
+  control_enabled: false
+  auto_discovery: true
   dry_run_default: true
   database_path: data/garden/garden.db
   thresholds:
@@ -12,3 +14,43 @@ garden:
     lawn_mowers: auto
     irrigation: auto
     weather: auto
+  zones:
+    lawn:
+      name: Rasen
+      entities:
+        moisture: ""
+        temperature: ""
+        battery: ""
+        soil_warning: ""
+        mower: ""
+        irrigation: ""
+        weather: ""
+        rain: ""
+      moisture:
+        critical_below: 15
+        dry_below: 25
+        target_min: 35
+        wet_above: 60
+      temperature:
+        irrigation_min_c: 5
+        irrigation_max_c: 32
+      irrigation:
+        enabled: true
+        automatic_enabled: false
+        default_duration_minutes: 20
+        max_duration_minutes: 30
+        minimum_pause_hours: 12
+        stop_on_sensor_failure: true
+        sensor_max_age_minutes: 180
+      mower:
+        enabled: true
+        block_during_irrigation: true
+        irrigation_block_states:
+          - mowing
+          - starting
+          - returning
+      weather:
+        enabled: true
+        rain_block_enabled: true
+        rain_probability_block_above: 60
+        forecast_hours: 12

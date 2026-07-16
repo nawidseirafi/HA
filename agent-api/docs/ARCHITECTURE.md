@@ -654,9 +654,23 @@ Verantwortung:
 - Bodenfeuchte-Sensoren ueber Entity-Namen, Friendly Names und typische Device Classes erkennen
 - Bewaesserung ueber `switch`, `valve` oder `input_boolean` mit Garten-/Bewaesserungsbezug erkennen, inklusive Eve-Aqua-Entities wie `switch.eve_aqua_123a`
 - Wetter-Entitaeten ueber `weather` erfassen
-- Gartenstatus regelbasiert bewerten
-- Snapshots historisieren
-- Empfehlungen erzeugen, ohne Geraete automatisch zu steuern
+- Gartenzonen regelbasiert bewerten
+- Zonen, Entscheidungen, Aktionen und Bewaesserungslaeufe historisieren
+- Empfehlungen erzeugen und Bewaesserung nur nach regelbasierter Safety-Freigabe ueber Home Assistant steuern
+- Mähroboter- und Bewaesserungszustand gegenseitig verriegeln
+
+Aktuelle Zone:
+
+- `lawn` / `Rasen`
+
+Fachlich ausgewertete Sensordaten:
+
+- Bodenfeuchte
+- Bodentemperatur
+- Batteriestand
+- optional Soil-Warning
+
+Kalibrierungs-, Sampling- und Diagnose-Entities werden bei der Bewaesserungsentscheidung ignoriert.
 
 Datenbank:
 
@@ -664,9 +678,13 @@ Datenbank:
 agent-api/data/garden/garden.db
 ```
 
-Tabelle:
+Tabellen:
 
 - `garden_snapshots`
+- `garden_zones`
+- `garden_decisions`
+- `garden_actions`
+- `garden_irrigation_runs`
 
 Konfiguration:
 
@@ -691,7 +709,11 @@ Architekturhinweis:
 - Household bleibt Fassade fuer allgemeinen Haushaltsstatus.
 - Garden besitzt die Fachhistorie fuer Garten, Mähroboter, Bodenfeuchte und Bewaesserung.
 - Die OpenAI-Kante ist vorbereitet. Aktuell erzeugt der Garden Agent noch keine aktive KI-Analyse.
-- Automatische Steuerung von Bewaesserung oder Mähroboter ist bewusst nicht aktiv. Der aktuelle Stand ist advisory/dry-run.
+- Automatische Bewaesserung ist standardmaessig deaktiviert (`control_enabled: false`, `automatic_enabled: false`).
+- Manuelle und automatische Starts laufen ueber dieselbe Safety-Pruefung; Safety-Blocks koennen nicht vom Frontend umgangen werden.
+- Geraetesteuerung erfolgt ausschliesslich ueber `HomeAssistantService` und den `GardenIrrigationAdapter`.
+- Eve-Aqua-kompatible Domains sind `switch`, `valve` und `input_boolean`.
+- Garantiertes Ausschalten wird ueber einen einmaligen Scheduler-Task per generischem Agent-Control `garden/run` angestossen; der Scheduler besitzt keine Garden-Imports.
 - KI-gestuetzte Empfehlungen sollen erst aktiviert werden, wenn Bodenfeuchte-, Wetter- und Bewaesserungsdaten stabil vorliegen.
 
 Control:
@@ -701,6 +723,18 @@ Control:
 - `disable`
 - `toggle`
 - `run`
+
+Garden API:
+
+- `GET /api/garden/status`
+- `GET /api/garden/zones`
+- `GET /api/garden/zones/{zone_id}`
+- `POST /api/garden/evaluate`
+- `POST /api/garden/zones/{zone_id}/evaluate`
+- `POST /api/garden/zones/{zone_id}/irrigation/start`
+- `POST /api/garden/zones/{zone_id}/irrigation/stop`
+- `GET /api/garden/zones/{zone_id}/decisions`
+- `GET /api/garden/zones/{zone_id}/irrigation-runs`
 
 # Gemeinsame Services
 

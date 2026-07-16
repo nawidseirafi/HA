@@ -48,6 +48,7 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   marketDashboard: { name: 'marketDashboard' },
   vacationDashboard: { name: 'vacationDashboard' },
   schedulerDashboard: { name: 'schedulerDashboard' },
+  gardenDashboard: { name: 'gardenDashboard' },
 };
 
 const iconMap: Record<string, LucideIcon> = {
