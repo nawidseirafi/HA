@@ -29,6 +29,7 @@ import {
     RefreshCw,
     ShieldAlert,
     Square,
+    Sprout,
     Thermometer,
     Zap,
     Warehouse,
@@ -37,6 +38,8 @@ import {
 import {
     api,
     type AgentStatus,
+    type GardenStatus,
+    type GardenZoneStatus,
     type MessageCenterItem,
     type WallCover,
     type WallDashboardData,
@@ -94,6 +97,7 @@ type HomeCardId =
     | 'garage'
     | 'batteries'
     | 'fritzbox'
+    | 'irrigation'
     | 'calendar'
     | 'floors';
 type MowerHomeCardId = `mower:${string}`;
@@ -111,11 +115,13 @@ const DEFAULT_HOME_CARD_ORDER: HomeCardId[] = [
     'garage',
     'batteries',
     'fritzbox',
+    'irrigation',
     'calendar',
     'floors',
 ];
 const HOME_CARD_SPANS: Partial<Record<HomeCardId, 2>> = {
     climate: 2,
+    irrigation: 2,
     calendar: 2,
     floors: 2,
 };
@@ -385,6 +391,7 @@ function WallDashboardContent() {
     const [messages, setMessages] = useState<MessageCenterItem[]>([]);
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+    const [gardenStatus, setGardenStatus] = useState<GardenStatus | null>(null);
     const [now, setNow] = useState(new Date());
     const brightnessTimers = useRef<Record<string, number>>({});
     const fanTimers = useRef<Record<string, number>>({});
@@ -394,14 +401,16 @@ function WallDashboardContent() {
         if (!silent) setLoading(true);
         setError('');
         try {
-            const [next, messageData, unreadData] = await Promise.all([
+            const [next, messageData, unreadData, nextGardenStatus] = await Promise.all([
                 api.wallDashboard(),
                 api.messages(60),
                 api.unreadMessageCount(),
+                api.gardenStatus().catch(() => null),
             ]);
             setData(next);
             setMessages(messageData.messages);
             setUnreadMessages(unreadData.unread_count);
+            setGardenStatus(nextGardenStatus);
             setSelectedFloor((currentFloor) => (
                 currentFloor === 'Alle Etagen' || next.light_groups.some((group) => group.area === currentFloor)
                     ? currentFloor
@@ -599,6 +608,27 @@ function WallDashboardContent() {
         }
     };
 
+    const toggleRoomDevice = async (device: WallEntity) => {
+        const domain = deviceDomain(device);
+        if (!domain || !isToggleableDevice(device)) return;
+        const active = deviceActive(device);
+        const service = domain === 'valve'
+            ? active ? 'close_valve' : 'open_valve'
+            : active ? 'turn_off' : 'turn_on';
+        setData((current) => patchWallSwitch(current, device.entity_id, {state: active ? 'off' : 'on'}));
+        setBusyEntity(device.entity_id);
+        setError('');
+        try {
+            await api.callHomeAssistantService({domain, service, entity_id: device.entity_id});
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Gerät konnte nicht geschaltet werden.');
+            await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
     const clearPost = async () => {
         const entityId = data?.post?.entity_id;
         if (!entityId || data?.post?.state !== 'on') return;
@@ -641,6 +671,27 @@ function WallDashboardContent() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Urlaubsmodus konnte nicht geschaltet werden.');
             await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
+    const toggleIrrigation = async (zone: GardenZoneStatus) => {
+        const zoneId = gardenZoneId(zone);
+        const active = zoneIrrigationActive(zone);
+        setBusyEntity(`garden-irrigation:${zoneId}`);
+        setError('');
+        try {
+            if (active) {
+                await api.stopGardenIrrigation(zoneId);
+            } else {
+                await api.startGardenIrrigation(zoneId, zone.decision?.recommended_duration_minutes ?? undefined);
+            }
+            setGardenStatus(await api.gardenStatus().catch(() => null));
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Bewässerung konnte nicht geschaltet werden.');
+            setGardenStatus(await api.gardenStatus().catch(() => null));
         } finally {
             setBusyEntity('');
         }
@@ -813,6 +864,8 @@ function WallDashboardContent() {
                                  onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates}
                                  onOpenings={openOpenings}
                                  onClearPost={clearPost} onToggleVacation={toggleVacation}
+                                 gardenStatus={gardenStatus}
+                                 onToggleIrrigation={toggleIrrigation}
                                  onMowerUpdated={scheduleRefresh}
                                  onGarageCommand={callCover}/>}
                 {data && section === 'lights' && (
@@ -862,6 +915,7 @@ function WallDashboardContent() {
                         onFanOscillation={toggleFanOscillation}
                         onFanDirection={toggleFanDirection}
                         onOutletToggle={toggleOutlet}
+                        onDeviceToggle={toggleRoomDevice}
                         onMowerUpdated={scheduleRefresh}
                     />
                 )}
@@ -880,6 +934,8 @@ function HomeSection({
                          onOpenings,
                          onClearPost,
                          onToggleVacation,
+                         gardenStatus,
+                         onToggleIrrigation,
                          onMowerUpdated,
                          onGarageCommand,
                          busyEntity,
@@ -894,6 +950,8 @@ function HomeSection({
     onOpenings: () => void;
     onClearPost: () => void;
     onToggleVacation: () => void;
+    gardenStatus: GardenStatus | null;
+    onToggleIrrigation: (zone: GardenZoneStatus) => void;
     onMowerUpdated: () => void;
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
 }) {
@@ -908,6 +966,7 @@ function HomeSection({
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
+    const irrigationZone = gardenStatus?.zones?.[0] ?? null;
     const [layoutEditing, setLayoutEditing] = useState(false);
     const [cardOrder, setCardOrder] = useState<WallHomeCardId[]>(readHomeCardOrder);
     const mowerCardIds = useMemo(
@@ -988,6 +1047,13 @@ function HomeSection({
                 tone={internetMetricTone(internetInfo.status)}
             />
         ),
+        irrigation: (
+            <WallIrrigationCard
+                zone={irrigationZone}
+                busy={irrigationZone ? busyEntity === `garden-irrigation:${gardenZoneId(irrigationZone)}` : false}
+                onToggle={onToggleIrrigation}
+            />
+        ),
         calendar: <CalendarAgendaCard calendar={data.calendar ?? data.household?.calendar ?? null} now={new Date()}/>,
         floors: (
             <section className="wall-panel wall-span-2">
@@ -1050,6 +1116,73 @@ function renderHomeCard(
         return mower ? <WallMowerCard mower={mower} onUpdated={onMowerUpdated}/> : null;
     }
     return cards[cardId];
+}
+
+function WallIrrigationCard({
+                                zone,
+                                busy,
+                                onToggle,
+                            }: {
+    zone: GardenZoneStatus | null;
+    busy: boolean;
+    onToggle: (zone: GardenZoneStatus) => void;
+}) {
+    const active = zoneIrrigationActive(zone);
+    const moisture = zone?.values?.moisture;
+    const temperature = zone?.values?.temperature ?? zone?.values?.soil_temperature;
+    const decision = zone?.decision;
+    const canStart = Boolean(zone && !active && zoneCanStartManualIrrigation(zone));
+    const canStop = Boolean(zone && active);
+    const disabled = busy || !zone || (!canStart && !canStop);
+    const detail = zone
+        ? active
+            ? zone.open_irrigation_run
+                ? 'Geplanter Bewässerungslauf aktiv'
+                : 'Home Assistant meldet Ventil an'
+            : zone.open_irrigation_run
+                ? 'Ventil aus, Lauf wurde synchronisiert'
+            : decision?.blocks?.[0]?.message || decision?.reasons?.[0]?.message || 'Bereit'
+        : 'Garden Agent nicht verfügbar';
+
+    return (
+        <article className={`wall-irrigation-card wall-robot-card ${active ? 'active' : ''} ${!zone ? 'offline' : ''}`}>
+            <div className="wall-irrigation-head">
+                <span className="wall-irrigation-icon"><Sprout size={28}/></span>
+                <div>
+                    <small>Bewässerung</small>
+                    <h3>{zone?.name ?? 'Garten'}</h3>
+                </div>
+                <button
+                    type="button"
+                    className={`wall-irrigation-switch ${active ? 'on' : ''}`}
+                    disabled={disabled}
+                    onClick={() => zone && onToggle(zone)}
+                    aria-label={active ? 'Bewässerung ausschalten' : 'Bewässerung einschalten'}
+                    aria-pressed={active}
+                >
+                    <span/>
+                </button>
+            </div>
+            <div className="wall-irrigation-status">
+                <strong>{active ? 'Ein' : 'Aus'}</strong>
+                <span>{busy ? 'Schalte...' : detail}</span>
+            </div>
+            <div className="wall-irrigation-metrics">
+                <div>
+                    <span>Feuchte</span>
+                    <strong>{typeof moisture === 'number' ? `${Math.round(moisture)}%` : '-'}</strong>
+                </div>
+                <div>
+                    <span>Boden</span>
+                    <strong>{typeof temperature === 'number' ? `${temperature.toFixed(1).replace('.', ',')}°` : '-'}</strong>
+                </div>
+                <div>
+                    <span>Dauer</span>
+                    <strong>{decision?.recommended_duration_minutes ? `${decision.recommended_duration_minutes} min` : '-'}</strong>
+                </div>
+            </div>
+        </article>
+    );
 }
 
 function HomeCardSlot({
@@ -1337,6 +1470,7 @@ function RoomSection({
                          onFanOscillation,
                          onFanDirection,
                          onOutletToggle,
+                         onDeviceToggle,
                          onMowerUpdated,
                      }: {
     data: WallDashboardData;
@@ -1356,6 +1490,7 @@ function RoomSection({
     onFanOscillation: (fan: WallFan) => void;
     onFanDirection: (fan: WallFan) => void;
     onOutletToggle: (outlet: WallEntity) => void;
+    onDeviceToggle: (device: WallEntity) => void;
     onMowerUpdated: () => void;
 }) {
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
@@ -1481,7 +1616,9 @@ function RoomSection({
                         </div>
                         <div className="wall-device-card-grid">
                             {otherDevices.map((device) => <RoomDeviceCard key={device.entity_id} device={device}
-                                                                          battery={batteryForDeviceName(data, room, device.name)}/>)}
+                                                                          battery={batteryForDeviceName(data, room, device.name)}
+                                                                          busy={busyEntity === device.entity_id}
+                                                                          onToggle={onDeviceToggle}/>)}
                         </div>
                     </section>
                 )}
@@ -1651,17 +1788,35 @@ function RoomCoverControl({
 function RoomDeviceCard({
                             device,
                             battery,
+                            busy,
+                            onToggle,
                         }: {
     device: WallEntity;
     battery?: BatteryBadge | null;
+    busy?: boolean;
+    onToggle?: (device: WallEntity) => void;
 }) {
+    const toggleable = isToggleableDevice(device);
+    const active = deviceActive(device);
     return (
-        <article className="wall-room-device-card">
+        <article className={`wall-room-device-card ${toggleable ? 'toggleable' : ''} ${active ? 'active' : ''}`}>
             <div className={`wall-dot ${deviceActive(device) ? 'on' : ''}`}/>
             <div>
                 <strong>{device.name}</strong>
                 <span>{deviceValue(device)}{battery && <BatteryPill battery={battery}/>}</span>
             </div>
+            {toggleable && (
+                <button
+                    type="button"
+                    className={`wall-device-toggle ${active ? 'on' : ''}`}
+                    disabled={busy}
+                    onClick={() => onToggle?.(device)}
+                    aria-label={`${device.name} ${active ? 'ausschalten' : 'einschalten'}`}
+                    aria-pressed={active}
+                >
+                    <span/>
+                </button>
+            )}
         </article>
     );
 }
@@ -3281,6 +3436,29 @@ function deviceActive(device: WallEntity) {
     const state = String(device.state || '').toLowerCase();
     if (state === 'on' || state === 'open' || state === 'opening') return true;
     return false;
+}
+
+function zoneIrrigationActive(zone: GardenZoneStatus | null) {
+    return zone?.values?.irrigation_active === true;
+}
+
+function gardenZoneId(zone: GardenZoneStatus) {
+    return zone.zone_id || zone.id || '';
+}
+
+function zoneCanStartManualIrrigation(zone: GardenZoneStatus) {
+    const irrigation = zone.entities?.irrigation;
+    if (!irrigation?.entity_id || irrigation.available === false) return false;
+    const hardBlocks = new Set(['irrigation_unavailable', 'mower_active', 'open_irrigation_run', 'irrigation_already_active']);
+    return !(zone.decision?.blocks ?? []).some((block) => hardBlocks.has(block.code));
+}
+
+function deviceDomain(device: WallEntity) {
+    return String(device.entity_id || '').split('.')[0] || '';
+}
+
+function isToggleableDevice(device: WallEntity) {
+    return ['switch', 'input_boolean', 'valve'].includes(deviceDomain(device));
 }
 
 function isFanEntity(device: WallEntity) {

@@ -23,7 +23,7 @@ garden:
         battery: ""
         soil_warning: ""
         mower: ""
-        irrigation: ""
+        irrigation: "switch.eve_aqua_123a"
         weather: ""
         rain: ""
       moisture:

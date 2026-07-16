@@ -21,6 +21,8 @@ from .store import GardenStore
 
 logger = logging.getLogger(__name__)
 
+MANUAL_START_HARD_BLOCKS = {"irrigation_unavailable", "mower_active", "open_irrigation_run", "irrigation_already_active"}
+
 
 class GardenSafetyBlocked(RuntimeError):
     def __init__(self, message: str, decision: dict[str, Any] | None = None) -> None:
@@ -216,7 +218,7 @@ class GardenService:
         duration = int(duration_minutes or decision.get("recommended_duration_minutes") or zone_cfg["irrigation"]["default_duration_minutes"])
         if duration < 1 or duration > max_duration:
             raise ValueError(f"Dauer muss zwischen 1 und {max_duration} Minuten liegen.")
-        if not decision.get("apply_allowed"):
+        if not self._irrigation_start_allowed(decision, source):
             raise GardenSafetyBlocked("Bewässerung ist durch Sicherheitsregeln blockiert.", decision)
 
         binding = zone["entities"]["irrigation"]
@@ -262,6 +264,22 @@ class GardenService:
         if not entity_id:
             raise GardenSafetyBlocked("Kein Bewässerungsventil zugeordnet.", zone["decision"])
         action = store.create_action(zone_id, "irrigation_stop", source, utc_now(), {"stop_reason": stop_reason})
+        if zone["values"].get("irrigation_active") is False:
+            completed = store.complete_action(
+                action["id"],
+                utc_now(),
+                True,
+                entity_id,
+                str(binding.get("domain") or ""),
+                "",
+                {"already_off": True, "stop_reason": stop_reason},
+            )
+            closed_run = None
+            if open_run:
+                closed_run = store.close_irrigation_run(
+                    open_run["id"], utc_now(), zone["values"].get("moisture"), "external_stop", completed["id"], "completed"
+                )
+            return {"ok": True, "status": "already_stopped", "action": completed, "irrigation_run": closed_run}
         try:
             adapter_result = GardenIrrigationAdapter(self.ha_service).stop(entity_id)
             completed = store.complete_action(
@@ -304,6 +322,16 @@ class GardenService:
         bindings = self.discovery.bind_zone_entities(states, zone_cfg, auto_discovery=config["auto_discovery"])
         store = self.store(config)
         decision_input = self._decision_input(zone_id, zone_cfg, bindings, store)
+        if decision_input.open_irrigation_run and decision_input.irrigation_active is False:
+            store.close_irrigation_run(
+                int(decision_input.open_irrigation_run["id"]),
+                utc_now(),
+                decision_input.moisture,
+                "external_stop",
+                None,
+                "completed",
+            )
+            decision_input = self._decision_input(zone_id, zone_cfg, bindings, store)
         decision = self.engine.evaluate_zone(decision_input).public_dict()
         if save:
             store.save_decision(decision)
@@ -327,6 +355,19 @@ class GardenService:
             "open_irrigation_run": store.open_irrigation_run(zone_id),
             "automatic_enabled": zone_cfg["irrigation"]["automatic_enabled"],
         }
+
+    def _irrigation_start_allowed(self, decision: dict[str, Any], source: str) -> bool:
+        if decision.get("apply_allowed"):
+            return True
+        if source != "manual":
+            return False
+        blocks = decision.get("blocks") or []
+        blocking_codes = {
+            str(block.get("code"))
+            for block in blocks
+            if isinstance(block, dict) and block.get("code") in MANUAL_START_HARD_BLOCKS
+        }
+        return not blocking_codes
 
     def _decision_input(self, zone_id: str, zone_cfg: dict[str, Any], bindings: dict[str, EntityBinding], store: GardenStore) -> ZoneEvaluationInput:
         moisture = _float_value(bindings["moisture"].state)

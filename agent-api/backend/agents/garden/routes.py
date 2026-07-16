@@ -124,6 +124,8 @@ def start_garden_irrigation(zone_id: str, payload: IrrigationStartPayload | None
         raise HTTPException(status_code=409, detail={"message": str(exc), "decision": exc.decision}) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Home-Assistant-Service konnte Bewässerung nicht starten: {exc}") from exc
 
 
 @router.post("/zones/{zone_id}/irrigation/stop")
@@ -138,6 +140,8 @@ def stop_garden_irrigation(zone_id: str, payload: IrrigationStopPayload | None =
         raise HTTPException(status_code=404, detail=f"Garden-Zone {zone_id} wurde nicht gefunden.") from exc
     except GardenSafetyBlocked as exc:
         raise HTTPException(status_code=409, detail={"message": str(exc), "decision": exc.decision}) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Home-Assistant-Service konnte Bewässerung nicht stoppen: {exc}") from exc
 
 
 @router.get("/zones/{zone_id}/decisions")

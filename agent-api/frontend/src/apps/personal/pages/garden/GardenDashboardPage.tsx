@@ -88,11 +88,12 @@ export function GardenDashboardPage() {
   const activeRuns = status?.summary?.active_irrigation_runs ?? 0;
 
   const startIrrigation = async (zone: GardenZoneStatus) => {
-    setBusy(`${zone.id}:start`);
+    const zoneId = gardenZoneId(zone);
+    setBusy(`${zoneId}:start`);
     setNotice('');
     setError('');
     try {
-      await api.startGardenIrrigation(zone.id, duration);
+      await api.startGardenIrrigation(zoneId, duration);
       setNotice(`${zone.name} wird für ${duration} Minuten bewässert.`);
       await load(true);
     } catch (err) {
@@ -103,11 +104,12 @@ export function GardenDashboardPage() {
   };
 
   const stopIrrigation = async (zone: GardenZoneStatus) => {
-    setBusy(`${zone.id}:stop`);
+    const zoneId = gardenZoneId(zone);
+    setBusy(`${zoneId}:stop`);
     setNotice('');
     setError('');
     try {
-      await api.stopGardenIrrigation(zone.id);
+      await api.stopGardenIrrigation(zoneId);
       setNotice(`${zone.name}: Bewässerung wurde gestoppt.`);
       await load(true);
     } catch (err) {
@@ -148,7 +150,7 @@ export function GardenDashboardPage() {
       <section className="garden-zone-list">
         {zones.map((zone) => (
           <ZoneCard
-            key={zone.id}
+            key={gardenZoneId(zone)}
             zone={zone}
             duration={duration}
             busy={busy}
@@ -183,7 +185,8 @@ function ZoneCard({
   onStart: (zone: GardenZoneStatus) => void;
   onStop: (zone: GardenZoneStatus) => void;
 }) {
-  const decision = zone.decision ?? emptyDecision(zone.id);
+  const zoneId = gardenZoneId(zone);
+  const decision = zone.decision ?? emptyDecision(zoneId);
   const values = zone.values ?? emptyValues();
   const entities = zone.entities ?? {};
   const hasOpenRun = Boolean(zone.open_irrigation_run);
@@ -203,10 +206,10 @@ function ZoneCard({
 
       <div className="garden-metric-grid">
         <Metric icon={<Droplets size={18} />} label="Bodenfeuchte" value={formatPercent(values.moisture)} />
-        <Metric icon={<Thermometer size={18} />} label="Bodentemperatur" value={formatTemperature(values.temperature)} />
+        <Metric icon={<Thermometer size={18} />} label="Bodentemperatur" value={formatTemperature(values.temperature ?? values.soil_temperature ?? null)} />
         <Metric icon={<BatteryMedium size={18} />} label="Sensorakku" value={formatPercent(values.battery)} />
         <Metric icon={<CloudRain size={18} />} label="Regen" value={rainLabel(zone)} />
-        <Metric icon={<Droplets size={18} />} label="Eve Aqua" value={values.irrigation_active === true ? 'Aktiv' : values.irrigation_active === false ? 'Aus' : 'Unbekannt'} />
+        <Metric icon={<Droplets size={18} />} label="Eve Aqua" value={values.irrigation_active === true ? 'HA meldet an' : values.irrigation_active === false ? 'Aus' : 'Unbekannt'} />
         <Metric icon={<Tractor size={18} />} label="Mähroboter" value={MOWER_LABELS[values.mower_status] ?? values.mower_status} />
       </div>
 
@@ -228,10 +231,10 @@ function ZoneCard({
             />
           </label>
           <button className="button primary" type="button" onClick={() => onStart(zone)} disabled={startDisabled}>
-            {busy === `${zone.id}:start` ? <Activity size={18} /> : <Play size={18} />} Start
+            {busy === `${zoneId}:start` ? <Activity size={18} /> : <Play size={18} />} Start
           </button>
           <button className="button secondary" type="button" onClick={() => onStop(zone)} disabled={Boolean(busy) || !hasOpenRun}>
-            {busy === `${zone.id}:stop` ? <Activity size={18} /> : <PauseCircle size={18} />} Stop
+            {busy === `${zoneId}:stop` ? <Activity size={18} /> : <PauseCircle size={18} />} Stop
           </button>
         </div>
       </div>
@@ -294,6 +297,10 @@ function toneForDecision(decision: GardenDecision) {
   if (decision.apply_allowed) return 'waiting';
   if (decision.blocks.length > 0) return 'error';
   return 'ok';
+}
+
+function gardenZoneId(zone: GardenZoneStatus) {
+  return zone.zone_id || zone.id || '';
 }
 
 function emptyDecision(zoneId: string): GardenDecision {

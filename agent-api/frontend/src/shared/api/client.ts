@@ -232,13 +232,15 @@ export type GardenIrrigationRun = {
 };
 
 export type GardenZoneStatus = {
-  id: string;
+  id?: string;
+  zone_id: string;
   name: string;
   enabled: boolean;
   entities: Record<string, GardenEntityBinding>;
   values: {
     moisture: number | null;
     temperature: number | null;
+    soil_temperature?: number | null;
     battery: number | null;
     soil_warning: boolean | null;
     irrigation_active: boolean | null;
@@ -1162,8 +1164,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const text = await response.text();
     let detail = '';
     try {
-      const data = JSON.parse(text) as { detail?: string };
-      detail = data.detail || '';
+      const data = JSON.parse(text) as { detail?: unknown };
+      if (typeof data.detail === 'string') {
+        detail = data.detail;
+      } else if (data.detail && typeof data.detail === 'object' && 'message' in data.detail) {
+        const message = (data.detail as { message?: unknown }).message;
+        detail = typeof message === 'string' ? message : JSON.stringify(data.detail);
+      } else if (data.detail) {
+        detail = JSON.stringify(data.detail);
+      }
     } catch {
       detail = '';
     }
