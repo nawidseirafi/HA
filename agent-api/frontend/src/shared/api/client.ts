@@ -100,6 +100,36 @@ export type ProductInfo = {
   description: string;
   frontend_app: string;
 };
+
+export type EnergyOverview = {
+  power: number | null;
+  power_avg: number | null;
+  phases: {
+    l1: number | null;
+    l2: number | null;
+    l3: number | null;
+  };
+  energy: {
+    meter: {
+      import_kwh: number | null;
+      export_kwh: number | null;
+    };
+    today: {
+      import_kwh: number | null;
+      export_kwh: number | null;
+    } | null;
+  };
+  updated_at: string;
+  status: 'ok' | 'unavailable' | string;
+  pv_power?: number | null;
+  battery_power?: number | null;
+  battery_soc?: number | null;
+  grid_power?: number | null;
+  ev_charger_power?: number | null;
+  cost_today?: number | null;
+  forecast?: unknown;
+};
+
 export type SystemVersion = {
   product: string;
   app_version?: string;
@@ -1225,6 +1255,7 @@ export const api = {
       body: JSON.stringify(payload ?? {}),
     }),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
+  energyOverview: () => request<EnergyOverview>('/api/homeassistant/energy'),
   vacationStatus: () => request<VacationStatus>('/api/vacation/status'),
   enableVacationAgent: () => request<VacationStatus>('/api/vacation/enable', { method: 'POST' }),
   disableVacationAgent: () => request<VacationStatus>('/api/vacation/disable', { method: 'POST' }),

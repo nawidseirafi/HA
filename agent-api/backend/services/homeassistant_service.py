@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -129,6 +130,70 @@ class HomeAssistantService:
         if value in (None, "", "unknown", "unavailable"):
             return None
         return state
+
+    def get_energy_overview(self) -> dict[str, Any]:
+        states = self.get_states()
+        by_entity = {str(state.get("entity_id") or ""): state for state in states}
+
+        power = _state_float(by_entity.get("sensor.ecotracker_power"))
+        power_avg = _state_float(by_entity.get("sensor.ecotracker_power_avg"))
+        import_total = _state_float(by_entity.get("sensor.ecotracker_energy_in"))
+        export_total = _state_float(by_entity.get("sensor.ecotracker_energy_out"))
+        today_import, today_export = _detect_daily_energy(states)
+
+        status = "ok" if any(
+            value is not None
+            for value in (
+                power,
+                power_avg,
+                _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
+                _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
+                _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+                import_total,
+                export_total,
+            )
+        ) else "unavailable"
+
+        return {
+            "power": power,
+            "power_avg": power_avg,
+            "phases": {
+                "l1": _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
+                "l2": _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
+                "l3": _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+            },
+            "energy": {
+                "meter": {
+                    "import_kwh": import_total,
+                    "export_kwh": export_total,
+                },
+                "today": (
+                    {
+                        "import_kwh": today_import,
+                        "export_kwh": today_export,
+                    }
+                    if today_import is not None or today_export is not None
+                    else None
+                ),
+            },
+            "updated_at": _latest_updated_at([
+                by_entity.get("sensor.ecotracker_power"),
+                by_entity.get("sensor.ecotracker_power_avg"),
+                by_entity.get("sensor.ecotracker_power_phase1"),
+                by_entity.get("sensor.ecotracker_power_phase2"),
+                by_entity.get("sensor.ecotracker_power_phase3"),
+                by_entity.get("sensor.ecotracker_energy_in"),
+                by_entity.get("sensor.ecotracker_energy_out"),
+            ]),
+            "status": status,
+            "pv_power": None,
+            "battery_power": None,
+            "battery_soc": None,
+            "grid_power": power,
+            "ev_charger_power": None,
+            "cost_today": None,
+            "forecast": None,
+        }
 
     def get_calendars(self) -> list[dict[str, Any]]:
         if not self.configured():
@@ -317,3 +382,77 @@ class HomeAssistantService:
         if isinstance(exc, httpx.HTTPError):
             return RuntimeError(f"{message}: {type(exc).__name__}: {exc}")
         return RuntimeError(f"{message}: {type(exc).__name__}: {exc}")
+
+
+def _state_float(state: dict[str, Any] | None) -> float | None:
+    if not state:
+        return None
+    value = state.get("state")
+    if value in {None, "", "unknown", "unavailable"}:
+        return None
+    try:
+        return float(str(value).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _latest_updated_at(states: list[dict[str, Any] | None]) -> str:
+    latest: datetime | None = None
+    for state in states:
+        if not state:
+            continue
+        raw = state.get("last_updated") or state.get("last_changed")
+        if not raw:
+            continue
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if latest is None or parsed > latest:
+            latest = parsed
+    return (latest or datetime.now(timezone.utc)).isoformat(timespec="seconds")
+
+
+def _detect_daily_energy(states: list[dict[str, Any]]) -> tuple[float | None, float | None]:
+    import_candidates: list[tuple[int, float]] = []
+    export_candidates: list[tuple[int, float]] = []
+    for state in states:
+        value = _state_float(state)
+        if value is None:
+            continue
+        attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+        device_class = str(attrs.get("device_class") or "").strip().lower()
+        if device_class != "energy" or unit not in {"kwh", "kw h"}:
+            continue
+        haystack = f"{state.get('entity_id') or ''} {attrs.get('friendly_name') or ''}".lower()
+        if not any(token in haystack for token in ("today", "daily", "day", "tag", "heute", "täglich", "taeglich")):
+            continue
+        if any(token in haystack for token in ("export", "out", "einspeis", "feed")):
+            export_candidates.append((_daily_energy_score(haystack), value))
+        elif any(token in haystack for token in ("import", "in", "netzbezug", "bezug", "verbrauch")):
+            import_candidates.append((_daily_energy_score(haystack), value))
+    return _best_daily_energy(import_candidates), _best_daily_energy(export_candidates)
+
+
+def _daily_energy_score(haystack: str) -> int:
+    score = 0
+    for token in ("ecotracker", "energy", "energie"):
+        if token in haystack:
+            score += 2
+    for token in ("today", "heute"):
+        if token in haystack:
+            score += 3
+    for token in ("daily", "day", "tag", "täglich", "taeglich"):
+        if token in haystack:
+            score += 1
+    return score
+
+
+def _best_daily_energy(candidates: list[tuple[int, float]]) -> float | None:
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    if len(candidates) == 1 or candidates[0][0] > candidates[1][0]:
+        return candidates[0][1]
+    return None

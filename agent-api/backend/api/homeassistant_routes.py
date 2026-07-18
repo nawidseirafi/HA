@@ -112,6 +112,14 @@ def wall_dashboard():
     }
 
 
+@router.get("/energy")
+def energy_overview():
+    try:
+        return ha_service.get_energy_overview()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.post("/service")
 def call_homeassistant_service(payload: ServicePayload):
     data = dict(payload.data or {})

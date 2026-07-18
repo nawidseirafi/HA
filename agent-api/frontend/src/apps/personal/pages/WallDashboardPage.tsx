@@ -16,6 +16,7 @@ import {
     DoorOpen,
     Fan,
     DoorClosed,
+    Gauge,
     GripVertical,
     Home,
     Lightbulb,
@@ -38,6 +39,7 @@ import {
 import {
     api,
     type AgentStatus,
+    type EnergyOverview,
     type GardenStatus,
     type GardenZoneStatus,
     type MessageCenterItem,
@@ -55,8 +57,9 @@ import {WallMowerCard} from '../components/wall/WallMowerCard';
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
 
-type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries';
+type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries' | 'energy';
 type BatteryBadge = { level: number | null; charging?: boolean };
+type EnergyPoint = { at: number; power: number };
 type OutletPower = { watts: number; label: string };
 type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
 type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
@@ -392,6 +395,9 @@ function WallDashboardContent() {
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [messageCenterOpen, setMessageCenterOpen] = useState(false);
     const [gardenStatus, setGardenStatus] = useState<GardenStatus | null>(null);
+    const [energy, setEnergy] = useState<EnergyOverview | null>(null);
+    const [energyHistory, setEnergyHistory] = useState<EnergyPoint[]>([]);
+    const [energyError, setEnergyError] = useState('');
     const [now, setNow] = useState(new Date());
     const brightnessTimers = useRef<Record<string, number>>({});
     const fanTimers = useRef<Record<string, number>>({});
@@ -420,6 +426,17 @@ function WallDashboardContent() {
             setError(err instanceof Error ? err.message : 'Wall-Dashboard konnte nicht geladen werden.');
         } finally {
             if (!silent) setLoading(false);
+        }
+    }, []);
+
+    const loadEnergy = useCallback(async () => {
+        setEnergyError('');
+        try {
+            const nextEnergy = await api.energyOverview();
+            setEnergy(nextEnergy);
+            setEnergyHistory((current) => appendEnergyPoint(current, nextEnergy));
+        } catch (err) {
+            setEnergyError(err instanceof Error ? err.message : 'Energiedaten konnten nicht geladen werden.');
         }
     }, []);
 
@@ -468,6 +485,15 @@ function WallDashboardContent() {
             Object.values(fanTimers.current).forEach((timer) => window.clearTimeout(timer));
         };
     }, [load]);
+
+    useEffect(() => {
+        if (section !== 'energy') return;
+        void loadEnergy();
+        const timer = window.setInterval(() => {
+            void loadEnergy();
+        }, 2000);
+        return () => window.clearInterval(timer);
+    }, [loadEnergy, section]);
 
     const visibleGroups = useMemo(() => {
         if (!data) return [];
@@ -824,6 +850,8 @@ function WallDashboardContent() {
                     <Lightbulb size={24}/></button>
                 <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')}
                         aria-label="Klima"><Thermometer size={24}/></button>
+                <button className={section === 'energy' ? 'active' : ''} onClick={() => goSection('energy')}
+                        aria-label="Energie"><Zap size={24}/></button>
                 <button className={section === 'security' || section === 'openings' ? 'active' : ''} onClick={() => goSection('security')}
                         aria-label="Sicherheit"><ShieldAlert size={24}/></button>
                 <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')}
@@ -835,7 +863,7 @@ function WallDashboardContent() {
                     <div>
                         <span>{formatWallDate(now)}</span>
                         <div className="wall-title-row">
-                            <h1>{headerTitle}</h1>
+                            <h1>{section === 'energy' && <Zap size={30}/>} {headerTitle}</h1>
                             <InternetStatusPill info={internetInfo}/>
                         </div>
                         <p>{subtitleFor(section, activeLights, totalLights, problemCount, data)}</p>
@@ -883,6 +911,7 @@ function WallDashboardContent() {
                 )}
                 {data && section === 'climate' &&
                     <ClimateSection data={data} selectedFloor={selectedFloor} onFloor={setSelectedFloor}/>}
+                {data && section === 'energy' && <EnergySection energy={energy} history={energyHistory} error={energyError}/>}
                 {data && section === 'security' && <SecuritySection data={data}/>}
                 {data && section === 'openings' && <OpeningsSection data={data}/>}
                 {data && section === 'agents' && <AgentsSection data={data}/>}
@@ -1299,6 +1328,130 @@ function HomeCardSlot({
                 </div>
             )}
             {children}
+        </div>
+    );
+}
+
+function EnergySection({energy, history, error}: { energy: EnergyOverview | null; history: EnergyPoint[]; error: string }) {
+    const power = typeof energy?.power === 'number' ? energy.power : null;
+    const direction = power !== null && power < 0 ? 'export' : 'import';
+    const heroUnavailable = power === null;
+    const meterUnavailable = energy?.energy.meter.import_kwh == null && energy?.energy.meter.export_kwh == null;
+    const todayUnavailable = !energy?.energy.today;
+    const stats = energyHistoryStats(history);
+    return (
+        <section className="wall-energy-page">
+            {error && <div className="wall-energy-unavailable">{error}</div>}
+            <article className={`wall-energy-hero ${heroUnavailable ? 'unavailable' : direction}`}>
+                <div className="wall-energy-card-head">
+                    <span><Zap size={24}/></span>
+                    <div>
+                        <small>Aktuelle Leistung</small>
+                        <strong>{power !== null ? formatWatts(power) : '-'}</strong>
+                    </div>
+                </div>
+                <div className="wall-energy-hero-bottom">
+                    <div>
+                        <span>Durchschnitt</span>
+                        <strong>{formatWatts(energy?.power_avg ?? null)}</strong>
+                    </div>
+                    <div className={`wall-energy-direction ${direction}`}>
+                        <i/>
+                        {heroUnavailable ? 'Daten momentan nicht verfügbar.' : direction === 'export' ? 'Einspeisung' : 'Netzbezug'}
+                    </div>
+                </div>
+            </article>
+
+            <article className={`wall-energy-meter-card ${meterUnavailable ? 'unavailable' : ''}`}>
+                <div className="wall-energy-section-title">
+                    <Gauge size={22}/>
+                    <span>Zählerstände</span>
+                </div>
+                <div className="wall-energy-meter-grid">
+                    <div>
+                        <span>Netzbezug</span>
+                        <strong>{formatKwh(energy?.energy.meter.import_kwh ?? null, 3)}</strong>
+                    </div>
+                    <div>
+                        <span>Einspeisung</span>
+                        <strong>{formatKwh(energy?.energy.meter.export_kwh ?? null, 3)}</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article className={`wall-energy-today-card ${todayUnavailable ? 'unavailable' : ''}`}>
+                <div className="wall-energy-section-title">
+                    <CalendarClock size={22}/>
+                    <span>Heute</span>
+                </div>
+                <div className="wall-energy-meter-grid compact">
+                    <div>
+                        <span>Import</span>
+                        <strong>{formatKwh(energy?.energy.today?.import_kwh ?? null, 1)}</strong>
+                    </div>
+                    <div>
+                        <span>Export</span>
+                        <strong>{formatKwh(energy?.energy.today?.export_kwh ?? null, 1)}</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article className={`wall-energy-chart-card ${history.length < 2 ? 'unavailable' : ''}`}>
+                <div className="wall-energy-section-title">
+                    <Activity size={22}/>
+                    <span>Letzte Stunde</span>
+                </div>
+                <EnergySparkline history={history}/>
+            </article>
+
+            <section className="wall-energy-phase-grid">
+                <EnergyPhaseCard label="L1" value={energy?.phases.l1 ?? null} max={maxPhasePower(energy)}/>
+                <EnergyPhaseCard label="L2" value={energy?.phases.l2 ?? null} max={maxPhasePower(energy)}/>
+                <EnergyPhaseCard label="L3" value={energy?.phases.l3 ?? null} max={maxPhasePower(energy)}/>
+            </section>
+
+            <section className="wall-energy-quick-grid">
+                <EnergyQuickCard label="Max" value={formatWatts(stats.max)}/>
+                <EnergyQuickCard label="Min" value={formatWatts(stats.min)}/>
+                <EnergyQuickCard label="Durchschnitt" value={formatWatts(stats.avg)}/>
+                <EnergyQuickCard label="Richtung" value={heroUnavailable ? '-' : direction === 'export' ? 'Einspeisung' : 'Netzbezug'} tone={direction}/>
+            </section>
+        </section>
+    );
+}
+
+function EnergyPhaseCard({label, value, max}: { label: string; value: number | null; max: number }) {
+    const width = value === null ? 0 : Math.max(5, Math.min(100, Math.round((Math.abs(value) / Math.max(max, 1)) * 100)));
+    return (
+        <article className={`wall-energy-phase-card ${value === null ? 'unavailable' : ''}`}>
+            <span>{label}</span>
+            <strong>{formatWatts(value)}</strong>
+            <div><i style={{width: `${width}%`}}/></div>
+        </article>
+    );
+}
+
+function EnergyQuickCard({label, value, tone}: { label: string; value: string; tone?: 'import' | 'export' }) {
+    return (
+        <article className={`wall-energy-quick-card ${tone ?? ''}`}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+        </article>
+    );
+}
+
+function EnergySparkline({history}: { history: EnergyPoint[] }) {
+    const path = energySparklinePath(history);
+    return (
+        <div className="wall-energy-sparkline">
+            {path ? (
+                <svg viewBox="0 0 640 190" preserveAspectRatio="none" aria-hidden="true">
+                    <path className="area" d={`${path} L 640 190 L 0 190 Z`}/>
+                    <path className="line" d={path}/>
+                </svg>
+            ) : (
+                <span>Daten momentan nicht verfügbar.</span>
+            )}
         </div>
     );
 }
@@ -2639,6 +2792,7 @@ function findEntityName(entities: WallEntity[], needles: string[]) {
 function titleFor(section: WallSection) {
     if (section === 'lights') return 'Lampen';
     if (section === 'climate') return 'Klima';
+    if (section === 'energy') return 'Energie';
     if (section === 'security') return 'Sicherheit';
     if (section === 'openings') return 'Fenster & Türen';
     if (section === 'agents') return 'Agenten';
@@ -2651,6 +2805,7 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
     if (section === 'floor') return 'Etage wählen und Räume öffnen';
     if (section === 'room') return 'Geräte in diesem Raum';
     if (section === 'batteries') return 'Batteriestände und Status aller Batterie-Geräte';
+    if (section === 'energy') return 'Leistung, Zählerstände und Phasen';
     if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
     if (section === 'openings' && data) return data.security.openings_open ? `${data.security.openings_open} Kontakte offen` : 'Alle Fenster und Türen geschlossen';
     if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
@@ -3451,6 +3606,54 @@ function zoneCanStartManualIrrigation(zone: GardenZoneStatus) {
     if (!irrigation?.entity_id || irrigation.available === false) return false;
     const hardBlocks = new Set(['irrigation_unavailable', 'mower_active', 'open_irrigation_run', 'irrigation_already_active']);
     return !(zone.decision?.blocks ?? []).some((block) => hardBlocks.has(block.code));
+}
+
+function appendEnergyPoint(history: EnergyPoint[], energy: EnergyOverview) {
+    if (typeof energy.power !== 'number' || !Number.isFinite(energy.power)) return history;
+    const now = Date.now();
+    const cutoff = now - 60 * 60 * 1000;
+    return [...history.filter((point) => point.at >= cutoff), {at: now, power: energy.power}].slice(-1800);
+}
+
+function energyHistoryStats(history: EnergyPoint[]) {
+    const values = history.map((point) => point.power).filter((value) => Number.isFinite(value));
+    if (!values.length) return {min: null, max: null, avg: null};
+    return {
+        min: Math.min(...values),
+        max: Math.max(...values),
+        avg: values.reduce((sum, value) => sum + value, 0) / values.length,
+    };
+}
+
+function energySparklinePath(history: EnergyPoint[]) {
+    const points = history.slice(-120);
+    if (points.length < 2) return '';
+    const values = points.map((point) => point.power);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = Math.max(1, max - min);
+    return points.map((point, index) => {
+        const x = (index / Math.max(points.length - 1, 1)) * 640;
+        const y = 176 - ((point.power - min) / range) * 152;
+        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+}
+
+function maxPhasePower(energy: EnergyOverview | null) {
+    const values = [energy?.phases.l1, energy?.phases.l2, energy?.phases.l3]
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+        .map((value) => Math.abs(value));
+    return Math.max(1, ...values);
+}
+
+function formatWatts(value: number | null | undefined) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+    return `${Math.abs(Math.round(value)).toLocaleString('de-DE')} W`;
+}
+
+function formatKwh(value: number | null | undefined, digits: number) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+    return `${value.toLocaleString('de-DE', {minimumFractionDigits: digits, maximumFractionDigits: digits})} kWh`;
 }
 
 function deviceDomain(device: WallEntity) {
