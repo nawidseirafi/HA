@@ -1,0 +1,9 @@
+ecotracker_energy_in_today:
+  name: "EcoTracker Netzbezug Heute"
+  source: sensor.ecotracker_energy_in
+  cycle: daily
+
+ecotracker_energy_out_today:
+  name: "EcoTracker Einspeisung Heute"
+  source: sensor.ecotracker_energy_out
+  cycle: daily

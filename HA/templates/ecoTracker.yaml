@@ -3,6 +3,8 @@
     - name: "EcoTracker Leistung"
       unique_id: ecotracker_power
       device_class: power
+      state_class: measurement
+      availability: "{{ state_attr('sensor.ecotracker_api', 'power') is not none }}"
       state: "{{ state_attr('sensor.ecotracker_api', 'power') | float(0) | round(0) }}"
       unit_of_measurement: "W"
 
@@ -10,6 +12,8 @@
     - name: "EcoTracker Leistung Durchschnitt"
       unique_id: ecotracker_power_avg
       device_class: power
+      state_class: measurement
+      availability: "{{ state_attr('sensor.ecotracker_api', 'powerAvg') is not none }}"
       state: "{{ state_attr('sensor.ecotracker_api', 'powerAvg') | float(0) | round(0) }}"
       unit_of_measurement: "W"
 
@@ -17,18 +21,24 @@
     - name: "EcoTracker Phase 1"
       unique_id: ecotracker_power_phase1
       device_class: power
+      state_class: measurement
+      availability: "{{ state_attr('sensor.ecotracker_api', 'powerPhase1') is not none }}"
       state: "{{ state_attr('sensor.ecotracker_api', 'powerPhase1') | float(0) | round(0) }}"
       unit_of_measurement: "W"
 
     - name: "EcoTracker Phase 2"
       unique_id: ecotracker_power_phase2
       device_class: power
+      state_class: measurement
+      availability: "{{ state_attr('sensor.ecotracker_api', 'powerPhase2') is not none }}"
       state: "{{ state_attr('sensor.ecotracker_api', 'powerPhase2') | float(0) | round(0) }}"
       unit_of_measurement: "W"
 
     - name: "EcoTracker Phase 3"
       unique_id: ecotracker_power_phase3
       device_class: power
+      state_class: measurement
+      availability: "{{ state_attr('sensor.ecotracker_api', 'powerPhase3') is not none }}"
       state: "{{ state_attr('sensor.ecotracker_api', 'powerPhase3') | float(0) | round(0) }}"
       unit_of_measurement: "W"
 
@@ -37,6 +47,7 @@
       unique_id: ecotracker_energy_in
       device_class: energy
       state_class: total_increasing
+      availability: "{{ state_attr('sensor.ecotracker_api', 'energyCounterIn') is not none }}"
       state: "{{ (state_attr('sensor.ecotracker_api', 'energyCounterIn') | float(0) / 1000) | round(3) }}"
       unit_of_measurement: "kWh"
 
@@ -45,5 +56,6 @@
       unique_id: ecotracker_energy_out
       device_class: energy
       state_class: total_increasing
+      availability: "{{ state_attr('sensor.ecotracker_api', 'energyCounterIn') is not none or state_attr('sensor.ecotracker_api', 'energyCounterOut') is not none }}"
       state: "{{ (state_attr('sensor.ecotracker_api', 'energyCounterOut') | float(0) / 1000) | round(3) }}"
       unit_of_measurement: "kWh"

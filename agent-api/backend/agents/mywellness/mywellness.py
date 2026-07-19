@@ -101,20 +101,8 @@ def log(message):
 # =====================
 def send_ha_notification(title, message):
     try:
-        service = HA_NOTIFY_SERVICE.replace("notify.", "")
-        url = f"{ha.base_url}/api/services/notify/{service}"
-        headers_ha = {
-            "Authorization": f"Bearer {ha.token}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "title": title,
-            "message": message
-        }
-        r = requests.post(url, headers=headers_ha, json=payload, timeout=2)
-        r.raise_for_status()
-        log(f"Home Assistant Notification Status: {r.status_code}")
+        ha.notify(HA_NOTIFY_SERVICE, title, message)
+        log("Home Assistant Notification gesendet")
     except Exception as e:
         log(f"Fehler bei Home Assistant Notification: {e}")
 

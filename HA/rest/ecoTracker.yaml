@@ -1,5 +1,5 @@
 - scan_interval: 5
-  resource: http://DEINE_ECOTRACKER_IP/v1/json
+  resource: http://192.168.178.191/v1/json
   sensor:
     - name: "ecotracker_api"
       value_template: "OK"
@@ -7,6 +7,8 @@
         - "power"
         - "powerAvg"
         - "energyCounterIn"
+        - "energyCounterInT1"
+        - "energyCounterInT2"
         - "energyCounterOut"
         - "powerPhase1"
         - "powerPhase2"

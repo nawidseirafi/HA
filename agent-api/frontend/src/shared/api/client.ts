@@ -121,6 +121,7 @@ export type EnergyOverview = {
   };
   updated_at: string;
   status: 'ok' | 'unavailable' | string;
+  error?: string | null;
   pv_power?: number | null;
   battery_power?: number | null;
   battery_soc?: number | null;
@@ -864,7 +865,7 @@ export type InfrastructureFullStatus = {
 
 export type WallDashboardData = {
   updated_at: string;
-  home_assistant: { configured: boolean; entity_count: number };
+  home_assistant: { configured: boolean; entity_count: number; status?: string; error?: string | null };
   weather: WallWeather | null;
   post?: WallEntity | null;
   waste?: WasteStatus | null;

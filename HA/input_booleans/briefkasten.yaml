@@ -9,8 +9,3 @@ post_im_briefkasten:
   initial: off  # Startet mit "off"
   # Dieser Status wird automatisch in der HA-DB persistiert
   # und wird durch Seiten-Refresh nicht zurückgesetzt
-
-tasche_bewegung:
-  name: "Tasche Bewegung"
-  icon: mdi:bag-personal
-  initial: off

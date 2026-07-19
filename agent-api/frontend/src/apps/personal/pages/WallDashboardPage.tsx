@@ -2810,6 +2810,7 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
     if (section === 'openings' && data) return data.security.openings_open ? `${data.security.openings_open} Kontakte offen` : 'Alle Fenster und Türen geschlossen';
     if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
     if (section === 'climate') return 'Temperaturen, Luftfeuchte und Thermostate';
+    if (section === 'home' && data?.home_assistant.status === 'error') return 'Home Assistant momentan nicht erreichbar';
     if (section === 'home' && data) return `Aktualisiert ${formatTime(data.updated_at)} · ${data.home_assistant.entity_count} Home-Assistant-Entities`;
     return 'Hausstatus, Geräte und Agenten auf einen Blick';
 }

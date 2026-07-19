@@ -1,42 +1,13 @@
-import requests
-import yaml
 import logging
-import os
-import re
-from pathlib import Path
-from urllib.parse import urlparse
-from dotenv import load_dotenv
 
-from backend.paths import API_DIR
-
-
-def _resolve_config_value(value: str | None) -> str:
-    if not value:
-        return ""
-    text = str(value).strip()
-    resolved = os.getenv(text) or os.getenv(text.upper())
-    if resolved:
-        return resolved.strip()
-    if re.fullmatch(r"[A-Z0-9_-]+", text):
-        return ""
-    return text
+from backend.services.homeassistant_service import HomeAssistantService
 
 
 class HomeAssistantClient:
     def __init__(self, config_path="config.yaml"):
-        load_dotenv(API_DIR / ".env")
-        config_file = Path(config_path)
-        if not config_file.is_absolute():
-            config_file = API_DIR / config_file
-
-        with config_file.open("r") as f:
-            config = yaml.safe_load(f)
-
-        if not config:
-            raise ValueError("config.yaml ist leer oder ungültig")
-
-        self.base_url = _resolve_config_value(config["home_assistant"].get("url", "")).rstrip("/")
-        self.token = _resolve_config_value(config["home_assistant"].get("token", ""))
+        self.service = HomeAssistantService()
+        self.base_url = self.service.base_url
+        self.token = self.service.token
         self._validate_config()
 
         self.headers = {
@@ -45,46 +16,24 @@ class HomeAssistantClient:
         }
 
     def _validate_config(self):
-        if not self.base_url:
-            raise ValueError("Home Assistant URL fehlt. Setze HA_URL in ai-agent/.env oder eine echte URL in config.yaml.")
-        parsed = urlparse(self.base_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError(
-                f"Home Assistant URL ist ungueltig: {self.base_url!r}. "
-                "Erwartet wird z.B. http://homeassistant.local:8123"
-            )
-        if not self.token:
-            raise ValueError("Home Assistant Token fehlt. Setze HA_TOKEN in ai-agent/.env oder eine echte Token-Referenz in config.yaml.")
+        if not self.service.configured():
+            raise ValueError("Home Assistant URL oder Token fehlt. Setze HA_URL und HA_TOKEN in agent-api/.env oder config.yaml.")
 
     def get_states(self):
-        url = f"{self.base_url}/api/states"
-        r = requests.get(url, headers=self.headers, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self.service.get_states()
 
     def get_state(self, entity_id):
-        url = f"{self.base_url}/api/states/{entity_id}"
-        r = requests.get(url, headers=self.headers, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self.service.get_state(entity_id)
 
     def get_calendars(self):
-        url = f"{self.base_url}/api/calendars"
-        r = requests.get(url, headers=self.headers, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self.service.get_calendars()
 
     def get_calendar_events(self, entity_id, start, end):
-        url = f"{self.base_url}/api/calendars/{entity_id}"
-        r = requests.get(url, headers=self.headers, params={"start": start, "end": end}, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self.service.get_calendar_events(entity_id, start, end)
 
     def call_service(self, domain, service, data):
-        url = f"{self.base_url}/api/services/{domain}/{service}"
-        r = requests.post(url, headers=self.headers, json=data, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        response = self.service.call_service(domain, service, data)
+        return response.get("result", response)
 
     def persistent_notification(self, title, message, notification_id=None):
         data = {

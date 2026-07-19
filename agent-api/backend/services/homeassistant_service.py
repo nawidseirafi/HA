@@ -134,11 +134,38 @@ class HomeAssistantService:
     def get_energy_overview(self) -> dict[str, Any]:
         states = self.get_states()
         by_entity = {str(state.get("entity_id") or ""): state for state in states}
+        ecotracker_api = by_entity.get("sensor.ecotracker_api")
 
-        power = _state_float(by_entity.get("sensor.ecotracker_power"))
-        power_avg = _state_float(by_entity.get("sensor.ecotracker_power_avg"))
-        import_total = _state_float(by_entity.get("sensor.ecotracker_energy_in"))
-        export_total = _state_float(by_entity.get("sensor.ecotracker_energy_out"))
+        power = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_power")),
+            _attr_float(ecotracker_api, "power"),
+        )
+        power_avg = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_power_avg")),
+            _attr_float(ecotracker_api, "powerAvg"),
+        )
+        phase_l1 = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
+            _attr_float(ecotracker_api, "powerPhase1"),
+        )
+        phase_l2 = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
+            _attr_float(ecotracker_api, "powerPhase2"),
+        )
+        phase_l3 = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+            _attr_float(ecotracker_api, "powerPhase3"),
+        )
+        import_total = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_energy_in")),
+            _attr_float(ecotracker_api, "energyCounterIn", scale=0.001),
+        )
+        export_total = _first_number(
+            _state_float(by_entity.get("sensor.ecotracker_energy_out")),
+            _attr_float(ecotracker_api, "energyCounterOut", scale=0.001),
+        )
+        if export_total is None and (power is not None or import_total is not None):
+            export_total = 0.0
         today_import, today_export = _detect_daily_energy(states)
 
         status = "ok" if any(
@@ -146,9 +173,9 @@ class HomeAssistantService:
             for value in (
                 power,
                 power_avg,
-                _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
-                _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
-                _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+                phase_l1,
+                phase_l2,
+                phase_l3,
                 import_total,
                 export_total,
             )
@@ -158,9 +185,9 @@ class HomeAssistantService:
             "power": power,
             "power_avg": power_avg,
             "phases": {
-                "l1": _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
-                "l2": _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
-                "l3": _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+                "l1": phase_l1,
+                "l2": phase_l2,
+                "l3": phase_l3,
             },
             "energy": {
                 "meter": {
@@ -184,6 +211,7 @@ class HomeAssistantService:
                 by_entity.get("sensor.ecotracker_power_phase3"),
                 by_entity.get("sensor.ecotracker_energy_in"),
                 by_entity.get("sensor.ecotracker_energy_out"),
+                ecotracker_api,
             ]),
             "status": status,
             "pv_power": None,
@@ -394,6 +422,28 @@ def _state_float(state: dict[str, Any] | None) -> float | None:
         return float(str(value).strip().replace(",", "."))
     except (TypeError, ValueError):
         return None
+
+
+def _attr_float(state: dict[str, Any] | None, key: str, *, scale: float = 1.0) -> float | None:
+    if not state:
+        return None
+    attrs = state.get("attributes")
+    if not isinstance(attrs, dict):
+        return None
+    value = attrs.get(key)
+    if value in {None, "", "unknown", "unavailable"}:
+        return None
+    try:
+        return float(str(value).strip().replace(",", ".")) * scale
+    except (TypeError, ValueError):
+        return None
+
+
+def _first_number(*values: float | None) -> float | None:
+    for value in values:
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
 
 
 def _latest_updated_at(states: list[dict[str, Any] | None]) -> str:

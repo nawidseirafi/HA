@@ -23,10 +23,12 @@ class ServicePayload(BaseModel):
 
 @router.get("/wall")
 def wall_dashboard():
+    ha_error = None
     try:
         states = ha_service.get_states()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        states = []
+        ha_error = str(exc)
 
     floor_map = _floor_area_entity_map()
     area_lookup = _entity_area_lookup(floor_map)
@@ -79,7 +81,7 @@ def wall_dashboard():
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "home_assistant": {"configured": ha_service.configured(), "entity_count": len(states)},
+        "home_assistant": {"configured": ha_service.configured(), "entity_count": len(states), "status": "error" if ha_error else "ok", "error": ha_error},
         "weather": weather,
         "lights": lights,
         "light_groups": _group_lights_by_floor(lights, floor_map),
@@ -117,7 +119,22 @@ def energy_overview():
     try:
         return ha_service.get_energy_overview()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return {
+            "power": None,
+            "power_avg": None,
+            "phases": {"l1": None, "l2": None, "l3": None},
+            "energy": {"meter": {"import_kwh": None, "export_kwh": None}, "today": None},
+            "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "status": "unavailable",
+            "error": str(exc),
+            "pv_power": None,
+            "battery_power": None,
+            "battery_soc": None,
+            "grid_power": None,
+            "ev_charger_power": None,
+            "cost_today": None,
+            "forecast": None,
+        }
 
 
 @router.post("/service")

@@ -1,0 +1,4 @@
+tasche_bewegung:
+  name: "Tasche Bewegung"
+  icon: mdi:bag-personal
+  initial: off
