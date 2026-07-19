@@ -1404,11 +1404,11 @@ function EnergySection({energy, history, error}: { energy: EnergyOverview | null
                 <div className="wall-energy-meter-grid">
                     <div>
                         <span>Netzbezug (kWh)</span>
-                        <strong>{formatKwh(energy?.energy.meter.import_kwh ?? null, 3)}</strong>
+                        <strong>{formatKwhNoUnit(energy?.energy.meter.import_kwh ?? null, 3)}</strong>
                     </div>
                     <div>
                         <span>Einspeisung (kWh)</span>
-                        <strong>{formatKwh(energy?.energy.meter.export_kwh ?? null, 3)}</strong>
+                        <strong>{formatKwhNoUnit(energy?.energy.meter.export_kwh ?? null, 3)}</strong>
                     </div>
                 </div>
             </article>
@@ -3847,9 +3847,12 @@ function formatWatts(value: number | null | undefined) {
 
 function formatKwh(value: number | null | undefined, digits: number) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+    return `${value.toLocaleString('de-DE', {minimumFractionDigits: digits, maximumFractionDigits: digits})} kWh`;
+}
+function formatKwhNoUnit(value: number | null | undefined, digits: number) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
     return `${value.toLocaleString('de-DE', {minimumFractionDigits: digits, maximumFractionDigits: digits})}`;
 }
-
 function deviceDomain(device: WallEntity) {
     return String(device.entity_id || '').split('.')[0] || '';
 }
