@@ -30,6 +30,7 @@ mqtt:
       payload_off: "OFF"
 command_line: !include_dir_merge_list command_lines
 rest: !include_dir_merge_list rest
+utility_meter: !include utility_meters.yaml
 frontend:
   themes: !include_dir_merge_named themes
 automation: !include_dir_merge_list automations
