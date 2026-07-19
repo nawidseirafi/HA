@@ -376,14 +376,14 @@
 
 .wall-energy-page {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  grid-template-columns: minmax(340px, 0.86fr) minmax(0, 1.14fr);
   gap: 18px;
   align-items: stretch;
 }
 
 .wall-energy-page article,
 .wall-energy-unavailable {
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: var(--radius-2xl);
   background: var(--card);
   box-shadow: var(--shadow-card);
@@ -396,22 +396,21 @@
 }
 
 .wall-energy-hero {
-  min-height: 290px;
-  grid-row: span 2;
+  min-height: 320px;
   display: grid;
   align-content: space-between;
-  gap: 28px;
-  padding: 26px;
+  gap: 30px;
+  padding: 28px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--state-active) 22%, transparent), transparent 36%),
-    linear-gradient(145deg, color-mix(in srgb, var(--card) 96%, #fff), var(--card));
+    radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--state-active) 13%, transparent), transparent 38%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card) 92%, var(--muted)), var(--card));
 }
 
 .wall-energy-hero.export {
   background:
-    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--state-ok) 24%, transparent), transparent 36%),
-    linear-gradient(145deg, color-mix(in srgb, var(--card) 96%, #fff), var(--card));
+    radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--state-ok) 14%, transparent), transparent 38%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card) 92%, var(--muted)), var(--card));
 }
 
 .wall-energy-card-head {
@@ -421,12 +420,12 @@
 }
 
 .wall-energy-card-head > span {
-  width: 58px;
-  height: 58px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 22px;
+  border-radius: 17px;
   color: #fff;
   background: var(--state-active);
 }
@@ -437,6 +436,8 @@
 
 .wall-energy-card-head small,
 .wall-energy-hero-bottom span,
+.wall-energy-hero-metrics span,
+.wall-energy-hero-status span,
 .wall-energy-section-title,
 .wall-energy-meter-grid span,
 .wall-energy-phase-card span,
@@ -450,23 +451,43 @@
   display: block;
   margin-top: 8px;
   color: var(--foreground);
-  font-size: clamp(3.2rem, 7vw, 6.8rem);
-  line-height: 0.92;
+  font-size: clamp(3rem, 5.6vw, 5.9rem);
+  line-height: 0.95;
   letter-spacing: 0;
 }
 
 .wall-energy-hero-bottom {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  display: grid;
   gap: 18px;
 }
 
-.wall-energy-hero-bottom strong {
+.wall-energy-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wall-energy-hero-metrics div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card) 72%, var(--muted));
+}
+
+.wall-energy-hero-metrics strong {
   display: block;
   margin-top: 5px;
   color: var(--foreground);
-  font-size: 1.65rem;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.05;
+}
+
+.wall-energy-hero-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .wall-energy-direction {
@@ -497,7 +518,7 @@
 .wall-energy-meter-card,
 .wall-energy-today-card,
 .wall-energy-chart-card {
-  padding: 22px;
+  padding: 24px;
 }
 
 .wall-energy-meter-card,
@@ -540,39 +561,50 @@
 }
 
 .wall-energy-chart-card {
-  grid-column: 1 / -1;
-  min-height: 280px;
+  min-height: 320px;
   display: grid;
   gap: 16px;
 }
 
 .wall-energy-sparkline {
-  min-height: 210px;
+  height: 244px;
+  min-height: 244px;
   display: grid;
   place-items: center;
-  border-radius: 22px;
+  border-radius: 20px;
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--secondary) 70%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--secondary) 58%, transparent), color-mix(in srgb, var(--card) 72%, transparent));
   overflow: hidden;
 }
 
 .wall-energy-sparkline svg {
   width: 100%;
   height: 100%;
-  min-height: 210px;
+  display: block;
 }
 
-.wall-energy-sparkline .area {
-  fill: color-mix(in srgb, var(--state-active) 18%, transparent);
+.wall-energy-tooltip {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 12px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
 }
 
-.wall-energy-sparkline .line {
-  fill: none;
-  stroke: var(--state-active);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: d 300ms ease;
+.wall-energy-tooltip strong {
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
+.wall-energy-tooltip span {
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+  line-height: 1.1;
 }
 
 .wall-energy-phase-grid,
@@ -589,11 +621,11 @@
 
 .wall-energy-phase-card,
 .wall-energy-quick-card {
-  min-height: 132px;
+  min-height: 116px;
   display: grid;
   align-content: center;
-  gap: 12px;
-  padding: 20px;
+  gap: 10px;
+  padding: 18px;
 }
 
 .wall-energy-phase-card strong,
@@ -614,7 +646,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--state-active), #38bdf8);
+  background: linear-gradient(90deg, var(--state-active), color-mix(in srgb, var(--state-active) 55%, var(--state-ok)));
   transition: width 320ms ease;
 }
 
@@ -3557,7 +3589,8 @@ button.wall-room-card {
   .wall-room-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
   .wall-outlet-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wall-energy-page { grid-template-columns: 1fr; }
-  .wall-energy-hero { grid-row: auto; }
+  .wall-energy-hero { grid-row: auto; min-height: 280px; }
+  .wall-energy-chart-card { min-height: 300px; }
   .agent-status-map {
     min-height: auto;
     grid-template-rows: 640px auto;
@@ -3621,7 +3654,9 @@ button.wall-room-card {
   .wall-cover-visual { width: 100%; height: 92px; }
   .wall-energy-page { grid-template-columns: 1fr; }
   .wall-energy-hero { min-height: 250px; padding: 22px; }
-  .wall-energy-hero-bottom { align-items: flex-start; flex-direction: column; }
+  .wall-energy-hero-metrics { grid-template-columns: 1fr; }
+  .wall-energy-hero-status { align-items: flex-start; flex-direction: column; }
+  .wall-energy-sparkline { height: 224px; min-height: 224px; }
   .agent-status-map {
     gap: 14px;
     grid-template-rows: 640px auto;

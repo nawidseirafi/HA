@@ -1,6 +1,15 @@
 import {Component, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {DragEvent, ErrorInfo, PointerEvent, ReactNode} from 'react';
 import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import {
     Activity,
     ArrowDown,
     ArrowUp,
@@ -59,7 +68,7 @@ import '@shared/styles/wall.css';
 
 type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries' | 'energy';
 type BatteryBadge = { level: number | null; charging?: boolean };
-type EnergyPoint = { at: number; power: number };
+type EnergyPowerPoint = { timestamp: string; value: number };
 type OutletPower = { watts: number; label: string };
 type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
 type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
@@ -396,7 +405,7 @@ function WallDashboardContent() {
     const [messageCenterOpen, setMessageCenterOpen] = useState(false);
     const [gardenStatus, setGardenStatus] = useState<GardenStatus | null>(null);
     const [energy, setEnergy] = useState<EnergyOverview | null>(null);
-    const [energyHistory, setEnergyHistory] = useState<EnergyPoint[]>([]);
+    const [energyHistory, setEnergyHistory] = useState<EnergyPowerPoint[]>(() => loadStoredEnergyHistory());
     const [energyError, setEnergyError] = useState('');
     const [now, setNow] = useState(new Date());
     const brightnessTimers = useRef<Record<string, number>>({});
@@ -434,7 +443,11 @@ function WallDashboardContent() {
         try {
             const nextEnergy = await api.energyOverview();
             setEnergy(nextEnergy);
-            setEnergyHistory((current) => appendEnergyPoint(current, nextEnergy));
+            setEnergyHistory((current) => {
+                const nextHistory = appendEnergyPoint(current, nextEnergy);
+                storeEnergyHistory(nextHistory);
+                return nextHistory;
+            });
         } catch (err) {
             setEnergyError(err instanceof Error ? err.message : 'Energiedaten konnten nicht geladen werden.');
         }
@@ -1332,7 +1345,7 @@ function HomeCardSlot({
     );
 }
 
-function EnergySection({energy, history, error}: { energy: EnergyOverview | null; history: EnergyPoint[]; error: string }) {
+function EnergySection({energy, history, error}: { energy: EnergyOverview | null; history: EnergyPowerPoint[]; error: string }) {
     const power = typeof energy?.power === 'number' ? energy.power : null;
     const direction = power !== null && power < 0 ? 'export' : 'import';
     const heroUnavailable = power === null;
@@ -1351,15 +1364,36 @@ function EnergySection({energy, history, error}: { energy: EnergyOverview | null
                     </div>
                 </div>
                 <div className="wall-energy-hero-bottom">
-                    <div>
-                        <span>Durchschnitt</span>
-                        <strong>{formatWatts(energy?.power_avg ?? null)}</strong>
+                    <div className="wall-energy-hero-metrics">
+                        <div>
+                            <span>Durchschnitt</span>
+                            <strong>{formatWatts(energy?.power_avg ?? null)}</strong>
+                        </div>
+                        <div>
+                            <span>Max</span>
+                            <strong>{formatWatts(stats.max)}</strong>
+                        </div>
+                        <div>
+                            <span>Min</span>
+                            <strong>{formatWatts(stats.min)}</strong>
+                        </div>
                     </div>
-                    <div className={`wall-energy-direction ${direction}`}>
-                        <i/>
-                        {heroUnavailable ? 'Daten momentan nicht verfügbar.' : direction === 'export' ? 'Einspeisung' : 'Netzbezug'}
+                    <div className="wall-energy-hero-status">
+                        <span>Status</span>
+                        <div className={`wall-energy-direction ${direction}`}>
+                            <i/>
+                            {heroUnavailable ? 'Daten momentan nicht verfügbar.' : direction === 'export' ? 'Einspeisung' : 'Netzbezug'}
+                        </div>
                     </div>
                 </div>
+            </article>
+
+            <article className={`wall-energy-chart-card ${history.length < 2 ? 'unavailable' : ''}`}>
+                <div className="wall-energy-section-title">
+                    <Activity size={22}/>
+                    <span>Leistungsverlauf</span>
+                </div>
+                <EnergySparkline history={history}/>
             </article>
 
             <article className={`wall-energy-meter-card ${meterUnavailable ? 'unavailable' : ''}`}>
@@ -1369,11 +1403,11 @@ function EnergySection({energy, history, error}: { energy: EnergyOverview | null
                 </div>
                 <div className="wall-energy-meter-grid">
                     <div>
-                        <span>Netzbezug</span>
+                        <span>Netzbezug (kWh)</span>
                         <strong>{formatKwh(energy?.energy.meter.import_kwh ?? null, 3)}</strong>
                     </div>
                     <div>
-                        <span>Einspeisung</span>
+                        <span>Einspeisung (kWh)</span>
                         <strong>{formatKwh(energy?.energy.meter.export_kwh ?? null, 3)}</strong>
                     </div>
                 </div>
@@ -1396,26 +1430,12 @@ function EnergySection({energy, history, error}: { energy: EnergyOverview | null
                 </div>
             </article>
 
-            <article className={`wall-energy-chart-card ${history.length < 2 ? 'unavailable' : ''}`}>
-                <div className="wall-energy-section-title">
-                    <Activity size={22}/>
-                    <span>Letzte Stunde</span>
-                </div>
-                <EnergySparkline history={history}/>
-            </article>
-
             <section className="wall-energy-phase-grid">
                 <EnergyPhaseCard label="L1" value={energy?.phases.l1 ?? null} max={maxPhasePower(energy)}/>
                 <EnergyPhaseCard label="L2" value={energy?.phases.l2 ?? null} max={maxPhasePower(energy)}/>
                 <EnergyPhaseCard label="L3" value={energy?.phases.l3 ?? null} max={maxPhasePower(energy)}/>
             </section>
 
-            <section className="wall-energy-quick-grid">
-                <EnergyQuickCard label="Max" value={formatWatts(stats.max)}/>
-                <EnergyQuickCard label="Min" value={formatWatts(stats.min)}/>
-                <EnergyQuickCard label="Durchschnitt" value={formatWatts(stats.avg)}/>
-                <EnergyQuickCard label="Richtung" value={heroUnavailable ? '-' : direction === 'export' ? 'Einspeisung' : 'Netzbezug'} tone={direction}/>
-            </section>
         </section>
     );
 }
@@ -1440,18 +1460,76 @@ function EnergyQuickCard({label, value, tone}: { label: string; value: string; t
     );
 }
 
-function EnergySparkline({history}: { history: EnergyPoint[] }) {
-    const path = energySparklinePath(history);
+function EnergySparkline({history}: { history: EnergyPowerPoint[] }) {
+    const chart = energyChartData(history);
     return (
         <div className="wall-energy-sparkline">
-            {path ? (
-                <svg viewBox="0 0 640 190" preserveAspectRatio="none" aria-hidden="true">
-                    <path className="area" d={`${path} L 640 190 L 0 190 Z`}/>
-                    <path className="line" d={path}/>
-                </svg>
+            {chart.data.length >= 2 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chart.data} margin={{top: 14, right: 10, bottom: 4, left: 0}}>
+                        <defs>
+                            <linearGradient id="wallEnergyPowerGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="var(--state-active)" stopOpacity={0.15}/>
+                                <stop offset="100%" stopColor="var(--state-active)" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                            vertical={false}
+                            stroke="color-mix(in srgb, var(--muted-foreground) 18%, transparent)"
+                            strokeWidth={1}
+                        />
+                        <XAxis
+                            dataKey="at"
+                            type="number"
+                            domain={[chart.start, chart.end]}
+                            ticks={chart.ticks}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={formatEnergyChartTime}
+                            tick={{fill: 'var(--muted-foreground)', fontSize: 11}}
+                            minTickGap={28}
+                        />
+                        <YAxis
+                            domain={[chart.domain.min, chart.domain.max]}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={formatEnergyChartWatts}
+                            tick={{fill: 'var(--muted-foreground)', fontSize: 11}}
+                            width={48}
+                        />
+                        <Tooltip
+                            content={<EnergyChartTooltip/>}
+                            cursor={{
+                                stroke: 'color-mix(in srgb, var(--state-active) 34%, transparent)',
+                                strokeWidth: 1,
+                            }}
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="value"
+                            stroke="var(--state-active)"
+                            strokeWidth={2}
+                            fill="url(#wallEnergyPowerGradient)"
+                            dot={(props) => renderEnergyLastDot(props, chart.lastIndex)}
+                            activeDot={{r: 5, stroke: 'var(--card)', strokeWidth: 2, fill: 'var(--state-active)'}}
+                            isAnimationActive={false}
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
             ) : (
                 <span>Daten momentan nicht verfügbar.</span>
             )}
+        </div>
+    );
+}
+
+function EnergyChartTooltip({active, payload, label}: { active?: boolean; payload?: Array<{ value?: number }>; label?: number }) {
+    const value = payload?.[0]?.value;
+    if (!active || typeof value !== 'number') return null;
+    return (
+        <div className="wall-energy-tooltip">
+            <strong>{formatWatts(value)}</strong>
+            <span>{typeof label === 'number' ? formatEnergyChartTime(label) : ''}</span>
         </div>
     );
 }
@@ -3609,15 +3687,56 @@ function zoneCanStartManualIrrigation(zone: GardenZoneStatus) {
     return !(zone.decision?.blocks ?? []).some((block) => hardBlocks.has(block.code));
 }
 
-function appendEnergyPoint(history: EnergyPoint[], energy: EnergyOverview) {
-    if (typeof energy.power !== 'number' || !Number.isFinite(energy.power)) return history;
-    const now = Date.now();
-    const cutoff = now - 60 * 60 * 1000;
-    return [...history.filter((point) => point.at >= cutoff), {at: now, power: energy.power}].slice(-1800);
+const ENERGY_HISTORY_WINDOW_MS = 60 * 60 * 1000;
+const ENERGY_HISTORY_STORAGE_KEY = 'robotersteve.wall.energy.history.v1';
+
+function loadStoredEnergyHistory(): EnergyPowerPoint[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.localStorage.getItem(ENERGY_HISTORY_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        const cutoff = Date.now() - ENERGY_HISTORY_WINDOW_MS;
+        return parsed
+            .filter((point): point is EnergyPowerPoint => (
+                typeof point?.timestamp === 'string' &&
+                typeof point?.value === 'number' &&
+                Number.isFinite(point.value) &&
+                Date.parse(point.timestamp) >= cutoff
+            ))
+            .slice(-1800);
+    } catch {
+        return [];
+    }
 }
 
-function energyHistoryStats(history: EnergyPoint[]) {
-    const values = history.map((point) => point.power).filter((value) => Number.isFinite(value));
+function storeEnergyHistory(history: EnergyPowerPoint[]) {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(ENERGY_HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-1800)));
+    } catch {
+        // The live chart still works without persisted browser storage.
+    }
+}
+
+function appendEnergyPoint(history: EnergyPowerPoint[], energy: EnergyOverview): EnergyPowerPoint[] {
+    if (typeof energy.power !== 'number' || !Number.isFinite(energy.power)) return history;
+    const now = Date.now();
+    const cutoff = now - ENERGY_HISTORY_WINDOW_MS;
+    const timestamp = new Date(now).toISOString();
+    return [
+        ...history.filter((point) => Date.parse(point.timestamp) >= cutoff),
+        {timestamp, value: energy.power},
+    ].slice(-1800);
+}
+
+function energyHistoryStats(history: EnergyPowerPoint[]) {
+    const cutoff = Date.now() - ENERGY_HISTORY_WINDOW_MS;
+    const values = history
+        .filter((point) => Date.parse(point.timestamp) >= cutoff)
+        .map((point) => point.value)
+        .filter((value) => Number.isFinite(value));
     if (!values.length) return {min: null, max: null, avg: null};
     return {
         min: Math.min(...values),
@@ -3626,18 +3745,92 @@ function energyHistoryStats(history: EnergyPoint[]) {
     };
 }
 
-function energySparklinePath(history: EnergyPoint[]) {
-    const points = history.slice(-120);
-    if (points.length < 2) return '';
-    const values = points.map((point) => point.power);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = Math.max(1, max - min);
+function energyChartData(history: EnergyPowerPoint[]) {
+    const now = Date.now();
+    const historyStart = now - ENERGY_HISTORY_WINDOW_MS;
+    const points = history
+        .map((point) => ({at: Date.parse(point.timestamp), value: point.value}))
+        .filter((point) => Number.isFinite(point.at) && Number.isFinite(point.value) && point.at >= historyStart && point.at <= now)
+        .sort((a, b) => a.at - b.at);
+    const domain = energyTimeDomain(points, now);
+    if (points.length < 2) {
+        return {
+            data: points,
+            domain: {min: 0, max: 500},
+            start: domain.start,
+            end: domain.end,
+            ticks: energyChartTicks(domain.start, domain.end),
+            lastIndex: Math.max(0, points.length - 1),
+        };
+    }
+    const data = smoothEnergyPoints(points);
+    const valueDomain = stableEnergyDomain(data.map((point) => point.value));
+    return {
+        data,
+        domain: valueDomain,
+        start: domain.start,
+        end: domain.end,
+        ticks: energyChartTicks(domain.start, domain.end),
+        lastIndex: Math.max(0, data.length - 1),
+    };
+}
+
+function energyTimeDomain(points: Array<{ at: number; value: number }>, now: number) {
+    if (!points.length) return {start: now - 10 * 60 * 1000, end: now};
+    const first = points[0].at;
+    const span = Math.max(1, now - first);
+    if (span >= ENERGY_HISTORY_WINDOW_MS * 0.82) {
+        return {start: now - ENERGY_HISTORY_WINDOW_MS, end: now};
+    }
+    const padding = Math.min(5 * 60 * 1000, Math.max(60 * 1000, span * 0.18));
+    return {
+        start: Math.max(now - ENERGY_HISTORY_WINDOW_MS, first - padding),
+        end: now,
+    };
+}
+
+function stableEnergyDomain(values: number[]) {
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const maxAbs = Math.max(500, Math.abs(minValue), Math.abs(maxValue)) * 1.15;
+    const step = maxAbs > 8000 ? 2000 : maxAbs > 4000 ? 1000 : maxAbs > 1500 ? 500 : maxAbs > 700 ? 250 : 100;
+    const max = Math.ceil(maxAbs / step) * step;
+    const min = minValue < 0 ? -Math.ceil(Math.abs(minValue) * 1.15 / step) * step : 0;
+    return {min, max};
+}
+
+function smoothEnergyPoints(points: Array<{ at: number; value: number }>) {
     return points.map((point, index) => {
-        const x = (index / Math.max(points.length - 1, 1)) * 640;
-        const y = 176 - ((point.power - min) / range) * 152;
-        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    }).join(' ');
+        const previous = points[index - 1]?.value;
+        const next = points[index + 1]?.value;
+        const values = [previous, point.value, next].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+        return {...point, value: values.reduce((sum, value) => sum + value, 0) / values.length};
+    });
+}
+
+function energyChartTicks(start: number, end: number) {
+    const span = Math.max(1, end - start);
+    const step = span > 45 * 60 * 1000 ? 15 * 60 * 1000 : span > 20 * 60 * 1000 ? 5 * 60 * 1000 : 2 * 60 * 1000;
+    const ticks: number[] = [];
+    for (let tick = Math.ceil(start / step) * step; tick < end; tick += step) {
+        ticks.push(tick);
+    }
+    return [start, ...ticks.slice(0, 5), end];
+}
+
+function formatEnergyChartTime(value: number) {
+    return new Date(value).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+}
+
+function formatEnergyChartWatts(value: number) {
+    if (Math.abs(value) >= 1000) return `${(value / 1000).toLocaleString('de-DE', {maximumFractionDigits: 1})} kW`;
+    return `${Math.round(value)} W`;
+}
+
+function renderEnergyLastDot(props: { cx?: number; cy?: number; index?: number }, lastIndex: number) {
+    const {cx, cy, index} = props;
+    if (index !== lastIndex || typeof cx !== 'number' || typeof cy !== 'number') return <g/>;
+    return <circle cx={cx} cy={cy} r={4} fill="var(--state-active)" stroke="var(--card)" strokeWidth={2}/>;
 }
 
 function maxPhasePower(energy: EnergyOverview | null) {
@@ -3654,7 +3847,7 @@ function formatWatts(value: number | null | undefined) {
 
 function formatKwh(value: number | null | undefined, digits: number) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
-    return `${value.toLocaleString('de-DE', {minimumFractionDigits: digits, maximumFractionDigits: digits})} kWh`;
+    return `${value.toLocaleString('de-DE', {minimumFractionDigits: digits, maximumFractionDigits: digits})}`;
 }
 
 function deviceDomain(device: WallEntity) {
