@@ -16,6 +16,8 @@
       data:
         title: "📬 Post ist da!"
         message: "Bitte Briefkasten leeren"
+        data:
+          tag: briefkasten_post
   mode: single
 
 - alias: "📬 Briefkasten - Manuelles Zurücksetzen"
@@ -29,6 +31,7 @@
   action:
     - service: notify.mobile_app_system_error_404
       data:
-        title: "✅ Briefkasten geleert"
-        message: "Status zurückgesetzt"
+        message: clear_notification
+        data:
+          tag: briefkasten_post
   mode: single
