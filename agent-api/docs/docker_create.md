@@ -1,16 +1,16 @@
-# Sentero Docker Deployment
+# RoboterSteve Docker Deployment
 
 Diese Datei ist bewusst nur noch ein Verweis.
 
-Die fruehere Proxmox-/Docker-Einzelanleitung war veraltet und enthielt alte Restart-Kommandos wie `docker restart`. Die aktuelle, getestete Anleitung steht zentral in:
+Die fruehere Proxmox-/Docker-Einzelanleitung ist veraltet. RoboterSteve wird in diesem Repository als Python/systemd-Deployment betrieben.
 
-- `docs/DEPLOYMENT.md` unter `Sentero ZIP-Docker Deployment V1`
-- `docs/UPDATE_SYSTEM.md` fuer ZIP-basierte Updates ohne Docker Registry
+Aktuelle Anleitungen:
 
-Aktueller V1-Standard:
+- `docs/DEPLOYMENT.md` fuer Installation und Betrieb
+- `docs/UPDATE_SYSTEM.md` fuer ZIP-basierte RoboterSteve-Updates
+
+Aktueller Standard:
 
 ```text
-Sentero Docker Update = ZIP herunterladen + Dateien aktualisieren + docker compose up -d --build
+RoboterSteve Update = ZIP herunterladen + Dateien aktualisieren + systemd-Service zeitverzoegert neu starten
 ```
-
-Kein `docker restart` als Standard.

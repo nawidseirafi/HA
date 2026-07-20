@@ -1,46 +1,32 @@
 # RoboterSteve Update-System V1
 
-Das Update-System ist edition-unabhaengig. V1 nutzt fuer Releases einen einfachen statischen HTTPS-Server mit `latest.json` und einer ZIP-Datei.
+Das Update-System nutzt fuer RoboterSteve einen einfachen statischen HTTPS-Server mit `latest.json` und einer ZIP-Datei.
 
-Keine Docker Registry ist notwendig.
+RoboterSteve wird aktuell als lokales Python/systemd-Deployment betrieben. Docker- und ausgelagerte Produkt-Deployments gehoeren nicht in dieses Repository.
 
-## Edition-Modi
+## Modus
 
-Personal bleibt ein normales Deployment ohne Docker:
+Empfohlene Zielkonfiguration:
 
 ```ini
-ROBOTERSTEVE_EDITION=personal
 UPDATE_EXECUTION_MODE=local_systemd
 UPDATE_SYSTEMD_SERVICE=agent-api
 UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
-Sentero ist eine Docker-Edition, wird aber per ZIP aktualisiert:
-
-```ini
-ROBOTERSTEVE_EDITION=sentero
-UPDATE_EXECUTION_MODE=zip_docker
-UPDATE_DEPLOYMENT_DIR=/opt/sentero
-UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero
-UPDATE_COMPOSE_FILE=docker-compose.yml
-```
-
 Unterstuetzte Modi:
 
 - `dry_run`: Manifest laden, Update simulieren, keine Dateien aendern
-- `local`: Legacy-Alias fuer `local_systemd`, ZIP-Datei einspielen und danach den systemd-Service neu starten
-- `local_systemd`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen und danach den systemd-Service neu starten, fuer Personal
-- `local_no_restart`: ZIP-Datei in ein normales Python/systemd-Deployment einspielen, ohne automatischen Neustart
-- `zip_docker`: ZIP-Datei in eine Docker-Edition einspielen und lokal per Compose neu bauen, fuer Sentero
+- `local`: Legacy-Alias fuer `local_systemd`
+- `local_systemd`: ZIP-Datei in ein Python/systemd-Deployment einspielen und danach den systemd-Service zeitverzoegert neu starten
+- `local_no_restart`: ZIP-Datei einspielen, ohne automatischen Neustart
+- `zip_docker`: Kompatibilitaetsmodus im Update-Service, nicht der RoboterSteve-Standard
 
 V1-Regel:
 
-- `local_systemd`: ZIP + systemd-Restart
-- `local`: ZIP + systemd-Restart, aus Kompatibilitaet mit alten Personal-Installationen
-- `zip_docker`: ZIP + `docker compose up -d --build`
-- Kein `docker restart` als Standard, weil dabei kein neues Image gebaut wird und neue Dependencies, Frontend-Builds oder Dockerfile-Aenderungen nicht sicher uebernommen werden.
-
-Der alte Docker-Image/Registry-Modus wird in V1 nicht verwendet.
+- RoboterSteve nutzt `local_systemd`.
+- `.env`, `config.yaml`, `data/`, `logs/`, `backups/`, `tmp/`, virtuelle Umgebungen und `node_modules/` werden nie ueberschrieben.
+- Der Restart wird verzoegert geplant, damit die API dem Frontend noch das Ergebnis melden kann.
 
 ## Update-Server
 
@@ -48,35 +34,35 @@ Ein statischer HTTPS-Webserver reicht aus:
 
 ```text
 https://seirafi.de/robotersteve/
-└── sentero/
+└── robotersteve/
     └── stable/
         ├── latest.json
         └── releases/
-            └── sentero-0.2.0.zip
+            └── robotersteve-0.2.0.zip
 ```
 
 Konfiguration auf dem Zielrechner:
 
 ```ini
-UPDATE_BASE_URL=https://seirafi.de/robotersteve
+UPDATE_BASE_URL=https://seirafi.de/robotersteve/robotersteve
 ```
 
 Dann wird automatisch gelesen:
 
 ```text
-https://seirafi.de/robotersteve/<edition>/stable/latest.json
+https://seirafi.de/robotersteve/robotersteve/stable/latest.json
 ```
 
 Alternativ kann direkt gesetzt werden:
 
 ```ini
-UPDATE_MANIFEST_URL=https://seirafi.de/robotersteve/sentero/stable/latest.json
+UPDATE_MANIFEST_URL=https://seirafi.de/robotersteve/robotersteve/stable/latest.json
 ```
 
 Prioritaet:
 
 1. `UPDATE_MANIFEST_URL`
-2. `UPDATE_BASE_URL + /<edition>/stable/latest.json`
+2. `UPDATE_BASE_URL + /stable/latest.json`
 3. lokales `update-manifest.json`
 4. Mock
 
@@ -87,54 +73,48 @@ Prioritaet:
 ```json
 {
   "latest_version": "0.2.0",
-  "download_url": "https://seirafi.de/robotersteve/sentero/stable/releases/sentero-0.2.0.zip",
+  "download_url": "https://seirafi.de/robotersteve/robotersteve/stable/releases/robotersteve-0.2.0.zip",
   "mandatory": false,
   "minimum_version": "0.1.0",
   "sha256": "...",
   "release_notes": [
     "Stabilitaet verbessert",
-    "Einrichtung verbessert"
+    "Wall Dashboard beschleunigt"
   ],
   "components": {
     "application": { "update": true },
     "homeassistant": { "update": false },
-    "ollama": { "update": false },
     "system": { "update": false }
   }
 }
 ```
 
-In V1 wird nur `components.application.update=true` umgesetzt. Home Assistant, Ollama und System sind im Manifest vorbereitet, werden aber nicht automatisch aktualisiert.
+In V1 wird nur `components.application.update=true` umgesetzt. Home Assistant und System sind im Manifest vorbereitet, werden aber nicht automatisch aktualisiert.
 
 `sha256` ist fuer ZIP-basierte Produktiv-Updates Pflicht. Fehlt die Pruefsumme oder passt sie nicht zur heruntergeladenen ZIP-Datei, bricht die Installation vor dem Entpacken ab. Wenn `size_bytes` gesetzt ist, wird zusaetzlich die Dateigroesse geprueft.
 
 Optional koennen Manifeste signiert werden:
 
 ```ini
-UPDATE_MANIFEST_PUBLIC_KEY=/opt/sentero/keys/update-public.pem
-```
-
-Der Builder kann signieren:
-
-```bash
-UPDATE_MANIFEST_SIGNING_KEY=/secure/update-private.pem ../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
+UPDATE_MANIFEST_PUBLIC_KEY=/opt/roboterSteve/keys/update-public.pem
 ```
 
 ## ZIP-Inhalt
 
-Das Release-ZIP enthaelt ein vollstaendiges deploybares Edition-Paket:
+Das Release-ZIP enthaelt ein vollstaendiges deploybares RoboterSteve-Paket:
 
 ```text
-sentero-0.2.0.zip
+robotersteve-0.2.0.zip
 ├── backend/
 ├── frontend/
 ├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
+├── agent-api.service
+├── main.py
 ├── config.example.yaml
+├── .env.example
 ├── version.json
 ├── update-manifest.json
-└── README.md oder README_INSTALL.md
+└── README_INSTALL.md
 ```
 
 Nicht enthalten bzw. nie ueberschrieben:
@@ -148,62 +128,39 @@ Nicht enthalten bzw. nie ueberschrieben:
 - virtuelle Umgebungen
 - `node_modules/`
 
-## ZIP-Docker Ablauf
+## Local/systemd Ablauf
 
-Bei `UPDATE_EXECUTION_MODE=zip_docker`:
+Bei `UPDATE_EXECUTION_MODE=local_systemd`:
 
 1. `latest.json` laden
 2. Version vergleichen
 3. ZIP aus `download_url` herunterladen
 4. SHA256 zwingend pruefen und `size_bytes` pruefen, falls gesetzt
-5. Backup erstellen unter `/opt/<edition>/backups/`, z. B. `/opt/sentero/backups/`
-6. ZIP nach `/opt/<edition>/tmp/update-<version>/` entpacken
-7. Struktur validieren: `backend/`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `version.json`
-8. `docker compose down`
-9. erlaubte Dateien aktualisieren
-10. `docker compose up -d --build`
+5. Backup erstellen
+6. ZIP in ein temporaeres Update-Verzeichnis entpacken
+7. Struktur validieren: `backend/`, `requirements.txt`, `version.json`
+8. erlaubte Dateien aktualisieren
+9. Status und Audit-Log schreiben
+10. systemd-Restart zeitverzoegert ausloesen
 11. Healthcheck pruefen, standardmaessig `http://127.0.0.1:8080/health`
-12. Status und Audit-Log schreiben
-
-Die RoboterSteve/Sentero-Anwendung wird lokal aus dem ZIP gebaut. Es gibt kein `docker compose pull` fuer `robotersteve-api` und keine externe Docker Registry.
-
-`docker-compose.yml` fuer Sentero baut lokal:
-
-```yaml
-services:
-  robotersteve-api:
-    build: ..
-    ports:
-      - "8080:8080"
-```
-
-Externe Standard-Images wie `ollama/ollama` duerfen weiterhin verwendet werden. Sie werden in V1 aber nicht automatisch aktualisiert.
 
 ## Backup und Rollback
 
-Backup sichert im ZIP-Docker-Modus:
+Backup sichert:
 
 - `config.yaml`
 - `.env`
 - `data/`
 - `settings/`
-- `editions/`
 - `version.json`
-- `docker-compose.yml`
 
-Wenn ein ZIP-Docker-Update fehlschlaegt, versucht der Service konservativ:
+Wenn ein Update fehlschlaegt, versucht der Service konservativ:
 
 1. letztes Backup wiederherstellen
-2. `docker compose up -d --build` erneut ausfuehren
+2. systemd-Service neu starten
 3. Fehler im Audit-Log speichern
 
-Die Kunden-UI zeigt nur:
-
-```text
-Update fehlgeschlagen. Das vorherige System wurde wiederhergestellt.
-```
-
-Technische Details stehen nur im Admin-/Dev-Modus bereit.
+Die normale UI zeigt nur eine nutzerfreundliche Meldung. Technische Details stehen nur im Admin-/Dev-Status bereit.
 
 ## API
 
@@ -214,66 +171,32 @@ Technische Details stehen nur im Admin-/Dev-Modus bereit.
 - `GET /api/system/update/admin/status`
 - `POST /api/system/update/rollback`
 
-`install` und `rollback` sind nur fuer den Administrator erlaubt.
-
-Die normale Kunden-UI zeigt keine technischen Details wie Docker, ZIP, Compose, Ollama, Home Assistant, System, Channel, Registry oder Image.
+`install` und `rollback` sind nur fuer Administratoren erlaubt.
 
 ## Release Build
 
-Sentero ZIP-Release bauen:
+RoboterSteve-Release bauen:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python deployment_build.py --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Erzeugt:
 
 ```text
-build/sentero/                              # normales installierbares Deployment-Paket
-build/updates/sentero/stable/latest.json             # Upload auf HTTPS-Update-Server
-build/updates/sentero/stable/deployment-manifest.json # Upload auf HTTPS-Update-Server
-build/updates/sentero/stable/releases/sentero-0.2.0.zip
+build/robotersteve/                                      # normales installierbares Deployment-Paket
+build/updates/robotersteve/stable/latest.json            # Upload auf HTTPS-Update-Server
+build/updates/robotersteve/stable/deployment-manifest.json
+build/updates/robotersteve/stable/releases/robotersteve-0.2.0.zip
 ```
 
-Der Edition Builder erzeugt standardmaessig beide Varianten unter `build/`.
-`build/<edition>/` ist das normale lokale Deployment-Paket.
-`build/updates/<edition>/stable/` ist der Upload-Ordner fuer den statischen Update-Server.
-`--zip` wird aus Kompatibilitaet weiter akzeptiert, ist aber nicht mehr notwendig.
+Der Builder erzeugt standardmaessig beide Varianten unter `build/`.
+`build/robotersteve/` ist das normale lokale Deployment-Paket.
+`build/updates/robotersteve/stable/` ist der Upload-Ordner fuer den statischen Update-Server.
 
-Diese Struktur kann direkt auf den HTTPS-Server hochgeladen werden:
-
-```text
-robotersteve/
-└── sentero/
-    └── stable/
-        ├── latest.json
-        └── releases/
-            └── sentero-0.2.0.zip
-```
-
-Personal bleibt moeglich:
+Wenn ausnahmsweise nur das lokale Deployment ohne Update-ZIP gebaut werden soll:
 
 ```bash
-../venv/bin/python tools/build_edition.py personal --version 0.2.0 --base-url https://seirafi.de/robotersteve
-```
-
-Personal nutzt `UPDATE_EXECUTION_MODE=local_systemd` und kein Docker.
-Der Restart wird standardmaessig verzoegert geplant:
-
-```bash
-systemd-run --on-active=2 systemctl restart agent-api
-```
-
-Wenn die Anwendung als `root` laeuft, ist keine sudoers-Regel notwendig.
-Wenn die Anwendung als eigener Service-User laeuft, setzt der Update-Service automatisch `sudo` vor den Befehl. Dann braucht dieser User eine eng begrenzte sudo-Regel, z. B.:
-
-```text
-robotersteve ALL=NOPASSWD: /usr/bin/systemd-run --on-active=2 systemctl restart agent-api, /bin/systemctl restart agent-api, /usr/bin/systemctl restart agent-api
-```
-
-Wenn ausnahmsweise nur das lokale Deployment ohne Update-Paket gebaut werden soll:
-
-```bash
-../venv/bin/python tools/build_edition.py personal --no-update
+../venv/bin/python deployment_build.py --no-zip
 ```

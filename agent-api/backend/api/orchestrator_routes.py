@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from backend.agents.registry import discover_agent_manifests, get_agent_control
@@ -24,10 +24,10 @@ class ControlPayload(BaseModel):
 
 
 @router.get("/map")
-def orchestrator_map() -> dict[str, Any]:
-    agents = [_agent_node(manifest.public_dict()) for manifest in discover_agent_manifests()]
+def orchestrator_map(live: bool = Query(default=False)) -> dict[str, Any]:
+    agents = [_agent_node(manifest.public_dict(), live=live) for manifest in discover_agent_manifests()]
     agent_ids = {agent["id"] for agent in agents}
-    services = _service_nodes()
+    services = _service_nodes(live=live)
     scheduler = next((agent for agent in agents if agent["id"] == "scheduler"), None)
     nodes = [
         {
@@ -132,9 +132,9 @@ def execute_agent_control(agent_id: str, action: str, payload: ControlPayload | 
     return control_service.execute(agent_id, action, data)
 
 
-def _agent_node(manifest: dict[str, Any]) -> dict[str, Any]:
+def _agent_node(manifest: dict[str, Any], live: bool = False) -> dict[str, Any]:
     agent_id = str(manifest.get("id") or "")
-    status_data = _agent_status(agent_id)
+    status_data = _agent_status(agent_id) if live else _fast_agent_status(agent_id, manifest)
     status = _status_tone(agent_id, manifest, status_data)
     return {
         "id": agent_id,
@@ -166,12 +166,26 @@ def _agent_status(agent_id: str) -> dict[str, Any]:
     return {}
 
 
-def _service_nodes() -> list[dict[str, Any]]:
+def _fast_agent_status(agent_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    enabled = bool(manifest.get("enabled", True))
+    status = "active" if enabled else "disabled"
+    defaults = {
+        "invoices": {"next_scheduled_run": "22:00 Uhr"},
+        "mywellness": {"next_scheduled_run": "17:00 Uhr"},
+        "market": {"next_scheduled_run": "Bereit"},
+        "vacation": {"next_scheduled_run": "Home Assistant synchronisieren"},
+        "garden": {"next_scheduled_run": "07:00 Uhr"},
+    }
+    return {"status": status, "enabled": enabled, **defaults.get(agent_id, {})}
+
+
+def _service_nodes(live: bool = False) -> list[dict[str, Any]]:
     ha_status = "active"
-    try:
-        HomeAssistantService().get_states()
-    except Exception:
-        ha_status = "error"
+    if live:
+        try:
+            HomeAssistantService().get_states()
+        except Exception:
+            ha_status = "error"
     candidates = [
         ("messaging", {"id": "messaging", "label": "Message Center", "subtitle": "Nachrichten & Hinweise", "kind": "platform", "status": "active", "icon": "Bell", "control": _read_only_control()}),
         ("household", {"id": "household", "label": "Household", "subtitle": "Haushaltsstatus & Checks", "kind": "platform", "status": "active", "icon": "Home", "control": _read_only_control()}),

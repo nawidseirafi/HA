@@ -211,6 +211,8 @@ class SchedulerService:
                     apply=bool(payload.get("apply", True)),
                     include_ai=payload.get("include_ai") if "include_ai" in payload else None,
                 )
+            if payload.get("check") == "openings" or str(task.get("default_key") or "") == "platform:household:window-check":
+                return HouseholdService().check_openings(notify=True)
             return HouseholdService().summary()
         if action_type == "update_check":
             from backend.services.update_service import UpdateService

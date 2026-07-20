@@ -4,7 +4,7 @@ Version: 1.0
 
 Dieses Dokument definiert die grundlegenden Architekturprinzipien von RoboterSteve.
 
-Diese Regeln gelten für alle Editionen (Personal, Sentero und zukünftige Produkte) und dürfen nur nach einer bewussten Architekturentscheidung geändert werden.
+Diese Regeln gelten fuer RoboterSteve und duerfen nur nach einer bewussten Architekturentscheidung geaendert werden.
 
 Dieses Dokument beschreibt keine Implementierungsdetails, sondern die Leitplanken für jede zukünftige Entwicklung.
 
@@ -70,7 +70,7 @@ Er koordiniert ausschließlich:
 - Scheduler
 - Routing
 
-Der Orchestrator darf niemals Rechnungen analysieren, Gartenlogik enthalten oder Sentero-Regeln implementieren.
+Der Orchestrator darf niemals Rechnungen analysieren, Gartenlogik oder andere Agent-Fachlogik enthalten.
 
 ---
 
@@ -145,33 +145,11 @@ Wall analysiert niemals Daten.
 
 Alle Bewertungen erfolgen durch Agenten.
 
----
-
-# 8. Sentero
-
-Sentero ist ein Produkt.
-
-Sentero ist keine Entwickleroberfläche.
-
-Regeln:
-
-Keine technischen Begriffe
-
-Keine Entity IDs
-
-Keine Datenbanken
-
-Keine API-Begriffe
-
-Keine Agentenkarte
-
-Keine Infrastrukturansichten
-
-Alles muss in Alltagssprache formuliert werden.
+Der erste Wall-Render darf nicht auf teure Detailabfragen warten. Umfangreiche Agent-, Kalender-, Message-, Garden- oder Chart-Daten sollen ueber Backend-Endpunkte gekapselt und nachgeladen oder als optionale Live-Abfrage angeboten werden.
 
 ---
 
-# 9. KI
+# 8. KI
 
 Die KI unterstützt Entscheidungen.
 
@@ -202,7 +180,7 @@ Der Household Comfort Service darf einen Schlafzimmer-Ventilator nur dann ueber 
 
 ---
 
-# 10. Lernen
+# 9. Lernen
 
 Agenten dürfen Verhalten lernen.
 
@@ -220,7 +198,7 @@ Neue Modelle dürfen bestehende Regeln ergänzen, aber nicht ersetzen.
 
 ---
 
-# 11. Benutzeroberflächen
+# 10. Benutzeroberflächen
 
 Jede Oberfläche verfolgt genau einen Zweck.
 
@@ -228,19 +206,15 @@ Personal
 
 → Administrator
 
-Sentero
-
-→ Angehörige
-
 Wall
 
 → Smart Home Bedienung
 
-Adminfunktionen dürfen niemals in Sentero erscheinen.
+Adminfunktionen gehoeren in die Personal-/Admin-Oberflaeche und nicht in vereinfachte Bedienoberflaechen wie Wall.
 
 ---
 
-# 12. Services
+# 11. Services
 
 Services sind Querschnittskomponenten.
 
@@ -260,7 +234,7 @@ Services besitzen keine Fachlogik.
 
 ---
 
-# 13. Datenbanken
+# 12. Datenbanken
 
 Fachdaten bleiben beim jeweiligen Agenten.
 
@@ -278,10 +252,6 @@ Market
 
 → market.db
 
-Sentero
-
-→ sentero.db
-
 Household Comfort
 
 → Household Service / optional spaeter household.db
@@ -290,7 +260,7 @@ Keine globale Monolith-Datenbank.
 
 ---
 
-# 14. APIs
+# 13. APIs
 
 Jede API besitzt genau einen Verantwortungsbereich.
 
@@ -300,23 +270,23 @@ Gemeinsame Logik gehört in Services.
 
 ---
 
-# 15. Frontend
+# 14. Frontend
 
-Gemeinsame Komponenten liegen ausschließlich unter
+Gemeinsame Komponenten liegen unter
 
 frontend/src/shared/
 
-Produktlogik liegt ausschließlich unter
+RoboterSteve-spezifische UI liegt unter
 
-frontend/src/apps/<edition>
+frontend/src/apps/personal/
 
-Keine verstreuten if (edition == ...).
+Keine fachliche Logik in `shared/`, wenn sie nur zur Personal-App gehoert.
 
 ---
 
-# 16. Design
+# 15. Design
 
-Alle Produkte verwenden dieselbe Designphilosophie.
+RoboterSteve verwendet eine konsistente Designphilosophie.
 
 Prinzipien:
 
@@ -334,7 +304,7 @@ Animationen nur dezent.
 
 ---
 
-# 17. Sicherheit
+# 16. Sicherheit
 
 Secrets niemals im Code.
 
@@ -350,15 +320,13 @@ Benutzerdaten verlassen niemals ohne Zustimmung das System.
 
 ---
 
-# 18. Updates
+# 17. Updates
 
 Updates müssen
 
 atomar
 
 rollbackfähig
-
-editionfähig
 
 offlinefähig
 

@@ -6,8 +6,8 @@ Dieses Dokument beschreibt nicht den Ist-Zustand im Detail. Der aktuelle Aufbau 
 
 # Leitlinien
 
-- Ein gemeinsames Repository bleibt die Quelle fuer alle Editionen.
-- Editionen werden per YAML und Environment gesteuert, nicht durch getrennte Repos.
+- Dieses Repository bleibt die Quelle fuer RoboterSteve.
+- Ausgelagerte Produkte werden nicht mehr in diesem Repo dokumentiert oder gebaut.
 - Bestehende Agenten, APIs und Datenbanken werden nicht ohne Migrationspfad gebrochen.
 - Manifeste bleiben Quelle fuer Agent-Metadaten und Scheduler-Defaults.
 - Fachliche Daten bleiben bei den owning Agents oder Services.
@@ -15,29 +15,24 @@ Dieses Dokument beschreibt nicht den Ist-Zustand im Detail. Der aktuelle Aufbau 
 - Der Orchestrator koordiniert, besitzt aber keine Agent-Fachlogik.
 - Agenten werden nur ueber den Agent-Control-Vertrag zentral gesteuert.
 - Hinweise, Warnungen und Aufgaben laufen ueber den Messaging Service.
-- Kunden-UI bleibt produktorientiert; technische Details bleiben Personal/Admin/Dev vorbehalten.
+- Technische Details bleiben Personal/Admin/Dev vorbehalten.
 
 # Bereits umgesetzt
 
-## Editionen
+## Produktkonfiguration
 
 Umgesetzt:
 
-- Editionen liegen unter `editions/*.yaml`.
-- Runtime-Auswahl erfolgt ueber `ROBOTERSTEVE_EDITION`, danach `config.yaml -> edition.name`, danach `personal`.
-- `backend/editions.py` kapselt die Edition-Erkennung.
-- Registry, Agent-Router, Agent-Liste und Orchestrator Map respektieren die aktive Edition.
-- `tools/build_edition.py` erzeugt Deployment-Artefakte pro Edition.
-- Build-Artefakte werden unter `build/` getrennt:
-  - `build/<edition>/` fuer normales Deployment
-  - `build/updates/<edition>/stable/` fuer Update-Server-Dateien
-- Personal bleibt lokale/systemd Edition.
-- Sentero bleibt Docker-Edition mit ZIP-basierten Updates.
+- RoboterSteve nutzt `editions/personal.yaml` als Personal-Konfiguration.
+- Registry, Agent-Router, Agent-Liste und Orchestrator Map respektieren die erlaubten Agenten und Core-Services.
+- `deployment_build.py` erzeugt RoboterSteve-Deployment-Artefakte.
+- Build-Artefakte werden unter `build/robotersteve/` und `build/updates/robotersteve/stable/` erzeugt.
+- RoboterSteve bleibt ein lokales/systemd Deployment.
 
 Zielregel:
 
-- Neue Produkteditionen bekommen eine eigene YAML-Datei, eigene Frontend-App und klare Agent-/Core-Service-Liste.
-- Keine Edition darf still auf Personal-Komponenten zurueckfallen, wenn sie als Produktedition gebaut wurde.
+- Neue RoboterSteve-Agenten muessen explizit in Konfiguration, Manifest und Navigation eingetragen werden.
+- Ausgelagerte Produkte gehoeren nicht in dieses Repository.
 
 ## Frontend Multi-App
 
@@ -45,33 +40,31 @@ Umgesetzt:
 
 - Gemeinsamer Entry Point: `frontend/src/main.tsx`.
 - Personal App: `frontend/src/apps/personal/`.
-- Sentero App: `frontend/src/apps/sentero/`.
 - Shared-Bereich: `frontend/src/shared/`.
-- `VITE_ROBOTERSTEVE_EDITION=personal` baut die Personal App.
-- `VITE_ROBOTERSTEVE_EDITION=sentero` baut die Sentero App.
-- Sentero besitzt eigene Navigation, eigene Seiten und eigenes Designsystem.
+- `npm run build` baut die Personal App.
 
 Zielregel:
 
-- Keine verstreuten Edition-Abfragen in shared Komponenten.
+- Keine produkt- oder app-spezifische Fachlogik in shared Komponenten.
 - Shared enthaelt nur wirklich gemeinsame API-, Auth-, UI- und Utility-Bausteine.
-- Produktnavigation und Produktseiten gehoeren in `apps/<edition>/`.
+- RoboterSteve-Navigation und Seiten gehoeren in `apps/personal/`.
 
 ## Agent Registry und Orchestrator
 
 Umgesetzt:
 
-- `discover_agent_manifests()` filtert standardmaessig nach aktiver Edition.
+- `discover_agent_manifests()` filtert standardmaessig nach erlaubten RoboterSteve-Agenten.
 - `include_agent_routers(app)` bindet nur erlaubte Agent-Router ein.
-- `/api/agents` zeigt nur Agenten der aktiven Edition.
+- `/api/agents` zeigt nur erlaubte Agenten.
 - `/api/orchestrator/map` baut seine Agent-Knoten aus der gefilterten Registry.
+- `/api/orchestrator/map` liefert standardmaessig eine schnelle Manifest-/Registry-Map; teure Live-Checks laufen optional ueber `?live=true`.
 - `backend/services/orchestrator_control_service.py` nutzt den Agent-Control-Vertrag.
 
 Zielregel:
 
 - Orchestrator Map bleibt die zentrale UI-Quelle fuer Agent-Status.
 - Agent-Metadaten kommen aus Manifesten.
-- Runtime-Status kommt aus Agent-Control, nicht aus hardcodierter UI-Logik.
+- Runtime-Status kommt aus Agent-Control, nicht aus hardcodierter UI-Logik. Fuer den ersten Render duerfen leichte Statuswerte genutzt werden; Live-Status darf nicht die Map blockieren.
 
 ## Agent Control Contract
 
@@ -118,7 +111,7 @@ Aktuelle Zielregel:
 
 - Scheduler-Defaults duerfen bestehende lokale Anpassungen nicht ueberschreiben.
 - Erfolgsmeldungen fuer Routinechecks bleiben still; Fehler und handlungsrelevante Warnungen duerfen Messages erzeugen.
-- Tasks ausserhalb aktivierter Agenten/Editionen duerfen nicht laufen.
+- Tasks ausserhalb aktivierter Agenten duerfen nicht laufen.
 
 Offen fuer spaetere Versionen:
 
@@ -139,14 +132,14 @@ data/messaging/messages.db
 Regeln:
 
 - Agenten erzeugen fachliche Hinweise ueber den Messaging Service.
-- Kundenrelevante Hinweise erscheinen im Message Center.
+- Nutzerrelevante Hinweise erscheinen im Message Center.
 - Routine-Erfolgsmeldungen sollen nicht ins Message Center.
 - `notification_targets` bleibt die Vorbereitung fuer spaetere Zustellung per Mail, Push oder andere Kanaele.
 
 Offen:
 
 - Echte externe Zustellung an `notification_targets`.
-- Eskalationsregeln pro Edition und Severity.
+- Eskalationsregeln pro Severity.
 - Dedizierte Zustellhistorie fuer Push/Mail.
 
 ## Household und Waste
@@ -158,6 +151,8 @@ Umgesetzt:
 - Household-Routen existieren.
 - Wall-/HomeAssistant-Kontext kann ueber Household zusammengefuehrt werden.
 - Vacation Waste-Hinweise werden auf den Urlaubszeitraum begrenzt und nicht als Termin-Historie in Messages gespammt.
+- Offene Tuer-/Fensterkontakte werden ueber Home Assistant erkannt und koennen als Household-Reminder, Message und optional mobile Push-Nachricht gemeldet werden.
+- Schlafzimmer-Komfortsteuerung kann regelbasiert und mit optionaler KI-Einschaetzung ueber Home Assistant einen Ventilator schalten; KI steuert nicht direkt.
 
 Zielregel:
 
@@ -172,6 +167,7 @@ Offen:
 - Dedizierte `household.db` nur einfuehren, wenn echte Haushaltsereignisse historisiert werden muessen.
 - Wall-Dashboard langfristig weiter auf `HouseholdService.summary()` konsolidieren.
 - Comfort-Historie in `household.db` aufnehmen, wenn mehrere Komfortregeln produktiv laufen.
+- Zentrale Push-Zustellung ueber `notification_targets`; aktuelle Household-Pushes nutzen noch den konfigurierten Home-Assistant-Notify-Service.
 
 ## Garden Agent
 
@@ -211,6 +207,24 @@ Offen:
 - KI-Analyse erst nach stabiler Datensammlung aktivieren.
 - Optional Garden-Zusammenfassung im Household-/Wall-Kontext anzeigen.
 
+## Wall und Energie
+
+Umgesetzt:
+
+- Wall Dashboard nutzt fuer den Initial-Render eine schnelle Home-Assistant-Zusammenfassung.
+- Sekundaerdaten wie Messages, Garden-Status und schwere Charts werden nachgeladen.
+- Wall-Energie-Seite nutzt `/api/homeassistant/energy`.
+- EcoTracker, Tageswerte und Phasen werden ausschliesslich ueber Home Assistant gelesen.
+- Recharts wird als eigene Lazy-Komponente geladen.
+- Die Live-Linie speichert lokal die letzten 60 Minuten, damit ein Seiten-Reload die Kurve nicht sofort leert.
+
+Zielregel:
+
+- Wall enthaelt Darstellung und Bedienung, aber keine Fachlogik.
+- Energie V1 bleibt reine Visualisierung; ein Energy Agent ist spaeter moeglich, aber nicht Bestandteil der Wall-Seite.
+- Keine direkte Kommunikation mit EcoTracker, Wechselrichtern, Wallboxen oder anderen Energiegeraeten ausserhalb von Home Assistant.
+- Performance-relevante Detaildaten duerfen den ersten Wall-Render nicht blockieren.
+
 ## Infrastructure Monitoring
 
 Umgesetzt:
@@ -245,10 +259,9 @@ Umgesetzt:
 - `/api/system/update/install`.
 - `/api/system/update/status`.
 - `/api/system/update/rollback`.
-- Kundenfreundliches Update-UI ohne technische Details.
+- Nutzerfreundliches Update-UI ohne technische Details.
 - Admin-/Dev-Details ueber separaten Status.
-- ZIP-basierte Edition-Updates fuer Docker-Editionen.
-- ZIP-basierte lokale Updates mit systemd restart fuer Personal/local_systemd.
+- ZIP-basierte lokale Updates mit systemd restart fuer RoboterSteve/local_systemd.
 - Lokale Update-Manifeste und `latest.json` fuer statischen HTTPS-Update-Server.
 - SHA256-Pruefung fuer Release-ZIPs.
 - Backups vor Update.
@@ -257,39 +270,15 @@ Umgesetzt:
 Zielregel:
 
 - V1 nutzt keinen Docker-Registry-Updatepfad fuer die Applikation.
-- Docker-Editionen aktualisieren per ZIP und `docker compose up -d --build`.
-- Local/systemd Editionen aktualisieren per ZIP und zeitverzoegertem `systemctl restart`.
+- Local/systemd Deployments aktualisieren per ZIP und zeitverzoegertem `systemctl restart`.
 - `.env`, `config.yaml`, `data/`, `logs/` und `backups/` werden beim Update nicht ueberschrieben.
 
 Offen fuer Produktreife:
 
 - Kryptographische Signatur der Update-Manifeste oder ZIPs.
 - Harter Rollback-Test auf Zielsystemen.
-- Update-Server-Konvention fuer mehrere Kunden/Editionen finalisieren.
+- Update-Server-Konvention fuer RoboterSteve-Releases finalisieren.
 - Optionaler Support-Bundle-Export bei fehlgeschlagenen Updates.
-
-## Sentero
-
-Umgesetzt:
-
-- Sentero Agent Grundstruktur existiert im Backend.
-- Sentero Frontend ist eine getrennte App.
-- Sentero nutzt eine produktorientierte, nicht-technische UI.
-- Sentero besitzt Dashboard, Verlauf, Raeume, Kontakte, Einstellungen und Setup-Wizard-Struktur.
-- Mock-Daten sind gekapselt.
-
-Zielregel:
-
-- Sentero darf keine Personal-Agent-Console, Agent Map, OpenAI-, Database- oder technische Infrastrukturansichten zeigen.
-- Sprache bleibt kundenfreundlich und nicht technisch.
-- Sensoren werden im Produkt als Raeume, Aktivitaet und Hinweise dargestellt, nicht als Entity-IDs.
-
-Offen:
-
-- Echte Sensor-Onboarding-API.
-- Persistente Sentero-/Kontakt-/Wohnungsprofile.
-- Ereignismodell fuer Sentero-Aktivitaeten.
-- Benachrichtigungsregeln fuer Angehoerige.
 
 # Zielmodelle fuer optionale Persistenz
 
@@ -330,15 +319,13 @@ Zweck:
 Wichtig:
 
 - `orchestrator.db` darf keine Fachhistorien besitzen.
-- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden, Garden-Snapshots und Sentero-Ereignisse bleiben in ihren owning Domains.
+- Rechnungen, Wellness-Daten, Marktberichte, Vacation-Perioden und Garden-Snapshots bleiben in ihren owning Domains.
 
 # Offene Architekturarbeit
 
 ## P1
 
-- Update-Rollback auf echtem Docker-Zielsystem und lokalem systemd-Zielsystem testen und dokumentieren.
-- Sentero Setup-Daten persistent machen.
-- Sensor-Onboarding fuer Sentero fachlich modellieren.
+- Update-Rollback auf echtem lokalem systemd-Zielsystem testen und dokumentieren.
 - Messaging-Zustellung an E-Mail/Push als echte Delivery-Schicht implementieren.
 - Secrets aus Service-Dateien konsequent entfernen und nur ueber `.env`/Environment laden.
 
@@ -347,9 +334,9 @@ Wichtig:
 - Household-Fassade weiter stabilisieren und Wall-Dashboard schrittweise darauf konsolidieren.
 - Orchestrator-Statusereignisse entwerfen, bevor `orchestrator.db` eingefuehrt wird.
 - Scheduler-Abhaengigkeiten und Task-Ketten fachlich definieren.
-- Garden-Bodenfeuchte, Bewaesserungszonen und Wetterkontext fachlich modellieren.
 - LLM-Factory und Provider-Konfiguration bereinigen.
-- Home-Assistant-Client-Pfade konsolidieren.
+- Garden um mehrere produktive Zonen, erweiterte Wetterprognosen und optionale Mähroboter-Aktionen erweitern.
+- Zentrale Home-Assistant-Service-Schnittstelle weiter pruefen; der alte `HomeAssistantClient` ist nur noch ein Kompatibilitaets-Wrapper.
 
 ## P3
 
@@ -361,9 +348,7 @@ Wichtig:
 
 # Nicht-Ziele
 
-- Kein neues Repo pro Edition.
-- Keine Kopie der kompletten Personal-App fuer Sentero.
+- Keine ausgelagerten Produkte wieder in dieses Repo zurueckziehen.
 - Keine privaten Daten, Logs oder Secrets in Builds oder Update-ZIPs.
-- Keine Docker Registry als Pflicht fuer Sentero V1.
 - Kein `docker restart` als Standard-Updatepfad.
 - Keine KI- oder Agent-Komponente steuert direkt Smart-Home-Geraete ohne regelbasierte Freigabe.

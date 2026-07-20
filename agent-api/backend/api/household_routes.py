@@ -14,6 +14,10 @@ class BedroomFanComfortPayload(BaseModel):
     include_ai: bool | None = None
 
 
+class OpeningsCheckPayload(BaseModel):
+    notify: bool = True
+
+
 @router.get("/status")
 def household_status():
     return household_service.status()
@@ -27,6 +31,16 @@ def household_summary():
 @router.get("/reminders")
 def household_reminders():
     return household_service.reminders()
+
+
+@router.get("/openings")
+def household_openings():
+    return household_service.openings_status()
+
+
+@router.post("/openings/check")
+def check_household_openings(payload: OpeningsCheckPayload | None = None):
+    return household_service.check_openings(notify=payload.notify if payload else True)
 
 
 @router.get("/comfort/bedroom-fan")

@@ -1,9 +1,9 @@
 # RoboterSteve Agent API Deployment
 
-Diese Anleitung beschreibt klassische Deployments und Edition-Deployments auf einem Debian-Zielrechner. Ziel ist:
+Diese Anleitung beschreibt das RoboterSteve-Deployment auf einem Debian-Zielrechner. Ziel ist:
 
 - FastAPI laeuft als systemd-Service auf Port `8080`
-- Die gebaute React-GUI der gewaehlten Edition wird direkt von FastAPI ausgeliefert
+- Die gebaute React-GUI wird direkt von FastAPI ausgeliefert
 - Zugriff im Browser ueber `http://robotersteve.local:8080`
 - `agent-api` ist die deploybare Anwendungseinheit
 
@@ -43,38 +43,24 @@ sudo ufw allow 8080/tcp
 sudo ufw allow 5353/udp
 ```
 
-## Empfohlener Deployment-Weg: Edition Build
+## Empfohlener Deployment-Weg: RoboterSteve Build
 
-Der aktuelle Standard ist ein Edition-Build. Dadurch wird nur der fuer die Edition erlaubte Backend-/Agent-Code plus das passende Frontend gebaut. Private Daten, Logs, `.env`, Datenbanken, `node_modules`, `venv` und `__pycache__` werden nicht kopiert.
+Der aktuelle Standard ist `deployment_build.py`. Dadurch wird ein deploybares RoboterSteve-Paket plus Update-Artefakte erzeugt. Private Daten, Logs, `.env`, Datenbanken, `node_modules`, `venv` und `__pycache__` werden nicht kopiert.
 
-Der Edition Builder erzeugt beide Varianten unter `build/`:
-das normale Deployment-Paket unter `build/<edition>/` und die Update-Server-Dateien unter `build/updates/<edition>/stable/`.
+Der Builder erzeugt beide Varianten unter `build/`:
+das normale Deployment-Paket unter `build/robotersteve/` und die Update-Server-Dateien unter `build/updates/robotersteve/stable/`.
 
 Auf dem Entwicklungsrechner:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py personal
-```
-
-Fuer Sentero:
-
-```bash
-cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py sentero
-```
-
-Kompatibilitaet: Das alte Script `deployment_build.py` ist nur noch ein Wrapper und ruft intern den Edition Builder auf.
-
-```bash
-cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python deployment_build.py personal
+../venv/bin/python deployment_build.py
 ```
 
 Ergebnis:
 
 ```text
-agent-api/build/personal/
+agent-api/build/robotersteve/
 ├── backend/
 ├── frontend/dist/
 ├── config.example.yaml
@@ -83,7 +69,7 @@ agent-api/build/personal/
 └── README_INSTALL.md
 ```
 
-Die Personal Edition ist ein normales Python/systemd-Deployment. Im Personal-Build wird bewusst keine `docker-compose.yml` erzeugt.
+RoboterSteve ist ein normales Python/systemd-Deployment. Es wird bewusst keine `docker-compose.yml` erzeugt.
 
 Auf den Zielrechner kopieren:
 
@@ -93,23 +79,11 @@ rsync -av --delete \
   --exclude 'logs' \
   --exclude '.env' \
   --exclude 'config.yaml' \
-  /Users/nawid/Projects/roboterSteve/agent-api/build/personal/ \
+  /Users/nawid/Projects/roboterSteve/agent-api/build/robotersteve/ \
   user@robotersteve.local:/opt/roboterSteve/agent-api/
 ```
 
-Fuer Sentero entsprechend:
-
-```bash
-rsync -av --delete \
-  --exclude 'data' \
-  --exclude 'logs' \
-  --exclude '.env' \
-  --exclude 'config.yaml' \
-  /Users/nawid/Projects/roboterSteve/agent-api/build/sentero/ \
-  user@robotersteve.local:/opt/roboterSteve/agent-api/
-```
-
-Wenn du bestehende lokale Datenbanken auf dem Zielrechner behalten willst, schuetzt der empfohlene `rsync`-Befehl `data/`, `logs/`, `.env` und `config.yaml` explizit vor Loeschung. Der Edition-Build selbst enthaelt diese privaten Dateien nicht. Er enthaelt ausserdem `editions/edition.lock`, damit ein Sentero-Build nicht versehentlich als Personal startet.
+Wenn du bestehende lokale Datenbanken auf dem Zielrechner behalten willst, schuetzt der empfohlene `rsync`-Befehl `data/`, `logs/`, `.env` und `config.yaml` explizit vor Loeschung. Der Build selbst enthaelt diese privaten Dateien nicht.
 
 Beim ersten Deployment auf einem leeren Zielsystem erzeugst du die echte Konfiguration aus den Beispieldateien:
 
@@ -125,7 +99,7 @@ nano .env
 Danach sollte `config.yaml` und `.env` nicht mehr per Build ueberschrieben werden.
 
 
-Optionale persistente Daten liegen unter `agent-api/data/`. Der Edition-Build enthaelt dieses Verzeichnis bewusst nicht. Wenn du bestehende Personal-Datenbanken oder Invoice-Archive migrieren willst, kopiere sie separat nach `/opt/roboterSteve/agent-api/data/`.
+Optionale persistente Daten liegen unter `agent-api/data/`. Der Build enthaelt dieses Verzeichnis bewusst nicht. Wenn du bestehende Datenbanken oder Invoice-Archive migrieren willst, kopiere sie separat nach `/opt/roboterSteve/agent-api/data/`.
 
 
 ## Legacy-Deployment: komplettes Entwicklungsverzeichnis synchronisieren
@@ -157,11 +131,11 @@ python3 -m venv venv
 ```
 
 
-## Frontend bauen ohne Edition Builder
+## Frontend manuell bauen
 
-Normalerweise erledigt `tools/build_edition.py` den Frontend-Build automatisch. Dieser Abschnitt ist nur fuer manuelle Legacy-Deployments relevant.
+Normalerweise erledigt `deployment_build.py` den Frontend-Build automatisch. Dieser Abschnitt ist nur fuer manuelle Legacy-Deployments relevant.
 
-Wichtig: Das Frontend hat mehrere Apps. Fuer Personal muss `VITE_ROBOTERSTEVE_EDITION=personal` gesetzt sein, fuer Sentero `VITE_ROBOTERSTEVE_EDITION=sentero`. Wenn FastAPI `frontend/dist` ausliefert, ist immer der zuletzt gebaute Frontend-Stand aktiv.
+Wenn FastAPI `frontend/dist` ausliefert, ist immer der zuletzt gebaute Frontend-Stand aktiv.
 
 Moeglich sind zwei Varianten.
 
@@ -170,14 +144,7 @@ Moeglich sind zwei Varianten.
 ```bash
 cd /opt/roboterSteve/agent-api/frontend
 npm install
-VITE_ROBOTERSTEVE_EDITION=personal npm run build
-```
-
-Fuer Sentero:
-
-```bash
-cd /opt/roboterSteve/agent-api/frontend
-VITE_ROBOTERSTEVE_EDITION=sentero npm run build
+npm run build
 ```
 
 Wenn `agent-api/frontend/dist` existiert, liefert FastAPI die GUI direkt unter Port `8080` aus.
@@ -189,10 +156,10 @@ Auf dem Entwicklungsrechner:
 ```bash
 cd agent-api/frontend
 npm install
-VITE_ROBOTERSTEVE_EDITION=personal npm run build
+npm run build
 ```
 
-Fuer Sentero entsprechend `VITE_ROBOTERSTEVE_EDITION=sentero`. Danach muss `dist/` mit auf den Zielrechner kopiert werden. Wichtig: Bei dieser Variante `frontend/dist` nicht vom Sync ausschliessen:
+Danach muss `dist/` mit auf den Zielrechner kopiert werden. Wichtig: Bei dieser Variante `frontend/dist` nicht vom Sync ausschliessen:
 
 ```bash
 rsync -av --delete \
@@ -224,8 +191,6 @@ sudo nano /etc/robotersteve-agent-api.env
 Beispiel:
 
 ```ini
-ROBOTERSTEVE_EDITION=personal
-
 AGENT_API_USERNAME=admin
 AGENT_API_PASSWORD=change-me
 AGENT_API_JWT_SECRET=change-me-long-random-secret
@@ -256,20 +221,19 @@ Hinweis: Environment-Variablennamen mit Bindestrich sind ungueltig. Verwende `HA
 
 
 
-## Edition Builder Kurzreferenz
+## Build Kurzreferenz
 
-Der bevorzugte Weg fuer produktionsnahe Artefakte ist der Edition Builder:
+Der bevorzugte Weg fuer produktionsnahe Artefakte ist der RoboterSteve Builder:
 
 ```bash
 cd agent-api
-../venv/bin/python tools/build_edition.py personal
-../venv/bin/python tools/build_edition.py sentero
+../venv/bin/python deployment_build.py
 ```
 
 Erzeugt wird:
 
 ```text
-agent-api/build/<edition>/
+agent-api/build/robotersteve/
 ├── backend/
 ├── frontend/dist/
 ├── config.example.yaml
@@ -278,46 +242,39 @@ agent-api/build/<edition>/
 └── README_INSTALL.md
 ```
 
-Hinweis: `personal` enthaelt keine `docker-compose.yml`; `sentero` enthaelt eine einfache Compose-Datei fuer API und Ollama.
+Hinweis: RoboterSteve ist ein systemd-Deployment und enthaelt keine `docker-compose.yml`.
 
 Diese Build-Verzeichnisse enthalten keine privaten Datenbanken, Logs, `.env`, `node_modules`, `venv` oder `__pycache__`.
 
 Update-Server-Artefakte werden parallel erzeugt:
 
 ```bash
-../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
+../venv/bin/python deployment_build.py --version 0.2.0 --base-url https://seirafi.de/robotersteve
 ```
 
 Dann gilt:
 
 ```text
-agent-api/build/sentero/                       # normales Deployment-Paket
-agent-api/build/updates/sentero/stable/latest.json      # Upload auf HTTPS-Server
-agent-api/build/updates/sentero/stable/releases/*.zip   # Upload auf HTTPS-Server
+agent-api/build/robotersteve/                              # normales Deployment-Paket
+agent-api/build/updates/robotersteve/stable/latest.json    # Upload auf HTTPS-Server
+agent-api/build/updates/robotersteve/stable/releases/*.zip # Upload auf HTTPS-Server
 ```
 
-Deployment eines Edition-Builds:
+Deployment eines Builds:
 
 ```bash
-rsync -av --delete --exclude 'data' --exclude 'logs' --exclude '.env' --exclude 'config.yaml' agent-api/build/personal/ user@robotersteve.local:/opt/roboterSteve/agent-api/
+rsync -av --delete --exclude 'data' --exclude 'logs' --exclude '.env' --exclude 'config.yaml' agent-api/build/robotersteve/ user@robotersteve.local:/opt/roboterSteve/agent-api/
 ```
 
-Auf dem Zielsystem muss die Environment-Datei zur Edition passen:
+Auf dem Zielsystem muss die Environment-Datei zum systemd-Deployment passen:
 
 ```ini
-ROBOTERSTEVE_EDITION=personal
 UPDATE_EXECUTION_MODE=local_systemd
 UPDATE_SYSTEMD_SERVICE=agent-api
 UPDATE_SYSTEMD_RESTART_DELAY_SECONDS=2
 ```
 
-Oder fuer Sentero:
-
-```ini
-ROBOTERSTEVE_EDITION=sentero
-```
-
-Fuer Personal-Updates ueber die UI muss der systemd-Restart moeglich sein.
+Fuer Updates ueber die UI muss der systemd-Restart moeglich sein.
 Wenn die Anwendung als `root` laeuft, ist keine sudoers-Regel notwendig.
 Wenn sie als eigener Service-User laeuft, ist eine eng begrenzte sudoers-Regel fuer diesen User notwendig:
 
@@ -427,14 +384,14 @@ curl http://robotersteve.local:8080/health
 
 ## Update-Deployment
 
-Empfohlen: Edition neu bauen, kopieren, Requirements installieren, Service neu starten.
+Empfohlen: RoboterSteve neu bauen, kopieren, Requirements installieren, Service neu starten.
 
 Auf dem Entwicklungsrechner:
 
 ```bash
 cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py personal
-rsync -av --delete --exclude 'data' --exclude 'logs' --exclude '.env' --exclude 'config.yaml' build/personal/ user@robotersteve.local:/opt/roboterSteve/agent-api/
+../venv/bin/python deployment_build.py
+rsync -av --delete --exclude 'data' --exclude 'logs' --exclude '.env' --exclude 'config.yaml' build/robotersteve/ user@robotersteve.local:/opt/roboterSteve/agent-api/
 ```
 
 Auf dem Zielrechner:
@@ -444,8 +401,6 @@ cd /opt/roboterSteve
 ./venv/bin/pip install -r agent-api/requirements.txt
 sudo systemctl restart agent-api
 ```
-
-Fuer Sentero `personal` durch `sentero` ersetzen und `ROBOTERSTEVE_EDITION=sentero` in `/etc/robotersteve-agent-api.env` setzen.
 
 ## Typische Fehler
 
@@ -498,100 +453,3 @@ ping robotersteve.local
 ```
 
 Falls es weiter nicht geht, pruefe Router, VLAN/Gastnetz und Firewall.
-
-## Sentero ZIP-Docker Deployment V1
-
-Sentero wird fuer Produkt-/Kundeninstallationen als Docker-Edition betrieben, aber ohne Docker Registry. Die Anwendung wird lokal aus dem ZIP-Paket gebaut.
-
-### Release bauen
-
-Auf dem Entwicklungsrechner:
-
-```bash
-cd /Users/nawid/Projects/roboterSteve/agent-api
-../venv/bin/python tools/build_edition.py sentero --version 0.2.0 --base-url https://seirafi.de/robotersteve
-```
-
-Ergebnis fuer den HTTPS-Update-Server:
-
-```text
-build/updates/sentero/stable/latest.json
-build/updates/sentero/stable/deployment-manifest.json
-build/updates/sentero/stable/releases/sentero-0.2.0.zip
-```
-
-`build/sentero/` ist parallel das normale installierbare Deployment-Verzeichnis. Es ist nicht der Upload-Ordner fuer den Update-Server.
-
-Upload-Struktur:
-
-```text
-robotersteve/
-└── sentero/
-    └── stable/
-        ├── latest.json
-        └── releases/
-            └── sentero-0.2.0.zip
-```
-
-### Erstinstallation auf Zielrechner
-
-Empfohlener Installationspfad:
-
-```text
-/opt/sentero/
-```
-
-Kopiere initial den Inhalt von `build/sentero/` auf den Zielrechner:
-
-```bash
-rsync -av --delete \
-  --exclude 'data' \
-  --exclude 'logs' \
-  --exclude 'backups' \
-  --exclude 'tmp' \
-  --exclude '.env' \
-  --exclude 'config.yaml' \
-  /Users/nawid/Projects/roboterSteve/agent-api/build/sentero/ \
-  user@zielrechner:/opt/sentero/
-```
-
-Auf dem Zielrechner:
-
-```bash
-cd /opt/sentero
-cp .env.example .env
-cp config.example.yaml config.yaml
-```
-
-Wichtige `.env`-Werte:
-
-```ini
-ROBOTERSTEVE_EDITION=sentero
-UPDATE_EXECUTION_MODE=zip_docker
-UPDATE_BASE_URL=https://seirafi.de/robotersteve
-UPDATE_DEPLOYMENT_DIR=/opt/sentero
-UPDATE_COMPOSE_PROJECT_DIR=/opt/sentero
-UPDATE_COMPOSE_FILE=docker-compose.yml
-ROBOTERSTEVE_BACKUP_DIR=/opt/sentero/backups
-```
-
-Start:
-
-```bash
-docker compose up -d --build
-```
-
-### Updates
-
-Bei Klick auf `Update installieren` macht Sentero:
-
-1. `latest.json` laden
-2. ZIP herunterladen
-3. Backup unter `/opt/sentero/backups/` erstellen
-4. `docker compose down`
-5. neue Dateien aus ZIP kopieren
-6. `.env`, `config.yaml`, `data/`, `logs/`, `backups/` behalten
-7. `docker compose up -d --build`
-8. Healthcheck pruefen
-
-Es wird keine Docker Registry und kein Image-Server benoetigt.

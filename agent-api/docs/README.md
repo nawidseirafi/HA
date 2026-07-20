@@ -4,7 +4,7 @@ Diese Dokumentation ist nach Zweck getrennt. Fuer konkrete Deployments und Updat
 
 ## Betriebsdokumente
 
-- `DEPLOYMENT.md`: Installation, Edition-Builds, Personal/systemd, Sentero/Docker, Betrieb und Fehleranalyse.
+- `DEPLOYMENT.md`: Installation, RoboterSteve/systemd, Betrieb und Fehleranalyse.
 - `UPDATE_SYSTEM.md`: Update Engine V1, statischer HTTPS-Update-Server, ZIP-Releases, local/systemd und ZIP-Docker Updates.
 
 ## Architektur
@@ -16,18 +16,17 @@ Aktuell wichtige Fachagenten der Personal Edition:
 
 - Scheduler: zentrale Zeitsteuerung.
 - Invoice, Market, MyWellness und Vacation: bestehende Fachagenten.
-- Garden: vorbereitender Garten-Agent fuer Mähroboter, Bodenfeuchte, Bewaesserung und Wetter. Der Agent arbeitet aktuell beratend und sammelt Snapshots; automatische Gartensteuerung und KI-Entscheidungen folgen erst nach stabiler Sensorbasis.
+- Garden: Garten-Agent fuer Mähroboter, Bodenfeuchte, Bewaesserung und Wetter. Der Agent sammelt Snapshots, speichert Entscheidungen und kann Bewaesserung nur nach regelbasierter Safety-Freigabe ueber Home Assistant steuern. Automatik ist standardmaessig aus; KI steuert keine Geraete direkt.
 
 ## Konsolidierte Dokumente
 
-- `docker_create.md`: veraltete Proxmox-/Docker-Einzelanleitung. Inhalt wurde auf einen Verweis reduziert; aktuelle Sentero-Docker-Schritte stehen in `DEPLOYMENT.md`.
+- `docker_create.md`: veraltete Proxmox-/Docker-Einzelanleitung. Inhalt wurde auf einen Verweis reduziert; der aktuelle Standard fuer RoboterSteve ist das systemd-Deployment in `DEPLOYMENT.md`.
 
 ## Aktuelle Deployment-Regeln
 
 ```text
-Personal = build/personal + systemd + UPDATE_EXECUTION_MODE=local_systemd
-Sentero = build/sentero + Docker Compose + UPDATE_EXECUTION_MODE=zip_docker
-Update-Server Upload = build/updates/<edition>/stable/
+RoboterSteve = build/robotersteve + systemd + UPDATE_EXECUTION_MODE=local_systemd
+Update-Server Upload = build/updates/robotersteve/stable/
 ```
 
 Docker-Updates verwenden `docker compose up -d --build`. `docker restart` ist kein Standard-Updatepfad.

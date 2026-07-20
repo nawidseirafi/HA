@@ -6,7 +6,7 @@ Dieses Dokument beschreibt den aktuellen Zustand des Projekts nach P1, P2, Infra
 
 # Systemuebersicht
 
-RoboterSteve besteht aktuell aus einer FastAPI-Backend-Anwendung und einem React/Vite-Frontend unter `agent-api/`. Das Projekt bleibt ein gemeinsames Entwicklungsrepo, kann aber ueber Editionen unterschiedliche Deployment-Zuschnitte bauen.
+RoboterSteve besteht aktuell aus einer FastAPI-Backend-Anwendung und einem React/Vite-Frontend unter `agent-api/`. Dieses Repo beschreibt nur RoboterSteve; andere Produkte liegen ausserhalb dieses Projekts.
 
 Der Backend-Einstieg ist:
 
@@ -14,7 +14,7 @@ Der Backend-Einstieg ist:
 agent-api/backend/main.py
 ```
 
-Das Backend bindet zentrale Router edition-aware ein:
+Das Backend bindet zentrale Router ein:
 
 - Auth
 - Agents
@@ -27,7 +27,7 @@ Das Backend bindet zentrale Router edition-aware ein:
 - Settings
 - dynamisch geladene Agent-Router aus Manifesten
 
-Die aktive Edition wird ueber `ROBOTERSTEVE_EDITION`, danach `config.yaml -> edition.name`, danach `personal` bestimmt. Ohne explizite Edition entspricht `personal` dem bisherigen privaten System.
+Die aktive Produktkonfiguration ist RoboterSteve/Personal. Historische Edition-Auswahl ist nur noch Kompatibilitaet fuer bestehende Konfigurationen.
 
 Das Frontend liegt unter:
 
@@ -35,7 +35,7 @@ Das Frontend liegt unter:
 agent-api/frontend/
 ```
 
-Der gemeinsame Vite-Einstieg ist `frontend/src/main.tsx`. Dieser waehlt ueber die Backend-Editionserkennung und als Fallback ueber `VITE_ROBOTERSTEVE_EDITION` die Produkt-App. `personal` ist die private RoboterSteve-Anwendung; `sentero` ist eine eigene mobile-first Produktoberflaeche mit Onboarding, Dashboard, Verlauf, Raeumen, Kontakten und Einstellungen.
+Der Vite-Einstieg ist `frontend/src/main.tsx` und laedt die Personal-App.
 
 Wichtige UI-Bereiche:
 
@@ -71,7 +71,6 @@ agent-api/
 │   │   ├── market/
 │   │   ├── mywellness/
 │   │   ├── scheduler/
-│   │   ├── sentero/
 │   │   └── vacation/
 │   ├── api/
 │   │   ├── auth_routes.py
@@ -104,17 +103,14 @@ agent-api/
 │   ├── mywellness/
 │   └── scheduler/
 ├── editions/
-│   ├── personal.yaml
-│   └── sentero.yaml
-├── tools/
-│   └── build_edition.py
+│   └── personal.yaml
+├── deployment_build.py
 ├── frontend/
 │   └── src/
 │       ├── main.tsx
 │       ├── shared/
 │       └── apps/
 │           ├── personal/
-│           └── sentero/
 └── config.yaml
 ```
 
@@ -141,36 +137,35 @@ agent-api/backend/agents/registry.py
 
 Aufgaben:
 
-- aktive Edition laden und erlaubte Agenten bestimmen
+- aktive RoboterSteve-Agenten bestimmen
 - `backend/agents/*/manifest.yaml` entdecken
 - Manifestdaten in `AgentManifest` laden
 - sichere Metadaten per `public_dict()` bereitstellen
-- Agent-Router dynamisch und edition-gefiltert einbinden
-- Runtime-Service-Objekte nur fuer erlaubte Agenten finden
+- Agent-Router dynamisch einbinden
+- Runtime-Service-Objekte fuer erlaubte Agenten finden
 - Agent-Control-Adapter per `get_agent_control(agent_id)` bereitstellen
 
 Aktuell gilt:
 
-- Agent-Router werden eingebunden, wenn ein `route_module` vorhanden ist und der Agent in der aktiven Edition erlaubt ist. Runtime-Disabled darf APIs innerhalb der Edition nicht entfernen, weil sonst Enable/Status-Endpunkte nicht erreichbar waeren.
+- Agent-Router werden eingebunden, wenn ein `route_module` vorhanden ist und der Agent erlaubt ist. Runtime-Disabled darf APIs nicht entfernen, weil sonst Enable/Status-Endpunkte nicht erreichbar waeren.
 - `agent_runtime_services()` startet Scheduler/Runtime-Dienste nur fuer aktivierte Agenten.
 - `get_agent_control(agent_id)` kann ein Service-Objekt ueber `runtime.service_object` finden, wenn `route_module` importierbar ist.
 - Die Registry speichert keinen Runtime-State und nutzt keine eigene Datenbank.
 
 
-# Edition Runtime
+# Produktkonfiguration
 
-Editionen sind additive Deployment-Zuschnitte innerhalb desselben Repos.
+RoboterSteve nutzt aktuell eine Personal-Produktkonfiguration.
 
 Dateien:
 
 ```text
 agent-api/editions/personal.yaml
-agent-api/editions/sentero.yaml
-agent-api/backend/editions.py
-agent-api/tools/build_edition.py
+agent-api/backend/product.py
+agent-api/deployment_build.py
 ```
 
-Eine Edition beschreibt:
+Die Produktkonfiguration beschreibt:
 
 - `name`
 - `description`
@@ -183,26 +178,26 @@ Eine Edition beschreibt:
 - `exclude_files`
 - `config_template`
 
-Runtime-Fallback:
+Runtime-Fallback fuer bestehende Installationen:
 
 1. `ROBOTERSTEVE_EDITION`
 2. `config.yaml -> edition.name`
 3. `personal`
 
-Edition-Auswirkungen:
+Auswirkungen:
 
-- `discover_agent_manifests()` liefert nur Agenten der aktiven Edition.
+- `discover_agent_manifests()` liefert nur erlaubte Agenten.
 - `include_agent_routers(app)` bindet nur erlaubte Agent-Router ein.
 - `agent_runtime_services()` startet nur erlaubte Runtime-Services.
 - `/api/agents` und `/api/orchestrator/map` zeigen nur erlaubte Agenten.
 - Core-Router in `backend/main.py` werden anhand `enabled_core_services` lazy eingebunden.
-- Der Scheduler liest Manifest-Default-Tasks nur fuer Agenten der aktiven Edition.
-- Edition-Builds enthalten `editions/edition.lock`; in diesem Build-Kontext gibt es keinen stillen Fallback auf `personal`.
+- Der Scheduler liest Manifest-Default-Tasks nur fuer erlaubte Agenten.
 
 Build-Ausgaben entstehen unter:
 
 ```text
-agent-api/build/<edition>/
+agent-api/build/robotersteve/
+agent-api/build/updates/robotersteve/stable/
 ```
 
 Private Daten werden nicht kopiert: `data/`, `logs/`, `.env`, `*.db`, `__pycache__/`, `venv/`, `.venv/`, `node_modules/`, `.DS_Store`.
@@ -341,6 +336,8 @@ agent-api/backend/services/orchestrator_control_service.py
 
 `GET /api/orchestrator/map` ist die zentrale Datenquelle fuer die Agent Map im Frontend.
 
+Der Standardaufruf ist bewusst schnell: Agent-Knoten werden aus Manifesten und leichten Registry-/Scheduler-Daten aufgebaut. Teure Live-Aufrufe ueber Agent-Control oder Home Assistant erfolgen nur optional ueber `GET /api/orchestrator/map?live=true`.
+
 Die Map enthaelt:
 
 - Orchestrator Node
@@ -350,7 +347,7 @@ Die Map enthaelt:
 - Edges von Agenten zu Datenbank/OpenAI/Home Assistant
 - normalisierte Statuswerte
 - Control-Informationen je Node
-- Agent-Runtime-Status wird generisch ueber den Agent-Control-Vertrag (`status`) gelesen; keine Agent-Sonderlogik in der Map.
+- Agent-Runtime-Status kann generisch ueber den Agent-Control-Vertrag (`status`) gelesen werden; keine Agent-Sonderlogik in der Map.
 
 Statuswerte:
 
@@ -796,6 +793,7 @@ Verwendet:
 - Vacation Status Provider
 - `InfrastructureService`
 - `HouseholdComfortService`
+- `MessagingService`
 
 Liefert:
 
@@ -803,14 +801,26 @@ Liefert:
 - `summary()`
 - `reminders()`
 - `comfort_bedroom_fan()`
+- `openings_status()`
+- `check_openings()`
 
 API:
 
 - `GET /api/household/status`
 - `GET /api/household/summary`
 - `GET /api/household/reminders`
+- `GET /api/household/openings`
+- `POST /api/household/openings/check`
 - `GET /api/household/comfort/bedroom-fan`
 - `POST /api/household/comfort/bedroom-fan/evaluate`
+
+Offene Tueren/Fenster:
+
+- liest `binary_sensor`-Entitaeten mit `device_class` `door`, `window` oder `opening`
+- erzeugt bei offenen Kontakten einen Household-Reminder
+- `check_openings()` kann eine Message Center Nachricht erzeugen
+- optionaler Home-Assistant-Push erfolgt ueber `household.notifications.notify_service`
+- Push/Messages werden ueber Signatur und vorhandene Message gedrosselt, damit offene Kontakte nicht staendig neu gemeldet werden
 
 Es gibt aktuell keine `household.db`.
 
@@ -1015,7 +1025,10 @@ Architekturregeln:
 Home Assistant ist aktuell Datenquelle fuer:
 
 - Wall Dashboard
+- Wall Energie
 - Lights, Covers, Climate, Sensors
+- Fans
+- Lawn Mowers
 - Room/Floor Zuordnung
 - Poststatus
 - Waste/Abfall
@@ -1024,6 +1037,8 @@ Home Assistant ist aktuell Datenquelle fuer:
 - MyWellness Health
 - Infrastructure/Fritzbox
 
+`HomeAssistantService` ist die zentrale Home-Assistant-Schnittstelle. Der alte `HomeAssistantClient` unter `services/core/ha_client.py` ist nur noch ein Kompatibilitaets-Wrapper und delegiert an `HomeAssistantService`, damit Vacation, Garden, Wall und andere Services nicht unterschiedliche HTTP-Clients verwenden.
+
 `homeassistant_routes.py` erzeugt weiterhin eine umfassende Wall-Dashboard-Antwort:
 
 - `lights`
@@ -1031,6 +1046,8 @@ Home Assistant ist aktuell Datenquelle fuer:
 - `covers`
 - `sensors`
 - `switches`
+- `fans`
+- `lawn_mowers`
 - `media_players`
 - `climate`
 - `temperature_sensors`
@@ -1041,10 +1058,24 @@ Home Assistant ist aktuell Datenquelle fuer:
 - `post`
 - `waste`
 - `household`
+- `calendar`
+
+`/api/homeassistant/wall` ist fuer den ersten Wall-Render optimiert. Der Endpoint nutzt bereits geladene Home-Assistant-States fuer Post, Waste, Vacation und Agent-Zusammenfassung und blockiert nicht auf teure Detailabfragen wie Kalender-, Infrastructure- oder Agent-Live-Status. Detaildaten werden ueber eigene Endpunkte oder Hintergrundloads nachgeladen.
+
+`GET /api/homeassistant/energy` liefert die Wall-Energieuebersicht:
+
+- aktuelle Leistung und Durchschnitt
+- Phasen L1/L2/L3
+- Zaehlerstaende fuer Netzbezug und Einspeisung
+- Tageswerte, falls Home-Assistant-Utility-Meter vorhanden sind
+- optionale Zukunftsfelder fuer PV, Batteriespeicher, Wallbox, Kosten und Forecast
+
+Auch die Energieuebersicht liest ausschliesslich Home-Assistant-States. Es gibt keine direkte EcoTracker- oder Geraetekommunikation im Backend ausserhalb von Home Assistant.
 
 Aktuelle Verbesserung:
 
 - Sensoren ohne direkte HA-Area-Zuordnung koennen ueber bekannte Raumnamen aus der Floor Map inferiert werden. Dadurch werden z.B. `powder_room_temperature` und `Powder Room` zusammengefuehrt.
+- Wenn Home Assistant temporaer nicht erreichbar ist, liefern Wall- und Energy-Endpunkte strukturierte Fallback-Antworten statt den ersten Wall-Render mit einem 502 abbrechen zu lassen.
 
 # LLM Architektur
 
@@ -1134,6 +1165,7 @@ Wichtige Orchestrator-Endpunkte:
 
 ```text
 GET  /api/orchestrator/map
+GET  /api/orchestrator/map?live=true
 GET  /api/orchestrator/agents/{agent_id}/control
 POST /api/orchestrator/agents/{agent_id}/control/{action}
 ```
@@ -1173,32 +1205,28 @@ frontend/src/
     │   ├── pages/
     │   ├── components/
     │   └── routes/
-    └── sentero/
-        ├── main.tsx
-        ├── App.tsx
-        ├── pages/
-        ├── components/
-        ├── routes/
-        └── navigation/
 ```
 
-`frontend/src/main.tsx` waehlt die App ueber `VITE_ROBOTERSTEVE_EDITION`:
+`frontend/src/main.tsx` laedt die Personal-App:
 
-- `personal`: bisherige private App mit Agent Console, Invoice, Market, MyWellness, Vacation, Scheduler, Wall Dashboard und Settings.
-- `sentero`: eigene Produkt-App mit Premium-/mobile-first UI fuer Setup, Dashboard, Verlauf, Raeume, Kontakte und Einstellungen.
+- Agent Console
+- Invoice
+- Market
+- MyWellness
+- Vacation
+- Scheduler
+- Garden
+- Wall Dashboard
+- Settings
 
-Gemeinsame Bausteine gehoeren nach `src/shared/`. Produktnavigation, Produktseiten und edition-spezifische UI bleiben in `src/apps/<edition>/`. Dadurch muessen spaetere Produkteditionen keine verstreuten Edition-Abfragen in Personal-Komponenten einbauen.
+Gemeinsame Bausteine gehoeren nach `src/shared/`. RoboterSteve-spezifische Navigation, Produktseiten und UI bleiben in `src/apps/personal/`.
 
-Builds:
+Build:
 
 ```bash
 cd agent-api/frontend
 npm run build
-VITE_ROBOTERSTEVE_EDITION=personal npm run build
-VITE_ROBOTERSTEVE_EDITION=sentero npm run build
 ```
-
-Der Edition Builder setzt `VITE_ROBOTERSTEVE_EDITION` automatisch anhand `frontend_app` der Edition.
 
 # Frontend
 
@@ -1248,6 +1276,8 @@ agent-api/frontend/src/components/AgentMap.tsx
 Rolle:
 
 - nutzt `/api/orchestrator/map`
+- nutzt standardmaessig die schnelle Map ohne Live-Deep-Checks
+- kann bei Bedarf ueber `?live=true` echte Agent-Control-/Home-Assistant-Statusabfragen laden
 - rendert Nodes und Edges
 - nutzt Manifest-Metadaten aus dem Backend
 - enthaelt keine hardcoded Agent-Metadaten fuer Name/Icon/Description
@@ -1264,11 +1294,30 @@ Rolle:
 
 - Home Assistant Dashboard fuer Hausstatus
 - nutzt `/api/homeassistant/wall`
+- laedt Messages, Garden-Status und andere Sekundaerdaten nach dem ersten Wall-Datensatz im Hintergrund
 - zeigt Household- und Infrastructure-Daten
 - Fritzbox-Kachel kombiniert Infrastructure-Status mit HA-Entities fuer Upload/Download, IP und Uptime
 - bleibt read-only bezogen auf Agent-Control
 - Vacation-Kachel steuert ausschliesslich `input_boolean.vacation_mode`
 - Glocke/Message Center zeigt zentrale Messages aus `/api/messages`; Badge/Rahmen sind reine UI-Details.
+
+## Wall Energie
+
+Dateien:
+
+```text
+agent-api/frontend/src/pages/WallDashboardPage.tsx
+agent-api/frontend/src/apps/personal/components/wall/WallEnergyChart.tsx
+```
+
+Rolle:
+
+- zeigt die Energie-Seite im Wall Dashboard
+- nutzt ausschliesslich `/api/homeassistant/energy`
+- zeigt aktuelle Leistung, Durchschnitt, Richtung, Zaehlerstaende, Tageswerte und Phasen
+- puffert die lokale 60-Minuten-Live-Linie im Browser, damit ein Reload die Anzeige nicht sofort leert
+- laedt Recharts als eigene Lazy-Komponente, damit der initiale Wall-Bundle kleiner bleibt
+- enthaelt keine Energie-Fachlogik und keine direkten Home-Assistant-Aufrufe
 
 ## Settings
 

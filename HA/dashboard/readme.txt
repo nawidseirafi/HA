@@ -15,7 +15,7 @@ RoboterSteve Wall Dashboard
 - Vacation-Kachel steuert nur input_boolean.vacation_mode.
 - Keine Geräteautomatisierung durch Vacation oder Infrastructure Service.
 
-Edition-Hinweis
+RoboterSteve-Hinweis
 - Das bestehende Wall Dashboard gehoert zur Personal App unter frontend/src/apps/personal.
 - Gemeinsame API/Auth/Styles liegen unter frontend/src/shared.
-- Sentero bekommt eine eigene App-Struktur und soll keine Personal-Wall-Komponenten direkt voraussetzen.
+- Smart-Home-Logik bleibt im Backend und wird nicht in Home-Assistant-Dashboard-Karten dupliziert.

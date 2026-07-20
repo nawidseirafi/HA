@@ -30,6 +30,9 @@ infrastructure:
     uptime: ""
 
 household:
+  notifications:
+    notify_service: "notify.mobile_app_system_error_404"
+    openings_push_enabled: true
   comfort:
     bedroom_fan:
       enabled: true

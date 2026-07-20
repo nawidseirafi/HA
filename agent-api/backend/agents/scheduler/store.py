@@ -533,6 +533,7 @@ class SchedulerStore:
                 "target_agent": "household",
                 "target_action": "summary",
                 "action_type": "household_check",
+                "action_payload": {"check": "openings"},
                 "source": "platform",
                 "default_key": "platform:household:window-check",
             },

@@ -293,7 +293,7 @@ class UpdateServiceTests(unittest.TestCase):
             paths.config_path.write_text("updates:\n  execution_mode: local\n  manifest_path: update-manifest.json\n", encoding="utf-8")
             paths.manifest_file.write_text(
                 json.dumps({
-                    "product": "sentero",
+                    "product": "other-product",
                     "latest_version": "1.4.0",
                     "download_url": source_zip.as_uri(),
                     "sha256": sha256,
@@ -401,19 +401,19 @@ class UpdateServiceTests(unittest.TestCase):
             (deploy / "frontend" / "dist" / "index.html").write_text("old-ui", encoding="utf-8")
             (deploy / "docker-compose.yml").write_text("old-compose", encoding="utf-8")
             (deploy / "version.json").write_text(json.dumps({"version": "1.2.0"}), encoding="utf-8")
-            source_zip = paths.api_dir / "sentero.zip"
+            source_zip = paths.api_dir / "docker-release.zip"
             with zipfile.ZipFile(source_zip, "w") as archive:
-                archive.writestr("sentero-1.4.0/backend/main.py", "new")
-                archive.writestr("sentero-1.4.0/frontend/dist/index.html", "<html></html>")
-                archive.writestr("sentero-1.4.0/requirements.txt", "fastapi")
-                archive.writestr("sentero-1.4.0/Dockerfile", "FROM python:3.12-slim")
-                archive.writestr("sentero-1.4.0/docker-compose.yml", "services: {}")
-                archive.writestr("sentero-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
-                archive.writestr("sentero-1.4.0/update-manifest.json", "{}")
-                archive.writestr("sentero-1.4.0/README.md", "readme")
-                archive.writestr("sentero-1.4.0/.env", "SECRET=replace")
-                archive.writestr("sentero-1.4.0/config.yaml", "secret: replace")
-                archive.writestr("sentero-1.4.0/data/local.db", "replace")
+                archive.writestr("docker-release-1.4.0/backend/main.py", "new")
+                archive.writestr("docker-release-1.4.0/frontend/dist/index.html", "<html></html>")
+                archive.writestr("docker-release-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("docker-release-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("docker-release-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("docker-release-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+                archive.writestr("docker-release-1.4.0/update-manifest.json", "{}")
+                archive.writestr("docker-release-1.4.0/README.md", "readme")
+                archive.writestr("docker-release-1.4.0/.env", "SECRET=replace")
+                archive.writestr("docker-release-1.4.0/config.yaml", "secret: replace")
+                archive.writestr("docker-release-1.4.0/data/local.db", "replace")
             sha256 = hashlib.sha256(source_zip.read_bytes()).hexdigest()
             paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
             paths.config_path.write_text(
@@ -478,13 +478,13 @@ class UpdateServiceTests(unittest.TestCase):
             deploy = root / "deploy"
             deploy.mkdir()
             (deploy / "docker-compose.yml").write_text("services: {}", encoding="utf-8")
-            source_zip = paths.api_dir / "sentero.zip"
+            source_zip = paths.api_dir / "docker-release.zip"
             with zipfile.ZipFile(source_zip, "w") as archive:
-                archive.writestr("sentero-1.4.0/backend/main.py", "new")
-                archive.writestr("sentero-1.4.0/requirements.txt", "fastapi")
-                archive.writestr("sentero-1.4.0/Dockerfile", "FROM python:3.12-slim")
-                archive.writestr("sentero-1.4.0/docker-compose.yml", "services: {}")
-                archive.writestr("sentero-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+                archive.writestr("docker-release-1.4.0/backend/main.py", "new")
+                archive.writestr("docker-release-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("docker-release-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("docker-release-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("docker-release-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
             paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
             paths.config_path.write_text(
                 f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n",
@@ -515,13 +515,13 @@ class UpdateServiceTests(unittest.TestCase):
             deploy = root / "deploy"
             deploy.mkdir()
             (deploy / "docker-compose.yml").write_text("services: {}", encoding="utf-8")
-            source_zip = paths.api_dir / "sentero.zip"
+            source_zip = paths.api_dir / "docker-release.zip"
             with zipfile.ZipFile(source_zip, "w") as archive:
-                archive.writestr("sentero-1.4.0/backend/main.py", "new")
-                archive.writestr("sentero-1.4.0/requirements.txt", "fastapi")
-                archive.writestr("sentero-1.4.0/Dockerfile", "FROM python:3.12-slim")
-                archive.writestr("sentero-1.4.0/docker-compose.yml", "services: {}")
-                archive.writestr("sentero-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
+                archive.writestr("docker-release-1.4.0/backend/main.py", "new")
+                archive.writestr("docker-release-1.4.0/requirements.txt", "fastapi")
+                archive.writestr("docker-release-1.4.0/Dockerfile", "FROM python:3.12-slim")
+                archive.writestr("docker-release-1.4.0/docker-compose.yml", "services: {}")
+                archive.writestr("docker-release-1.4.0/version.json", json.dumps({"version": "1.4.0"}))
             paths.version_file.write_text(json.dumps({"version": "1.2.0", "build": "test", "commit": "abc"}), encoding="utf-8")
             paths.config_path.write_text(
                 f"updates:\n  execution_mode: zip_docker\n  manifest_path: update-manifest.json\n  deployment_dir: {deploy}\n  compose_project_dir: {deploy}\n",

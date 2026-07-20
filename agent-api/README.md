@@ -17,4 +17,6 @@ This package is built as a single RoboterSteve product.
 
 The Personal edition includes manifest-based agents for invoices, market monitoring, MyWellness, vacation handling, scheduling and garden automation.
 
-The Garden Agent is currently an advisory agent. It reads compatible Home Assistant entities such as `lawn_mower.*`, soil moisture sensors, irrigation switches/valves and weather entities, stores snapshots in its own database and produces rule-based recommendations. It is prepared for later AI analysis, but it does not automatically control irrigation or mower devices yet.
+The Garden Agent owns lawn, soil moisture, irrigation, mower and garden-history logic. It reads compatible Home Assistant entities such as `lawn_mower.*`, soil moisture sensors, irrigation switches/valves and weather entities, stores snapshots and decisions in `garden.db`, and evaluates each garden zone with rule-based safety checks. Irrigation can be started manually through the Garden API and can run automatically only when the global control flag, the zone automation flag and every safety rule allow it. Automation is disabled by default. AI may explain or summarize Garden recommendations later, but it never controls devices directly.
+
+Wall includes a Home-Assistant-backed Energy page for EcoTracker-style power sensors and utility-meter daily values. Wall does not talk to meters or devices directly; all data comes through the backend Home Assistant service.
