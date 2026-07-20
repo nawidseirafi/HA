@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.waste_service import MAILBOX_ENTITY_ID, VACATION_ENTITY_ID, WASTE_ENTITY_ID, WasteService
 
 
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
@@ -72,9 +73,9 @@ def wall_dashboard():
         and state.get("attributes", {}).get("device_class") in {"door", "window", "opening"}
     ]
 
-    agents = _agent_summary()
     climate_summary = _climate_summary()
-    household = _household_summary()
+    household = _wall_household_summary(states)
+    agents = _agent_summary(household.get("vacation"))
     waste = household.get("waste") or _waste_status()
     calendar = household.get("calendar") or _calendar_summary()
     post = (household.get("post") or {}).get("entity") or post
@@ -148,7 +149,7 @@ def call_homeassistant_service(payload: ServicePayload):
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-def _agent_summary() -> dict[str, Any]:
+def _agent_summary(vacation_context: dict[str, Any] | None = None) -> dict[str, Any]:
     invoices: dict[str, Any]
     market: dict[str, Any]
     mywellness: dict[str, Any]
@@ -186,12 +187,28 @@ def _agent_summary() -> dict[str, Any]:
         }
     except Exception as exc:
         market = {"status": "error", "error": str(exc)}
+    vacation = _wall_vacation_agent_summary(vacation_context)
+    return {"invoices": invoices, "mywellness": mywellness, "market": market, "vacation": vacation}
+
+
+def _wall_vacation_agent_summary(vacation_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    active = vacation_context.get("vacation_mode") if isinstance(vacation_context, dict) else None
+    summary = {
+        "status": "active",
+        "enabled": True,
+        "is_running": False,
+        "vacation_mode": {"active": active, "source": VACATION_ENTITY_ID},
+        "vacation_mode_active": active,
+    }
     try:
         vacation_service = import_module("backend.agents.vacation.routes").vacation_service
-        vacation = vacation_service.status()
+        config = vacation_service.config()
+        summary["enabled"] = bool(config.get("enabled", True))
+        summary["status"] = "active" if summary["enabled"] else "disabled"
+        summary["schedule_times"] = config.get("schedule_times", [])
     except Exception as exc:
-        vacation = {"status": "error", "error": str(exc)}
-    return {"invoices": invoices, "mywellness": mywellness, "market": market, "vacation": vacation}
+        summary["error"] = str(exc)
+    return summary
 
 
 def _household_summary() -> dict[str, Any]:
@@ -211,6 +228,152 @@ def _household_summary() -> dict[str, Any]:
         ).summary()
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def _wall_household_summary(states: list[dict[str, Any]]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    by_entity = {str(state.get("entity_id") or ""): state for state in states}
+    post = _wall_post_status(by_entity.get(MAILBOX_ENTITY_ID))
+    vacation = _wall_vacation_status(by_entity.get(VACATION_ENTITY_ID))
+    waste = _wall_waste_status(by_entity.get(WASTE_ENTITY_ID), vacation.get("vacation_mode"), post.get("has_mail"))
+    infrastructure = {
+        "ok": True,
+        "updated_at": now,
+        "status": "unknown",
+        "label": "Netzwerk",
+        "detail": "Wird separat aktualisiert",
+        "router": "Fritzbox",
+        "connected_devices": None,
+        "wifi": "unknown",
+        "checks": {},
+    }
+    calendar = {
+        "ok": True,
+        "updated_at": now,
+        "today_count": 0,
+        "next_event": None,
+        "upcoming": [],
+        "source": "wall-fast-summary",
+    }
+    comfort = {"bedroom_fan": {"ok": True, "status": "unknown", "decision": {"status": "unknown"}}}
+    reminders = _wall_reminders(waste, post, vacation, infrastructure)
+    return {
+        "ok": True,
+        "updated_at": now,
+        "waste": waste,
+        "post": post,
+        "vacation": vacation,
+        "infrastructure": infrastructure,
+        "calendar": calendar,
+        "comfort": comfort,
+        "reminders": reminders,
+        "counts": {
+            "reminders": len(reminders),
+            "high_priority": len([item for item in reminders if item.get("priority") == "high"]),
+            "waste_items": len(waste.get("items", [])) if isinstance(waste, dict) else 0,
+            "calendar_events_today": 0,
+        },
+        "state": {
+            "mailbox_has_mail": post.get("has_mail"),
+            "vacation_mode": vacation.get("vacation_mode"),
+            "next_waste": waste.get("next") if isinstance(waste, dict) else None,
+            "next_calendar_event": None,
+            "infrastructure_status": "unknown",
+            "bedroom_fan_status": "unknown",
+        },
+    }
+
+
+def _wall_post_status(state: dict[str, Any] | None) -> dict[str, Any]:
+    if not state:
+        return {"ok": True, "entity_id": MAILBOX_ENTITY_ID, "has_mail": None, "entity": None}
+    value = str(state.get("state") or "").lower()
+    return {
+        "ok": True,
+        "entity_id": MAILBOX_ENTITY_ID,
+        "has_mail": value == "on" if value not in {"", "unknown", "unavailable"} else None,
+        "entity": _simple_item(state),
+    }
+
+
+def _wall_vacation_status(state: dict[str, Any] | None) -> dict[str, Any]:
+    if not state:
+        return {"ok": True, "available": False, "vacation_mode": None}
+    value = str(state.get("state") or "").lower()
+    return {
+        "ok": True,
+        "available": True,
+        "vacation_mode": value == "on" if value not in {"", "unknown", "unavailable"} else None,
+        "source": VACATION_ENTITY_ID,
+        "updated_at": state.get("last_changed") or state.get("last_updated"),
+    }
+
+
+def _wall_waste_status(state: dict[str, Any] | None, vacation_mode: bool | None, mailbox_has_mail: bool | None) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    if not state:
+        return {
+            "ok": False,
+            "updated_at": now,
+            "next": None,
+            "items": [],
+            "context": {"vacation_mode": vacation_mode, "mailbox_has_mail": mailbox_has_mail},
+            "reminders": [],
+            "source_entity": WASTE_ENTITY_ID,
+            "error": f"Home Assistant Entity nicht gefunden: {WASTE_ENTITY_ID}",
+        }
+    try:
+        normalized = WasteService(ha_service).normalize({**state, "attributes": state.get("attributes") or {}})
+        context = {"vacation_mode": vacation_mode, "mailbox_has_mail": mailbox_has_mail}
+        reminders = WasteService(ha_service).reminders(normalized.get("items", []), context)
+        return {
+            "ok": True,
+            "updated_at": now,
+            "next": normalized.get("next"),
+            "items": normalized.get("items", []),
+            "context": context,
+            "reminders": reminders,
+            "source_entity": WASTE_ENTITY_ID,
+            "raw": normalized.get("raw"),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "updated_at": now,
+            "next": None,
+            "items": [],
+            "context": {"vacation_mode": vacation_mode, "mailbox_has_mail": mailbox_has_mail},
+            "reminders": [],
+            "source_entity": WASTE_ENTITY_ID,
+            "error": str(exc),
+        }
+
+
+def _wall_reminders(waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any], infrastructure: dict[str, Any]) -> list[dict[str, str]]:
+    reminders: list[dict[str, str]] = []
+    for item in waste.get("reminders", []) if isinstance(waste, dict) else []:
+        if isinstance(item, dict):
+            reminders.append({
+                "priority": str(item.get("priority") or "medium"),
+                "message": str(item.get("message") or ""),
+                "reason": str(item.get("reason") or "Abfallstatus"),
+                "source": "waste",
+            })
+    if post.get("has_mail") is True:
+        reminders.append({"priority": "medium", "message": "Post im Briefkasten", "reason": "Briefkasten meldet Post.", "source": "post"})
+    if vacation.get("vacation_mode") is True and post.get("has_mail") is True:
+        reminders.append({
+            "priority": "high",
+            "message": "Post trotz Urlaubsmodus beachten",
+            "reason": "Urlaubsmodus ist aktiv und Briefkasten meldet Post.",
+            "source": "household",
+        })
+    infrastructure_status = str(infrastructure.get("status") or "")
+    if infrastructure_status in {"down", "critical"}:
+        reminders.append({"priority": "high", "message": "Internet oder Netzwerk gestört", "reason": str(infrastructure.get("detail") or ""), "source": "infrastructure"})
+    elif infrastructure_status in {"unstable", "warning"}:
+        reminders.append({"priority": "medium", "message": "Internet oder Netzwerk instabil", "reason": str(infrastructure.get("detail") or ""), "source": "infrastructure"})
+    return reminders
 
 
 def _waste_status() -> dict[str, Any]:
