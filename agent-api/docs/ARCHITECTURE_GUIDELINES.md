@@ -226,11 +226,27 @@ Authentication
 
 Infrastructure
 
+Context
+
 Home Assistant
 
 LLM
 
 Services besitzen keine Fachlogik.
+
+## 11a. Context Service
+
+Der ContextService ist eine Querschnittskomponente fuer berechneten Lebens- und Hauskontext.
+
+Home Assistant bleibt die Quelle der Sensorzustaende. Der ContextService darf Home Assistant lesen, aber keine Home-Assistant-Aktionen ausfuehren.
+
+Der ContextService berechnet ausschliesslich Zustaende, zum Beispiel Anwesenheit, Abfahrt, Garage, Hauszustand, Schlafkontext, Gaeste, Urlaub, Transition und Confidence.
+
+Agenten, Scheduler, Household, Garden, Vacation, Wall sowie spaetere Energy- und Sentero-Komponenten nutzen diesen Service als zentrale Kontextquelle. Sie duerfen Garagen- oder Schlafkontext nicht erneut aus einzelnen Home-Assistant-Entities zusammensetzen.
+
+Garagen-, Jalousien-, Licht-, Schloss- und andere Geraeteaktionen bleiben ausserhalb des ContextService. Der ContextService liefert nur `READY_TO_*`, `KEEP_OPEN`, `SLEEPING`, `OUTSIDE`, `GUESTS` und vergleichbare Zustandsinformationen.
+
+KI ist fuer den ContextService spaeter optional. KI darf Muster erklaeren oder Heuristiken vorschlagen, aber keine Aktionen ausloesen und die regelbasierte Zustandsberechnung nicht ersetzen.
 
 ---
 

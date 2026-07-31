@@ -48,18 +48,18 @@ export function MarketPerformanceChart({
           <AreaChart data={data} margin={{ top: 14, right: 18, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="marketPerformanceFill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="5%" stopColor="#4d8dff" stopOpacity={0.42} />
-                <stop offset="95%" stopColor="#4d8dff" stopOpacity={0.02} />
+                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.42} />
+                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(190, 208, 235, 0.08)" vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#7f8da8', fontSize: 12 }} minTickGap={18} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#7f8da8', fontSize: 12 }} tickFormatter={(value) => `${value}%`} width={46} />
-            <Tooltip content={<MarketTooltip />} cursor={{ stroke: 'rgba(77, 141, 255, 0.34)' }} />
+            <CartesianGrid stroke="rgba(255, 184, 108, 0.08)" vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#9e958c', fontSize: 12 }} minTickGap={18} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#9e958c', fontSize: 12 }} tickFormatter={(value) => `${value}%`} width={46} />
+            <Tooltip content={<MarketTooltip />} cursor={{ stroke: 'rgba(245, 158, 11, 0.34)' }} />
             <Area
               type="monotone"
               dataKey="performance"
-              stroke="#6da2ff"
+              stroke="#ffb65c"
               strokeWidth={3}
               fill="url(#marketPerformanceFill)"
               isAnimationActive

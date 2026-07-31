@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        graphite: '#111416',
-        tealsteel: '#2f6f6d',
+        graphite: '#030303',
+        tealsteel: '#f59e0b',
       },
       borderRadius: {
         ui: '8px',

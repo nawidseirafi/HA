@@ -10,6 +10,7 @@ import {
     BatteryWarning,
     Bell,
     Bot,
+    BrainCircuit,
     CalendarClock,
     ChevronRight,
     CloudSun,
@@ -385,7 +386,7 @@ function avg(values: number[]) {
 
 function WallDashboardContent() {
     const [data, setData] = useState<WallDashboardData | null>(null);
-    const [section, setSection] = useState<WallSection>('home');
+    const [section, setSection] = useState<WallSection>(() => initialWallSection());
     const [selectedFloor, setSelectedFloor] = useState('Alle Etagen');
     const [floorView, setFloorView] = useState('');
     const [roomView, setRoomView] = useState('');
@@ -848,6 +849,7 @@ function WallDashboardContent() {
     const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
     const internetInfo = data ? fritzboxInfo(data) : unknownFritzboxInfo();
     const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
+    const headerIcon = iconFor(section);
 
     return (
         <div className="wall-shell">
@@ -866,6 +868,10 @@ function WallDashboardContent() {
                         aria-label="Sicherheit"><ShieldAlert size={24}/></button>
                 <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')}
                         aria-label="Agenten"><Bot size={24}/></button>
+                <button onClick={() => {
+                    window.history.pushState({}, '', '/wall/steve');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }} aria-label="Steve"><BrainCircuit size={24}/></button>
             </aside>
 
             <main className="wall-main">
@@ -873,7 +879,7 @@ function WallDashboardContent() {
                     <div>
                         <span>{formatWallDate(now)}</span>
                         <div className="wall-title-row">
-                            <h1>{section === 'energy' && <Zap size={30}/>} {headerTitle}</h1>
+                            <h1>{headerIcon} {headerTitle}</h1>
                             <InternetStatusPill info={internetInfo}/>
                         </div>
                         <p>{subtitleFor(section, activeLights, totalLights, problemCount, data)}</p>
@@ -2807,6 +2813,26 @@ function titleFor(section: WallSection) {
     if (section === 'agents') return 'Agenten';
     if (section === 'batteries') return 'Batterien';
     return 'Zuhause';
+}
+
+function initialWallSection(): WallSection {
+    if (typeof window === 'undefined') return 'home';
+    const raw = new URLSearchParams(window.location.search).get('section') || '';
+    const allowed: WallSection[] = ['home', 'lights', 'climate', 'security', 'openings', 'agents', 'floor', 'batteries', 'energy'];
+    return allowed.includes(raw as WallSection) ? raw as WallSection : 'home';
+}
+
+function iconFor(section: WallSection): ReactNode {
+    if (section === 'lights') return <Lightbulb size={30}/>;
+    if (section === 'climate') return <Thermometer size={30}/>;
+    if (section === 'energy') return <Zap size={30}/>;
+    if (section === 'security') return <ShieldAlert size={30}/>;
+    if (section === 'openings') return <DoorOpen size={30}/>;
+    if (section === 'agents') return <Bot size={30}/>;
+    if (section === 'batteries') return <Battery size={30}/>;
+    if (section === 'floor') return <Layers3 size={30}/>;
+    if (section === 'room') return <Home size={30}/>;
+    return <Home size={30}/>;
 }
 
 function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number, data?: WallDashboardData | null) {

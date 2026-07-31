@@ -272,8 +272,8 @@ function formatDate(value?: string | null) {
 }
 
 function statusColor(status: AgentMapStatus) {
-  if (status === 'active') return '#34d399';
-  if (status === 'running') return '#4d8dff';
+  if (status === 'active') return '#36d38a';
+  if (status === 'running') return '#f59e0b';
   if (status === 'paused') return '#f59e0b';
   if (status === 'error') return '#fb7185';
   return '#6b7280';

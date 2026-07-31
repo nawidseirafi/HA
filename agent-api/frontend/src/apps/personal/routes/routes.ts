@@ -1,5 +1,7 @@
 export type Route =
   | { name: 'wall' }
+  | { name: 'wallSteve' }
+  | { name: 'contextDashboard' }
   | { name: 'agents' }
   | { name: 'agentList' }
   | { name: 'agentMap' }

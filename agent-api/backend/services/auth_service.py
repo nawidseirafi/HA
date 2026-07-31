@@ -10,6 +10,9 @@ import yaml
 from fastapi import HTTPException, Request
 from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
 
+
+_PRESENCE_CACHE: dict[str, Any] = {"checked_at": 0.0, "state": "unknown", "available": False}
+
 def _load_config() -> dict[str, Any]:
     if not API_CONFIG_PATH.exists():
         return {}
@@ -67,17 +70,28 @@ def token_ttl_seconds() -> int:
     return int(_auth_config().get("token_ttl_seconds", 60 * 60 * 24 * 7))
 
 
+def away_token_ttl_seconds() -> int:
+    return int(_away_reauth_config().get("token_ttl_seconds", 60 * 60 * 12))
+
+
 def authenticate(username: str, password: str) -> dict[str, Any]:
     if not hmac.compare_digest(username, configured_username()):
         raise HTTPException(status_code=401, detail="Benutzername oder Passwort ist falsch.")
     if not hmac.compare_digest(password, configured_password()):
         raise HTTPException(status_code=401, detail="Benutzername oder Passwort ist falsch.")
-    expires_at = int(time.time()) + token_ttl_seconds()
-    token = create_token({"sub": username, "exp": expires_at})
+    presence = auth_presence_state()
+    away = _presence_is_away(presence)
+    expires_at = int(time.time()) + (away_token_ttl_seconds() if away else token_ttl_seconds())
+    token = create_token({
+        "sub": username,
+        "exp": expires_at,
+        "auth_scope": "away" if away else "home",
+    })
     return {
         "access_token": token,
         "token_type": "bearer",
         "expires_at": expires_at,
+        "force_session": away,
         "user": {"username": username},
     }
 
@@ -113,7 +127,72 @@ def user_from_request(request: Request) -> dict[str, Any]:
     if scheme.lower() != "bearer" or not token:
         raise HTTPException(status_code=401, detail="Nicht angemeldet.")
     payload = verify_token(token)
+    enforce_presence_reauth(payload)
     return {"username": payload.get("sub", "")}
+
+
+def enforce_presence_reauth(payload: dict[str, Any]) -> None:
+    presence = auth_presence_state()
+    if not _presence_is_away(presence):
+        return
+    if payload.get("auth_scope") == "away":
+        return
+    raise HTTPException(status_code=401, detail="Du bist nicht zuhause. Bitte neu anmelden.")
+
+
+def auth_presence_state() -> dict[str, Any]:
+    config = _away_reauth_config()
+    if not config.get("enabled", False):
+        return {"enabled": False, "state": "disabled", "available": False}
+    entity_id = str(config.get("presence_entity") or "").strip()
+    if not entity_id:
+        return {"enabled": True, "state": "unconfigured", "available": False}
+    cache_seconds = max(0, int(config.get("cache_seconds", 10)))
+    now = time.time()
+    if cache_seconds and now - float(_PRESENCE_CACHE.get("checked_at") or 0) < cache_seconds:
+        return {
+            "enabled": True,
+            "entity_id": entity_id,
+            "state": _PRESENCE_CACHE.get("state"),
+            "available": bool(_PRESENCE_CACHE.get("available")),
+            "cached": True,
+        }
+    try:
+        from backend.services.homeassistant_service import HomeAssistantService
+
+        state = HomeAssistantService().get_state(entity_id)
+        raw_state = str((state or {}).get("state") or "").strip().lower()
+        available = bool(raw_state and raw_state not in {"unknown", "unavailable"})
+    except Exception:
+        raw_state = "unknown"
+        available = False
+    _PRESENCE_CACHE.update({"checked_at": now, "state": raw_state, "available": available})
+    return {
+        "enabled": True,
+        "entity_id": entity_id,
+        "state": raw_state,
+        "available": available,
+        "cached": False,
+    }
+
+
+def _away_reauth_config() -> dict[str, Any]:
+    config = _auth_config().get("away_reauth")
+    return config if isinstance(config, dict) else {}
+
+
+def _presence_is_away(presence: dict[str, Any]) -> bool:
+    if not presence.get("enabled"):
+        return False
+    if not presence.get("available"):
+        return False
+    state = str(presence.get("state") or "").strip().lower()
+    home_states = {
+        str(value).strip().lower()
+        for value in _away_reauth_config().get("home_states", ["home"])
+        if str(value).strip()
+    }
+    return state not in home_states
 
 
 def _sign(value: str) -> str:

@@ -211,6 +211,22 @@ GEMINI_API_KEY=change-me
 CLAUDE_API_KEY=change-me
 ```
 
+Anwesenheitsbasierter Login-Zwang wird in `config.yaml` konfiguriert:
+
+```yaml
+auth:
+  token_ttl_seconds: 604800
+  away_reauth:
+    enabled: true
+    presence_entity: "person.nawid"
+    home_states:
+      - home
+    cache_seconds: 10
+    token_ttl_seconds: 43200
+```
+
+Wenn `person.nawid` nicht `home` ist, werden bestehende 7-Tage-Tokens abgelehnt und das Frontend zeigt wieder die Login-Seite. Ein Login von unterwegs wird nur als Session-Token gespeichert.
+
 Rechte setzen:
 
 ```bash

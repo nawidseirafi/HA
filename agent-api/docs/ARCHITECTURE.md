@@ -21,6 +21,7 @@ Das Backend bindet zentrale Router ein:
 - Orchestrator
 - Household
 - Infrastructure
+- Context
 - Home Assistant Wall API
 - Messaging
 - Waste
@@ -82,6 +83,7 @@ agent-api/
 │   │   └── waste_routes.py
 │   ├── services/
 │   │   ├── auth_service.py
+│   │   ├── context/
 │   │   ├── homeassistant_service.py
 │   │   ├── household_service.py
 │   │   ├── infrastructure_service.py
@@ -98,6 +100,7 @@ agent-api/
 │   ├── garden/
 │   ├── invoices/
 │   ├── infrastructure/
+│   ├── context/
 │   ├── market/
 │   ├── messaging/
 │   ├── mywellness/
@@ -124,6 +127,67 @@ Oeffentliche Pfade:
 - `POST /api/auth/login`
 
 Alle anderen `/api/*`-Endpunkte laufen durch die bestehende Auth-Middleware.
+
+## Auth und Abwesenheit
+
+Datei:
+
+```text
+agent-api/backend/services/auth_service.py
+```
+
+RoboterSteve nutzt lokale JWTs. Standard-Token laufen nach `auth.token_ttl_seconds` ab.
+
+Optional kann `auth.away_reauth` eine Home-Assistant-Anwesenheitsentity pruefen, z.B. `person.nawid`.
+
+Regel:
+
+- Wenn die Anwesenheitsentity einen Home-State wie `home` liefert, gilt die normale Token-Laufzeit.
+- Wenn die Anwesenheitsentity nicht zuhause ist, werden vorhandene Home-Tokens abgelehnt und das Frontend zeigt wieder die Login-Seite.
+- Ein Login von unterwegs erzeugt nur einen kurzen Session-Token (`auth.away_reauth.token_ttl_seconds`) und wird vom Frontend nicht dauerhaft gespeichert.
+- Wenn Home Assistant oder die Anwesenheitsentity nicht verfuegbar ist, wird fail-open gearbeitet, damit man sich nicht versehentlich aussperrt.
+
+## Context Service
+
+Status: Version 1.0 umgesetzt.
+
+Dateien:
+
+```text
+agent-api/backend/services/context/
+agent-api/backend/api/context_routes.py
+agent-api/data/context/context.db
+```
+
+Der ContextService ist eine Querschnittskomponente. Home Assistant bleibt die Datenquelle fuer Sensor-, Personen-, Fahrzeug-, Garagen-, Licht-, Medien-, Tuer- und Praesenzsignale. Der ContextService liest diese Signale und berechnet daraus ausschliesslich Zustaende:
+
+- `PresenceState`
+- `GarageState`
+- `HouseState`
+- `VacationState`
+- `TransitionState`
+
+Der Service fuehrt keine Home-Assistant-Aktionen aus. Er oeffnet oder schliesst keine Garage, faehrt keine Jalousien, verriegelt keine Nuki-Tuer und schaltet keine Geraete. Spaetere Household-, Garden-, Vacation-, Wall-, Scheduler-, Energy- oder Sentero-Regeln duerfen den Kontext lesen und darauf eigene regelbasierte Entscheidungen aufbauen.
+
+Garagen- und Abfahrtslogik wird ueber einen `DepartureContext` bewertet. Beim Verlassen wird erst ein Beobachtungsfenster genutzt. Kurzabwesenheiten liefern `SHORT_AWAY` und koennen `GarageState.KEEP_OPEN` ergeben. Erst wenn das Fenster abgelaufen ist und Fahrzeug sowie Person weiter abwesend sind, wird `PresenceState.AWAY` und bei offenem Tor `GarageState.READY_TO_CLOSE` berechnet. Bei Rueckkehr nach laengerer Abwesenheit liefert der Kontext `COMING_HOME` und `READY_TO_OPEN`.
+
+Der Schlafkontext wird nicht ausschliesslich ueber Uhrzeit bestimmt. Der Service beruecksichtigt mindestens Schlafzimmer, Wohnzimmer, Terrasse, Terrassentuer, Wohnzimmerlicht, Schlafzimmerlicht, TV, Musik, Nuki und Bewegung. Terrasse, aktive Wohnzimmer-/Mediennutzung und erkannte Gaeste verhindern den Nachtkontext. Erst wenn das Haus ruhig ist, kann `PREPARING_SLEEP` und danach `SLEEPING` entstehen.
+
+API:
+
+- `GET /api/context/status`
+- `GET /api/context/history`
+- `GET /api/context/debug`
+
+Persistenz:
+
+- `context_history`
+- `presence_history`
+- `house_state_history`
+- `garage_context`
+- `sleep_context`
+
+Die Historie speichert lokale Kontextmerkmale wie Abfahrts-, Rueckkehr-, Schlaf-, Gaeste- und Aussenzeiten als Grundlage fuer spaeteres Lernen. KI ist nicht Bestandteil von V1 und spaeter nur optional.
 
 Beim Startup ruft `main.py` ueber `agent_runtime_services()` fuer aktivierte Agenten optional `start_scheduler()` auf. Beim Shutdown wird optional `stop_scheduler()` aufgerufen.
 

@@ -11,6 +11,13 @@ auth:
   password_env: AGENT_API_PASSWORD
   jwt_secret_env: AGENT_API_JWT_SECRET
   token_ttl_seconds: 604800
+  away_reauth:
+    enabled: true
+    presence_entity: "person.nawid"
+    home_states:
+      - home
+    cache_seconds: 10
+    token_ttl_seconds: 43200
 home_assistant:
   url: HA_URL
   token: HA_TOKEN

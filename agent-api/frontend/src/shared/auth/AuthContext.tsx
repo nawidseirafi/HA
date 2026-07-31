@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login: async ({ username, password, remember }) => {
       if (!username.trim() || !password.trim()) return false;
       const response = await api.login(username, password);
-      setAuthToken(response.access_token, remember);
+      setAuthToken(response.access_token, remember && !response.force_session);
       setIsAuthenticated(true);
       return true;
     },

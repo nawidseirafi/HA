@@ -12,6 +12,7 @@ Dieses Dokument beschreibt nicht den Ist-Zustand im Detail. Der aktuelle Aufbau 
 - Manifeste bleiben Quelle fuer Agent-Metadaten und Scheduler-Defaults.
 - Fachliche Daten bleiben bei den owning Agents oder Services.
 - Querschnittsdaten bekommen eigene Services und eigene Persistenz.
+- Der ContextService ist die zentrale Quelle fuer berechneten Lebens- und Hauskontext.
 - Der Orchestrator koordiniert, besitzt aber keine Agent-Fachlogik.
 - Agenten werden nur ueber den Agent-Control-Vertrag zentral gesteuert.
 - Hinweise, Warnungen und Aufgaben laufen ueber den Messaging Service.
@@ -168,6 +169,34 @@ Offen:
 - Wall-Dashboard langfristig weiter auf `HouseholdService.summary()` konsolidieren.
 - Comfort-Historie in `household.db` aufnehmen, wenn mehrere Komfortregeln produktiv laufen.
 - Zentrale Push-Zustellung ueber `notification_targets`; aktuelle Household-Pushes nutzen noch den konfigurierten Home-Assistant-Notify-Service.
+
+## Context Service
+
+Umgesetzt:
+
+- ContextService als Querschnittsservice unter `backend/services/context/`.
+- Eigene SQLite-Persistenz unter `data/context/context.db`.
+- API unter `/api/context/status`, `/api/context/history` und `/api/context/debug`.
+- Berechnete Zustaende fuer Presence, Garage, House, Vacation und Transition.
+- Regelbasierter `DepartureContext` fuer Abfahrt, Kurzabwesenheit und Rueckkehr.
+- Regelbasierter Haus-/Schlafkontext, der Uhrzeit nur als ein Signal verwendet.
+- Gaeste- und Terrassenkontext blockieren den Nachtkontext.
+- Confidence-Wert aus verfuegbaren Signalen und Regelstaerke.
+- Debug-Ausgabe mit aktiven Regeln und verwendeten Signalen.
+
+Zielregel:
+
+- Home Assistant bleibt Datenquelle fuer Live-Signale und Geraeteschnittstelle.
+- ContextService fuehrt keine Home-Assistant-Service-Calls aus und loest keine Automationen aus.
+- Agenten und Scheduler sollen Garagen-, Schlaf- und Hausentscheidungen kuenftig ueber den ContextService treffen, nicht durch eigene Direktinterpretation einzelner HA-Entities.
+- Garage-, Jalousien-, Nuki-, Licht- und andere Smart-Home-Aktionen bleiben in den dafuer verantwortlichen Regeln/Automationen und duerfen den ContextService nur lesen.
+- KI darf spaeter Kontextmuster erklaeren oder Gewichte vorschlagen, aber die regelbasierte Kontextberechnung nicht ersetzen.
+
+Offen:
+
+- Produktive Entity-Zuordnung pro Installation verfeinern.
+- Historische Merkmale fuer Abfahrt, Rueckkehr, Schlafenszeit, Gaestedauer und Aussenaufenthalt aggregieren.
+- Spaetere Energy- und Sentero-Kontexte an den ContextService anbinden.
 
 ## Garden Agent
 

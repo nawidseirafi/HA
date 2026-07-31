@@ -564,14 +564,14 @@ function DonutChart({ data }: { data: Array<{ label: string; value: number; colo
       parts.offset = end;
       return parts;
     }, { offset: 0, segments: [] as string[] }).segments.join(', ')
-    : '#26344d 0 100%';
+    : '#35281c 0 100%';
   return (
     <div className="donut-wrap">
       <div className="donut" style={{ background: `conic-gradient(${gradient})` }}>
         <span>{data.length || 0}</span>
       </div>
       <div className="donut-legend">
-        {(data.length ? data : [{ label: 'Keine Daten', value: 0, color: '#4d8dff' }]).map((item) => (
+        {(data.length ? data : [{ label: 'Keine Daten', value: 0, color: '#f59e0b' }]).map((item) => (
           <div key={item.label}>
             <i style={{ background: item.color }} />
             <span>{item.label}</span>
@@ -610,7 +610,7 @@ function daysUntilDate(value: string) {
 }
 
 function categoryTotals(invoices: Invoice[]) {
-  const colors = ['#7c5cff', '#4d8dff', '#34d399', '#fbbf24', '#fb7185'];
+  const colors = ['#f59e0b', '#c77732', '#36d38a', '#ffb65c', '#ff6b6b'];
   const totals = invoices.reduce<Record<string, number>>((acc, invoice) => {
     const label = invoice.category || 'Ohne Kategorie';
     acc[label] = (acc[label] ?? 0) + (invoice.gross_amount ?? invoice.amount ?? 0);

@@ -11,6 +11,7 @@ export type AuthResponse = {
   access_token: string;
   token_type: 'bearer';
   expires_at: number;
+  force_session?: boolean;
   user: { username: string };
 };
 export function getAuthToken() {
@@ -644,6 +645,58 @@ export type MessageCenterItem = {
   read_at?: string | null;
 };
 
+export type ContextSignal = {
+  entity_id?: string;
+  state?: string;
+  name?: string;
+  device_class?: string;
+  updated_at?: string | null;
+  attributes?: Record<string, unknown>;
+};
+
+export type ContextStatus = {
+  presence: string;
+  departure?: string;
+  garage: string;
+  house: string;
+  sleep?: string;
+  vacation?: string;
+  transition?: string;
+  guest: boolean;
+  confidence: number;
+  updated_at: string;
+  summary?: string;
+  reason?: string;
+  message?: string;
+  decisions?: Array<{ target?: string; state?: string; reason?: string; summary?: string; rules?: string[] }>;
+};
+
+export type ContextDebug = ContextStatus & {
+  signals?: Record<string, ContextSignal | ContextSignal[] | null>;
+  active_rules?: string[];
+  reasons?: Record<string, string[]>;
+  metrics?: Record<string, unknown>;
+  confidence_details?: Record<string, number>;
+  database?: { path?: string; counts?: Record<string, number> };
+  config?: Record<string, unknown>;
+};
+
+export type ContextHistoryItem = {
+  id: number;
+  created_at: string;
+  presence: string;
+  garage: string;
+  house: string;
+  vacation?: string;
+  transition?: string;
+  confidence: number;
+  payload?: ContextDebug;
+};
+
+export type ContextHistory = {
+  items: ContextHistoryItem[];
+};
+
 export type WallEntity = {
   entity_id: string;
   name: string;
@@ -1256,6 +1309,9 @@ export const api = {
       body: JSON.stringify(payload ?? {}),
     }),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
+  contextStatus: () => request<ContextStatus>('/api/context/status'),
+  contextHistory: (limit = 100) => request<ContextHistory>(`/api/context/history?limit=${limit}`),
+  contextDebug: () => request<ContextDebug>('/api/context/debug'),
   energyOverview: () => request<EnergyOverview>('/api/homeassistant/energy'),
   vacationStatus: () => request<VacationStatus>('/api/vacation/status'),
   enableVacationAgent: () => request<VacationStatus>('/api/vacation/enable', { method: 'POST' }),
