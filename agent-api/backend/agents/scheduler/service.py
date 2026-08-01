@@ -211,6 +211,18 @@ class SchedulerService:
                     apply=bool(payload.get("apply", True)),
                     include_ai=payload.get("include_ai") if "include_ai" in payload else None,
                 )
+            if payload.get("comfort") == "front_light":
+                return HouseholdService().front_light_on_arrival(
+                    apply=bool(payload.get("apply", True)),
+                )
+            if payload.get("automation") == "garage":
+                return HouseholdService().garage_context_control(
+                    apply=bool(payload.get("apply", True)),
+                )
+            if payload.get("automation") == "ground_floor_shutters":
+                return HouseholdService().ground_floor_shutters_context_control(
+                    apply=bool(payload.get("apply", True)),
+                )
             if payload.get("check") == "openings" or str(task.get("default_key") or "") == "platform:household:window-check":
                 return HouseholdService().check_openings(notify=True)
             return HouseholdService().summary()

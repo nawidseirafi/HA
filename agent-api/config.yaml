@@ -40,6 +40,41 @@ household:
   notifications:
     notify_service: "notify.mobile_app_system_error_404"
     openings_push_enabled: true
+  front_light:
+    enabled: true
+    control_enabled: true
+    auto_discovery: true
+    light_entity: ""
+    evening_start: "18:00"
+    morning_end: "07:00"
+    turn_off_after_minutes: 10
+    min_confidence: 0.55
+    arrival_states:
+      - COMING_HOME
+    arrival_garage_states:
+      - READY_TO_OPEN
+  garage:
+    enabled: true
+    control_enabled: true
+    auto_discovery: true
+    garage_entity: ""
+    allow_open: true
+    allow_close: true
+    min_confidence: 0.6
+  shutters:
+    enabled: true
+    control_enabled: true
+    auto_discovery: true
+    ground_floor_entities: []
+    open_after_sunrise: true
+    fallback_open_after: "07:30"
+    min_confidence: 0.6
+    close_states:
+      - SLEEPING
+    block_house_states:
+      - OUTSIDE
+      - GUESTS
+      - RELAXING
   comfort:
     bedroom_fan:
       enabled: true

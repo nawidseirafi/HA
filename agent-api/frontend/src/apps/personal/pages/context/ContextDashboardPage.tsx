@@ -253,17 +253,21 @@ function currentContextCards(status: ContextStatus) {
 
 function liveSignalCards(debug: ContextDebug) {
   const signals = debug.signals || {};
+  const terraceCards = signals.terrace_presence
+    ? [liveSignal('Terrassenpräsenz', signals.terrace_presence)]
+    : [];
   return [
-    liveSignal('Terrasse', signals.terrace_presence || signals.terrace_door),
+    ...terraceCards,
+    liveSignal('Terrassentür', signals.terrace_door, 'door'),
     liveSignal('Wohnzimmer', signals.living_presence || signals.living_light || signals.tv),
     liveSignal('Schlafzimmer', signals.bedroom_presence || signals.bedroom_light),
     liveSignal('Auto', signals.vehicle),
     liveSignal('Home Zone', signals.person),
-    liveSignal('Garagentor', signals.garage_door),
+    liveSignal('Garagentor', signals.garage_door, 'cover'),
   ];
 }
 
-function liveSignal(label: string, signal: ContextSignal | ContextSignal[] | null | undefined) {
+function liveSignal(label: string, signal: ContextSignal | ContextSignal[] | null | undefined, kind = '') {
   if (Array.isArray(signal)) {
     const active = signal.filter((item) => activeSignalState(item.state)).length;
     return { label, state: active ? 'Aktiv' : 'Leer', source: `${active}/${signal.length} Signale` };
@@ -271,7 +275,7 @@ function liveSignal(label: string, signal: ContextSignal | ContextSignal[] | nul
   if (!signal) return { label, state: 'Unbekannt', source: 'Kein Signal im ContextService' };
   return {
     label,
-    state: readableSignalState(signal.state),
+    state: readableSignalState(signal.state, kind),
     source: signal.name || signal.entity_id || 'ContextService',
   };
 }
@@ -387,8 +391,18 @@ function activeSignalState(value?: string) {
   return ['on', 'home', 'open', 'playing', 'detected', 'occupied'].includes(String(value || '').toLowerCase());
 }
 
-function readableSignalState(value?: string) {
+function readableSignalState(value?: string, kind = '') {
   const state = String(value || '').toLowerCase();
+  if (kind === 'cover') {
+    if (state === 'open') return 'Offen';
+    if (state === 'closed') return 'Geschlossen';
+    if (state === 'opening') return 'Öffnet';
+    if (state === 'closing') return 'Schließt';
+  }
+  if (kind === 'door') {
+    if (['open', 'on'].includes(state)) return 'Offen';
+    if (['closed', 'off'].includes(state)) return 'Geschlossen';
+  }
   if (activeSignalState(state)) return 'Aktiv';
   if (['off', 'not_home', 'closed', 'idle', 'standby'].includes(state)) return 'Leer';
   return value || 'Unbekannt';

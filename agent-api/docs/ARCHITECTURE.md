@@ -169,6 +169,10 @@ Der ContextService ist eine Querschnittskomponente. Home Assistant bleibt die Da
 
 Der Service fuehrt keine Home-Assistant-Aktionen aus. Er oeffnet oder schliesst keine Garage, faehrt keine Jalousien, verriegelt keine Nuki-Tuer und schaltet keine Geraete. Spaetere Household-, Garden-, Vacation-, Wall-, Scheduler-, Energy- oder Sentero-Regeln duerfen den Kontext lesen und darauf eigene regelbasierte Entscheidungen aufbauen.
 
+Die Frontlicht-Ankunftsregel liegt in Household. Sie liest den ContextService, erkennt abendliche Heimkehr ueber `COMING_HOME` oder `READY_TO_OPEN`, schaltet das konfigurierte oder sicher erkannte Front-/Eingangslicht ueber Home Assistant ein und nach einer begrenzten Zeit wieder aus. Der ContextService bleibt dabei reine Kontextquelle und fuehrt keine Lichtaktion aus.
+
+Garagen- und Erdgeschoss-Rollo-Aktionen liegen ebenfalls in Household. Die Garagenregel liest `GarageState.READY_TO_OPEN` und `GarageState.READY_TO_CLOSE` aus dem ContextService und fuehrt erst danach `cover.open_cover` oder `cover.close_cover` ueber Home Assistant aus. Die Rollo-Regel liest den Schlaf- und Gaestekontext, schliesst Erdgeschoss-Rollos nur bei `SLEEPING` ohne blockierende Zustaende und oeffnet morgens nur Rollos, die Steve selbst geschlossen hat.
+
 Garagen- und Abfahrtslogik wird ueber einen `DepartureContext` bewertet. Beim Verlassen wird erst ein Beobachtungsfenster genutzt. Kurzabwesenheiten liefern `SHORT_AWAY` und koennen `GarageState.KEEP_OPEN` ergeben. Erst wenn das Fenster abgelaufen ist und Fahrzeug sowie Person weiter abwesend sind, wird `PresenceState.AWAY` und bei offenem Tor `GarageState.READY_TO_CLOSE` berechnet. Bei Rueckkehr nach laengerer Abwesenheit liefert der Kontext `COMING_HOME` und `READY_TO_OPEN`.
 
 Der Schlafkontext wird nicht ausschliesslich ueber Uhrzeit bestimmt. Der Service beruecksichtigt mindestens Schlafzimmer, Wohnzimmer, Terrasse, Terrassentuer, Wohnzimmerlicht, Schlafzimmerlicht, TV, Musik, Nuki und Bewegung. Terrasse, aktive Wohnzimmer-/Mediennutzung und erkannte Gaeste verhindern den Nachtkontext. Erst wenn das Haus ruhig ist, kann `PREPARING_SLEEP` und danach `SLEEPING` entstehen.

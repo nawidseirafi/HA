@@ -86,6 +86,21 @@ class ContextServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.presence, PresenceState.SHORT_AWAY)
         self.assertEqual(snapshot.garage, GarageState.KEEP_OPEN)
 
+    def test_garage_detection_prefers_cover_over_problem_sensor(self):
+        now = datetime(2026, 7, 31, 18, 0, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        states = [
+            state("person.nawid", "home", "Nawid"),
+            state("device_tracker.auto", "home", "Auto"),
+            state("binary_sensor.garage_problem", "off", "Garage Problem", "problem"),
+            state("cover.garagentor", "open", "Garagentor"),
+        ]
+
+        snapshot = service.evaluate(states, now=now)
+
+        self.assertEqual(snapshot.signals["garage_door"]["entity_id"], "cover.garagentor")
+        self.assertEqual(snapshot.garage, GarageState.KEEP_OPEN)
+
     def test_coming_home_after_long_absence_ready_to_open(self):
         now = datetime(2026, 7, 31, 8, 0, tzinfo=timezone.utc)
         service, _ = self.service(now)
@@ -160,6 +175,23 @@ class ContextServiceTests(unittest.TestCase):
 
         self.assertGreaterEqual(rich.confidence, 0.8)
         self.assertEqual(poor.confidence, 0.2)
+
+    def test_summary_text_is_returned_for_ui(self):
+        now = datetime(2026, 7, 31, 22, 15, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        snapshot = service.evaluate(
+            with_states(
+                base_states(),
+                state("binary_sensor.wohnzimmer_presence", "on", "Wohnzimmer Presence", "presence"),
+                state("media_player.tv", "playing", "TV"),
+            ),
+            now=now,
+        )
+        payload = snapshot.as_dict()
+
+        self.assertIn("summary", payload)
+        self.assertTrue(payload["summary"])
+        self.assertNotIn("ContextService liefert noch keinen", payload["summary"])
 
     def test_transition_state_for_preparing_sleep(self):
         now = datetime(2026, 7, 31, 22, 45, tzinfo=timezone.utc)

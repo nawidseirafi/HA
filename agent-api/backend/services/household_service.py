@@ -5,6 +5,9 @@ from backend.config import load_global_config
 from backend.services.calendar_service import CalendarService
 from backend.services.homeassistant_service import HomeAssistantService
 from backend.services.household.comfort_service import HouseholdComfortService
+from backend.services.household.front_light_service import HouseholdFrontLightService
+from backend.services.household.garage_service import HouseholdGarageService
+from backend.services.household.shutter_service import HouseholdShutterService
 from backend.services.infrastructure_service import InfrastructureService
 from backend.services.messaging import MessagingService
 from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
@@ -27,6 +30,9 @@ class HouseholdService:
         self.infrastructure_service = infrastructure_service or InfrastructureService(self.ha_service)
         self.calendar_service = calendar_service or CalendarService()
         self.comfort_service = HouseholdComfortService(self.ha_service)
+        self.front_light_service = HouseholdFrontLightService(self.ha_service)
+        self.garage_service = HouseholdGarageService(self.ha_service)
+        self.shutter_service = HouseholdShutterService(self.ha_service)
         self.messaging_service = messaging_service or MessagingService()
         self.config = load_global_config().get("household") or {}
         self.vacation_status_provider = vacation_status_provider
@@ -110,6 +116,15 @@ class HouseholdService:
 
     def comfort_bedroom_fan(self, apply: bool = False, include_ai: bool | None = None) -> dict[str, Any]:
         return self.comfort_service.evaluate_bedroom_fan(apply=apply, include_ai=include_ai)
+
+    def front_light_on_arrival(self, apply: bool = False) -> dict[str, Any]:
+        return self.front_light_service.evaluate(apply=apply)
+
+    def garage_context_control(self, apply: bool = False) -> dict[str, Any]:
+        return self.garage_service.evaluate(apply=apply)
+
+    def ground_floor_shutters_context_control(self, apply: bool = False) -> dict[str, Any]:
+        return self.shutter_service.evaluate(apply=apply)
 
     def openings_status(self) -> dict[str, Any]:
         updated_at = self._now()
@@ -235,6 +250,9 @@ class HouseholdService:
     def _comfort_status(self) -> dict[str, Any]:
         return {
             "bedroom_fan": self.comfort_service.bedroom_fan_status(include_ai=False),
+            "front_light": self.front_light_service.status(),
+            "garage": self.garage_service.status(),
+            "ground_floor_shutters": self.shutter_service.status(),
         }
 
     def _reminders(self, waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any], infrastructure: dict[str, Any], openings: dict[str, Any] | None = None) -> list[dict[str, str]]:

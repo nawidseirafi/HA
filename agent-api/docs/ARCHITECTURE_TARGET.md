@@ -154,6 +154,8 @@ Umgesetzt:
 - Vacation Waste-Hinweise werden auf den Urlaubszeitraum begrenzt und nicht als Termin-Historie in Messages gespammt.
 - Offene Tuer-/Fensterkontakte werden ueber Home Assistant erkannt und koennen als Household-Reminder, Message und optional mobile Push-Nachricht gemeldet werden.
 - Schlafzimmer-Komfortsteuerung kann regelbasiert und mit optionaler KI-Einschaetzung ueber Home Assistant einen Ventilator schalten; KI steuert nicht direkt.
+- Frontlicht bei abendlicher Heimkehr wird als Household-Regel ueber den ContextService entschieden und ueber Home Assistant zeitlich begrenzt geschaltet.
+- Garage und Erdgeschoss-Rollos werden als Household-Regeln ueber ContextService-Zustaende entschieden und ausschliesslich ueber Home Assistant ausgefuehrt.
 
 Zielregel:
 
@@ -161,6 +163,7 @@ Zielregel:
 - Vacation und Household entscheiden, welche Waste-Termine wirklich handlungsrelevant sind.
 - Haushaltszustand darf nicht direkt aus UI-Komponenten zusammengesucht werden.
 - Comfort-Regeln wie Schlafzimmer-Ventilator gehoeren in Household, bleiben aber regelbasiert und duerfen KI nur beratend verwenden.
+- Ankunfts- und Hausregeln wie Frontlicht, Garage und Erdgeschoss-Rollos gehoeren in Household oder spaetere dedizierte Automationsregeln, lesen den ContextService und speichern nur eigenen Ausfuehrungszustand.
 - Smart-Home-Schaltungen laufen ausschliesslich ueber Home Assistant und nur nach expliziter regelbasierter Freigabe.
 
 Offen:

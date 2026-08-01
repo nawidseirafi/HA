@@ -66,6 +66,8 @@ class ContextSnapshot:
     guest: bool
     confidence: float
     updated_at: str
+    summary: str = ""
+    reason: str = ""
     signals: dict[str, Any] = field(default_factory=dict)
     active_rules: list[str] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
@@ -82,6 +84,8 @@ class ContextSnapshot:
             "guest": self.guest,
             "confidence": self.confidence,
             "updated_at": self.updated_at,
+            "summary": self.summary,
+            "reason": self.reason,
         }
         if include_debug:
             payload["signals"] = self.signals

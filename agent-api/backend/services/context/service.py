@@ -107,6 +107,17 @@ class ContextService:
         metrics["house"] = house_metrics
         if ha_error:
             active_rules.append("home_assistant_unavailable")
+        summary, reason = self._summary_reason(
+            presence=presence,
+            departure=departure,
+            garage=garage,
+            house=house,
+            sleep=sleep,
+            guest=guest,
+            transition=transition,
+            signals=signals,
+            metrics=metrics,
+        )
 
         return ContextSnapshot(
             presence=presence,
@@ -119,9 +130,100 @@ class ContextService:
             guest=guest,
             confidence=confidence,
             updated_at=now.astimezone(timezone.utc).isoformat(timespec="seconds"),
+            summary=summary,
+            reason=reason,
             signals={key: self._signal_payload(value) for key, value in signals.items()},
             active_rules=active_rules,
             metrics=metrics,
+        )
+
+    def _summary_reason(
+        self,
+        presence: PresenceState,
+        departure: PresenceState,
+        garage: GarageState,
+        house: HouseState,
+        sleep: HouseState,
+        guest: bool,
+        transition: TransitionState,
+        signals: dict[str, EntitySignal | list[EntitySignal] | None],
+        metrics: dict[str, Any],
+    ) -> tuple[str, str]:
+        if garage == GarageState.READY_TO_OPEN:
+            return (
+                "Ich glaube, du kommst nach Hause. Die Garage ist bereit zum Oeffnen.",
+                "ContextService meldet Heimkehr nach laengerer Abwesenheit und die Garage ist geschlossen.",
+            )
+        if garage == GarageState.READY_TO_CLOSE:
+            return (
+                "Ich glaube, du bist wirklich weg. Die Garage ist bereit zum Schliessen.",
+                "Fahrzeug und Person sind nach dem Beobachtungsfenster weiter abwesend.",
+            )
+        if garage == GarageState.KEEP_OPEN and presence in {PresenceState.LEAVING, PresenceState.SHORT_AWAY}:
+            elapsed = (metrics.get("departure") or {}).get("elapsed_seconds")
+            if elapsed is not None:
+                minutes = max(1, round(float(elapsed) / 60))
+                return (
+                    "Ich warte noch, bevor ich die Garage schliesse.",
+                    f"Abfahrt wurde vor etwa {minutes} Minute(n) erkannt; das Kurzabwesenheitsfenster ist noch relevant.",
+                )
+            return (
+                "Ich warte noch, bevor ich die Garage schliesse.",
+                "Der ContextService prueft gerade, ob es nur eine Kurzabwesenheit ist.",
+            )
+        if guest or house == HouseState.GUESTS:
+            return (
+                "Ich habe Gaeste erkannt.",
+                "Mehrere Aktivitaets- und Oeffnungssignale sprechen gegen eine Nachtautomatik.",
+            )
+        if house == HouseState.OUTSIDE:
+            return (
+                "Ich glaube, dass du noch draussen sitzt.",
+                "Terrassenpraesenz oder Terrassentuer blockiert den Nachtkontext.",
+            )
+        if sleep == HouseState.SLEEPING:
+            return (
+                "Ich glaube, dass das Haus jetzt schlaeft.",
+                "Schlafkontext ist stabil und der Rest des Hauses wirkt ruhig.",
+            )
+        if sleep == HouseState.PREPARING_SLEEP or house == HouseState.PREPARING_SLEEP:
+            return (
+                "Ich glaube, dass du gerade schlafen gehst.",
+                "Schlafzimmer- und Ruhe-Signale deuten auf Schlafvorbereitung hin.",
+            )
+        if house == HouseState.RELAXING:
+            return (
+                "Das Haus befindet sich im Entspannungsmodus.",
+                "Wohnzimmer, Medien oder Lichtsignale sprechen noch gegen den Schlafkontext.",
+            )
+        if presence == PresenceState.COMING_HOME:
+            return (
+                "Ich glaube, du kommst gerade nach Hause.",
+                "Person oder Fahrzeug wurde nach einer Abwesenheit wieder zuhause erkannt.",
+            )
+        if presence == PresenceState.AWAY:
+            return (
+                "Ich glaube, dass niemand zuhause ist.",
+                "Person und Fahrzeug wirken abwesend.",
+            )
+        if transition == TransitionState.TRANSITION:
+            return (
+                "Ich beobachte gerade einen Uebergang.",
+                "Der aktuelle Kontext ist noch nicht vollstaendig stabil.",
+            )
+        if house == HouseState.EVENING:
+            return (
+                "Ich beobachte den Abendmodus.",
+                "Die Uhrzeit spricht fuer Abend, aber keine staerkere Schlaf- oder Gaeste-Regel ist aktiv.",
+            )
+        if house == HouseState.DAY:
+            return (
+                "Das Haus befindet sich im Tagesmodus.",
+                "Es gibt keinen Hinweis auf Schlaf, Gaeste oder Abwesenheitsuebergaenge.",
+            )
+        return (
+            "Ich lese gerade den Hauskontext.",
+            "Der ContextService hat noch keinen spezifischeren Zustand priorisiert.",
         )
 
     def _departure_context(
@@ -351,7 +453,13 @@ class ContextService:
         signals: dict[str, EntitySignal | list[EntitySignal] | None] = {
             "person": self._configured_or_detected(entities, "person", states, by_entity, lambda item: self._domain(item) == "person"),
             "vehicle": self._configured_or_detected(entities, "vehicle", states, by_entity, lambda item: self._domain(item) == "device_tracker" and self._matches(item, ["auto", "car", "vehicle", "fahrzeug"])),
-            "garage_door": self._configured_or_detected(entities, "garage_door", states, by_entity, lambda item: self._matches(item, ["garage"]) and self._domain(item) in {"cover", "binary_sensor"}),
+            "garage_door": self._configured_or_detected(
+                entities,
+                "garage_door",
+                states,
+                by_entity,
+                lambda item: self._garage_door_match(item),
+            ),
             "bedroom_presence": self._configured_or_detected(entities, "bedroom_presence", states, by_entity, lambda item: self._presence_match(item, ["schlaf", "bedroom"])),
             "living_presence": self._configured_or_detected(entities, "living_presence", states, by_entity, lambda item: self._presence_match(item, ["wohn", "living"])),
             "terrace_presence": self._configured_or_detected(entities, "terrace_presence", states, by_entity, lambda item: self._presence_match(item, ["terrasse", "terrace", "garten", "garden"])),
@@ -380,6 +488,18 @@ class ContextService:
             return self._signal(by_entity[configured])
         detected = next((item for item in states if predicate(item)), None)
         return self._signal(detected) if detected else None
+
+    def _garage_door_match(self, item: dict[str, Any]) -> bool:
+        domain = self._domain(item)
+        if domain == "cover":
+            return self._matches(item, ["garage"]) or self._matches(item, ["garagen", "garagentor"]) or self._matches(item, ["tor"])
+        if domain != "binary_sensor":
+            return False
+        if not (self._matches(item, ["garage"]) or self._matches(item, ["garagen", "garagentor"])):
+            return False
+        if self._device_class(item) == "problem":
+            return False
+        return not self._matches(item, ["problem", "diagnose", "diagnostic", "fault", "error", "battery", "batterie"])
 
     def _detect_many(self, states: list[dict[str, Any]], predicate: Callable[[dict[str, Any]], bool]) -> list[EntitySignal]:
         return [self._signal(item) for item in states if predicate(item)]
