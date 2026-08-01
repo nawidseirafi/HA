@@ -244,7 +244,7 @@ function currentContextCards(status: ContextStatus) {
   return [
     { label: 'Haus', value: status.house || '-', detail: 'HouseState', tone: toneFor(status.house), icon: <Home size={22} /> },
     { label: 'Anwesenheit', value: status.presence || '-', detail: 'PresenceState', tone: toneFor(status.presence), icon: <Users size={22} /> },
-    { label: 'Garage', value: status.garage || '-', detail: 'GarageState', tone: toneFor(status.garage), icon: <Warehouse size={22} /> },
+    { label: 'Garage', value: garageDisplayValue(status.garage), detail: 'GarageState', tone: toneFor(status.garage), icon: <Warehouse size={22} /> },
     { label: 'Schlaf', value: status.sleep || '-', detail: 'Sleep Context', tone: toneFor(status.sleep), icon: <Moon size={22} /> },
     { label: 'Gäste', value: status.guest ? 'JA' : 'NEIN', detail: 'Guest Heuristic', tone: status.guest ? 'guests' : 'neutral', icon: <Users size={22} /> },
     { label: 'Confidence', value: formatPercent(status.confidence), detail: 'Gesamtwert', tone: 'confidence', icon: <BarChart3 size={22} /> },
@@ -287,7 +287,7 @@ function explanationGroups(status: ContextStatus, debug: ContextDebug) {
   const groups = [
     {
       title: 'Garage',
-      outcome: status.garage ? `Steve bereitet ${status.garage} vor.` : 'Keine Garagenentscheidung.',
+      outcome: garageOutcome(status.garage),
       items: reasons.garage || reasons.departure || decisions.find((item) => item.target === 'garage')?.rules || activeRules.filter((rule) => rule.includes('garage') || rule.includes('vehicle') || rule.includes('departure')),
     },
     {
@@ -305,6 +305,25 @@ function explanationGroups(status: ContextStatus, debug: ContextDebug) {
     ...group,
     items: (group.items || []).length ? (group.items || []).map(displayRule) : ['ContextService liefert für diesen Bereich noch keine Detailregeln.'],
   }));
+}
+
+function garageDisplayValue(value?: string) {
+  const state = String(value || '').toUpperCase();
+  if (!state) return '-';
+  if (state === 'NONE') return 'Keine Aktion';
+  if (state === 'KEEP_OPEN') return 'Offen lassen';
+  if (state === 'READY_TO_OPEN') return 'Bereit zum Öffnen';
+  if (state === 'READY_TO_CLOSE') return 'Bereit zum Schließen';
+  return value || '-';
+}
+
+function garageOutcome(value?: string) {
+  const state = String(value || '').toUpperCase();
+  if (state === 'NONE') return 'Steve bereitet keine Garagenaktion vor.';
+  if (state === 'KEEP_OPEN') return 'Steve lässt die Garage offen.';
+  if (state === 'READY_TO_OPEN') return 'Steve bereitet das Öffnen der Garage vor.';
+  if (state === 'READY_TO_CLOSE') return 'Steve bereitet das Schließen der Garage vor.';
+  return value ? `Garagenstatus ist ${value}.` : 'Keine Garagenentscheidung.';
 }
 
 function confidenceItems(status: ContextStatus, debug: ContextDebug) {

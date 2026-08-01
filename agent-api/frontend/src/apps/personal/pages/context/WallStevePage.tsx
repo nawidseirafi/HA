@@ -117,7 +117,7 @@ export function WallStevePage() {
           <section className="wall-steve-grid">
             <WallSteveCard icon={<Home size={24} />} label="Hausstatus" value={status.house} />
             <WallSteveCard icon={<Users size={24} />} label="Anwesenheit" value={status.presence} />
-            <WallSteveCard icon={<Warehouse size={24} />} label="Garage" value={status.garage} />
+            <WallSteveCard icon={<Warehouse size={24} />} label="Garage" value={garageDisplayValue(status.garage)} />
             <WallSteveCard icon={<Moon size={24} />} label="Schlaf" value={status.sleep || '-'} />
             <WallSteveCard icon={<Users size={24} />} label="Gäste" value={status.guest ? 'JA' : 'NEIN'} />
             <WallSteveCard icon={<BarChart3 size={24} />} label="Confidence" value={`${Math.round(Number(status.confidence || 0) * 100)} %`} />
@@ -165,6 +165,16 @@ function WallSteveCard({ icon, label, value }: { icon: ReactNode; label: string;
       <strong>{value}</strong>
     </article>
   );
+}
+
+function garageDisplayValue(value?: string) {
+  const state = String(value || '').toUpperCase();
+  if (!state) return '-';
+  if (state === 'NONE') return 'Keine Aktion';
+  if (state === 'KEEP_OPEN') return 'Offen lassen';
+  if (state === 'READY_TO_OPEN') return 'Bereit zum Öffnen';
+  if (state === 'READY_TO_CLOSE') return 'Bereit zum Schließen';
+  return value || '-';
 }
 
 function formatClock(date: Date) {
