@@ -68,6 +68,7 @@ class HouseholdFrontLightService:
             "control_enabled": bool(front_light.get("control_enabled", True)),
             "auto_discovery": bool(front_light.get("auto_discovery", True)),
             "light_entity": str(front_light.get("light_entity") or "").strip(),
+            "light_entities": _string_list(front_light.get("light_entities")),
             "evening_start": str(front_light.get("evening_start") or "18:00"),
             "morning_end": str(front_light.get("morning_end") or "07:00"),
             "turn_off_after_minutes": max(1, int(_float_value(front_light.get("turn_off_after_minutes"), 10))),
@@ -85,9 +86,10 @@ class HouseholdFrontLightService:
         raise TypeError("ContextProvider liefert keinen ContextSnapshot.")
 
     def _runtime_context(self, states: list[dict[str, Any]], context: dict[str, Any], config: dict[str, Any], now: datetime) -> dict[str, Any]:
-        light = self._configured_or_auto_light(states, config["light_entity"], config["auto_discovery"])
+        lights = self._configured_or_auto_lights(states, config["light_entity"], config["light_entities"], config["auto_discovery"])
+        light = lights[0] if lights else None
         owned = self._read_owner_state(now)
-        light_on = _truthy_state(light.get("state")) if light else None
+        light_on = any(_truthy_state(item.get("state")) for item in lights) if lights else None
         in_evening_window = _in_time_window(now.time(), config["evening_start"], config["morning_end"])
         presence = str(context.get("presence") or "").strip().upper()
         garage = str(context.get("garage") or "").strip().upper()
@@ -104,6 +106,7 @@ class HouseholdFrontLightService:
             "light_on": light_on,
             "entities": {
                 "front_light": _entity_summary(light),
+                "front_lights": [_entity_summary(item) for item in lights],
             },
             "owner_state": owned,
             "thresholds": {
@@ -115,7 +118,7 @@ class HouseholdFrontLightService:
         }
 
     def _rule_decision(self, runtime: dict[str, Any], config: dict[str, Any], now: datetime) -> dict[str, Any]:
-        light = runtime["entities"].get("front_light") or {}
+        lights = runtime["entities"].get("front_lights") if isinstance(runtime["entities"].get("front_lights"), list) else []
         owner = runtime.get("owner_state") if isinstance(runtime.get("owner_state"), dict) else None
 
         if owner and _owner_elapsed_minutes(owner, now) >= config["turn_off_after_minutes"]:
@@ -125,7 +128,7 @@ class HouseholdFrontLightService:
 
         if not config["enabled"]:
             return _decision("disabled", "none", "Frontlicht-Regel ist deaktiviert.", False)
-        if not light:
+        if not lights:
             return _decision("missing_light", "none", "Kein Front- oder Eingangslicht konfiguriert oder sicher erkannt.", False)
         if not runtime.get("in_evening_window"):
             return _decision("daytime", "none", "Ankunft liegt nicht im Abend- oder Nachtfenster.", False)
@@ -146,38 +149,50 @@ class HouseholdFrontLightService:
         now: datetime,
     ) -> dict[str, Any] | None:
         action = str(decision.get("action") or "none")
-        light = runtime["entities"].get("front_light") or {}
-        entity_id = str(light.get("entity_id") or "").strip()
+        lights = runtime["entities"].get("front_lights") if isinstance(runtime["entities"].get("front_lights"), list) else []
+        entity_ids = [str(item.get("entity_id") or "").strip() for item in lights if str(item.get("entity_id") or "").strip()]
 
         if action == "clear_owner_state" and apply:
             self._clear_owner_state()
             return None
-        if not apply or action not in {"turn_on", "turn_off"} or not entity_id:
+        if not apply or action not in {"turn_on", "turn_off"} or not entity_ids:
             return None
         if not config["control_enabled"] or not decision.get("allowed"):
             return None
 
-        result = self.ha_service.call_service("light", action, {"entity_id": entity_id})
+        target: str | list[str] = entity_ids[0] if len(entity_ids) == 1 else entity_ids
+        result = self.ha_service.call_service("light", action, {"entity_id": target})
         if action == "turn_on":
-            self._write_owner_state(entity_id, now, config, decision)
+            self._write_owner_state(entity_ids, now, config, decision)
         else:
             self._clear_owner_state()
         return {
             "domain": "light",
             "service": action,
-            "entity_id": entity_id,
+            "entity_id": target,
             "result": result,
         }
 
-    def _configured_or_auto_light(self, states: list[dict[str, Any]], entity_id: str, auto_discovery: bool) -> dict[str, Any] | None:
+    def _configured_or_auto_lights(self, states: list[dict[str, Any]], entity_id: str, entity_ids: list[str], auto_discovery: bool) -> list[dict[str, Any]]:
+        configured = [*entity_ids]
         if entity_id:
-            return next((state for state in states if state.get("entity_id") == entity_id), None)
+            configured.insert(0, entity_id)
+        if configured:
+            by_entity = {str(state.get("entity_id") or ""): state for state in states}
+            seen: set[str] = set()
+            result = []
+            for item in configured:
+                if item in seen or item not in by_entity:
+                    continue
+                seen.add(item)
+                result.append(by_entity[item])
+            return result
         if not auto_discovery:
-            return None
+            return []
         candidates = [(self._front_light_score(state), state) for state in states]
         candidates = [(score, state) for score, state in candidates if score > 0]
         candidates.sort(key=lambda item: item[0], reverse=True)
-        return candidates[0][1] if candidates else None
+        return [candidates[0][1]] if candidates else []
 
     def _front_light_score(self, state: dict[str, Any]) -> int:
         entity_id = str(state.get("entity_id") or "").lower()
@@ -222,12 +237,13 @@ class HouseholdFrontLightService:
         data["elapsed_minutes"] = max(0.0, (now.astimezone(timezone.utc) - turned_on_at.astimezone(timezone.utc)).total_seconds() / 60)
         return data
 
-    def _write_owner_state(self, entity_id: str, now: datetime, config: dict[str, Any], decision: dict[str, Any]) -> None:
+    def _write_owner_state(self, entity_ids: list[str], now: datetime, config: dict[str, Any], decision: dict[str, Any]) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(
             json.dumps(
                 {
-                    "entity_id": entity_id,
+                    "entity_id": entity_ids[0] if entity_ids else "",
+                    "entity_ids": entity_ids,
                     "turned_on_at": now.astimezone(timezone.utc).isoformat(),
                     "turn_off_after_minutes": config["turn_off_after_minutes"],
                     "reason": decision.get("reason"),
@@ -327,3 +343,9 @@ def _string_set(value: Any, fallback: set[str]) -> set[str]:
         return set(fallback)
     items = {str(item or "").strip().upper() for item in value if str(item or "").strip()}
     return items or set(fallback)
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]

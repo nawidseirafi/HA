@@ -3839,71 +3839,6 @@ button.wall-room-card {
   }
 }
 
-.wall-steve-shell {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.wall-steve-main {
-  display: grid;
-  align-content: start;
-  gap: 22px;
-}
-
-.wall-steve-hero {
-  min-height: 220px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 26px;
-  align-items: center;
-  padding: clamp(22px, 3.4vw, 42px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-4xl);
-  background:
-    linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)),
-    var(--card);
-  box-shadow: var(--shadow-card);
-}
-
-.wall-steve-icon {
-  width: clamp(72px, 7vw, 112px);
-  height: clamp(72px, 7vw, 112px);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-4xl);
-  color: #a5f3fc;
-  background: rgba(34, 211, 238, 0.1);
-}
-
-.wall-steve-hero span {
-  color: var(--muted-foreground);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.wall-steve-hero h1 {
-  margin-top: 12px;
-}
-
-.wall-steve-hero h2 {
-  max-width: 980px;
-  margin-top: 12px;
-  font-size: clamp(2rem, 4.2vw, 4.8rem);
-  line-height: 1.02;
-  letter-spacing: 0;
-}
-
-.wall-steve-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(140px, 1fr));
-  gap: 16px;
-  margin-top: 2px;
-}
-
-.wall-steve-message-center {
-  margin-bottom: 0;
-}
-
 .wall-title-row .wall-internet-pill {
   display: inline-block;
   flex: 0 0 auto;
@@ -3911,71 +3846,87 @@ button.wall-room-card {
   font-size: 0;
 }
 
-.wall-steve-card {
-  min-height: 174px;
+.wall-steve-summary-card {
   display: grid;
-  align-content: space-between;
-  gap: 14px;
-  padding: 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 138px;
+  margin-bottom: 18px;
+  padding: 22px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-3xl);
-  background: var(--card);
+  border-radius: var(--radius-2xl);
+  background:
+    linear-gradient(145deg, rgba(34, 211, 238, 0.11), rgba(245, 158, 11, 0.06)),
+    var(--card);
   box-shadow: var(--shadow-card);
 }
 
-.wall-steve-card > div {
-  width: 48px;
-  height: 48px;
+.wall-steve-summary-icon {
+  width: 58px;
+  height: 58px;
   display: grid;
   place-items: center;
   border-radius: var(--radius-xl);
   color: #a5f3fc;
-  background: rgba(34, 211, 238, 0.1);
+  background: rgba(34, 211, 238, 0.12);
 }
 
-.wall-steve-card span {
+.wall-steve-summary-main {
+  min-width: 0;
+}
+
+.wall-steve-summary-main span,
+.wall-steve-summary-meta small {
   color: var(--muted-foreground);
   font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.wall-steve-card strong {
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  line-height: 1.06;
+.wall-steve-summary-main strong {
+  display: block;
+  max-width: 1100px;
+  margin-top: 8px;
+  color: var(--foreground);
+  font-size: clamp(1.55rem, 2.6vw, 3rem);
+  line-height: 1.08;
   overflow-wrap: anywhere;
 }
 
-.wall-steve-state {
-  min-height: 180px;
+.wall-steve-summary-main p {
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+}
+
+.wall-steve-summary-meta {
+  min-width: 118px;
   display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 12px;
-  padding: 24px;
+  gap: 8px;
+  justify-items: end;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-3xl);
-  background: var(--card);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--card) 74%, transparent);
 }
 
-.wall-steve-state.error {
-  border-color: rgba(239, 68, 68, 0.32);
-  color: #fecaca;
-}
-
-@media (max-width: 1180px) {
-  .wall-steve-grid {
-    grid-template-columns: repeat(3, minmax(160px, 1fr));
-  }
+.wall-steve-summary-meta strong {
+  color: var(--foreground);
+  font-size: 1.8rem;
+  line-height: 1;
 }
 
 @media (max-width: 720px) {
-  .wall-steve-hero {
+  .wall-steve-summary-card {
     grid-template-columns: 1fr;
-    min-height: 0;
+    align-items: start;
   }
-  .wall-steve-grid {
-    grid-template-columns: 1fr;
+  .wall-steve-summary-meta {
+    justify-items: start;
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 

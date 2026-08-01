@@ -40,6 +40,7 @@ import {
 import {
     api,
     type AgentStatus,
+    type ContextStatus,
     type EnergyOverview,
     type GardenStatus,
     type GardenZoneStatus,
@@ -397,6 +398,7 @@ function WallDashboardContent() {
     const [messages, setMessages] = useState<MessageCenterItem[]>([]);
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+    const [contextStatus, setContextStatus] = useState<ContextStatus | null>(null);
     const [gardenStatus, setGardenStatus] = useState<GardenStatus | null>(null);
     const [energy, setEnergy] = useState<EnergyOverview | null>(null);
     const [energyHistory, setEnergyHistory] = useState<EnergyPowerPoint[]>(() => loadStoredEnergyHistory());
@@ -407,14 +409,16 @@ function WallDashboardContent() {
     const refreshTimer = useRef<number | null>(null);
 
     const loadWallSecondaryData = useCallback(async () => {
-        const [messageData, unreadData, nextGardenStatus] = await Promise.all([
+        const [messageData, unreadData, nextGardenStatus, nextContextStatus] = await Promise.all([
             api.messages(60).catch(() => ({messages: []})),
             api.unreadMessageCount().catch(() => ({unread_count: 0})),
             api.gardenStatus().catch(() => null),
+            api.contextStatus().catch(() => null),
         ]);
         setMessages(messageData.messages);
         setUnreadMessages(unreadData.unread_count);
         setGardenStatus(nextGardenStatus);
+        setContextStatus(nextContextStatus);
     }, []);
 
     const load = useCallback(async (silent = false) => {
@@ -868,10 +872,6 @@ function WallDashboardContent() {
                         aria-label="Sicherheit"><ShieldAlert size={24}/></button>
                 <button className={section === 'agents' ? 'active' : ''} onClick={() => goSection('agents')}
                         aria-label="Agenten"><Bot size={24}/></button>
-                <button onClick={() => {
-                    window.history.pushState({}, '', '/wall/steve');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
-                }} aria-label="Steve"><BrainCircuit size={24}/></button>
             </aside>
 
             <main className="wall-main">
@@ -911,7 +911,8 @@ function WallDashboardContent() {
                                  gardenStatus={gardenStatus}
                                  onToggleIrrigation={toggleIrrigation}
                                  onMowerUpdated={scheduleRefresh}
-                                 onGarageCommand={callCover}/>}
+                                 onGarageCommand={callCover}
+                                 contextStatus={contextStatus}/>}
                 {data && section === 'lights' && (
                     <LightsSection
                         data={data}
@@ -984,6 +985,7 @@ function HomeSection({
                          onMowerUpdated,
                          onGarageCommand,
                          busyEntity,
+                         contextStatus,
                      }: {
     data: WallDashboardData;
     busyEntity: string;
@@ -999,6 +1001,7 @@ function HomeSection({
     onToggleIrrigation: (zone: GardenZoneStatus) => void;
     onMowerUpdated: () => void;
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+    contextStatus: ContextStatus | null;
 }) {
     const hasPost = postStatus(data);
     const vacation = vacationStatus(data);
@@ -1119,24 +1122,48 @@ function HomeSection({
     };
 
     return (
-        <div className={`wall-home-grid ${layoutEditing ? 'is-editing' : ''}`}>
-            {orderedCardIds.map((cardId, index) => (
-                <HomeCardSlot
-                    key={cardId}
-                    id={cardId}
-                    span={homeCardSpan(cardId)}
-                    editing={layoutEditing}
-                    canShiftBack={index > 0}
-                    canShiftForward={index < orderedCardIds.length - 1}
-                    onMove={moveCard}
-                    onShift={shiftCard}
-                    onBeginEdit={() => setLayoutEditing(true)}
-                    onFinishEdit={() => setLayoutEditing(false)}
-                >
-                    {renderHomeCard(cardId, cards, data, onMowerUpdated)}
-                </HomeCardSlot>
-            ))}
-        </div>
+        <>
+            <SteveThoughtDashboardCard status={contextStatus}/>
+            <div className={`wall-home-grid ${layoutEditing ? 'is-editing' : ''}`}>
+                {orderedCardIds.map((cardId, index) => (
+                    <HomeCardSlot
+                        key={cardId}
+                        id={cardId}
+                        span={homeCardSpan(cardId)}
+                        editing={layoutEditing}
+                        canShiftBack={index > 0}
+                        canShiftForward={index < orderedCardIds.length - 1}
+                        onMove={moveCard}
+                        onShift={shiftCard}
+                        onBeginEdit={() => setLayoutEditing(true)}
+                        onFinishEdit={() => setLayoutEditing(false)}
+                    >
+                        {renderHomeCard(cardId, cards, data, onMowerUpdated)}
+                    </HomeCardSlot>
+                ))}
+            </div>
+        </>
+    );
+}
+
+function SteveThoughtDashboardCard({status}: { status: ContextStatus | null }) {
+    const summary = status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
+    const confidence = clampPercent(Number(status?.confidence ?? 0) * 100);
+    return (
+        <section className="wall-steve-summary-card" data-testid="wall-steve-thought-card">
+            <div className="wall-steve-summary-icon">
+                <BrainCircuit size={30}/>
+            </div>
+            <div className="wall-steve-summary-main">
+                <span>Steve denkt ...</span>
+                <strong>{summary}</strong>
+                <p>{status ? `Aktualisiert ${formatTime(status.updated_at)}` : 'ContextService wird geladen'}</p>
+            </div>
+            <div className="wall-steve-summary-meta">
+                <small>Confidence</small>
+                <strong>{Math.round(confidence)}%</strong>
+            </div>
+        </section>
     );
 }
 

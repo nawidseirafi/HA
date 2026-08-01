@@ -40,7 +40,7 @@ def context(presence="COMING_HOME", garage="READY_TO_OPEN", confidence=0.91):
     }
 
 
-def config(light_entity="light.front_door", auto_discovery=True):
+def config(light_entity="light.front_door", auto_discovery=True, light_entities=None):
     return {
         "household": {
             "front_light": {
@@ -48,6 +48,7 @@ def config(light_entity="light.front_door", auto_discovery=True):
                 "control_enabled": True,
                 "auto_discovery": auto_discovery,
                 "light_entity": light_entity,
+                "light_entities": light_entities or [],
                 "evening_start": "18:00",
                 "morning_end": "07:00",
                 "turn_off_after_minutes": 10,
@@ -135,6 +136,24 @@ class HouseholdFrontLightServiceTests(unittest.TestCase):
 
         self.assertTrue(result["applied"])
         self.assertEqual(ha.calls[0]["payload"]["entity_id"], "light.eingang")
+
+    def test_configured_frontdoor_lights_turn_on_together(self):
+        now = datetime(2026, 8, 1, 20, 30, tzinfo=timezone.utc)
+        ha = FakeHomeAssistant([
+            light("light.eingang", "off", "Eingang"),
+            light("light.front_door", "off", "Front Door"),
+        ])
+        service = self.service(
+            ha,
+            context(),
+            now,
+            cfg=config(light_entity="", auto_discovery=True, light_entities=["light.eingang", "light.front_door"]),
+        )
+
+        result = service.evaluate(apply=True)
+
+        self.assertTrue(result["applied"])
+        self.assertEqual(ha.calls[0]["payload"]["entity_id"], ["light.eingang", "light.front_door"])
 
     def test_low_confidence_blocks_arrival_light(self):
         now = datetime(2026, 8, 1, 20, 30, tzinfo=timezone.utc)

@@ -45,6 +45,9 @@ household:
     control_enabled: true
     auto_discovery: true
     light_entity: ""
+    light_entities:
+      - "light.eingang"
+      - "light.front_door"
     evening_start: "18:00"
     morning_end: "07:00"
     turn_off_after_minutes: 10

@@ -26,7 +26,6 @@ import { SchedulerDashboardPage } from './pages/scheduler/SchedulerDashboardPage
 import { GardenDashboardPage } from './pages/garden/GardenDashboardPage';
 import { WallDashboardPage } from './pages/WallDashboardPage';
 import { ContextDashboardPage } from './pages/context/ContextDashboardPage';
-import { WallStevePage } from './pages/context/WallStevePage';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from '@shared/auth/AuthContext';
 import type { Route } from './routes/routes';
@@ -34,7 +33,6 @@ export type { Route } from './routes/routes';
 
 function parseRoute(): Route {
   const parts = window.location.pathname.split('/').filter(Boolean);
-  if (parts[0] === 'wall' && parts[1] === 'steve') return { name: 'wallSteve' };
   if (parts[0] === 'wall') return { name: 'wall' };
   if (parts[0] === 'context' || parts[0] === 'steve-context') return { name: 'contextDashboard' };
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2] && parts[3] === 'months' && parts[4]) {
@@ -108,7 +106,6 @@ function AppContent() {
   };
 
   const page = useMemo(() => {
-    if (route.name === 'wallSteve') return <WallStevePage />;
     if (route.name === 'wall') return <WallDashboardPage />;
     if (route.name === 'contextDashboard') return <ContextDashboardPage />;
     if (route.name === 'agents') return <AgentsPage navigate={navigate} variant="overview" />;
@@ -142,7 +139,7 @@ function AppContent() {
     return <LoginPage onLoggedIn={() => setRoute(parseRoute())} />;
   }
 
-  if (route.name === 'wall' || route.name === 'wallSteve') {
+  if (route.name === 'wall') {
     return page;
   }
 
@@ -154,7 +151,6 @@ function AppContent() {
 }
 
 function routeToPath(route: Route) {
-  if (route.name === 'wallSteve') return '/wall/steve';
   if (route.name === 'wall') return '/wall';
   if (route.name === 'contextDashboard') return '/context';
   if (route.name === 'agents') return '/agents';
