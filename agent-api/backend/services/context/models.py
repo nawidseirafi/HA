@@ -102,7 +102,6 @@ class DepartureContext:
     elapsed_seconds: int | None = None
     away_seconds: int | None = None
     person_home: bool | None = None
-    vehicle_home: bool | None = None
     garage_open: bool = False
 
     def as_metrics(self) -> dict[str, Any]:
@@ -110,6 +109,5 @@ class DepartureContext:
             "elapsed_seconds": self.elapsed_seconds,
             "away_seconds": self.away_seconds,
             "person_home": self.person_home,
-            "vehicle_home": self.vehicle_home,
             "garage_open": self.garage_open,
         }

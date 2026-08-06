@@ -33,6 +33,7 @@ import {
     Square,
     Sprout,
     Thermometer,
+    Users,
     Zap,
     Warehouse,
     Wifi,
@@ -68,6 +69,25 @@ type OutletPower = { watts: number; label: string };
 type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
 type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
 type InternetStatus = 'ok' | 'down' | 'unstable' | 'unknown';
+type ImportantTone = 'info' | 'warn' | 'critical' | 'ok';
+type ImportantNowItemData = {
+    id: string;
+    tone: ImportantTone;
+    icon: ReactNode;
+    title: string;
+    detail: string;
+    critical?: boolean;
+    onClick?: () => void;
+};
+type ImportantNowState = {
+    items: ImportantNowItemData[];
+    openCount: number;
+    hasCritical: boolean;
+    badgeTone: 'ok' | 'warn' | 'critical';
+    badgeTitle: string;
+    badgeSubtext: string;
+    openingsCount: number;
+};
 type FritzboxInfo = {
     status: InternetStatus;
     pillLabel: string;
@@ -502,11 +522,11 @@ function WallDashboardContent() {
     }, [load]);
 
     useEffect(() => {
-        if (section !== 'energy') return;
+        if (section !== 'energy' && section !== 'home') return;
         void loadEnergy();
         const timer = window.setInterval(() => {
             void loadEnergy();
-        }, 2000);
+        }, section === 'energy' ? 2000 : 15000);
         return () => window.clearInterval(timer);
     }, [loadEnergy, section]);
 
@@ -848,10 +868,30 @@ function WallDashboardContent() {
         setSection('room');
     };
 
+    const openMowerRoom = () => {
+        const mower = data ? primaryMower(data) : null;
+        const room = mower?.area || '';
+        if (!room) return;
+        const floor = floorForRoom(data, room) || room;
+        openRoom(floor, room);
+    };
+
+    const openPrimaryClimateRoom = () => {
+        const climate = data ? primaryClimateEntity(data) : null;
+        const room = climate?.area || '';
+        if (!room) {
+            openClimates();
+            return;
+        }
+        const floor = floorForRoom(data, room) || room;
+        openRoom(floor, room);
+    };
+
     const activeLights = data?.lights.filter((light) => light.on).length ?? 0;
     const totalLights = data?.lights.length ?? 0;
     const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
     const internetInfo = data ? fritzboxInfo(data) : unknownFritzboxInfo();
+    const homeImportantState = data ? buildImportantNowState(data, contextStatus, gardenStatus, clearPost, openOpenings, openBatteries, openLights, callCover, toggleIrrigation) : null;
     const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
     const headerIcon = iconFor(section);
 
@@ -912,6 +952,12 @@ function WallDashboardContent() {
                                  onToggleIrrigation={toggleIrrigation}
                                  onMowerUpdated={scheduleRefresh}
                                  onGarageCommand={callCover}
+                                 onClimateMode={(item, mode) => void callClimate(item, 'set_hvac_mode', {hvac_mode: mode})}
+                                 onClimateRoom={openPrimaryClimateRoom}
+                                 onEnergy={() => goSection('energy')}
+                                 onMowerRoom={openMowerRoom}
+                                 important={homeImportantState}
+                                 energy={energy}
                                  contextStatus={contextStatus}/>}
                 {data && section === 'lights' && (
                     <LightsSection
@@ -984,7 +1030,13 @@ function HomeSection({
                          onToggleIrrigation,
                          onMowerUpdated,
                          onGarageCommand,
+                         onClimateMode,
+                         onClimateRoom,
+                         onEnergy,
+                         onMowerRoom,
+                         important,
                          busyEntity,
+                         energy,
                          contextStatus,
                      }: {
     data: WallDashboardData;
@@ -1001,170 +1053,530 @@ function HomeSection({
     onToggleIrrigation: (zone: GardenZoneStatus) => void;
     onMowerUpdated: () => void;
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+    onClimateMode: (item: WallDashboardData['climate'][number], mode: string) => void;
+    onClimateRoom: () => void;
+    onEnergy: () => void;
+    onMowerRoom: () => void;
+    important: ImportantNowState | null;
     contextStatus: ContextStatus | null;
+    energy: EnergyOverview | null;
 }) {
-    const hasPost = postStatus(data);
     const vacation = vacationStatus(data);
     const climate = houseClimateSummary(data);
-    const activeLights = data.lights.filter((light) => light.on).length;
-    const open = data.security.openings_open;
-    const issues = data.security.problems.length + data.health.unavailable.length;
-    const batterySummary = homeBatterySummary(data);
-    const wallBatteries = wallBatteryEntities(data.health.batteries ?? []);
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
-    const irrigationZone = gardenStatus?.zones?.[0] ?? null;
-    const [layoutEditing, setLayoutEditing] = useState(false);
-    const [cardOrder, setCardOrder] = useState<WallHomeCardId[]>(readHomeCardOrder);
-    const mowerCardIds = useMemo(
-        () => (data.lawn_mowers ?? []).map((mower) => mowerHomeCardId(mower.entity_id)),
-        [data.lawn_mowers],
-    );
-    const orderedCardIds = normalizeHomeCardOrder(cardOrder, mowerCardIds);
-
-    useEffect(() => {
-        window.localStorage.setItem(WALL_HOME_CARD_ORDER_KEY, JSON.stringify(orderedCardIds));
-    }, [orderedCardIds]);
-
-    const moveCard = useCallback((source: WallHomeCardId, target: WallHomeCardId) => {
-        setCardOrder((current) => moveHomeCard(normalizeHomeCardOrder(current, mowerCardIds), source, target));
-    }, [mowerCardIds]);
-    const shiftCard = useCallback((cardId: WallHomeCardId, offset: -1 | 1) => {
-        setCardOrder((current) => shiftHomeCard(normalizeHomeCardOrder(current, mowerCardIds), cardId, offset));
-    }, [mowerCardIds]);
-
-    const cards: Record<HomeCardId, ReactNode> = {
-        climate: <ClimateOverviewCard data={data} climate={climate} onClick={onClimate}/>,
-        waste: (
-            <MetricCard
-                icon={<Trash2 size={24}/>}
-                label="Müllabfuhr"
-                value={wasteTitle(data)}
-                detail={wasteDetail(data)}
-                tone={wasteTone(data)}
-            />
-        ),
-        vacation: (
-            <MetricCard
-                icon={<Plane size={24}/>}
-                label="Vacation Mode"
-                value={vacation ? 'Aktiv' : 'Aus'}
-                detail={vacationDetail(data)}
-                tone={vacation ? 'warn' : 'neutral'}
-                onClick={onToggleVacation}
-            />
-        ),
-        lights: (
-            <MetricCard icon={<Lightbulb size={24}/>} label="Lampen" value={`${activeLights}/${data.lights.length}`}
-                        detail="aktiv" tone={activeLights ? 'light' : 'neutral'} onClick={onLights}/>
-        ),
-        security: (
-            <MetricCard icon={open ? <DoorOpen size={24}/> : <DoorClosed size={24}/>} label="Fenster & Türen"
-                        value={`${open}/${data.security.openings_total}`} detail="offen"
-                        tone={open ? 'critical' : 'ok'} onClick={onOpenings}/>
-        ),
-        post: (
-            <MetricCard
-                icon={<Mailbox size={24}/>}
-                label="Posteingang"
-                value={hasPost ? 'Post da' : 'Leer'}
-                detail={hasPost ? 'Antippen zum Zurücksetzen' : 'Briefkasten'}
-                tone={hasPost ? 'critical' : hasPost ? 'warn' : 'neutral'}
-                onClick={hasPost ? onClearPost : undefined}
-            />
-        ),
-        garage: (
-            <GarageDoorCard
-                cover={garage}
-                busy={garage ? busyEntity === garage.entity_id : false}
-                onCommand={onGarageCommand}
-            />
-        ),
-        batteries: (
-            <MetricCard icon={batterySummary.icon} label="Batterien" value={`${wallLowBatteries.length}`}
-                        detail={`${wallBatteries.length} gesamt`} tone={batterySummary.tone}
-                        onClick={onBatteries}/>
-        ),
-        fritzbox: (
-            <MetricCard
-                icon={<Wifi size={24}/>}
-                label="Fritzbox"
-                value={internetInfo.cardValue}
-                detail={internetInfo.cardDetail}
-                tone={internetMetricTone(internetInfo.status)}
-            />
-        ),
-        irrigation: (
-            <WallIrrigationCard
-                zone={irrigationZone}
-                busy={irrigationZone ? busyEntity === `garden-irrigation:${gardenZoneId(irrigationZone)}` : false}
-                onToggle={onToggleIrrigation}
-            />
-        ),
-        calendar: <CalendarAgendaCard calendar={data.calendar ?? data.household?.calendar ?? null} now={new Date()}/>,
-        floors: (
-            <section className="wall-panel wall-span-2">
-                <div className="wall-section-title">
-                    <span>Etagen</span>
-                    <strong>{data.light_groups.length}</strong>
-                </div>
-                <div className="wall-area-strip">
-                    {data.light_groups.map((group) => (
-                        <button key={group.area} type="button" onClick={() => onFloor(group.area)}>
-                            <strong>{group.area}</strong>
-                            <span>{group.on}/{group.total} Lampen an</span>
-                        </button>
-                    ))}
-                </div>
-            </section>
-        ),
-    };
+    const importantState = important ?? buildImportantNowState(data, contextStatus, gardenStatus, () => onClearPost(), () => onOpenings(), () => onBatteries(), () => onLights(), onGarageCommand, onToggleIrrigation);
+    const calendar = data.calendar ?? data.household?.calendar ?? null;
+    const primaryClimate = primaryClimateEntity(data);
+    const peopleValue = peopleAtHomeLabel(contextStatus);
+    const mower = primaryMower(data);
 
     return (
-        <>
-            <SteveThoughtDashboardCard status={contextStatus}/>
-            <div className={`wall-home-grid ${layoutEditing ? 'is-editing' : ''}`}>
-                {orderedCardIds.map((cardId, index) => (
-                    <HomeCardSlot
-                        key={cardId}
-                        id={cardId}
-                        span={homeCardSpan(cardId)}
-                        editing={layoutEditing}
-                        canShiftBack={index > 0}
-                        canShiftForward={index < orderedCardIds.length - 1}
-                        onMove={moveCard}
-                        onShift={shiftCard}
-                        onBeginEdit={() => setLayoutEditing(true)}
-                        onFinishEdit={() => setLayoutEditing(false)}
-                    >
-                        {renderHomeCard(cardId, cards, data, onMowerUpdated)}
-                    </HomeCardSlot>
-                ))}
+        <section className="wall-home-overview" data-testid="wall-home-overview">
+            <div className="wall-home-dashboard-grid">
+                <ImportantNowList items={importantState.items} status={contextStatus}/>
+                <div className="wall-home-side-column">
+                    <WeatherCard
+                        data={data}
+                        climate={climate}
+                        primaryClimate={primaryClimate}
+                        busy={primaryClimate ? busyEntity === primaryClimate.entity_id : false}
+                        onOpenClimate={onClimate}
+                        onOpenClimateRoom={onClimateRoom}
+                        onClimateMode={onClimateMode}
+                    />
+                    <TodayCard calendar={calendar} now={new Date()}/>
+                </div>
             </div>
-        </>
+            <BottomStatusBar
+                peopleValue={peopleValue}
+                energy={energy}
+                internetInfo={internetInfo}
+                mower={mower}
+                garage={garage}
+                vacation={vacation}
+                onEnergy={onEnergy}
+                onVacation={onToggleVacation}
+                onMowerRoom={onMowerRoom}
+                onGarageCommand={onGarageCommand}
+            />
+        </section>
     );
 }
 
-function SteveThoughtDashboardCard({status}: { status: ContextStatus | null }) {
-    const summary = status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
-    const confidence = clampPercent(Number(status?.confidence ?? 0) * 100);
+function ImportantNowList({items, status}: { items: ImportantNowItemData[]; status: ContextStatus | null }) {
+    const summary = steveThoughtSummary(status, items);
+    const confidence = confidencePercent(status?.confidence);
     return (
-        <section className="wall-steve-summary-card" data-testid="wall-steve-thought-card">
-            <div className="wall-steve-summary-icon">
-                <BrainCircuit size={30}/>
+        <section className="wall-important-card" data-testid="wall-important-now">
+            <div className="wall-important-head">
+                <h3>Jetzt wichtig</h3>
+                <span>{items.length ? `${items.length} offen` : 'Alles ruhig'}</span>
             </div>
-            <div className="wall-steve-summary-main">
-                <span>Steve denkt ...</span>
-                <strong>{summary}</strong>
-                <p>{status ? `Aktualisiert ${formatTime(status.updated_at)}` : 'ContextService wird geladen'}</p>
-            </div>
-            <div className="wall-steve-summary-meta">
-                <small>Confidence</small>
-                <strong>{Math.round(confidence)}%</strong>
+            <div className="wall-important-list">
+                <div className="wall-important-steve" data-testid="wall-important-steve">
+                    <span className="wall-important-icon info"><BrainCircuit size={28}/></span>
+                    <div>
+                        <small>Steve denkt ...</small>
+                        <strong>{summary}</strong>
+                    </div>
+                    {confidence && <b>{confidence}</b>}
+                </div>
+                {items.length ? items.map((item) => <ImportantNowItem key={item.id} item={item}/>) : (
+                    <div className="wall-important-empty">
+                        <span className="wall-important-icon ok"><Home size={28}/></span>
+                        <div>
+                            <strong>Keine offenen Punkte</strong>
+                            <p>Post, Zugänge, Müll, Garage, Batterien und Mäher sind im Normalzustand.</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </section>
     );
+}
+
+function ImportantNowItem({item}: { item: ImportantNowItemData }) {
+    const content = (
+        <>
+            <span className={`wall-important-icon ${item.tone}`}>{item.icon}</span>
+            <div>
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
+            </div>
+
+        </>
+    );
+    if (item.onClick) {
+        return <button type="button" className={`wall-important-item ${item.tone}`} onClick={item.onClick}>{content}</button>;
+    }
+    return <article className={`wall-important-item ${item.tone}`}>{content}</article>;
+}
+
+function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowItemData[] = []) {
+    if (items.length > 0) {
+        const critical = items.filter((item) => item.critical);
+        const primary = critical[0] ?? items[0];
+        const remaining = items.length - 1;
+        if (remaining > 0) {
+            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.`;
+        }
+        return `Ich sehe einen offenen Punkt: ${primary.title}.`;
+    }
+    return status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
+}
+
+function confidencePercent(value?: number | null) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return '';
+    const numeric = Number(value);
+    return `${Math.round(clampPercent(numeric <= 1 ? numeric * 100 : numeric))}%`;
+}
+
+function WeatherCard({
+                         data,
+                         climate,
+                         primaryClimate,
+                         busy,
+                         onOpenClimate,
+                         onOpenClimateRoom,
+                         onClimateMode,
+                     }: {
+    data: WallDashboardData;
+    climate: ReturnType<typeof houseClimateSummary>;
+    primaryClimate: WallDashboardData['climate'][number] | null;
+    busy: boolean;
+    onOpenClimate: () => void;
+    onOpenClimateRoom: () => void;
+    onClimateMode: (item: WallDashboardData['climate'][number], mode: string) => void;
+}) {
+    const weatherLabel = data.weather?.state ? labelState(data.weather.state) : 'Keine Daten';
+    const climateMode = String(primaryClimate?.state || 'off').toLowerCase();
+    const climateActive = primaryClimate ? climateMode !== 'off' : false;
+    const nextClimateMode = primaryClimate ? preferredClimateStartMode(primaryClimate) : 'auto';
+    return (
+        <section className={`wall-home-weather-card ${weatherTone(data)}`} data-testid="wall-home-weather">
+            <div className="wall-home-card-title">
+                <strong>Wetter</strong>
+                <button type="button" onClick={onOpenClimate}>Klima</button>
+            </div>
+            <div className="wall-home-weather-main">
+                <CloudSun size={70}/>
+                <div>
+                    <strong>{formatNumber(data.weather?.temperature)}°</strong>
+                    <span>{weatherLabel}</span>
+                </div>
+            </div>
+            <div className="wall-home-weather-metrics" aria-label="Temperaturwerte">
+                <div>
+                    <span>Außen</span>
+                    <strong>{formatNumber(data.weather?.temperature)}°</strong>
+                    <small>{formatNumber(data.weather?.humidity)}%</small>
+                </div>
+                <div>
+                    <span>Haus</span>
+                    <strong>{formatNumber(climate.houseTemp)}°</strong>
+                    <small>{formatNumber(climate.houseHumidity)}%</small>
+                </div>
+                <div>
+                    <span>Keller</span>
+                    <strong>{formatNumber(climate.basementTemp)}°</strong>
+                    <small>{formatNumber(climate.basementHumidity)}%</small>
+                </div>
+            </div>
+            <div className="wall-home-climate-row">
+                <div>
+                    <span>Klimaanlage</span>
+                    <button type="button" onClick={onOpenClimateRoom}>
+                        {primaryClimate
+                            ? `${labelClimateMode(climateMode)} · Ist ${formatNumber(primaryClimate.current_temperature)}° · Ziel ${formatNumber(primaryClimate.target_temperature)}°`
+                            : 'Nicht verfügbar'}
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    className={`wall-home-climate-toggle ${climateActive ? 'on' : ''}`}
+                    disabled={!primaryClimate || busy}
+                    onClick={() => primaryClimate && onClimateMode(primaryClimate, climateActive ? 'off' : nextClimateMode)}
+                    aria-label={climateActive ? 'Klimaanlage ausschalten' : 'Klimaanlage einschalten'}
+                    aria-pressed={climateActive}
+                >
+                    <span/>
+                </button>
+            </div>
+        </section>
+    );
+}
+
+function TodayCard({calendar, now}: { calendar: WallDashboardData['calendar'] | null; now: Date }) {
+    const upcoming = (calendar?.upcoming ?? []).slice(0, 3);
+    return (
+        <section className="wall-home-today-card" data-testid="wall-home-today">
+            <div className="wall-home-card-title">
+                <strong>Heute</strong>
+                <CalendarClock size={24}/>
+            </div>
+            {upcoming.length ? (
+                <div className="wall-home-today-list">
+                    {upcoming.map((event, index) => (
+                        <div key={`${event.start}-${event.title}-${index}`}>
+                            <time>{formatEventTime(event.start)}</time>
+                            <span>{event.title}</span>
+                            <small>{relativeEventTime(event.start, now)}</small>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="wall-home-today-empty">
+                    <CalendarClock size={58}/>
+                    <strong>Keine Termine</strong>
+                </div>
+            )}
+        </section>
+    );
+}
+
+function BottomStatusBar({
+                             peopleValue,
+                             energy,
+                             internetInfo,
+                             mower,
+                             garage,
+                             vacation,
+                             onEnergy,
+                             onVacation,
+                             onMowerRoom,
+                             onGarageCommand,
+                         }: {
+    peopleValue: string;
+    energy: EnergyOverview | null;
+    internetInfo: FritzboxInfo;
+    mower: NonNullable<WallDashboardData['lawn_mowers']>[number] | null;
+    garage: WallCover | null;
+    vacation: boolean;
+    onEnergy: () => void;
+    onVacation: () => void;
+    onMowerRoom: () => void;
+    onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void;
+}) {
+    const garageAction = garage ? garagePrimaryAction(garage) : null;
+    return (
+        <section className="wall-home-status-bar" data-testid="wall-home-status-bar">
+                        <StatusBarItem tone="ok" icon={<Users size={25}/>} label="Personen" value={peopleValue}/>
+            <StatusBarItem tone={vacation ? 'warn' : 'ok'} icon={<Plane size={25}/>} label="Vacation" value={vacation ? 'Aktiv' : 'Aus'} onClick={onVacation}/>
+            <StatusBarItem tone="info" icon={<Zap size={25}/>} label="Energie" value={formatWatts(energy?.power ?? null)} onClick={onEnergy}/>
+            <StatusBarItem
+                tone={internetInfo.status === 'ok' ? 'ok' : internetInfo.status === 'down' ? 'critical' : 'warn'}
+                icon={<Wifi size={25}/>}
+                label="Netzwerk"
+                value={internetInfo.cardValue}
+                detail={internetInfo.cardDetail}
+            />
+            <StatusBarItem tone={mowerStatusTone(mower)} icon={<Bot size={25}/>} label="Mäher" value={mowerShortStatus(mower)} onClick={mower?.area ? onMowerRoom : undefined}/>
+            <StatusBarItem
+                tone={garageStatusTone(garage)}
+                icon={<Warehouse size={25}/>}
+                label="Garage"
+                value={garage ? garageDoorState(garage) : '-'}
+                onClick={garage && garageAction ? () => onGarageCommand(garage, garageAction) : undefined}
+            />
+        </section>
+    );
+}
+
+function StatusBarItem({tone, icon, label, value, detail, onClick}: {
+    tone: ImportantTone;
+    icon: ReactNode;
+    label: string;
+    value: string;
+    detail?: string;
+    onClick?: () => void;
+}) {
+    const content = (
+        <>
+            <span className={`wall-status-icon ${tone}`}>{icon}</span>
+            <div>
+                <small>{label}</small>
+                <strong>{value}</strong>
+                {detail && <p>{detail}</p>}
+            </div>
+        </>
+    );
+    if (onClick) return <button type="button" className="wall-status-item" onClick={onClick}>{content}</button>;
+    return <div className="wall-status-item">{content}</div>;
+}
+
+function buildImportantNowState(
+    data: WallDashboardData,
+    contextStatus: ContextStatus | null,
+    gardenStatus: GardenStatus | null,
+    onPost: () => void,
+    onOpenings: () => void,
+    onBatteries: () => void,
+    onLights: () => void,
+    onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void,
+    onToggleIrrigation: (zone: GardenZoneStatus) => void,
+): ImportantNowState {
+    const items: ImportantNowItemData[] = [];
+    const openingsCount = data.security.openings_open;
+    const activeLights = data.lights.filter((light) => light.on);
+    const lowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
+    const activeIrrigationZones = gardenActiveIrrigationZones(gardenStatus);
+    const garage = garageCover(data);
+    if (postStatus(data)) {
+        items.push({
+            id: 'post',
+            tone: 'info',
+            icon: <Mailbox size={30}/>,
+            title: 'Post ist angekommen',
+            detail: postDetail(data),
+            onClick: onPost,
+        });
+    }
+
+    const waste = data.waste?.next;
+    if (waste && typeof waste.days_until === 'number' && waste.days_until <= 1) {
+        items.push({
+            id: 'waste',
+            tone: 'warn',
+            icon: <Trash2 size={30}/>,
+            title: wasteTitle(data),
+            detail: waste.days_until <= 0 ? 'Heute rausstellen' : 'Morgen früh',
+        });
+    }
+
+    if (openingsCount > 0) {
+        const openItems = (data.security.openings ?? []).filter((item) => String(item.state).toLowerCase() === 'on');
+        items.push({
+            id: 'openings',
+            tone: 'critical',
+            icon: <DoorOpen size={30}/>,
+            title: `${openingsCount} ${openingsCount === 1 ? 'Zugang geöffnet' : 'Zugänge geöffnet'}`,
+            detail: openItems.slice(0, 2).map((item) => item.name).join(' · ') || 'Fenster oder Türen prüfen',
+            critical: true,
+            onClick: onOpenings,
+        });
+    }
+
+    if (activeLights.length > 0) {
+        items.push({
+            id: 'active-lights',
+            tone: 'warn',
+            icon: <Lightbulb size={30}/>,
+            title: `${activeLights.length} ${activeLights.length === 1 ? 'Licht eingeschaltet' : 'Lichter eingeschaltet'}`,
+            detail: activeLights.slice(0, 2).map((light) => light.name).join(' · ') || 'Lampen prüfen',
+            onClick: onLights,
+        });
+    }
+
+    if (garage && String(garage.state || '').toLowerCase() === 'open') {
+        items.push({
+            id: 'garage-open',
+            tone: 'critical',
+            icon: <Warehouse size={30}/>,
+            title: 'Garage ist offen',
+            detail: 'Antippen zum Schließen',
+            critical: true,
+            onClick: () => onGarageCommand(garage, 'close_cover'),
+        });
+    }
+
+    if (lowBatteries.length > 0) {
+        const names = lowBatteries.slice(0, 2).map((battery) => battery.name).join(' · ');
+        items.push({
+            id: 'low-batteries',
+            tone: 'warn',
+            icon: <Battery size={30}/>,
+            title: `${lowBatteries.length} ${lowBatteries.length === 1 ? 'Batterie bald leer' : 'Batterien bald leer'}`,
+            detail: names || 'Batterieliste prüfen',
+            onClick: onBatteries,
+        });
+    }
+
+    for (const zone of activeIrrigationZones) {
+        items.push({
+            id: `irrigation:${gardenZoneId(zone)}`,
+            tone: 'warn',
+            icon: <Sprout size={30}/>,
+            title: `${zone.name} wird bewässert`,
+            detail: irrigationImportantDetail(zone),
+            onClick: () => onToggleIrrigation(zone),
+        });
+    }
+
+    for (const mower of data.lawn_mowers ?? []) {
+        if (!mowerIsImportant(mower)) continue;
+        const critical = mowerStatusTone(mower) === 'critical';
+        items.push({
+            id: `mower:${mower.entity_id}`,
+            tone: critical ? 'critical' : 'warn',
+            icon: <Bot size={30}/>,
+            title: mower.name,
+            detail: mowerLongStatus(mower),
+            critical,
+        });
+    }
+
+    const openCount = items.length;
+    const hasCritical = items.some((item) => item.critical);
+    const peopleCount = peopleAtHomeCount(contextStatus);
+    const badgeTone = hasCritical ? 'critical' : openCount ? 'warn' : 'ok';
+    return {
+        items,
+        openCount,
+        hasCritical,
+        badgeTone,
+        badgeTitle: openCount ? `${openCount} ${openCount === 1 ? 'Punkt offen' : 'Punkte offen'}` : 'Alles in Ordnung',
+        badgeSubtext: `Zuhause · ${peopleCount} ${peopleCount === 1 ? 'Person' : 'Personen'}`,
+        openingsCount,
+    };
+}
+
+function postDetail(data: WallDashboardData) {
+    const raw = (data.post as WallEntity & { last_changed?: string; last_updated?: string } | null | undefined)?.last_changed
+        || (data.post as WallEntity & { last_updated?: string } | null | undefined)?.last_updated;
+    return raw ? `Seit ${formatTime(raw)} Uhr` : 'Briefkasten prüfen';
+}
+
+function primaryClimateEntity(data: WallDashboardData) {
+    return data.climate.find((item) => String(item.state || '').toLowerCase() !== 'off') ?? data.climate[0] ?? null;
+}
+
+function climateModes(item: WallDashboardData['climate'][number]) {
+    const modes = Array.isArray(item.hvac_modes)
+        ? item.hvac_modes.map((mode) => String(mode).toLowerCase()).filter(Boolean)
+        : [];
+    return modes.length ? modes : ['off', 'heat', 'cool', 'auto', 'dry'];
+}
+
+function preferredClimateStartMode(item: WallDashboardData['climate'][number]) {
+    const modes = climateModes(item);
+    return ['cool', 'heat', 'auto', 'dry', 'fan_only'].find((mode) => modes.includes(mode)) ?? modes.find((mode) => mode !== 'off') ?? 'auto';
+}
+
+function peopleAtHomeCount(contextStatus: ContextStatus | null) {
+    const presence = String(contextStatus?.presence || '').toUpperCase();
+    if (presence === 'AWAY') return 0;
+    if (presence === 'UNKNOWN') return 0;
+    return 1;
+}
+
+function peopleAtHomeLabel(contextStatus: ContextStatus | null) {
+    const count = peopleAtHomeCount(contextStatus);
+    return count === 1 ? '1 da' : `${count} da`;
+}
+
+function primaryMower(data: WallDashboardData) {
+    return (data.lawn_mowers ?? [])[0] ?? null;
+}
+
+function gardenActiveIrrigationZones(gardenStatus: GardenStatus | null) {
+    return (gardenStatus?.zones ?? []).filter((zone) => zoneIrrigationActive(zone) || !!zone.open_irrigation_run);
+}
+
+function irrigationImportantDetail(zone: GardenZoneStatus) {
+    const run = zone.open_irrigation_run;
+    if (run?.started_at) return `Seit ${formatTime(run.started_at)} Uhr · Antippen zum Stoppen`;
+    const moisture = zone.values?.moisture;
+    return moisture !== null && moisture !== undefined
+        ? `${formatNumber(moisture)}% Bodenfeuchte · Antippen zum Stoppen`
+        : 'Antippen zum Stoppen';
+}
+
+function floorForRoom(data: WallDashboardData | null, room: string) {
+    if (!data || !room) return '';
+    const directFloor = data.light_groups.find((group) => sameArea(group.area, room));
+    if (directFloor) return directFloor.area;
+    const group = data.light_groups.find((item) => (item.rooms ?? []).some((candidate) => sameArea(candidate.area, room)));
+    return group?.area || '';
+}
+
+function mowerRawState(mower: NonNullable<WallDashboardData['lawn_mowers']>[number] | null) {
+    return String(mower?.raw_status || mower?.state || '').toLowerCase();
+}
+
+function mowerIsImportant(mower: NonNullable<WallDashboardData['lawn_mowers']>[number]) {
+    const state = mowerRawState(mower);
+    return ['mowing', 'mow', 'cutting', 'in_operation', 'paused', 'error', 'returning'].includes(state);
+}
+
+function mowerStatusTone(mower: NonNullable<WallDashboardData['lawn_mowers']>[number] | null): ImportantTone {
+    const state = mowerRawState(mower);
+    if (!mower) return 'info';
+    if (state === 'error' || state === 'unavailable' || state === 'unknown') return 'critical';
+    if (['mowing', 'mow', 'cutting', 'in_operation', 'paused', 'returning'].includes(state)) return 'warn';
+    return 'ok';
+}
+
+function mowerShortStatus(mower: NonNullable<WallDashboardData['lawn_mowers']>[number] | null) {
+    if (!mower) return '-';
+    const state = mowerRawState(mower);
+    const labels: Record<string, string> = {
+        docked: 'Docked',
+        mowing: 'Mäht',
+        mow: 'Mäht',
+        cutting: 'Mäht',
+        in_operation: 'Mäht',
+        paused: 'Pause',
+        returning: 'Zurück',
+        charging: 'Lädt',
+        idle: 'Bereit',
+        error: 'Fehler',
+        unavailable: 'Offline',
+        unknown: 'Offline',
+    };
+    const battery = typeof mower.battery_level === 'number' && Number.isFinite(mower.battery_level) ? ` · ${Math.round(mower.battery_level)}%` : '';
+    return `${labels[state] ?? labelState(state)}${battery}`;
+}
+
+function mowerLongStatus(mower: NonNullable<WallDashboardData['lawn_mowers']>[number]) {
+    const state = mowerRawState(mower);
+    if (state === 'mowing') return 'Mäht gerade';
+    if (state === 'mow' || state === 'cutting' || state === 'in_operation') return 'Mäht gerade';
+    if (state === 'paused') return 'Mähvorgang pausiert';
+    if (state === 'returning') return 'Fährt zur Station';
+    if (state === 'error') return 'Fehler prüfen';
+    return mowerShortStatus(mower);
 }
 
 function mowerHomeCardId(entityId: string): MowerHomeCardId {
@@ -1899,6 +2311,7 @@ function RoomClimateControl({
 }) {
     const mode = String(item.state || 'off').toLowerCase();
     const target = Number(item.target_temperature ?? item.current_temperature ?? 20);
+    const modes = climateModes(item);
     return (
         <section className={`wall-room-panel wall-climate-control ${climateToneClass(mode)}`}>
             <div className="wall-room-panel-title">
@@ -1921,7 +2334,7 @@ function RoomClimateControl({
                         aria-label="Zieltemperatur erhöhen"><Plus size={20}/></button>
             </div>
             <div className="wall-mode-buttons">
-                {['off', 'heat', 'cool', 'auto', 'dry'].map((nextMode) => (
+                {modes.map((nextMode) => (
                     <button key={nextMode} type="button" className={mode === nextMode ? 'active' : ''} disabled={busy}
                             onClick={() => onMode(item, nextMode)}>
                         {labelClimateMode(nextMode)}
@@ -2962,6 +3375,21 @@ function garageDoorState(cover: WallCover) {
     if (state === 'closing') return 'Schließt';
     if (state === 'unavailable' || state === 'unknown') return 'Nicht verfügbar';
     return labelState(cover.state);
+}
+
+function garagePrimaryAction(cover: WallCover): 'open_cover' | 'close_cover' | null {
+    const state = String(cover.state || '').toLowerCase();
+    if (state === 'closed') return 'open_cover';
+    if (state === 'open') return 'close_cover';
+    return null;
+}
+
+function garageStatusTone(cover: WallCover | null): ImportantTone {
+    const state = String(cover?.state || '').toLowerCase();
+    if (!cover || state === 'unavailable' || state === 'unknown') return 'critical';
+    if (state === 'open') return 'critical';
+    if (state === 'opening' || state === 'closing') return 'warn';
+    return 'ok';
 }
 
 function garageDoorClass(state: string, offline: boolean) {

@@ -747,6 +747,7 @@ export type WallClimate = WallEntity & {
   target_temperature?: number | null;
   humidity?: number | null;
   hvac_action?: string | null;
+  hvac_modes?: string[];
 };
 
 export type WallTemperatureSensor = WallEntity & {

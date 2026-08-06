@@ -47,7 +47,6 @@ class ContextStore:
                     created_at TEXT NOT NULL,
                     presence_state TEXT NOT NULL,
                     departure_state TEXT NOT NULL,
-                    vehicle_state TEXT NOT NULL DEFAULT '',
                     person_state TEXT NOT NULL DEFAULT '',
                     details_json TEXT NOT NULL DEFAULT '{}'
                 )
@@ -74,7 +73,6 @@ class ContextStore:
                     created_at TEXT NOT NULL,
                     garage_state TEXT NOT NULL,
                     door_state TEXT NOT NULL DEFAULT '',
-                    vehicle_state TEXT NOT NULL DEFAULT '',
                     details_json TEXT NOT NULL DEFAULT '{}'
                 )
                 """
@@ -93,6 +91,8 @@ class ContextStore:
                 """
             )
             connection.execute("CREATE INDEX IF NOT EXISTS idx_sleep_context_created_at ON sleep_context(created_at)")
+            self._drop_column_if_exists(connection, "presence_history", "vehicle_state")
+            self._drop_column_if_exists(connection, "garage_context", "vehicle_state")
             connection.commit()
 
     def save_snapshot(self, snapshot: dict[str, Any]) -> None:
@@ -120,14 +120,13 @@ class ContextStore:
             connection.execute(
                 """
                 INSERT INTO presence_history (
-                    created_at, presence_state, departure_state, vehicle_state, person_state, details_json
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    created_at, presence_state, departure_state, person_state, details_json
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     created_at,
                     str(snapshot.get("presence") or "UNKNOWN"),
                     str(snapshot.get("departure") or "UNKNOWN"),
-                    str((signals.get("vehicle") or {}).get("state") or ""),
                     str((signals.get("person") or {}).get("state") or ""),
                     json.dumps(snapshot.get("metrics") or {}, ensure_ascii=False),
                 ),
@@ -149,14 +148,13 @@ class ContextStore:
             connection.execute(
                 """
                 INSERT INTO garage_context (
-                    created_at, garage_state, door_state, vehicle_state, details_json
-                ) VALUES (?, ?, ?, ?, ?)
+                    created_at, garage_state, door_state, details_json
+                ) VALUES (?, ?, ?, ?)
                 """,
                 (
                     created_at,
                     str(snapshot.get("garage") or "NONE"),
                     str((signals.get("garage_door") or {}).get("state") or ""),
-                    str((signals.get("vehicle") or {}).get("state") or ""),
                     json.dumps(snapshot.get("metrics", {}).get("departure") or {}, ensure_ascii=False),
                 ),
             )
@@ -218,6 +216,15 @@ class ContextStore:
             "confidence": float(row["confidence"]),
             "payload": payload,
         }
+
+    def _drop_column_if_exists(self, connection: sqlite3.Connection, table: str, column: str) -> None:
+        columns = [str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in columns:
+            return
+        try:
+            connection.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+        except sqlite3.OperationalError:
+            pass
 
     @staticmethod
     def _json(value: str | None, fallback: Any) -> Any:

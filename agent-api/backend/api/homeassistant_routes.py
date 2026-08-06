@@ -74,10 +74,10 @@ def wall_dashboard():
     ]
 
     climate_summary = _climate_summary()
-    household = _wall_household_summary(states)
+    calendar = _calendar_summary()
+    household = _wall_household_summary(states, calendar)
     agents = _agent_summary(household.get("vacation"))
     waste = household.get("waste") or _waste_status()
-    calendar = household.get("calendar") or _calendar_summary()
     post = (household.get("post") or {}).get("entity") or post
 
     return {
@@ -230,7 +230,7 @@ def _household_summary() -> dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
-def _wall_household_summary(states: list[dict[str, Any]]) -> dict[str, Any]:
+def _wall_household_summary(states: list[dict[str, Any]], calendar: dict[str, Any] | None = None) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     by_entity = {str(state.get("entity_id") or ""): state for state in states}
     post = _wall_post_status(by_entity.get(MAILBOX_ENTITY_ID))
@@ -247,14 +247,7 @@ def _wall_household_summary(states: list[dict[str, Any]]) -> dict[str, Any]:
         "wifi": "unknown",
         "checks": {},
     }
-    calendar = {
-        "ok": True,
-        "updated_at": now,
-        "today_count": 0,
-        "next_event": None,
-        "upcoming": [],
-        "source": "wall-fast-summary",
-    }
+    calendar = calendar or _calendar_summary()
     comfort = {"bedroom_fan": {"ok": True, "status": "unknown", "decision": {"status": "unknown"}}}
     reminders = _wall_reminders(waste, post, vacation, infrastructure)
     return {
@@ -271,13 +264,13 @@ def _wall_household_summary(states: list[dict[str, Any]]) -> dict[str, Any]:
             "reminders": len(reminders),
             "high_priority": len([item for item in reminders if item.get("priority") == "high"]),
             "waste_items": len(waste.get("items", [])) if isinstance(waste, dict) else 0,
-            "calendar_events_today": 0,
+            "calendar_events_today": int(calendar.get("today_count") or 0) if isinstance(calendar, dict) else 0,
         },
         "state": {
             "mailbox_has_mail": post.get("has_mail"),
             "vacation_mode": vacation.get("vacation_mode"),
             "next_waste": waste.get("next") if isinstance(waste, dict) else None,
-            "next_calendar_event": None,
+            "next_calendar_event": calendar.get("next_event") if isinstance(calendar, dict) else None,
             "infrastructure_status": "unknown",
             "bedroom_fan_status": "unknown",
         },
@@ -489,6 +482,7 @@ def _climate_item(state: dict[str, Any]) -> dict[str, Any]:
         "target_temperature": attributes.get("temperature"),
         "humidity": attributes.get("current_humidity"),
         "hvac_action": attributes.get("hvac_action"),
+        "hvac_modes": attributes.get("hvac_modes") if isinstance(attributes.get("hvac_modes"), list) else [],
     }
 
 

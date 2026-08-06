@@ -186,7 +186,7 @@ Umgesetzt:
 - Gaeste- und Terrassenkontext blockieren den Nachtkontext.
 - Confidence-Wert aus verfuegbaren Signalen und Regelstaerke.
 - Debug-Ausgabe mit aktiven Regeln und verwendeten Signalen.
-- Garagen-Heimkehr kann bei vorhandener Fahrzeug-Entity ueber das Fahrzeug und sonst ueber die Person-Entity erkannt werden; Kurzabwesenheiten bleiben durch ein Rueckkehrfenster geschuetzt.
+- Garagen-Heimkehr wird ueber die konfigurierte Person-Entity erkannt; Kurzabwesenheiten bleiben durch ein Rueckkehrfenster geschuetzt.
 
 Zielregel:
 
