@@ -44,6 +44,7 @@ class ContextService:
         self.departure_window_seconds = int(self.config.get("departure_window_seconds") or 300)
         self.short_away_return_seconds = int(self.config.get("short_away_return_seconds") or 600)
         self.long_away_seconds = int(self.config.get("long_away_seconds") or 7200)
+        self.garage_open_after_away_seconds = int(self.config.get("garage_open_after_away_seconds") or self.short_away_return_seconds)
         self.sleep_quiet_minutes = int(self.config.get("sleep_quiet_minutes") or 10)
         self._memory: dict[str, Any] = {}
         self._last_snapshot: ContextSnapshot | None = None
@@ -157,7 +158,7 @@ class ContextService:
         if garage == GarageState.READY_TO_CLOSE:
             return (
                 "Ich glaube, du bist wirklich weg. Die Garage ist bereit zum Schliessen.",
-                "Fahrzeug und Person sind nach dem Beobachtungsfenster weiter abwesend.",
+                "Person oder Fahrzeug sind nach dem Beobachtungsfenster weiter abwesend.",
             )
         if garage == GarageState.KEEP_OPEN and presence in {PresenceState.LEAVING, PresenceState.SHORT_AWAY}:
             elapsed = (metrics.get("departure") or {}).get("elapsed_seconds")
@@ -235,32 +236,37 @@ class ContextService:
         person_home = self._is_home(signals.get("person"))
         vehicle_home = self._is_home(signals.get("vehicle"))
         garage_open = self._is_open(signals.get("garage_door"))
-        previous_vehicle_home = self._memory.get("vehicle_home")
+        mobility_home = vehicle_home if vehicle_home is not None else person_home
+        mobility_source = "vehicle" if vehicle_home is not None else "person"
+        previous_mobility_home = self._memory.get("mobility_home")
         departure_started_at = self._memory.get("departure_started_at")
         away_started_at = self._memory.get("away_started_at")
         last_away_at = self._memory.get("last_away_at")
 
-        if vehicle_home and previous_vehicle_home is False and last_away_at:
+        if mobility_home and previous_mobility_home is False and last_away_at:
             away_seconds = max(0, int((now - last_away_at).total_seconds()))
             self._memory["last_return_at"] = now
             self._memory["departure_started_at"] = None
             self._memory["away_started_at"] = None
             if away_seconds <= self.short_away_return_seconds:
-                active_rules.append("vehicle_returned_within_short_away_window")
+                active_rules.append(f"{mobility_source}_returned_within_short_away_window")
                 presence = PresenceState.SHORT_AWAY
                 departure = PresenceState.SHORT_AWAY
                 garage = GarageState.KEEP_OPEN if garage_open else GarageState.NONE
-            elif away_seconds >= self.long_away_seconds:
-                active_rules.append("vehicle_returned_after_long_absence")
+            elif away_seconds >= self.garage_open_after_away_seconds:
+                rule = "long_absence" if away_seconds >= self.long_away_seconds else "garage_open_window"
+                active_rules.append(f"{mobility_source}_returned_after_{rule}")
                 presence = PresenceState.COMING_HOME
                 departure = PresenceState.COMING_HOME
                 garage = GarageState.READY_TO_OPEN
             else:
-                active_rules.append("vehicle_returned_after_medium_absence")
+                active_rules.append(f"{mobility_source}_returned_after_medium_absence")
                 presence = PresenceState.COMING_HOME
                 departure = PresenceState.COMING_HOME
                 garage = GarageState.KEEP_OPEN if garage_open else GarageState.NONE
             self._memory["vehicle_home"] = vehicle_home
+            self._memory["mobility_home"] = mobility_home
+            self._memory["mobility_source"] = mobility_source
             return DepartureContext(
                 presence=presence,
                 departure=departure,
@@ -271,14 +277,14 @@ class ContextService:
                 garage_open=garage_open,
             )
 
-        if vehicle_home is False and previous_vehicle_home is not False:
+        if mobility_home is False and previous_mobility_home is not False:
             departure_started_at = now
             last_away_at = now
             self._memory["departure_started_at"] = departure_started_at
             self._memory["last_away_at"] = last_away_at
-            active_rules.append("vehicle_left_home_departure_window_started")
+            active_rules.append(f"{mobility_source}_left_home_departure_window_started")
 
-        if vehicle_home is False:
+        if mobility_home is False:
             if departure_started_at is None:
                 departure_started_at = now
                 self._memory["departure_started_at"] = departure_started_at
@@ -292,11 +298,14 @@ class ContextService:
             else:
                 if away_started_at is None:
                     self._memory["away_started_at"] = now
-                presence = PresenceState.AWAY if not person_home else PresenceState.LEAVING
-                departure = PresenceState.AWAY if not person_home else PresenceState.LEAVING
-                garage = GarageState.READY_TO_CLOSE if garage_open and not person_home else GarageState.NONE
-                active_rules.append("departure_window_elapsed_vehicle_still_away")
+                truly_away = person_home is False and (vehicle_home is False or vehicle_home is None)
+                presence = PresenceState.AWAY if truly_away else PresenceState.LEAVING
+                departure = PresenceState.AWAY if truly_away else PresenceState.LEAVING
+                garage = GarageState.READY_TO_CLOSE if garage_open and truly_away else GarageState.NONE
+                active_rules.append(f"departure_window_elapsed_{mobility_source}_still_away")
             self._memory["vehicle_home"] = vehicle_home
+            self._memory["mobility_home"] = mobility_home
+            self._memory["mobility_source"] = mobility_source
             return DepartureContext(
                 presence=presence,
                 departure=departure,
@@ -308,6 +317,8 @@ class ContextService:
             )
 
         self._memory["vehicle_home"] = vehicle_home
+        self._memory["mobility_home"] = mobility_home
+        self._memory["mobility_source"] = mobility_source
         if person_home or vehicle_home:
             self._memory["departure_started_at"] = None
             active_rules.append("home_presence_detected")
@@ -576,6 +587,7 @@ class ContextService:
         return {
             "departure_window_seconds": self.departure_window_seconds,
             "short_away_return_seconds": self.short_away_return_seconds,
+            "garage_open_after_away_seconds": self.garage_open_after_away_seconds,
             "long_away_seconds": self.long_away_seconds,
             "sleep_quiet_minutes": self.sleep_quiet_minutes,
             "configured_entities": sorted((self.config.get("entities") or {}).keys()) if isinstance(self.config.get("entities"), dict) else [],

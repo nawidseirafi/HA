@@ -42,6 +42,10 @@ def base_states(person="home", vehicle="home", garage="closed"):
     ]
 
 
+def base_states_without_vehicle(person="home", garage="closed"):
+    return [item for item in base_states(person=person, vehicle="home", garage=garage) if item["entity_id"] != "device_tracker.auto"]
+
+
 def with_states(states, *updates):
     by_entity = {item["entity_id"]: dict(item) for item in states}
     for item in updates:
@@ -112,6 +116,58 @@ class ContextServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.presence, PresenceState.COMING_HOME)
         self.assertEqual(snapshot.garage, GarageState.READY_TO_OPEN)
         self.assertEqual(snapshot.transition, TransitionState.TRANSITION)
+
+    def test_person_departure_without_vehicle_tracker_can_ready_to_close(self):
+        now = datetime(2026, 7, 31, 18, 0, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        service.evaluate(base_states_without_vehicle(), now=now)
+
+        leaving = service.evaluate(base_states_without_vehicle(person="not_home", garage="open"), now=now + timedelta(minutes=1))
+        self.assertEqual(leaving.presence, PresenceState.LEAVING)
+        self.assertEqual(leaving.garage, GarageState.KEEP_OPEN)
+        self.assertIn("person_left_home_departure_window_started", leaving.active_rules)
+
+        away = service.evaluate(base_states_without_vehicle(person="not_home", garage="open"), now=now + timedelta(minutes=6))
+        self.assertEqual(away.presence, PresenceState.AWAY)
+        self.assertEqual(away.garage, GarageState.READY_TO_CLOSE)
+        self.assertIn("departure_window_elapsed_person_still_away", away.active_rules)
+
+    def test_person_short_away_without_vehicle_tracker_keeps_garage_open(self):
+        now = datetime(2026, 7, 31, 18, 0, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        service.evaluate(base_states_without_vehicle(), now=now)
+        service.evaluate(base_states_without_vehicle(person="not_home", garage="open"), now=now + timedelta(minutes=1))
+
+        snapshot = service.evaluate(base_states_without_vehicle(person="home", garage="open"), now=now + timedelta(minutes=3))
+
+        self.assertEqual(snapshot.presence, PresenceState.SHORT_AWAY)
+        self.assertEqual(snapshot.garage, GarageState.KEEP_OPEN)
+        self.assertIn("person_returned_within_short_away_window", snapshot.active_rules)
+
+    def test_person_coming_home_without_vehicle_tracker_ready_to_open(self):
+        now = datetime(2026, 7, 31, 8, 0, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        service.evaluate(base_states_without_vehicle(), now=now)
+        service.evaluate(base_states_without_vehicle(person="not_home", garage="closed"), now=now + timedelta(minutes=1))
+
+        snapshot = service.evaluate(base_states_without_vehicle(person="home", garage="closed"), now=now + timedelta(hours=4))
+
+        self.assertEqual(snapshot.presence, PresenceState.COMING_HOME)
+        self.assertEqual(snapshot.garage, GarageState.READY_TO_OPEN)
+        self.assertGreaterEqual(snapshot.confidence, 0.6)
+        self.assertIn("person_returned_after_long_absence", snapshot.active_rules)
+
+    def test_person_coming_home_after_non_short_absence_ready_to_open(self):
+        now = datetime(2026, 7, 31, 18, 0, tzinfo=timezone.utc)
+        service, _ = self.service(now)
+        service.evaluate(base_states_without_vehicle(), now=now)
+        service.evaluate(base_states_without_vehicle(person="not_home", garage="closed"), now=now + timedelta(minutes=1))
+
+        snapshot = service.evaluate(base_states_without_vehicle(person="home", garage="closed"), now=now + timedelta(minutes=31))
+
+        self.assertEqual(snapshot.presence, PresenceState.COMING_HOME)
+        self.assertEqual(snapshot.garage, GarageState.READY_TO_OPEN)
+        self.assertIn("person_returned_after_garage_open_window", snapshot.active_rules)
 
     def test_guests_prevent_sleep_context(self):
         now = datetime(2026, 7, 31, 21, 30, tzinfo=timezone.utc)

@@ -36,6 +36,16 @@ infrastructure:
     external_ip: ""
     uptime: ""
 
+context:
+  database_path: data/context/context.db
+  departure_window_seconds: 300
+  short_away_return_seconds: 600
+  garage_open_after_away_seconds: 600
+  long_away_seconds: 7200
+  entities:
+    person: "person.nawid"
+    garage_door: "cover.smart_garage_door_2303160919847461070348e1e9be2fde_garage"
+
 household:
   notifications:
     notify_service: "notify.mobile_app_system_error_404"

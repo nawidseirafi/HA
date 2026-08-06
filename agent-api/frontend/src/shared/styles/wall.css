@@ -1890,24 +1890,24 @@ button.wall-room-card {
 }
 
 .wall-room-mood-chips .cool {
-  color: #0f766e;
-  background: color-mix(in srgb, var(--state-climate) 14%, #fff);
+  color: #9cf0df;
+  background: color-mix(in srgb, var(--state-climate) 16%, var(--card));
 }
 
 .wall-room-mood-chips .heat,
 .wall-room-mood-chips .open {
-  color: #92400e;
-  background: color-mix(in srgb, var(--state-warn) 16%, #fff);
+  color: #ffcf92;
+  background: color-mix(in srgb, var(--state-warn) 17%, var(--card));
 }
 
 .wall-room-mood-chips .auto {
-  color: #047857;
-  background: color-mix(in srgb, var(--state-ok) 14%, #fff);
+  color: #9af0c9;
+  background: color-mix(in srgb, var(--state-ok) 16%, var(--card));
 }
 
 .wall-room-mood-chips .vacation {
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--state-neutral) 10%, #fff);
+  background: color-mix(in srgb, var(--state-neutral) 16%, var(--card));
 }
 
 .wall-room-mood-chips .music::before {
@@ -1973,7 +1973,7 @@ button.wall-room-card {
   place-items: center;
   border-radius: 22px;
   color: var(--muted-foreground);
-  background: rgba(171, 181, 200, 0.82);
+  background: color-mix(in srgb, var(--state-neutral) 18%, var(--card));
 }
 
 .wall-light-control.on .wall-light-control-main > span {
@@ -2282,13 +2282,19 @@ button.wall-room-card {
   overflow: hidden;
   border-radius: 20px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, #fff, var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--muted) 72%, #050505), var(--card));
 }
 
 .wall-cover-visual i {
   width: 100%;
   display: block;
-  background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--state-neutral) 55%, #fff), color-mix(in srgb, var(--state-neutral) 55%, #fff) 8px, #fff 9px, #fff 14px);
+  background: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--state-neutral) 38%, var(--card)),
+    color-mix(in srgb, var(--state-neutral) 38%, var(--card)) 8px,
+    color-mix(in srgb, var(--muted) 86%, #050505) 9px,
+    color-mix(in srgb, var(--muted) 86%, #050505) 14px
+  );
   transition: height 160ms ease;
 }
 
@@ -2355,24 +2361,24 @@ button.wall-room-card {
 }
 
 .wall-mower-status.ok {
-  color: color-mix(in srgb, var(--state-ok) 70%, #111827);
-  background: color-mix(in srgb, var(--state-ok) 13%, #fff);
+  color: #9af0c9;
+  background: color-mix(in srgb, var(--state-ok) 15%, var(--card));
 }
 
 .wall-mower-status.active {
-  color: color-mix(in srgb, var(--state-active) 75%, #111827);
-  background: color-mix(in srgb, var(--state-active) 12%, #fff);
+  color: #ffd9aa;
+  background: color-mix(in srgb, var(--state-active) 15%, var(--card));
 }
 
 .wall-mower-status.warn {
-  color: color-mix(in srgb, var(--state-warn) 70%, #111827);
-  background: color-mix(in srgb, var(--state-warn) 16%, #fff);
+  color: #ffcf92;
+  background: color-mix(in srgb, var(--state-warn) 17%, var(--card));
 }
 
 .wall-mower-status.critical,
 .wall-mower-status.offline {
-  color: color-mix(in srgb, var(--state-critical) 75%, #111827);
-  background: color-mix(in srgb, var(--state-critical) 12%, #fff);
+  color: #fecaca;
+  background: color-mix(in srgb, var(--state-critical) 15%, var(--card));
 }
 
 .wall-mower-body {
@@ -2458,7 +2464,7 @@ button.wall-room-card {
   overflow: hidden;
   background:
     radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--state-ok) 18%, transparent), transparent 34%),
-    linear-gradient(145deg, color-mix(in srgb, var(--card) 94%, #fff), var(--card));
+    linear-gradient(145deg, color-mix(in srgb, var(--state-ok) 7%, var(--card)), var(--card));
 }
 
 .wall-irrigation-card.active {
@@ -2483,8 +2489,8 @@ button.wall-room-card {
   display: grid;
   place-items: center;
   border-radius: 20px;
-  color: color-mix(in srgb, var(--state-ok) 76%, #030303);
-  background: color-mix(in srgb, var(--state-ok) 14%, #fff);
+  color: #9af0c9;
+  background: color-mix(in srgb, var(--state-ok) 16%, var(--card));
 }
 
 .wall-irrigation-head small,
@@ -2591,7 +2597,8 @@ button.wall-room-card {
   min-height: 76px;
   padding: 14px;
   border-radius: 16px;
-  background: rgba(195, 205, 224, 0.82);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--muted) 76%, var(--card));
 }
 
 .wall-sensor-chip strong {
@@ -2604,19 +2611,19 @@ button.wall-room-card {
 }
 
 .wall-sensor-chip.climate {
-  background: color-mix(in srgb, var(--state-climate) 11%, #fff);
+  background: color-mix(in srgb, var(--state-climate) 12%, var(--card));
 }
 
 .wall-sensor-chip.ok {
-  background: color-mix(in srgb, var(--state-ok) 10%, #fff);
+  background: color-mix(in srgb, var(--state-ok) 12%, var(--card));
 }
 
 .wall-sensor-chip.warn {
-  background: color-mix(in srgb, var(--state-warn) 13%, #fff);
+  background: color-mix(in srgb, var(--state-warn) 14%, var(--card));
 }
 
 .wall-sensor-chip.critical {
-  background: color-mix(in srgb, var(--state-critical) 10%, #fff);
+  background: color-mix(in srgb, var(--state-critical) 12%, var(--card));
 }
 
 .wall-room-device-card {
@@ -2628,11 +2635,11 @@ button.wall-room-card {
 
 .wall-room-device-card.toggleable {
   grid-template-columns: 12px minmax(0, 1fr) auto;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), color-mix(in srgb, var(--state-ok) 8%, #fff));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--muted) 80%, var(--card)), color-mix(in srgb, var(--state-ok) 8%, var(--card)));
 }
 
 .wall-room-device-card.toggleable.active {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--state-ok) 18%, #fff), rgba(255, 255, 255, 0.96));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--state-ok) 20%, var(--card)), color-mix(in srgb, var(--muted) 72%, var(--card)));
 }
 
 .wall-room-device-card strong,
@@ -2662,7 +2669,7 @@ button.wall-room-card {
   padding: 3px;
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 76%, #fff);
+  background: color-mix(in srgb, var(--muted) 78%, #050505);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18), 0 8px 18px rgba(0, 0, 0, 0.08);
   transition: background 180ms ease, opacity 180ms ease, transform 180ms ease;
 }
@@ -2696,7 +2703,7 @@ button.wall-room-card {
 }
 
 .wall-outlet-control {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 9%, #fff), rgba(255, 255, 255, 0.96));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 9%, var(--card)), var(--card));
 }
 
 .wall-outlet-control.active {
@@ -2714,11 +2721,11 @@ button.wall-room-card {
   padding: 14px;
   border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
+  background: color-mix(in srgb, var(--muted) 78%, var(--card));
 }
 
 .wall-outlet-group.active {
-  background: color-mix(in srgb, var(--primary) 8%, #fff);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
 }
 
 .wall-outlet-group-head {
@@ -2735,7 +2742,7 @@ button.wall-room-card {
   place-items: center;
   border-radius: 14px;
   color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 13%, #fff);
+  background: color-mix(in srgb, var(--primary) 15%, var(--card));
 }
 
 .wall-outlet-group-head strong,
@@ -2759,7 +2766,7 @@ button.wall-room-card {
   padding: 4px 8px;
   border-radius: 999px;
   color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, #fff);
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
   font-size: 0.78rem;
   line-height: 1;
 }
@@ -2811,7 +2818,7 @@ button.wall-room-card {
 
 .wall-outlet-button.on {
   border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
-  background: color-mix(in srgb, var(--primary) 11%, #fff);
+  background: color-mix(in srgb, var(--primary) 13%, var(--card));
 }
 
 .wall-outlet-button:not(:disabled):active {
@@ -3263,12 +3270,12 @@ button.wall-room-card {
   place-items: center;
   border-radius: 15px;
   color: var(--state-ok);
-  background: color-mix(in srgb, var(--state-ok) 12%, #fff);
+  background: color-mix(in srgb, var(--state-ok) 14%, var(--card));
 }
 
 .wall-opening-card.open .wall-opening-icon {
   color: var(--state-critical);
-  background: color-mix(in srgb, var(--state-critical) 12%, #fff);
+  background: color-mix(in srgb, var(--state-critical) 14%, var(--card));
 }
 
 .wall-opening-card strong,
