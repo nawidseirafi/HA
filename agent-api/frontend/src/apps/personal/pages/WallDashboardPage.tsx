@@ -17,6 +17,7 @@ import {
     DoorOpen,
     Fan,
     DoorClosed,
+    Droplets,
     Gauge,
     GripVertical,
     Home,
@@ -1008,6 +1009,8 @@ function WallDashboardContent() {
                         onFanDirection={toggleFanDirection}
                         onOutletToggle={toggleOutlet}
                         onDeviceToggle={toggleRoomDevice}
+                        gardenStatus={gardenStatus}
+                        onToggleIrrigation={toggleIrrigation}
                         onMowerUpdated={scheduleRefresh}
                     />
                 )}
@@ -1074,6 +1077,18 @@ function HomeSection({
 
     return (
         <section className="wall-home-overview" data-testid="wall-home-overview">
+            <BottomStatusBar
+                peopleValue={peopleValue}
+                energy={energy}
+                internetInfo={internetInfo}
+                mower={mower}
+                garage={garage}
+                vacation={vacation}
+                onEnergy={onEnergy}
+                onVacation={onToggleVacation}
+                onMowerRoom={onMowerRoom}
+                onGarageCommand={onGarageCommand}
+            />
             <div className="wall-home-dashboard-grid">
                 <ImportantNowList items={importantState.items} status={contextStatus}/>
                 <div className="wall-home-side-column">
@@ -1089,18 +1104,7 @@ function HomeSection({
                     <TodayCard calendar={calendar} now={new Date()}/>
                 </div>
             </div>
-            <BottomStatusBar
-                peopleValue={peopleValue}
-                energy={energy}
-                internetInfo={internetInfo}
-                mower={mower}
-                garage={garage}
-                vacation={vacation}
-                onEnergy={onEnergy}
-                onVacation={onToggleVacation}
-                onMowerRoom={onMowerRoom}
-                onGarageCommand={onGarageCommand}
-            />
+
         </section>
     );
 }
@@ -1606,18 +1610,22 @@ function WallIrrigationCard({
                                 zone,
                                 busy,
                                 onToggle,
+                                compact = false,
                             }: {
     zone: GardenZoneStatus | null;
     busy: boolean;
     onToggle: (zone: GardenZoneStatus) => void;
+    compact?: boolean;
 }) {
     const active = zoneIrrigationActive(zone);
     const moisture = zone?.values?.moisture;
     const temperature = zone?.values?.temperature ?? zone?.values?.soil_temperature;
+    const battery = zone?.values?.battery;
     const decision = zone?.decision;
     const canStart = Boolean(zone && !active && zoneCanStartManualIrrigation(zone));
     const canStop = Boolean(zone && active);
     const disabled = busy || !zone || (!canStart && !canStop);
+    const moisturePercent = typeof moisture === 'number' && Number.isFinite(moisture) ? clampPercent(moisture) : null;
     const detail = zone
         ? active
             ? zone.open_irrigation_run
@@ -1629,7 +1637,7 @@ function WallIrrigationCard({
         : 'Garden Agent nicht verfügbar';
 
     return (
-        <article className={`wall-irrigation-card wall-robot-card ${active ? 'active' : ''} ${!zone ? 'offline' : ''}`}>
+        <article className={`wall-irrigation-card wall-robot-card ${compact ? 'compact' : ''} ${active ? 'active' : ''} ${!zone ? 'offline' : ''}`}>
             <div className="wall-irrigation-head">
                 <span className="wall-irrigation-icon"><Sprout size={28}/></span>
                 <div>
@@ -1647,6 +1655,24 @@ function WallIrrigationCard({
                     <span/>
                 </button>
             </div>
+            {compact && (
+                <div className="wall-irrigation-orb" aria-hidden="true">
+                    <svg viewBox="0 0 120 120" role="img">
+                        <circle className="track" cx="60" cy="60" r="48"/>
+                        <circle
+                            className="value"
+                            cx="60"
+                            cy="60"
+                            r="48"
+                            pathLength="100"
+                            style={{strokeDasharray: `${moisturePercent ?? 0} 100`}}
+                        />
+                    </svg>
+                    <span><Droplets size={24}/></span>
+                    <strong>{moisturePercent !== null ? `${Math.round(moisturePercent)}%` : '--'}</strong>
+                    <small>Bodenfeuchte</small>
+                </div>
+            )}
             <div className="wall-irrigation-status">
                 <strong>{active ? 'Ein' : 'Aus'}</strong>
                 <span>{busy ? 'Schalte...' : detail}</span>
@@ -1664,6 +1690,12 @@ function WallIrrigationCard({
                     <span>Dauer</span>
                     <strong>{decision?.recommended_duration_minutes ? `${decision.recommended_duration_minutes} min` : '-'}</strong>
                 </div>
+                {compact && (
+                    <div>
+                        <span>Batterie</span>
+                        <strong>{typeof battery === 'number' ? `${Math.round(battery)}%` : '-'}</strong>
+                    </div>
+                )}
             </div>
         </article>
     );
@@ -2078,6 +2110,8 @@ function RoomSection({
                          onFanDirection,
                          onOutletToggle,
                          onDeviceToggle,
+                         gardenStatus,
+                         onToggleIrrigation,
                          onMowerUpdated,
                      }: {
     data: WallDashboardData;
@@ -2098,16 +2132,23 @@ function RoomSection({
     onFanDirection: (fan: WallFan) => void;
     onOutletToggle: (outlet: WallEntity) => void;
     onDeviceToggle: (device: WallEntity) => void;
+    gardenStatus: GardenStatus | null;
+    onToggleIrrigation: (zone: GardenZoneStatus) => void;
     onMowerUpdated: () => void;
 }) {
+    const gardenZone = gardenZoneForRoom(gardenStatus, room);
+    const gardenEntityIds = gardenRoomEntityIds(gardenZone);
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const mowers = (data.lawn_mowers ?? []).filter((mower) => sameArea(mower.area, room));
-    const outlets = roomOutlets(data, room);
+    const outlets = roomOutlets(data, room).filter((outlet) => !gardenEntityIds.has(outlet.entity_id));
     const outletGroups = groupRoomOutlets(outlets, room, data);
-    const sensorChips = roomSensorChips(data, room);
+    const sensorChips = roomSensorChips(data, room).filter((chip) => {
+        const sourceEntityId = chip.entity_id.split(':')[0] ?? chip.entity_id;
+        return !gardenEntityIds.has(chip.entity_id) && !gardenEntityIds.has(sourceEntityId);
+    });
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
@@ -2116,12 +2157,13 @@ function RoomSection({
         ...mowers.map((mower) => mower.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
+        ...gardenEntityIds,
     ]);
-    const otherDevices = roomDevices(data, room, excluded);
+    const otherDevices = roomDevices(data, room, excluded).filter((device) => !gardenEntityIds.has(device.entity_id));
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length;
+    const deviceCount = lights.length + covers.length + climates.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length + (gardenZone ? 1 : 0);
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
     const openingSummary = roomOpeningSummary(data, room);
@@ -2196,9 +2238,18 @@ function RoomSection({
                         onToggle={onOutletToggle}
                     />
                 )}
+
                 {mowers.map((mower) => (
                     <WallMowerCard key={mower.entity_id} mower={mower} onUpdated={onMowerUpdated}/>
                 ))}
+                                {gardenZone && (
+                    <WallIrrigationCard
+                        zone={gardenZone}
+                        busy={busyEntity === `garden-irrigation:${gardenZoneId(gardenZone)}`}
+                        onToggle={onToggleIrrigation}
+                        compact
+                    />
+                )}
                 {sensorChips.length > 0 && (
                     <section className="wall-room-panel wall-room-sensors">
                         <div className="wall-room-panel-title">
@@ -4090,6 +4141,23 @@ function zoneIrrigationActive(zone: GardenZoneStatus | null) {
 
 function gardenZoneId(zone: GardenZoneStatus) {
     return zone.zone_id || zone.id || '';
+}
+
+function gardenZoneForRoom(gardenStatus: GardenStatus | null, room: string) {
+    const zones = gardenStatus?.zones ?? [];
+    if (!zones.length || !roomAliases(room).some((alias) => alias === 'garten' || alias === 'garden')) return null;
+    return zones.find((zone) => sameArea(zone.name, room) || roomAliases(room).some((alias) => normalizeArea(zone.name).includes(alias)))
+        ?? zones[0]
+        ?? null;
+}
+
+function gardenRoomEntityIds(zone: GardenZoneStatus | null) {
+    const ids = new Set<string>();
+    if (!zone) return ids;
+    for (const binding of Object.values(zone.entities ?? {})) {
+        if (binding?.entity_id) ids.add(binding.entity_id);
+    }
+    return ids;
 }
 
 function zoneCanStartManualIrrigation(zone: GardenZoneStatus) {

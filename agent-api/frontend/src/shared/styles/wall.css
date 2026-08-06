@@ -2252,52 +2252,69 @@ button.wall-room-card {
   align-items: center;
   gap: 18px;
   padding: 24px;
-  background: linear-gradient(135deg, #141414, color-mix(in srgb, var(--primary) 12%, #080808));
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-ok) 13%, transparent), transparent 32%),
+    linear-gradient(100deg, #141414 0%, #111614 56%, color-mix(in srgb, var(--state-ok) 16%, #07100b) 100%);
+  border-color: color-mix(in srgb, var(--state-ok) 24%, var(--border));
+  box-shadow: var(--shadow-card), inset 4px 0 0 var(--state-warn);
+}
+
+.wall-room-hero.temp-cold,
+.wall-room-hero.temp-cool,
+.wall-room-hero.temp-comfort,
+.wall-room-hero.temp-neutral,
+.wall-room-hero.temp-warm,
+.wall-room-hero.temp-hot {
+  box-shadow: var(--shadow-card), inset 4px 0 0 var(--state-warn);
 }
 
 .wall-room-hero.temp-cold {
   background:
     radial-gradient(circle at 88% 18%, rgba(245, 158, 11, 0.16), transparent 34%),
-    linear-gradient(135deg, #141414, color-mix(in srgb, #ffb65c 14%, #080808));
+    linear-gradient(100deg, #141414 0%, #141312 56%, color-mix(in srgb, #ffb65c 16%, #080808) 100%);
+  border-color: color-mix(in srgb, #ffb65c 24%, var(--border));
 }
 
 .wall-room-hero.temp-cool {
   background:
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-climate) 14%, transparent), transparent 34%),
-    linear-gradient(135deg, #141414, color-mix(in srgb, var(--state-climate) 10%, #080808));
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-climate) 15%, transparent), transparent 34%),
+    linear-gradient(100deg, #141414 0%, #101416 56%, color-mix(in srgb, var(--state-climate) 15%, #080808) 100%);
+  border-color: color-mix(in srgb, var(--state-climate) 26%, var(--border));
 }
 
 .wall-room-hero.temp-comfort,
 .wall-room-hero.temp-neutral {
   background:
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-ok) 10%, transparent), transparent 34%),
-    linear-gradient(135deg, #141414, color-mix(in srgb, var(--state-climate) 8%, #080808));
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-ok) 13%, transparent), transparent 32%),
+    linear-gradient(100deg, #141414 0%, #111614 56%, color-mix(in srgb, var(--state-ok) 16%, #07100b) 100%);
+  border-color: color-mix(in srgb, var(--state-ok) 24%, var(--border));
 }
 
 .wall-room-hero.temp-warm {
   background:
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-warn) 16%, transparent), transparent 34%),
-    linear-gradient(135deg, #141414, color-mix(in srgb, var(--state-warn) 14%, #080808));
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-warn) 18%, transparent), transparent 34%),
+    linear-gradient(100deg, #141414 0%, #17130f 56%, color-mix(in srgb, var(--state-warn) 18%, #080808) 100%);
+  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
 }
 
 .wall-room-hero.temp-hot {
   background:
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-critical) 12%, transparent), transparent 34%),
-    linear-gradient(135deg, #141414, color-mix(in srgb, var(--state-warn) 18%, #080808));
-  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--state-critical) 14%, transparent), transparent 34%),
+    linear-gradient(100deg, #141414 0%, #17100f 56%, color-mix(in srgb, var(--state-critical) 16%, #080808) 100%);
+  border-color: color-mix(in srgb, var(--state-critical) 30%, var(--border));
 }
 
 .wall-room-hero.active > span {
-  color: #1f2937;
-  background: var(--state-warn);
+  color: #111827;
+  background: #a8b3c8;
 }
 
 .wall-room-hero.mood-cool {
-  border-color: color-mix(in srgb, var(--state-climate) 28%, var(--border));
+  border-color: color-mix(in srgb, var(--state-ok) 24%, var(--border));
 }
 
 .wall-room-hero.mood-heat {
-  border-color: color-mix(in srgb, var(--state-warn) 28%, var(--border));
+  border-color: color-mix(in srgb, var(--state-ok) 24%, var(--border));
 }
 
 .wall-room-hero.mood-auto {
@@ -2310,8 +2327,6 @@ button.wall-room-card {
 
 .wall-room-hero.mood-vacation {
   filter: saturate(0.88);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface) 80%, #080808), #101010);
 }
 
 .wall-room-hero > span {
@@ -2321,8 +2336,8 @@ button.wall-room-card {
   place-items: center;
   flex: 0 0 auto;
   border-radius: 24px;
-  color: var(--primary-foreground);
-  background: var(--state-neutral);
+  color: #111827;
+  background: #a8b3c8;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
 }
 
@@ -2951,6 +2966,40 @@ button.wall-room-card {
   box-shadow: var(--shadow-card), 0 0 0 1px color-mix(in srgb, var(--state-ok) 18%, transparent) inset;
 }
 
+.wall-irrigation-card.compact {
+  min-height: 256px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 22px;
+  border-color: color-mix(in srgb, var(--state-ok) 26%, var(--border));
+  background:
+    radial-gradient(circle at 86% 18%, rgba(132, 204, 22, 0.18), transparent 30%),
+    radial-gradient(circle at 16% 92%, rgba(14, 165, 233, 0.16), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--state-ok) 10%, #151515), #0b0f0d);
+}
+
+.wall-irrigation-card.compact .wall-irrigation-head,
+.wall-irrigation-card.compact .wall-irrigation-status,
+.wall-irrigation-card.compact .wall-irrigation-metrics {
+  grid-column: 1;
+}
+
+.wall-irrigation-card.compact .wall-irrigation-head h3 {
+  font-size: 1.38rem;
+}
+
+.wall-irrigation-card.compact .wall-irrigation-status strong {
+  font-size: 2rem;
+}
+
+.wall-irrigation-card.compact .wall-irrigation-status span {
+  max-width: 520px;
+}
+
+.wall-irrigation-card.compact .wall-irrigation-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .wall-irrigation-card.offline {
   opacity: 0.72;
 }
@@ -3041,6 +3090,73 @@ button.wall-room-card {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.wall-irrigation-orb {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  width: 126px;
+  height: 126px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+    color-mix(in srgb, var(--card) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+.wall-irrigation-orb svg {
+  position: absolute;
+  inset: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  transform: rotate(-90deg);
+}
+
+.wall-irrigation-orb circle {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.wall-irrigation-orb .track {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.wall-irrigation-orb .value {
+  stroke: #7dd3fc;
+  filter: drop-shadow(0 0 10px rgba(125, 211, 252, 0.28));
+}
+
+.wall-irrigation-orb span,
+.wall-irrigation-orb strong,
+.wall-irrigation-orb small {
+  position: relative;
+  z-index: 1;
+}
+
+.wall-irrigation-orb span {
+  margin-top: 14px;
+  color: #7dd3fc;
+}
+
+.wall-irrigation-orb strong {
+  margin-top: 38px;
+  color: var(--foreground);
+  font-size: 1.62rem;
+  line-height: 1;
+}
+
+.wall-irrigation-orb small {
+  margin-top: 76px;
+  color: var(--muted-foreground);
+  font-size: 0.62rem;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .wall-irrigation-metrics {
@@ -4075,6 +4191,7 @@ button.wall-room-card {
   .wall-home-status-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .wall-status-item:nth-child(4n) { border-right: 0; }
   .wall-room-control-grid { grid-template-columns: 1fr; }
+  .wall-irrigation-card.compact { grid-column: auto; }
   .wall-light-control { grid-column: auto; }
   .wall-room-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
   .wall-outlet-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -4129,8 +4246,22 @@ button.wall-room-card {
   .wall-span-2,
   .wall-list-panel,
   .wall-home-card-slot.span-2,
+  .wall-irrigation-card.compact,
   .wall-climate-overview,
   .wall-calendar-card { grid-column: auto; }
+  .wall-irrigation-card.compact {
+    grid-template-columns: 1fr;
+  }
+  .wall-irrigation-card.compact .wall-irrigation-orb {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: center;
+    width: 142px;
+    height: 142px;
+  }
+  .wall-irrigation-card.compact .wall-irrigation-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .wall-climate-overview-grid { grid-template-columns: 1fr; }
   .wall-light-control-main,
   .wall-cover-body { grid-template-columns: 1fr; }
