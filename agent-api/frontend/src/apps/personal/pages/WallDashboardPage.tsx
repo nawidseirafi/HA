@@ -1104,7 +1104,6 @@ function HomeSection({
                     <TodayCard calendar={calendar} now={new Date()}/>
                 </div>
             </div>
-
         </section>
     );
 }
