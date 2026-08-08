@@ -13,6 +13,22 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, VACATION_ENTITY_ID
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
 LOW_BATTERY_THRESHOLD = 40
+WALL_DEVICE_DOMAIN_PRIORITY = [
+    "humidifier",
+    "climate",
+    "water_heater",
+    "vacuum",
+    "lawn_mower",
+    "cover",
+    "lock",
+    "camera",
+    "media_player",
+    "light",
+    "fan",
+    "switch",
+    "sensor",
+]
+WALL_DEVICE_DOMAIN_RANK = {domain: index for index, domain in enumerate(WALL_DEVICE_DOMAIN_PRIORITY)}
 
 
 class ServicePayload(BaseModel):
@@ -33,14 +49,16 @@ def wall_dashboard():
 
     floor_map = _floor_area_entity_map()
     area_lookup = _entity_area_lookup(floor_map)
-    lights = [_with_area_lookup(_light_item(state), area_lookup) for state in states if _domain(state) == "light"]
-    covers = [_with_area_lookup(_cover_item(state), area_lookup) for state in states if _domain(state) == "cover"]
-    sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "sensor"]
-    switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "switch"]
-    fans = [_with_area_lookup(_fan_item(state), area_lookup) for state in states if _domain(state) == "fan"]
-    lawn_mowers = [_with_area_lookup(_lawn_mower_item(state), area_lookup) for state in states if _domain(state) == "lawn_mower"]
-    media_players = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _domain(state) == "media_player"]
-    climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _domain(state) == "climate"]
+    wall_device_groups = _wall_device_groups(states)
+    lights = [_with_area_lookup(_light_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "light")]
+    covers = [_with_area_lookup(_cover_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "cover")]
+    sensors = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "sensor")]
+    switches = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "switch")]
+    fans = [_with_area_lookup(_fan_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "fan")]
+    humidifiers = [_with_area_lookup(_humidifier_item(state, wall_device_groups.get(_wall_device_key(state), [])), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "humidifier")]
+    lawn_mowers = [_with_area_lookup(_lawn_mower_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "lawn_mower")]
+    media_players = [_with_area_lookup(_simple_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "media_player")]
+    climate = [_with_area_lookup(_climate_item(state), area_lookup) for state in states if _wall_state_is_primary(state, wall_device_groups, "climate")]
     temperature_sensors = [_with_area_lookup(item, area_lookup) for item in _temperature_items(states)]
     weather = next((_weather_item(state) for state in states if _domain(state) == "weather"), None)
     post = next(
@@ -90,6 +108,7 @@ def wall_dashboard():
         "sensors": sorted(sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "switches": switches,
         "fans": sorted(fans, key=lambda item: (item.get("area") or "", item.get("name") or "")),
+        "humidifiers": sorted(humidifiers, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "lawn_mowers": sorted(lawn_mowers, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "media_players": media_players,
         "climate": climate,
@@ -389,6 +408,79 @@ def _domain(state: dict[str, Any]) -> str:
     return str(state.get("entity_id", "")).split(".", 1)[0]
 
 
+def _wall_device_groups(states: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for state in states:
+        domain = _domain(state)
+        if domain not in WALL_DEVICE_DOMAIN_RANK:
+            continue
+        groups.setdefault(_wall_device_key(state), []).append(state)
+    return groups
+
+
+def _wall_state_is_primary(state: dict[str, Any], groups: dict[str, list[dict[str, Any]]], expected_domain: str) -> bool:
+    domain = _domain(state)
+    if domain != expected_domain:
+        return False
+    group = groups.get(_wall_device_key(state), [state])
+    return _wall_primary_domain(group) == expected_domain
+
+
+def _wall_primary_domain(states: list[dict[str, Any]]) -> str:
+    domains = {_domain(state) for state in states}
+    return min(domains, key=lambda domain: WALL_DEVICE_DOMAIN_RANK.get(domain, 999))
+
+
+def _wall_device_key(state: dict[str, Any]) -> str:
+    attributes = state.get("attributes", {})
+    for key in ("device_id", "device"):
+        value = attributes.get(key) or state.get(key)
+        if value:
+            return f"device:{value}"
+    domain = _domain(state)
+    object_id = str(state.get("entity_id") or "").split(".", 1)[-1]
+    return f"name:{_wall_base_object_id(object_id, domain)}"
+
+
+def _wall_base_object_id(object_id: str, domain: str = "") -> str:
+    text = str(object_id or "").lower()
+    suffixes = [
+        "current_humidity",
+        "target_humidity",
+        "relative_humidity",
+        "air_humidity",
+        "humidity",
+        "luftfeuchtigkeit",
+        "current_temperature",
+        "temperature",
+        "temperatur",
+        "water_tank",
+        "tank_status",
+        "tank_full",
+        "tank",
+        "water",
+        "mode",
+        "preset_mode",
+        "fan_mode",
+        "fan",
+        "power",
+        "switch",
+        "status",
+        "state",
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for suffix in suffixes:
+            token = f"_{suffix}"
+            if text.endswith(token) and len(text) > len(token) + 2:
+                text = text[: -len(token)]
+                changed = True
+    if not text and domain:
+        text = str(object_id or "").lower()
+    return text or str(object_id or "").lower()
+
+
 def _name(state: dict[str, Any]) -> str:
     attributes = state.get("attributes", {})
     return attributes.get("friendly_name") or str(state.get("entity_id", "")).replace("_", " ")
@@ -459,6 +551,81 @@ def _fan_item(state: dict[str, Any]) -> dict[str, Any]:
         "direction": attributes.get("direction"),
         "supported_features": attributes.get("supported_features"),
     }
+
+
+def _humidifier_item(state: dict[str, Any], group_states: list[dict[str, Any]]) -> dict[str, Any]:
+    attributes = state.get("attributes", {})
+    fan_state = next((item for item in group_states if _domain(item) == "fan"), None)
+    sensor_states = [item for item in group_states if _domain(item) == "sensor"]
+    switch_state = next((item for item in group_states if _domain(item) == "switch"), None)
+    tank_state = _find_related_sensor(sensor_states, ("tank", "water", "wasser", "behälter", "behaelter"))
+    temperature_state = _find_related_sensor(sensor_states, ("temperature", "temperatur"))
+    humidity_state = _find_related_sensor(sensor_states, ("humidity", "luftfeuchtigkeit", "feuchtigkeit"))
+    fan_item = _fan_item(fan_state) if fan_state else None
+    return {
+        **_simple_item(state),
+        "device_type": "Luftentfeuchter",
+        "current_humidity": _first_numeric(
+            attributes.get("current_humidity"),
+            attributes.get("humidity"),
+            humidity_state.get("state") if humidity_state else None,
+        ),
+        "target_humidity": _first_numeric(
+            attributes.get("humidity"),
+            attributes.get("target_humidity"),
+            attributes.get("target_humidity_high"),
+        ),
+        "min_humidity": _numeric_value(attributes.get("min_humidity")),
+        "max_humidity": _numeric_value(attributes.get("max_humidity")),
+        "temperature": _first_numeric(
+            attributes.get("temperature"),
+            attributes.get("current_temperature"),
+            temperature_state.get("state") if temperature_state else None,
+        ),
+        "tank_status": _tank_status(tank_state),
+        "mode": attributes.get("mode") or attributes.get("preset_mode"),
+        "modes": attributes.get("available_modes") or attributes.get("modes") or [],
+        "supported_features": attributes.get("supported_features"),
+        "fan": fan_item,
+        "fan_entity_id": fan_state.get("entity_id") if fan_state else None,
+        "fan_state": fan_state.get("state") if fan_state else None,
+        "switch_entity_id": switch_state.get("entity_id") if switch_state else None,
+        "associated_entity_ids": sorted(
+            str(item.get("entity_id"))
+            for item in group_states
+            if item.get("entity_id") and item.get("entity_id") != state.get("entity_id")
+        ),
+    }
+
+
+def _find_related_sensor(states: list[dict[str, Any]], needles: tuple[str, ...]) -> dict[str, Any] | None:
+    for state in states:
+        text = f"{state.get('entity_id', '')} {_name(state)} {state.get('attributes', {}).get('device_class', '')}".lower()
+        if any(needle in text for needle in needles):
+            return state
+    return None
+
+
+def _first_numeric(*values: Any) -> float | None:
+    for value in values:
+        numeric = _numeric_value(value)
+        if numeric is not None:
+            return numeric
+    return None
+
+
+def _tank_status(state: dict[str, Any] | None) -> str | None:
+    if not state:
+        return None
+    value = str(state.get("state") or "").strip()
+    if not value:
+        return None
+    normalized = value.lower()
+    if normalized in {"on", "full", "problem", "detected"}:
+        return "Voll"
+    if normalized in {"off", "ok", "clear", "empty"}:
+        return "OK"
+    return value
 
 
 def _lawn_mower_item(state: dict[str, Any]) -> dict[str, Any]:

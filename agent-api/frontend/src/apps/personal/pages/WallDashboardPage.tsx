@@ -51,6 +51,7 @@ import {
     type WallDashboardData,
     type WallEntity,
     type WallFan,
+    type WallHumidifier,
     type WallLight,
     type WallLightGroup,
     type WallLightRoom,
@@ -654,6 +655,54 @@ function WallDashboardContent() {
         void callFan(fan, 'set_direction', {direction: nextDirection}, {direction: nextDirection});
     };
 
+    const callHumidifier = async (humidifier: WallHumidifier, service: string, payload: Record<string, unknown> = {}, patch: Partial<WallHumidifier> = {}) => {
+        setData((current) => patchWallHumidifier(current, humidifier.entity_id, patch));
+        setBusyEntity(humidifier.entity_id);
+        setError('');
+        try {
+            await api.callHomeAssistantService({domain: 'humidifier', service, entity_id: humidifier.entity_id, data: payload});
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Luftentfeuchter konnte nicht geschaltet werden.');
+            await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
+    const toggleHumidifier = (humidifier: WallHumidifier) => {
+        const nextOn = !deviceActive(humidifier);
+        void callHumidifier(humidifier, nextOn ? 'turn_on' : 'turn_off', {}, {state: nextOn ? 'on' : 'off'});
+    };
+
+    const setHumidifierHumidity = (humidifier: WallHumidifier, humidity: number) => {
+        const value = clampPercent(humidity);
+        void callHumidifier(humidifier, 'set_humidity', {humidity: value}, {target_humidity: value});
+    };
+
+    const setHumidifierMode = (humidifier: WallHumidifier, mode: string) => {
+        void callHumidifier(humidifier, 'set_mode', {mode}, {mode});
+    };
+
+    const toggleHumidifierFan = async (humidifier: WallHumidifier) => {
+        const fan = humidifier.fan;
+        if (!fan?.entity_id) return;
+        const nextOn = !deviceActive(fan);
+        const patch: WallFan = {...fan, state: nextOn ? 'on' : 'off'};
+        setData((current) => patchWallHumidifier(current, humidifier.entity_id, {fan: patch, fan_state: patch.state}));
+        setBusyEntity(fan.entity_id);
+        setError('');
+        try {
+            await api.callHomeAssistantService({domain: 'fan', service: nextOn ? 'turn_on' : 'turn_off', entity_id: fan.entity_id});
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Lüfter konnte nicht geschaltet werden.');
+            await load(true);
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
     const toggleOutlet = async (outlet: WallEntity) => {
         const nextOn = !deviceActive(outlet);
         setData((current) => patchWallSwitch(current, outlet.entity_id, {state: nextOn ? 'on' : 'off'}));
@@ -1007,6 +1056,10 @@ function WallDashboardContent() {
                         onFanPreset={setFanPreset}
                         onFanOscillation={toggleFanOscillation}
                         onFanDirection={toggleFanDirection}
+                        onHumidifierToggle={toggleHumidifier}
+                        onHumidifierHumidity={setHumidifierHumidity}
+                        onHumidifierMode={setHumidifierMode}
+                        onHumidifierFanToggle={toggleHumidifierFan}
                         onOutletToggle={toggleOutlet}
                         onDeviceToggle={toggleRoomDevice}
                         gardenStatus={gardenStatus}
@@ -2107,6 +2160,10 @@ function RoomSection({
                          onFanPreset,
                          onFanOscillation,
                          onFanDirection,
+                         onHumidifierToggle,
+                         onHumidifierHumidity,
+                         onHumidifierMode,
+                         onHumidifierFanToggle,
                          onOutletToggle,
                          onDeviceToggle,
                          gardenStatus,
@@ -2129,6 +2186,10 @@ function RoomSection({
     onFanPreset: (fan: WallFan, presetMode: string) => void;
     onFanOscillation: (fan: WallFan) => void;
     onFanDirection: (fan: WallFan) => void;
+    onHumidifierToggle: (humidifier: WallHumidifier) => void;
+    onHumidifierHumidity: (humidifier: WallHumidifier, humidity: number) => void;
+    onHumidifierMode: (humidifier: WallHumidifier, mode: string) => void;
+    onHumidifierFanToggle: (humidifier: WallHumidifier) => void;
     onOutletToggle: (outlet: WallEntity) => void;
     onDeviceToggle: (device: WallEntity) => void;
     gardenStatus: GardenStatus | null;
@@ -2140,29 +2201,34 @@ function RoomSection({
     const lights = findRoom(data, floor, room)?.items ?? data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
+    const humidifiers = (data.humidifiers ?? []).filter((item) => sameArea(item.area, room));
+    const humidifierEntityIds = humidifierAssociatedEntityIds(humidifiers);
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const mowers = (data.lawn_mowers ?? []).filter((mower) => sameArea(mower.area, room));
-    const outlets = roomOutlets(data, room).filter((outlet) => !gardenEntityIds.has(outlet.entity_id));
+    const outlets = roomOutlets(data, room).filter((outlet) => !gardenEntityIds.has(outlet.entity_id) && !humidifierEntityIds.has(outlet.entity_id));
     const outletGroups = groupRoomOutlets(outlets, room, data);
     const sensorChips = roomSensorChips(data, room).filter((chip) => {
         const sourceEntityId = chip.entity_id.split(':')[0] ?? chip.entity_id;
-        return !gardenEntityIds.has(chip.entity_id) && !gardenEntityIds.has(sourceEntityId);
+        return !gardenEntityIds.has(chip.entity_id) && !gardenEntityIds.has(sourceEntityId)
+            && !humidifierEntityIds.has(chip.entity_id) && !humidifierEntityIds.has(sourceEntityId);
     });
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
+        ...humidifiers.map((item) => item.entity_id),
+        ...humidifierEntityIds,
         ...fans.map((fan) => fan.entity_id),
         ...mowers.map((mower) => mower.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
         ...gardenEntityIds,
     ]);
-    const otherDevices = roomDevices(data, room, excluded).filter((device) => !gardenEntityIds.has(device.entity_id));
+    const otherDevices = roomDevices(data, room, excluded).filter((device) => !gardenEntityIds.has(device.entity_id) && !humidifierEntityIds.has(device.entity_id));
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length + (gardenZone ? 1 : 0);
+    const deviceCount = lights.length + covers.length + climates.length + humidifiers.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length + (gardenZone ? 1 : 0);
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
     const openingSummary = roomOpeningSummary(data, room);
@@ -2230,6 +2296,17 @@ function RoomSection({
                         onDirection={onFanDirection}
                     />
                 ))}
+                {humidifiers.map((humidifier) => (
+                    <RoomDehumidifierControl
+                        key={humidifier.entity_id}
+                        humidifier={humidifier}
+                        busy={busyEntity === humidifier.entity_id || busyEntity === humidifier.fan?.entity_id}
+                        onToggle={onHumidifierToggle}
+                        onHumidity={onHumidifierHumidity}
+                        onMode={onHumidifierMode}
+                        onFanToggle={onHumidifierFanToggle}
+                    />
+                ))}
                 {outlets.length > 0 && (
                     <RoomOutletControl
                         groups={outletGroups}
@@ -2279,7 +2356,7 @@ function RoomSection({
                         </div>
                     </section>
                 )}
-                {lights.length === 0 && climates.length === 0 && covers.length === 0 && fans.length === 0 && mowers.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+                {lights.length === 0 && climates.length === 0 && covers.length === 0 && humidifiers.length === 0 && fans.length === 0 && mowers.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
                     <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
                 )}
             </div>
@@ -2647,6 +2724,110 @@ function RoomFanControl({
     );
 }
 
+function RoomDehumidifierControl({
+                                     humidifier,
+                                     busy,
+                                     onToggle,
+                                     onHumidity,
+                                     onMode,
+                                     onFanToggle,
+                                 }: {
+    humidifier: WallHumidifier;
+    busy?: boolean;
+    onToggle: (humidifier: WallHumidifier) => void;
+    onHumidity: (humidifier: WallHumidifier, humidity: number) => void;
+    onMode: (humidifier: WallHumidifier, mode: string) => void;
+    onFanToggle: (humidifier: WallHumidifier) => void;
+}) {
+    const isOn = deviceActive(humidifier);
+    const currentHumidity = humidifier.current_humidity;
+    const targetHumidity = humidifier.target_humidity;
+    const minHumidity = Math.round(humidifier.min_humidity ?? 30);
+    const maxHumidity = Math.round(humidifier.max_humidity ?? 80);
+    const fan = humidifier.fan;
+    const fanOn = fan ? deviceActive(fan) : String(humidifier.fan_state || '').toLowerCase() === 'on';
+    const modes = humidifier.modes ?? [];
+    return (
+        <article className={`wall-room-panel wall-dehumidifier-control ${isOn ? 'active' : ''}`}>
+            <div className="wall-dehumidifier-head">
+                <span className="wall-dehumidifier-icon"><Droplets size={30}/></span>
+                <div>
+                    <small>Luftentfeuchter</small>
+                    <h3>{humidifier.name}</h3>
+                    <p>{busy ? 'Schaltet...' : isOn ? 'Ein' : 'Aus'}</p>
+                </div>
+                <button
+                    type="button"
+                    className={`wall-device-toggle ${isOn ? 'on' : ''}`}
+                    disabled={busy}
+                    onClick={() => onToggle(humidifier)}
+                    aria-pressed={isOn}
+                    aria-label={`${humidifier.name} ${isOn ? 'ausschalten' : 'einschalten'}`}
+                >
+                    <span/>
+                </button>
+            </div>
+            <div className="wall-dehumidifier-metrics">
+                <div>
+                    <span>Luftfeuchte</span>
+                    <strong>{typeof currentHumidity === 'number' ? `${Math.round(currentHumidity)}%` : '-'}</strong>
+                </div>
+                <div>
+                    <span>Ziel</span>
+                    <strong>{typeof targetHumidity === 'number' ? `${Math.round(targetHumidity)}%` : '-'}</strong>
+                </div>
+                <div>
+                    <span>Temperatur</span>
+                    <strong>{typeof humidifier.temperature === 'number' ? `${formatNumber(humidifier.temperature)}°C` : '-'}</strong>
+                </div>
+                <div>
+                    <span>Tank</span>
+                    <strong>{humidifier.tank_status || '-'}</strong>
+                </div>
+            </div>
+            <label className="wall-room-slider compact wall-dehumidifier-slider">
+                <span>Sollfeuchte</span>
+                <strong>{typeof targetHumidity === 'number' ? `${Math.round(targetHumidity)}%` : '-'}</strong>
+                <input
+                    type="range"
+                    min={minHumidity}
+                    max={maxHumidity}
+                    step="1"
+                    value={typeof targetHumidity === 'number' ? clampPercent(targetHumidity) : Math.min(Math.max(50, minHumidity), maxHumidity)}
+                    disabled={busy}
+                    onChange={(event) => onHumidity(humidifier, Number(event.target.value))}
+                />
+            </label>
+            <div className="wall-dehumidifier-controls">
+                {modes.length > 0 && (
+                    <label className="wall-fan-control-row wall-fan-select">
+                        <span>Modus</span>
+                        <select value={humidifier.mode || ''} disabled={busy}
+                                onChange={(event) => onMode(humidifier, event.target.value)}>
+                            {!humidifier.mode && <option value="">Auswählen</option>}
+                            {modes.map((mode) => (
+                                <option key={mode} value={mode}>{labelHumidifierMode(mode)}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
+                <div className="wall-fan-control-row">
+                    <span>Lüfter</span>
+                    <button type="button" className={`wall-switch ${fanOn ? 'on' : ''}`}
+                            disabled={busy || !fan?.entity_id} onClick={() => onFanToggle(humidifier)}
+                            aria-pressed={fanOn} aria-label="Lüfter ein- oder ausschalten"/>
+                </div>
+                {fan?.preset_mode && (
+                    <div className="wall-dehumidifier-mode-line">
+                        <span>Lüftermodus</span>
+                        <strong>{labelFanPreset(fan.preset_mode)}</strong>
+                    </div>
+                )}
+            </div>
+        </article>
+    );
+}
+
 function BatteryPill({battery}: { battery: BatteryBadge }) {
     return <WallBatteryStatus level={battery.level} charging={battery.charging} size="sm"/>;
 }
@@ -2827,6 +3008,7 @@ function ClimateSection({
 function SecuritySection({data}: { data: WallDashboardData }) {
     const openItems = data.security.openings.filter((item) => item.state === 'on');
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
+    const batteries = wallBatteryEntities(data.health.batteries ?? data.health.low_batteries).sort(compareBatteryStatus);
     return (
         <div className="wall-card-grid">
             <MetricCard icon={<DoorOpen size={24}/>} label="Offene Kontakte" value={`${openItems.length}`}
@@ -2841,6 +3023,7 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <ListPanel title="Offene Fenster & Türen" items={openItems}/>
             <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
+            <BatteryStatusPanel batteries={batteries}/>
         </div>
     );
 }
@@ -2923,6 +3106,27 @@ function BatteriesSection({data, onBack}: { data: WallDashboardData; onBack: () 
                 ))}
             </section>
         </div>
+    );
+}
+
+function BatteryStatusPanel({batteries}: { batteries: Array<WallEntity & { level?: number | null }> }) {
+    return (
+        <section className="wall-panel wall-list-panel wall-security-battery-panel">
+            <div className="wall-section-title"><span>Batterie-Status</span><strong>{batteries.length}</strong></div>
+            {batteries.length === 0 ? <p>Keine Batterie-Entities gefunden.</p> : (
+                <div className="wall-security-battery-list">
+                    {batteries.map((battery) => (
+                        <article className="wall-security-battery-row" key={battery.entity_id}>
+                            <div>
+                                <strong>{battery.name}</strong>
+                                <span>{battery.area || 'Haus'} · {battery.entity_id}</span>
+                            </div>
+                            <WallBatteryStatus level={batteryLevelValue(battery)} size="sm"/>
+                        </article>
+                    ))}
+                </div>
+            )}
+        </section>
     );
 }
 
@@ -3272,6 +3476,7 @@ function allWallEntities(data: WallDashboardData): WallEntity[] {
         ...(data.health?.batteries ?? []),
         ...(data.switches ?? []),
         ...(data.fans ?? []),
+        ...(data.humidifiers ?? []),
         ...(data.lawn_mowers ?? []),
         ...(data.media_players ?? []),
         ...(data.temperature_sensors ?? []),
@@ -3397,6 +3602,15 @@ function wallLowBatteryEntities(items: Array<WallEntity & { level?: number | nul
         return String(battery.state || '').toLowerCase() === 'low'
             || (level !== null && Number(level) < LOW_BATTERY_THRESHOLD);
     });
+}
+
+function compareBatteryStatus(left: WallEntity & { level?: number | null }, right: WallEntity & { level?: number | null }) {
+    const leftLevel = batteryLevelValue(left);
+    const rightLevel = batteryLevelValue(right);
+    if (leftLevel === null && rightLevel !== null) return -1;
+    if (leftLevel !== null && rightLevel === null) return 1;
+    if (leftLevel !== null && rightLevel !== null && leftLevel !== rightLevel) return leftLevel - rightLevel;
+    return `${left.area || ''}${left.name}`.localeCompare(`${right.area || ''}${right.name}`, 'de');
 }
 
 function isWallBatteryEntity(item: WallEntity) {
@@ -3754,18 +3968,22 @@ function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
     const lights = data.lights.filter((light) => sameArea(light.area, room));
     const covers = (data.covers ?? []).filter((cover) => sameArea(cover.area, room));
     const climates = data.climate.filter((item) => sameArea(item.area, room));
+    const humidifiers = (data.humidifiers ?? []).filter((item) => sameArea(item.area, room));
+    const humidifierEntityIds = humidifierAssociatedEntityIds(humidifiers);
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
-    const outlets = roomOutlets(data, room);
-    const sensors = roomSensorChips(data, room);
+    const outlets = roomOutlets(data, room).filter((outlet) => !humidifierEntityIds.has(outlet.entity_id));
+    const sensors = roomSensorChips(data, room).filter((sensor) => !humidifierEntityIds.has(sensor.entity_id) && !humidifierEntityIds.has(sensor.entity_id.split(':')[0] ?? sensor.entity_id));
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
         ...covers.map((cover) => cover.entity_id),
         ...climates.map((item) => item.entity_id),
+        ...humidifiers.map((item) => item.entity_id),
+        ...humidifierEntityIds,
         ...fans.map((fan) => fan.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
         ...sensors.map((sensor) => sensor.entity_id),
     ]);
-    return lights.length + covers.length + climates.length + fans.length + outlets.length + sensors.length + roomDevices(data, room, excluded).length;
+    return lights.length + covers.length + climates.length + humidifiers.length + fans.length + outlets.length + sensors.length + roomDevices(data, room, excluded).length;
 }
 
 function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
@@ -4045,6 +4263,21 @@ function fanStatusLabel(fan: WallFan) {
     return 'Aktiv';
 }
 
+function labelHumidifierMode(mode: string) {
+    const normalized = String(mode || '').toLowerCase();
+    const labels: Record<string, string> = {
+        dry: 'Dry',
+        auto: 'Auto',
+        smart: 'Smart',
+        continuous: 'Dauerbetrieb',
+        laundry: 'Wäsche',
+        sleep: 'Schlaf',
+        boost: 'Boost',
+        normal: 'Normal',
+    };
+    return labels[normalized] || labelState(mode);
+}
+
 function labelFanPreset(mode: string) {
     const normalized = String(mode || '').toLowerCase();
     const labels: Record<string, string> = {
@@ -4075,6 +4308,18 @@ function fanSupportsDirection(fan: WallFan) {
 
 function fanHasFeature(fan: WallFan, feature: number) {
     return typeof fan.supported_features === 'number' && (fan.supported_features & feature) === feature;
+}
+
+function humidifierAssociatedEntityIds(items: WallHumidifier[]) {
+    const ids = new Set<string>();
+    for (const item of items) {
+        ids.add(item.entity_id);
+        for (const entityId of item.associated_entity_ids ?? []) ids.add(entityId);
+        if (item.fan?.entity_id) ids.add(item.fan.entity_id);
+        if (item.fan_entity_id) ids.add(item.fan_entity_id);
+        if (item.switch_entity_id) ids.add(item.switch_entity_id);
+    }
+    return ids;
 }
 
 function climateToneClass(mode: string) {
@@ -4521,6 +4766,20 @@ function patchWallFan(
     return {
         ...current,
         fans: (current.fans ?? []).map((item) => (
+            item.entity_id === entityId ? {...item, ...patch} : item
+        )),
+    };
+}
+
+function patchWallHumidifier(
+    current: WallDashboardData | null,
+    entityId: string,
+    patch: Partial<WallHumidifier>,
+): WallDashboardData | null {
+    if (!current) return current;
+    return {
+        ...current,
+        humidifiers: (current.humidifiers ?? []).map((item) => (
             item.entity_id === entityId ? {...item, ...patch} : item
         )),
     };

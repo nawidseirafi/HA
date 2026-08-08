@@ -769,30 +769,33 @@
 .wall-important-list {
   min-height: 0;
   display: grid;
+  grid-auto-rows: max-content;
+  align-items: start;
   align-content: start;
-  gap: 14px;
+  gap: 12px;
   overflow: hidden;
 }
 
 .wall-important-steve {
   width: 100%;
-  min-height: 46px;
+  min-height: 132px;
+  align-self: start;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 7px 12px;
+  gap: 18px;
+  padding: 18px 22px;
   border: 1px solid color-mix(in srgb, #67e8f9 28%, var(--border));
-  border-radius: 16px;
+  border-radius: 22px;
   box-sizing: border-box;
   background: linear-gradient(135deg, color-mix(in srgb, #67e8f9 11%, var(--card)), color-mix(in srgb, var(--muted) 68%, var(--card)));
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 .wall-important-steve .wall-important-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
 }
 
 .wall-important-steve small,
@@ -806,10 +809,10 @@
 
 .wall-important-steve strong {
   display: block;
-  margin-top: 1px;
+  margin-top: 5px;
   color: var(--foreground);
-  font-size: 0.92rem;
-  line-height: 1.1;
+  font-size: clamp(1.2rem, 1.75vw, 1.8rem);
+  line-height: 1.12;
   overflow-wrap: anywhere;
 }
 
@@ -826,14 +829,15 @@
 .wall-important-item,
 .wall-important-empty {
   width: 100%;
-  min-height: 104px;
+  min-height: 64px;
+  align-self: start;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 24px;
-  padding: 16px 22px;
+  gap: 12px;
+  padding: 9px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 22px;
+  border-radius: 18px;
   color: inherit;
   background: color-mix(in srgb, var(--muted) 68%, var(--card));
   text-align: left;
@@ -870,6 +874,13 @@
   background: color-mix(in srgb, currentColor 13%, transparent);
 }
 
+.wall-important-item .wall-important-icon,
+.wall-important-empty .wall-important-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+}
+
 .wall-important-icon.info,
 .wall-status-icon.info { color: #93c5fd; }
 .wall-important-icon.warn,
@@ -883,16 +894,16 @@
 .wall-important-empty strong {
   display: block;
   color: var(--foreground);
-  font-size: clamp(1.5rem, 2.3vw, 2.55rem);
+  font-size: clamp(1rem, 1.25vw, 1.35rem);
   line-height: 1.05;
   overflow-wrap: anywhere;
 }
 
 .wall-important-item p,
 .wall-important-empty p {
-  margin-top: 8px;
+  margin-top: 3px;
   color: var(--muted-foreground);
-  font-size: 1.05rem;
+  font-size: 0.78rem;
   font-weight: 750;
 }
 
@@ -2422,10 +2433,12 @@ button.wall-room-card {
 .wall-room-control-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 18px;
 }
 
 .wall-room-panel {
+  align-self: start;
   padding: 20px;
 }
 
@@ -3184,7 +3197,20 @@ button.wall-room-card {
 .wall-device-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 10px;
+}
+
+.wall-room-sensors {
+  max-height: min(640px, calc(100dvh - 260px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.wall-room-sensors .wall-sensor-chip-grid {
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .wall-sensor-chip,
@@ -3426,6 +3452,7 @@ button.wall-room-card {
 }
 
 .wall-fan-control {
+  align-content: start;
   background:
     radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 34%),
     linear-gradient(145deg, rgba(48, 51, 57, 0.92), rgba(25, 27, 31, 0.94));
@@ -3630,6 +3657,110 @@ button.wall-room-card {
   background: rgba(8, 12, 18, 0.46);
   color: #fff;
   font-weight: 800;
+}
+
+.wall-dehumidifier-control {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  background:
+    radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--state-climate) 16%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--state-climate) 9%, var(--card)), var(--card));
+}
+
+.wall-dehumidifier-control.active {
+  border-color: color-mix(in srgb, var(--state-climate) 34%, var(--border));
+}
+
+.wall-dehumidifier-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.wall-dehumidifier-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: #7dd3fc;
+  background: color-mix(in srgb, var(--state-climate) 15%, var(--card));
+}
+
+.wall-dehumidifier-head small,
+.wall-dehumidifier-head p,
+.wall-dehumidifier-metrics span,
+.wall-dehumidifier-mode-line span {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.wall-dehumidifier-head h3,
+.wall-dehumidifier-head p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-dehumidifier-head h3 {
+  margin: 3px 0;
+  color: var(--foreground);
+  font-size: 1.22rem;
+  line-height: 1.1;
+}
+
+.wall-dehumidifier-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wall-dehumidifier-metrics div {
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--secondary) 70%, transparent);
+}
+
+.wall-dehumidifier-metrics span,
+.wall-dehumidifier-metrics strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-dehumidifier-metrics strong {
+  margin-top: 5px;
+  color: var(--foreground);
+  font-size: 1.04rem;
+}
+
+.wall-dehumidifier-slider {
+  margin: 0;
+}
+
+.wall-dehumidifier-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.wall-dehumidifier-mode-line {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--muted) 72%, var(--card));
+}
+
+.wall-dehumidifier-mode-line strong {
+  color: var(--foreground);
 }
 
 .wall-openings-hero {
@@ -4182,6 +4313,43 @@ button.wall-room-card {
   color: var(--muted-foreground);
 }
 
+.wall-security-battery-panel {
+  align-self: start;
+}
+
+.wall-security-battery-list {
+  max-height: 448px;
+  display: grid;
+  overflow: auto;
+}
+
+.wall-list-panel .wall-security-battery-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.wall-security-battery-row strong,
+.wall-security-battery-row span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-security-battery-row .wall-battery-status,
+.wall-security-battery-row .wall-battery-status span {
+  display: inline-flex;
+  margin-top: 0;
+}
+
+.wall-security-battery-row .wall-battery-status span {
+  color: inherit;
+  font-size: inherit;
+}
+
 @media (max-width: 1100px) {
   .wall-main { padding: 32px; }
   .wall-home-grid,
@@ -4259,18 +4427,36 @@ button.wall-room-card {
     gap: 10px;
   }
 
-  .wall-important-item,
-  .wall-important-empty {
-    min-height: 82px;
-    gap: 16px;
-    padding: 12px 16px;
+  .wall-important-steve {
+    min-height: 104px;
+    gap: 14px;
+    padding: 14px 16px;
     border-radius: 18px;
   }
 
-  .wall-important-icon {
-    width: 50px;
-    height: 50px;
+  .wall-important-steve .wall-important-icon {
+    width: 52px;
+    height: 52px;
     border-radius: 18px;
+  }
+
+  .wall-important-steve strong {
+    font-size: clamp(1.05rem, 1.7vw, 1.45rem);
+  }
+
+  .wall-important-item,
+  .wall-important-empty {
+    min-height: 56px;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 18px;
+  }
+
+  .wall-important-item .wall-important-icon,
+  .wall-important-empty .wall-important-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
   }
 
   .wall-important-item strong,
@@ -4350,6 +4536,233 @@ button.wall-room-card {
     width: 40px;
     height: 40px;
     border-radius: 15px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) and (max-height: 820px) {
+  .wall-main {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+    gap: 10px;
+    height: 100dvh;
+    padding: 14px 18px;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .wall-header {
+    min-height: 72px;
+    align-items: center;
+  }
+
+  .wall-main > .wall-home-overview {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .wall-home-overview {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .wall-header span {
+    font-size: 0.82rem;
+  }
+
+  .wall-header h1 {
+    margin-top: 2px;
+    font-size: clamp(1.7rem, 3vw, 2.1rem);
+  }
+
+  .wall-header p {
+    font-size: 0.82rem;
+  }
+
+  .wall-header-side {
+    gap: 10px;
+  }
+
+  .wall-header-side strong {
+    font-size: 1.4rem;
+  }
+
+  .wall-header-side button:not(.wall-message-button) {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  .wall-home-overview,
+  .wall-home-dashboard-grid,
+  .wall-home-side-column {
+    gap: 10px;
+  }
+
+  .wall-home-dashboard-grid {
+    grid-template-columns: minmax(0, 1.42fr) minmax(270px, 0.78fr);
+  }
+
+  .wall-home-side-column {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 0.46fr);
+  }
+
+  .wall-home-status-bar {
+    min-height: 72px;
+  }
+
+  .wall-status-item {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .wall-status-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 14px;
+  }
+
+  .wall-status-item small {
+    font-size: 0.7rem;
+  }
+
+  .wall-status-item strong {
+    margin-top: 2px;
+    font-size: 0.86rem;
+  }
+
+  .wall-status-item p {
+    display: none;
+  }
+
+  .wall-important-card,
+  .wall-home-weather-card,
+  .wall-home-today-card {
+    padding: 14px;
+  }
+
+  .wall-important-head h3 {
+    font-size: clamp(1.45rem, 2.2vw, 2rem);
+  }
+
+  .wall-important-steve {
+    min-height: 92px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .wall-important-steve .wall-important-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+  }
+
+  .wall-important-steve strong {
+    font-size: clamp(1rem, 1.55vw, 1.25rem);
+  }
+
+  .wall-important-item,
+  .wall-important-empty {
+    min-height: 52px;
+    gap: 9px;
+    padding: 7px 10px;
+  }
+
+  .wall-important-item .wall-important-icon,
+  .wall-important-empty .wall-important-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .wall-important-item strong,
+  .wall-important-empty strong {
+    font-size: clamp(1.08rem, 1.8vw, 1.55rem);
+  }
+
+  .wall-important-item p,
+  .wall-important-empty p {
+    font-size: 0.8rem;
+  }
+
+  .wall-home-card-title {
+    margin-bottom: 2px;
+  }
+
+  .wall-home-card-title strong {
+    font-size: 1.08rem;
+  }
+
+  .wall-home-card-title button {
+    min-height: 30px;
+    padding: 0 10px;
+  }
+
+  .wall-home-weather-card,
+  .wall-home-today-card {
+    gap: 9px;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .wall-home-weather-main {
+    gap: 10px;
+  }
+
+  .wall-home-weather-main svg {
+    width: 58px;
+    height: 58px;
+  }
+
+  .wall-home-weather-main strong {
+    font-size: clamp(2.2rem, 3.6vw, 3rem);
+  }
+
+  .wall-home-weather-metrics {
+    gap: 8px;
+  }
+
+  .wall-home-weather-metrics div {
+    padding: 8px;
+  }
+
+  .wall-home-weather-metrics strong {
+    font-size: 1.08rem;
+  }
+
+  .wall-home-weather-metrics small {
+    margin-top: 3px;
+    font-size: 0.72rem;
+  }
+
+  .wall-home-weather-lines {
+    gap: 5px;
+    padding-top: 8px;
+  }
+
+  .wall-home-climate-row {
+    padding: 8px 10px;
+  }
+
+  .wall-home-today-list div {
+    padding: 6px 0;
+  }
+
+  .wall-home-today-empty {
+    min-height: 0;
+    gap: 4px;
+  }
+
+  .wall-home-today-empty svg {
+    width: 38px;
+    height: 38px;
+  }
+
+  .wall-home-today-empty strong {
+    font-size: 0.92rem;
+  }
+
+  .wall-home-today-empty p {
+    font-size: 0.78rem;
   }
 }
 

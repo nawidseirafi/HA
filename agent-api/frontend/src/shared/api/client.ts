@@ -727,6 +727,24 @@ export type WallFan = WallEntity & {
   supported_features?: number | null;
 };
 
+export type WallHumidifier = WallEntity & {
+  device_type?: string;
+  current_humidity?: number | null;
+  target_humidity?: number | null;
+  min_humidity?: number | null;
+  max_humidity?: number | null;
+  temperature?: number | null;
+  tank_status?: string | null;
+  mode?: string | null;
+  modes?: string[];
+  supported_features?: number | null;
+  fan?: WallFan | null;
+  fan_entity_id?: string | null;
+  fan_state?: string | null;
+  switch_entity_id?: string | null;
+  associated_entity_ids?: string[];
+};
+
 export type WallLightGroup = {
   area: string;
   total: number;
@@ -930,6 +948,7 @@ export type WallDashboardData = {
   sensors?: WallEntity[];
   switches: WallEntity[];
   fans?: WallFan[];
+  humidifiers?: WallHumidifier[];
   lawn_mowers?: LawnMowerEntity[];
   media_players?: WallEntity[];
   climate: WallClimate[];
