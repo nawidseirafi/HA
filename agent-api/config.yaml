@@ -44,7 +44,7 @@ context:
   long_away_seconds: 7200
   entities:
     person: "person.nawid"
-    garage_door: "cover.smart_garage_door_2303160919847461070348e1e9be2fde_garage"
+    garage_door: "cover.garage_garegentor_garage"
 
 household:
   notifications:
@@ -70,7 +70,7 @@ household:
     enabled: true
     control_enabled: true
     auto_discovery: true
-    garage_entity: ""
+    garage_entity: "cover.garage_garegentor_garage"
     allow_open: true
     allow_close: true
     min_confidence: 0.6
