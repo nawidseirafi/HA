@@ -153,8 +153,8 @@ def prepare_course_ids():
             names = [str(event.get("name")) for event in event_items if event.get("name")]
             log("Keine Wunschkurse gefunden. Geladene Kurse: " + (", ".join(names[:40]) if names else "Keine"))
         log(message)
-        if course_ids:
-            send_ha_notification("Kurs-IDs vorbereitet", message)
+        # if course_ids:
+          #  send_ha_notification("Kurs-IDs vorbereitet", message)
     except Exception as e:
         msg = f"Fehler beim Vorbereiten: {e}"
         log(msg)
