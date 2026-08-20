@@ -1,7 +1,8 @@
 - scan_interval: 5
   resource: http://192.168.178.191/v1/json
   sensor:
-    - name: "ecotracker_api"
+    - name: "Laundry Room Power Meter"
+      unique_id: laundry_room_power_meter
       value_template: "OK"
       json_attributes:
         - "power"
