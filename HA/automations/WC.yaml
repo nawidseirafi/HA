@@ -1,0 +1,15 @@
+- alias: WC-Licht bei Präsenz und Dunkelheit
+  description: Schaltet das WC-Licht bei Präsenz ein, wenn es dunkel ist.
+  triggers:
+   - trigger: state
+     entity_id: binary_sensor.guest_wc_presence_sensor_presence
+     to: "on"
+  conditions:
+   - condition: numeric_state
+     entity_id: sensor.guest_wc_presence_sensor_illuminance
+     below: 20
+  actions:
+    - action: light.turn_on
+      target:
+        entity_id: light.wc
+  mode: restart
