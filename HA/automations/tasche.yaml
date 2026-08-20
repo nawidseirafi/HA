@@ -1,25 +1,26 @@
 - alias: "🚨 Tasche - Bewegung erkannt"
-  description: "Benachrichtigt, wenn Zigbee2MQTT fuer den Diebstahlsensor eine Bewegung meldet"
+  description: "Benachrichtigt, wenn Zigbee2MQTT fuer den Office Theft Sensor eine Bewegung meldet"
+
   trigger:
     - platform: mqtt
       id: action_topic_movement
-      topic: "zigbee2mqtt/Diebstahlsensor/action"
+      topic: "zigbee2mqtt/office Theft Sensor/action"
       payload: "movement"
 
     - platform: mqtt
       id: action_topic_vibration
-      topic: "zigbee2mqtt/Diebstahlsensor/action"
+      topic: "zigbee2mqtt/office Theft Sensor/action"
       payload: "vibration"
 
     - platform: mqtt
       id: json_topic_movement
-      topic: "zigbee2mqtt/Diebstahlsensor"
+      topic: "zigbee2mqtt/office Theft Sensor"
       payload: "movement"
       value_template: "{{ value_json.action | default('') }}"
 
     - platform: mqtt
       id: json_topic_vibration
-      topic: "zigbee2mqtt/Diebstahlsensor"
+      topic: "zigbee2mqtt/office Theft Sensor"
       payload: "vibration"
       value_template: "{{ value_json.action | default('') }}"
 
@@ -29,12 +30,16 @@
     - service: input_boolean.turn_on
       target:
         entity_id: input_boolean.tasche_bewegung
+
     - service: notify.mobile_app_system_error_404
       data:
         title: "🚨 Tasche bewegt"
-        message: "Der Diebstahlsensor hat eine Bewegung erkannt."
+        message: "Der Office Theft Sensor hat eine Bewegung erkannt."
+
     - delay: "00:01:00"
+
     - service: input_boolean.turn_off
       target:
         entity_id: input_boolean.tasche_bewegung
+
   mode: restart

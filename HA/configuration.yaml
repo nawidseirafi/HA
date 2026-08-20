@@ -2,32 +2,22 @@ input_boolean: !include_dir_merge_named input_booleans
 default_config:
 mqtt:
   sensor:
-    - name: "Diebstahlsensor Aktion"
-      unique_id: diebstahlsensor_action
-      state_topic: "zigbee2mqtt/Diebstahlsensor"
+    - name: "Office Theft Sensor Action"
+      unique_id: office_theft_sensor_action
+      state_topic: "zigbee2mqtt/office Theft Sensor"
       value_template: "{{ value_json.action | default('unknown') }}"
-      json_attributes_topic: "zigbee2mqtt/Diebstahlsensor"
-    - name: "Diebstahlsensor Batterie"
-      unique_id: diebstahlsensor_battery
-      state_topic: "zigbee2mqtt/Diebstahlsensor"
-      value_template: "{{ value_json.battery }}"
-      unit_of_measurement: "%"
-      device_class: battery
-      state_class: measurement
+      json_attributes_topic: "zigbee2mqtt/office Theft Sensor"
   binary_sensor:
-    - name: "Tasche Bewegung"
-      unique_id: tasche_bewegung_mqtt
-      state_topic: "zigbee2mqtt/Diebstahlsensor"
+    - name: "Office Theft Sensor Movement"
+      unique_id: office_theft_sensor_movement_mqtt
+      state_topic: "zigbee2mqtt/office Theft Sensor"
       device_class: motion
       off_delay: 120
+      payload_on: "ON"
       value_template: >
         {% if value_json.action | default('') in ['movement', 'vibration'] %}
           ON
-        {% else %}
-          OFF
         {% endif %}
-      payload_on: "ON"
-      payload_off: "OFF"
 command_line: !include_dir_merge_list command_lines
 rest: !include_dir_merge_list rest
 utility_meter: !include utility_meters.yaml
