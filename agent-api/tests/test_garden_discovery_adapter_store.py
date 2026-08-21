@@ -42,6 +42,22 @@ class GardenDiscoveryAdapterStoreTests(unittest.TestCase):
         self.assertEqual(bindings["irrigation"].entity_id, "switch.eve_aqua_123a")
         self.assertEqual(bindings["mower"].entity_id, "lawn_mower.garden_mower")
 
+    def test_discovery_falls_back_when_configured_entity_was_renamed(self):
+        states = [
+            state("sensor.alter_bodenfeuchtesensor", "unavailable", "Alter Bodenfeuchtesensor", device_class="moisture", unit_of_measurement="%"),
+            state("sensor.rasen_bodenfeuchtigkeit", "22", "Rasen Bodenfeuchtigkeit", unit_of_measurement="%"),
+            state("switch.rasensprenganlage_power", "off", "Rasensprenganlage Power"),
+        ]
+        bindings = GardenEntityDiscovery().bind_zone_entities(
+            states,
+            {"entities": {"moisture": "sensor.alter_bodenfeuchtesensor", "irrigation": "switch.eve_aqua_123a"}},
+            auto_discovery=True,
+        )
+        self.assertEqual(bindings["moisture"].entity_id, "sensor.rasen_bodenfeuchtigkeit")
+        self.assertEqual(bindings["moisture"].source, "auto")
+        self.assertEqual(bindings["irrigation"].entity_id, "switch.rasensprenganlage_power")
+        self.assertEqual(bindings["irrigation"].source, "auto")
+
     def test_irrigation_adapter_switch(self):
         self._assert_adapter("switch.eve_aqua", "turn_on", "turn_off")
 

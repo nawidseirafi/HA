@@ -1678,6 +1678,9 @@ function WallIrrigationCard({
     const canStop = Boolean(zone && active);
     const disabled = busy || !zone || (!canStart && !canStop);
     const moisturePercent = typeof moisture === 'number' && Number.isFinite(moisture) ? clampPercent(moisture) : null;
+    const batteryPercent = typeof battery === 'number' && Number.isFinite(battery) ? clampPercent(battery) : null;
+    const showMoisture = moisturePercent !== null;
+    const nonSensorBlock = decision?.blocks?.find((block) => block.code !== 'soil_moisture_unavailable' && block.code !== 'soil_moisture_invalid');
     const detail = zone
         ? active
             ? zone.open_irrigation_run
@@ -1685,7 +1688,7 @@ function WallIrrigationCard({
                 : 'Home Assistant meldet Ventil an'
             : zone.open_irrigation_run
                 ? 'Ventil aus, Lauf wurde synchronisiert'
-            : decision?.blocks?.[0]?.message || decision?.reasons?.[0]?.message || 'Bereit'
+            : nonSensorBlock?.message || decision?.reasons?.[0]?.message || (zone.entities?.irrigation?.available ? 'Bewässerung bereit' : 'Bewässerung nicht verfügbar')
         : 'Garden Agent nicht verfügbar';
 
     return (
@@ -1717,12 +1720,12 @@ function WallIrrigationCard({
                             cy="60"
                             r="48"
                             pathLength="100"
-                            style={{strokeDasharray: `${moisturePercent ?? 0} 100`}}
+                            style={{strokeDasharray: `${showMoisture ? moisturePercent : batteryPercent ?? 0} 100`}}
                         />
                     </svg>
-                    <span><Droplets size={24}/></span>
-                    <strong>{moisturePercent !== null ? `${Math.round(moisturePercent)}%` : '--'}</strong>
-                    <small>Bodenfeuchte</small>
+                    <span>{showMoisture ? <Droplets size={24}/> : <BatteryMedium size={24}/>}</span>
+                    <strong>{showMoisture ? `${Math.round(moisturePercent ?? 0)}%` : batteryPercent !== null ? `${Math.round(batteryPercent)}%` : '--'}</strong>
+                    <small>{showMoisture ? 'Bodenfeuchte' : 'Batterie'}</small>
                 </div>
             )}
             <div className="wall-irrigation-status">

@@ -15,6 +15,20 @@ import yaml
 from backend.paths import BACKEND_DIR, API_DIR, PROJECT_DIR, API_CONFIG_PATH, FRONTEND_DIST, LOG_DIR, ENV_PATH
 
 
+_ENERGY_OUTLET_NOISE = (
+    "outlet",
+    "plug",
+    "steckdose",
+    "kaffee",
+    "kaffeemaschine",
+    "waschmaschine",
+    "trockner",
+    "spülmaschine",
+    "spuelmaschine",
+    "geschirrspüler",
+    "geschirrspueler",
+)
+
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -133,35 +147,36 @@ class HomeAssistantService:
 
     def get_energy_overview(self) -> dict[str, Any]:
         states = self.get_states()
-        by_entity = {str(state.get("entity_id") or ""): state for state in states}
-        ecotracker_api = by_entity.get("sensor.ecotracker_api")
+        ecotracker_api = _find_attr_state(states, ("power", "powerAvg", "energyCounterIn"))
 
         power = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_power")),
+            _state_float(_find_state(states, ("sensor.ecotracker_power",), _is_current_power_sensor)),
             _attr_float(ecotracker_api, "power"),
         )
         power_avg = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_power_avg")),
+            _state_float(_find_state(states, ("sensor.ecotracker_power_avg",), lambda state: _is_current_power_sensor(state, average=True))),
             _attr_float(ecotracker_api, "powerAvg"),
         )
         phase_l1 = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_power_phase1")),
+            _state_float(_find_state(states, ("sensor.ecotracker_power_phase1",), lambda state: _is_phase_power_sensor(state, "l1"))),
             _attr_float(ecotracker_api, "powerPhase1"),
         )
         phase_l2 = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_power_phase2")),
+            _state_float(_find_state(states, ("sensor.ecotracker_power_phase2",), lambda state: _is_phase_power_sensor(state, "l2"))),
             _attr_float(ecotracker_api, "powerPhase2"),
         )
         phase_l3 = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_power_phase3")),
+            _state_float(_find_state(states, ("sensor.ecotracker_power_phase3",), lambda state: _is_phase_power_sensor(state, "l3"))),
             _attr_float(ecotracker_api, "powerPhase3"),
         )
+        import_state = _find_state(states, ("sensor.ecotracker_energy_in",), lambda state: _is_meter_energy_sensor(state, "import"))
+        export_state = _find_state(states, ("sensor.ecotracker_energy_out",), lambda state: _is_meter_energy_sensor(state, "export"))
         import_total = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_energy_in")),
+            _state_float(import_state),
             _attr_float(ecotracker_api, "energyCounterIn", scale=0.001),
         )
         export_total = _first_number(
-            _state_float(by_entity.get("sensor.ecotracker_energy_out")),
+            _state_float(export_state),
             _attr_float(ecotracker_api, "energyCounterOut", scale=0.001),
         )
         if export_total is None and (power is not None or import_total is not None):
@@ -204,13 +219,13 @@ class HomeAssistantService:
                 ),
             },
             "updated_at": _latest_updated_at([
-                by_entity.get("sensor.ecotracker_power"),
-                by_entity.get("sensor.ecotracker_power_avg"),
-                by_entity.get("sensor.ecotracker_power_phase1"),
-                by_entity.get("sensor.ecotracker_power_phase2"),
-                by_entity.get("sensor.ecotracker_power_phase3"),
-                by_entity.get("sensor.ecotracker_energy_in"),
-                by_entity.get("sensor.ecotracker_energy_out"),
+                _find_state(states, ("sensor.ecotracker_power",), _is_current_power_sensor),
+                _find_state(states, ("sensor.ecotracker_power_avg",), lambda state: _is_current_power_sensor(state, average=True)),
+                _find_state(states, ("sensor.ecotracker_power_phase1",), lambda state: _is_phase_power_sensor(state, "l1")),
+                _find_state(states, ("sensor.ecotracker_power_phase2",), lambda state: _is_phase_power_sensor(state, "l2")),
+                _find_state(states, ("sensor.ecotracker_power_phase3",), lambda state: _is_phase_power_sensor(state, "l3")),
+                import_state,
+                export_state,
                 ecotracker_api,
             ]),
             "status": status,
@@ -444,6 +459,112 @@ def _first_number(*values: float | None) -> float | None:
         if isinstance(value, (int, float)):
             return float(value)
     return None
+
+
+def _find_state(states: list[dict[str, Any]], exact_ids: tuple[str, ...], predicate: Any) -> dict[str, Any] | None:
+    by_entity = {str(state.get("entity_id") or ""): state for state in states}
+    for entity_id in exact_ids:
+        state = by_entity.get(entity_id)
+        if _state_float(state) is not None:
+            return state
+    candidates = [state for state in states if predicate(state) and _state_float(state) is not None and _energy_score(state) > 0]
+    if not candidates:
+        return None
+    scored = sorted(((_energy_score(state), state) for state in candidates), key=lambda item: item[0], reverse=True)
+    if len(scored) == 1 or scored[0][0] > scored[1][0]:
+        return scored[0][1]
+    return None
+
+
+def _find_attr_state(states: list[dict[str, Any]], required_attrs: tuple[str, ...]) -> dict[str, Any] | None:
+    exact = next((state for state in states if state.get("entity_id") == "sensor.ecotracker_api"), None)
+    if exact:
+        return exact
+    for state in states:
+        attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        if all(key in attrs for key in required_attrs):
+            return state
+    return None
+
+
+def _is_current_power_sensor(state: dict[str, Any], average: bool = False) -> bool:
+    if _domain(state) != "sensor":
+        return False
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+    if str(attrs.get("device_class") or "").strip().lower() != "power" or unit not in {"w", "kw"}:
+        return False
+    haystack = _state_haystack(state)
+    if _is_phase_haystack(haystack):
+        return False
+    if any(token in haystack for token in _ENERGY_OUTLET_NOISE):
+        return False
+    average_tokens = ("avg", "average", "durchschnitt", "mittelwert")
+    if average:
+        return any(token in haystack for token in average_tokens)
+    return not any(token in haystack for token in average_tokens)
+
+
+def _is_phase_power_sensor(state: dict[str, Any], phase: str) -> bool:
+    if _domain(state) != "sensor":
+        return False
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+    if str(attrs.get("device_class") or "").strip().lower() != "power" or unit not in {"w", "kw"}:
+        return False
+    haystack = _state_haystack(state)
+    if any(token in haystack for token in _ENERGY_OUTLET_NOISE):
+        return False
+    phase_tokens = {
+        "l1": ("l1", "phase1", "phase 1", "phase_1"),
+        "l2": ("l2", "phase2", "phase 2", "phase_2"),
+        "l3": ("l3", "phase3", "phase 3", "phase_3"),
+    }
+    return any(token in haystack for token in phase_tokens[phase])
+
+
+def _is_meter_energy_sensor(state: dict[str, Any], direction: str) -> bool:
+    if _domain(state) != "sensor":
+        return False
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+    if str(attrs.get("device_class") or "").strip().lower() != "energy" or unit not in {"kwh", "kw h"}:
+        return False
+    haystack = _state_haystack(state)
+    if any(token in haystack for token in _ENERGY_OUTLET_NOISE):
+        return False
+    if any(token in haystack for token in ("today", "daily", "day", "tag", "heute", "täglich", "taeglich")):
+        return False
+    direction_tokens = {
+        "import": ("import", "in", "netzbezug", "bezug", "verbrauch"),
+        "export": ("export", "out", "einspeis", "feed"),
+    }
+    return any(token in haystack for token in direction_tokens[direction])
+
+
+def _domain(state: dict[str, Any]) -> str:
+    return str(state.get("entity_id") or "").split(".", 1)[0]
+
+
+def _state_haystack(state: dict[str, Any]) -> str:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    return f"{state.get('entity_id') or ''} {attrs.get('friendly_name') or ''}".lower()
+
+
+def _is_phase_haystack(haystack: str) -> bool:
+    return any(token in haystack for token in ("l1", "l2", "l3", "phase1", "phase2", "phase3", "phase 1", "phase 2", "phase 3"))
+
+
+def _energy_score(state: dict[str, Any]) -> int:
+    haystack = _state_haystack(state)
+    score = 0
+    for token in ("ecotracker", "eco tracker", "power meter", "stromzähler", "stromzaehler", "energiezähler", "energiezaehler"):
+        if token in haystack:
+            score += 10
+    for token in ("energy", "energie", "power", "leistung", "netz", "strom"):
+        if token in haystack:
+            score += 3
+    return score
 
 
 def _latest_updated_at(states: list[dict[str, Any] | None]) -> str:

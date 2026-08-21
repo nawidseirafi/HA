@@ -18,7 +18,19 @@ DIAGNOSTIC_TOKENS = (
     "identify",
 )
 
-IRRIGATION_TOKENS = ("irrigation", "watering", "sprinkler", "bewässer", "bewasser", "garten", "ventil", "eve_aqua", "eve aqua")
+IRRIGATION_TOKENS = (
+    "irrigation",
+    "watering",
+    "sprinkler",
+    "sprenganlage",
+    "rasensprenger",
+    "bewässer",
+    "bewasser",
+    "garten",
+    "ventil",
+    "eve_aqua",
+    "eve aqua",
+)
 
 
 class GardenEntityDiscovery:
@@ -39,10 +51,18 @@ class GardenEntityDiscovery:
         entity_id = str(configured or "").strip()
         if entity_id:
             state = next((item for item in states if item.get("entity_id") == entity_id), None)
+            if (state is None or not self._state_available(state)) and auto:
+                return self._auto_bind(states, predicate)
             return self._binding(state, "configured", entity_id)
         if not auto:
             return EntityBinding()
+        return self._auto_bind(states, predicate)
+
+    def _auto_bind(self, states: list[dict[str, Any]], predicate: Callable[[dict[str, Any]], bool]) -> EntityBinding:
         matches = [state for state in states if predicate(state)]
+        available_matches = [state for state in matches if self._state_available(state)]
+        if available_matches:
+            matches = available_matches
         if len(matches) == 1:
             return self._binding(matches[0], "auto")
         if len(matches) > 1:
@@ -58,11 +78,10 @@ class GardenEntityDiscovery:
         attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         entity_id = str(state.get("entity_id") or fallback_entity_id)
         state_value = state.get("state")
-        available = state_value not in {None, "", "unknown", "unavailable"}
         return EntityBinding(
             entity_id=entity_id,
             source=source,
-            available=available,
+            available=self._state_available(state),
             state=state_value,
             name=str(attrs.get("friendly_name") or entity_id),
             last_updated=state.get("last_updated") or state.get("last_changed"),
@@ -78,7 +97,10 @@ class GardenEntityDiscovery:
         attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         device_class = str(attrs.get("device_class") or "").lower()
         unit = str(attrs.get("unit_of_measurement") or "").strip()
-        return (device_class in {"moisture", "humidity"} or any(token in haystack for token in ("soil moisture", "bodenfeuchte", "moisture", "feuchte"))) and unit in {"%", ""}
+        return (
+            device_class in {"moisture", "humidity"}
+            or any(token in haystack for token in ("soil moisture", "soil humidity", "bodenfeuchte", "bodenfeuchtigkeit", "moisture", "feuchte", "feuchtigkeit"))
+        ) and unit in {"%", ""}
 
     def _is_soil_temperature(self, state: dict[str, Any]) -> bool:
         if self._domain(state) != "sensor" or self._is_diagnostic(state):
@@ -123,6 +145,11 @@ class GardenEntityDiscovery:
 
     def _domain(self, state: dict[str, Any]) -> str:
         return str(state.get("entity_id") or "").split(".", 1)[0]
+
+    def _state_available(self, state: dict[str, Any] | None) -> bool:
+        if not state:
+            return False
+        return state.get("state") not in {None, "", "unknown", "unavailable"}
 
     def _score(self, state: dict[str, Any]) -> int:
         haystack = self._haystack(state)

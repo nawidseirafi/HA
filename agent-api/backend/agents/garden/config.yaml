@@ -20,10 +20,10 @@ garden:
       entities:
         moisture: ""
         temperature: ""
-        battery: ""
+        battery: "sensor.garden_garden_lawn_sprinkler_battery"
         soil_warning: ""
         mower: ""
-        irrigation: "switch.eve_aqua_123a"
+        irrigation: "switch.garden_garden_lawn_sprinkler"
         weather: ""
         rain: ""
       moisture:
