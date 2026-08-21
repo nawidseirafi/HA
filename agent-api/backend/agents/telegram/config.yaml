@@ -1,0 +1,11 @@
+telegram:
+  enabled: true
+  bot_token: TELEGRAM_BOT_TOKEN
+  allowed_chat_ids: []
+  auto_pair_first_chat: true
+  default_chat_id: ''
+  poll_interval_seconds: 10
+  timeout_seconds: 10
+  hourly_limit: 30
+  daily_limit: 120
+  database_path: data/telegram/telegram.db

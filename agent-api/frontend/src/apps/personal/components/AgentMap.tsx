@@ -22,6 +22,7 @@ import {
   HousePlug,
   LineChart,
   Mail,
+  MessageCircle,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -49,6 +50,7 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   vacationDashboard: { name: 'vacationDashboard' },
   schedulerDashboard: { name: 'schedulerDashboard' },
   gardenDashboard: { name: 'gardenDashboard' },
+  telegramDashboard: { name: 'telegramDashboard' },
 };
 
 const iconMap: Record<string, LucideIcon> = {
@@ -66,6 +68,7 @@ const iconMap: Record<string, LucideIcon> = {
   HousePlug,
   LineChart,
   Mail,
+  MessageCircle,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -227,18 +230,19 @@ function agentNodeFromMap(mapNode: OrchestratorMapNode, index: number): Node<Age
 
 function positionForNode(node: OrchestratorMapNode, index: number) {
   const fixed: Record<string, { x: number; y: number }> = {
-    orchestrator: { x: 390, y: 20 },
-    scheduler: { x: 180, y: 190 },
+    orchestrator: { x: 525, y: 20 },
+    scheduler: { x: 240, y: 190 },
     messaging: { x: 600, y: 190 },
-    market: { x: -150, y: 380 },
-    invoices: { x: 120, y: 380 },
-    vacation: { x: 390, y: 380 },
-    household: { x: 660, y: 380 },
-    mywellness: { x: 930, y: 380 },
-    garden: { x: 1200, y: 380 },
-    openai: { x: -120, y: 590 },
-    database: { x: 330, y: 590 },
-    homeassistant: { x: 780, y: 590 },
+    household: { x: 960, y: 190 },
+    market: { x: -120, y: 390 },
+    invoices: { x: 150, y: 390 },
+    vacation: { x: 420, y: 390 },
+    telegram: { x: 690, y: 390 },
+    mywellness: { x: 960, y: 390 },
+    garden: { x: 1230, y: 390 },
+    openai: { x: -80, y: 620 },
+    database: { x: 420, y: 620 },
+    homeassistant: { x: 920, y: 620 },
   };
   if (fixed[node.id]) return fixed[node.id];
   if (node.kind === 'agent') return { x: 20 + (index % 4) * 290, y: 220 + Math.floor(index / 4) * 140 };

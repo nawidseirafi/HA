@@ -1,0 +1,15 @@
+id: telegram
+name: Telegram Chat
+description: Privater Telegram-Chat mit Roboter Steve fuer Statusfragen und read-only Assistenz.
+status: active
+ui:
+  icon: MessageCircle
+  dashboard_route: telegramDashboard
+api:
+  prefix: /api/telegram
+  route_module: backend.agents.telegram.routes
+runtime:
+  service_object: telegram_service
+settings:
+  requires_home_assistant: false
+  read_only: true

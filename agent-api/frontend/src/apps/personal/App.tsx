@@ -24,6 +24,7 @@ import { MarketWatchlistPage } from './pages/market/MarketWatchlistPage';
 import { VacationDashboard } from './pages/VacationDashboard';
 import { SchedulerDashboardPage } from './pages/scheduler/SchedulerDashboardPage';
 import { GardenDashboardPage } from './pages/garden/GardenDashboardPage';
+import { TelegramDashboardPage } from './pages/TelegramDashboardPage';
 import { WallDashboardPage } from './pages/WallDashboardPage';
 import { ContextDashboardPage } from './pages/context/ContextDashboardPage';
 import { Layout } from './components/Layout';
@@ -62,6 +63,7 @@ function parseRoute(): Route {
   if (parts[0] === 'vacationDashboard' || parts[0] === 'vacation') return { name: 'vacationDashboard' };
   if (parts[0] === 'scheduler' || parts[0] === 'schedulerDashboard') return { name: 'schedulerDashboard' };
   if (parts[0] === 'garden' || parts[0] === 'gardenDashboard') return { name: 'gardenDashboard' };
+  if (parts[0] === 'telegram' || parts[0] === 'telegramDashboard') return { name: 'telegramDashboard' };
   if (parts[0] === 'years') return { name: 'years' };
   if (parts[0] === 'agents' && (parts[1] === 'invoices' || parts[1] === 'invoiceDashboard')) return { name: 'invoiceDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'market' || parts[1] === 'marketDashboard')) return { name: 'marketDashboard' };
@@ -69,6 +71,7 @@ function parseRoute(): Route {
   if (parts[0] === 'agents' && (parts[1] === 'vacation-dashboard' || parts[1] === 'vacationDashboard')) return { name: 'vacationDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'scheduler' || parts[1] === 'schedulerDashboard')) return { name: 'schedulerDashboard' };
   if (parts[0] === 'agents' && (parts[1] === 'garden' || parts[1] === 'gardenDashboard')) return { name: 'gardenDashboard' };
+  if (parts[0] === 'agents' && (parts[1] === 'telegram' || parts[1] === 'telegramDashboard')) return { name: 'telegramDashboard' };
   if (parts[0] === 'agents' && parts[1] === 'list') return { name: 'agentList' };
   if (parts[0] === 'agents' && parts[1] === 'map') return { name: 'agentMap' };
   if (parts[0] === 'agents' && parts[1] === 'messages') return { name: 'agentMessages' };
@@ -124,6 +127,7 @@ function AppContent() {
     if (route.name === 'vacationDashboard') return <VacationDashboard />;
     if (route.name === 'schedulerDashboard') return <SchedulerDashboardPage />;
     if (route.name === 'gardenDashboard') return <GardenDashboardPage />;
+    if (route.name === 'telegramDashboard') return <TelegramDashboardPage />;
     if (route.name === 'years') return <YearsPage navigate={navigate} />;
     if (route.name === 'year') return <YearPage year={route.year} navigate={navigate} />;
     if (route.name === 'month') return <MonthPage year={route.year} month={route.month} navigate={navigate} />;
@@ -169,6 +173,7 @@ function routeToPath(route: Route) {
   if (route.name === 'vacationDashboard') return '/vacationDashboard';
   if (route.name === 'schedulerDashboard') return '/scheduler';
   if (route.name === 'gardenDashboard') return '/garden';
+  if (route.name === 'telegramDashboard') return '/telegram';
   if (route.name === 'invoiceDashboard') return '/finance';
   if (route.name === 'contracts') return route.category ? `/finance/contracts/${route.category}` : '/finance/contracts';
   if (route.name === 'contract') return `/finance/contracts/${route.id}`;

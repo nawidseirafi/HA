@@ -102,6 +102,58 @@ export type ProductInfo = {
   frontend_app: string;
 };
 
+export type TelegramSetupInfo = {
+  enabled: boolean;
+  configured: boolean;
+  bot_token_configured: boolean;
+  allowed_chat_ids: string[];
+  allowed_chat_count: number;
+  auto_pair_first_chat: boolean;
+  bot: { id?: number | string | null; username?: string | null; first_name?: string | null };
+  bot_url: string;
+  qr_payload: string;
+  config_path: string;
+  env_keys: string[];
+  error?: string | null;
+};
+
+export type TelegramChatCandidate = {
+  chat_id: string;
+  type?: string | null;
+  title?: string | null;
+  username?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  latest_update_id?: number | null;
+  latest_message_id?: number | null;
+  authorized: boolean;
+};
+
+export type TelegramStatus = {
+  agent_id: string;
+  enabled: boolean;
+  configured: boolean;
+  is_running: boolean;
+  status: string;
+  allowed_chat_count: number;
+  last_poll_at?: string | null;
+  last_sent_at?: string | null;
+  last_error?: string | null;
+  recent_messages: Array<Record<string, unknown>>;
+};
+
+export type TelegramSettingsPayload = {
+  enabled?: boolean;
+  bot_token?: string;
+  allowed_chat_ids?: string[];
+  auto_pair_first_chat?: boolean;
+  default_chat_id?: string;
+  poll_interval_seconds?: number;
+  timeout_seconds?: number;
+  hourly_limit?: number;
+  daily_limit?: number;
+};
+
 export type EnergyOverview = {
   power: number | null;
   power_avg: number | null;
@@ -223,7 +275,7 @@ export type UpdateCheckResult = {
   error?: string;
 };
 
-export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard' | 'gardenDashboard';
+export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard' | 'gardenDashboard' | 'telegramDashboard';
 
 export type GardenEntityBinding = {
   entity_id: string | null;
@@ -1333,6 +1385,15 @@ export const api = {
   contextHistory: (limit = 100) => request<ContextHistory>(`/api/context/history?limit=${limit}`),
   contextDebug: () => request<ContextDebug>('/api/context/debug'),
   energyOverview: () => request<EnergyOverview>('/api/homeassistant/energy'),
+  telegramStatus: () => request<TelegramStatus>('/api/telegram/status'),
+  telegramSetup: () => request<TelegramSetupInfo>('/api/telegram/setup'),
+  telegramDiscoverChats: () => request<{ chats: TelegramChatCandidate[] }>('/api/telegram/discover-chats'),
+  updateTelegramSettings: (payload: TelegramSettingsPayload) =>
+    request<TelegramStatus>('/api/telegram/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  enableTelegramAgent: () => request<TelegramStatus>('/api/telegram/enable', { method: 'POST' }),
+  disableTelegramAgent: () => request<TelegramStatus>('/api/telegram/disable', { method: 'POST' }),
+  testTelegramAgent: (text?: string) =>
+    request<{ ok: boolean; result: unknown }>('/api/telegram/test', { method: 'POST', body: JSON.stringify({ text }) }),
   vacationStatus: () => request<VacationStatus>('/api/vacation/status'),
   enableVacationAgent: () => request<VacationStatus>('/api/vacation/enable', { method: 'POST' }),
   disableVacationAgent: () => request<VacationStatus>('/api/vacation/disable', { method: 'POST' }),
