@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 from dataclasses import replace
 
-from backend.agents.telegram.service import TelegramConfig, TelegramService, TelegramStore
+from backend.agents.telegram.service import TelegramConfig, TelegramService, TelegramStore, _home_assistant_snapshot
 
 
 class RecordingTelegramClient:
@@ -131,6 +131,37 @@ class TelegramAgentTests(unittest.TestCase):
             self.assertEqual(service.config().allowed_chat_ids, ("6516768203",))
             self.assertIn("jetzt mit Roboter Steve verbunden", client.sent[0]["text"])
 
+    def test_homeassistant_snapshot_includes_temperature_and_alert_sensors(self):
+        snapshot = _home_assistant_snapshot([
+            ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
+            ha_state("sensor.bad_luftfeuchtigkeit", "48", "Bad Luftfeuchtigkeit", device_class="humidity", unit_of_measurement="%"),
+            ha_state("binary_sensor.flur_rauchmelder", "off", "Flur Rauchmelder", device_class="smoke"),
+            ha_state("binary_sensor.kueche_problem", "on", "Kueche Problem", device_class="problem"),
+            ha_state("sensor.tuerkontakt_battery", "21", "Tuerkontakt Batterie", device_class="battery", unit_of_measurement="%"),
+        ])
+
+        self.assertEqual(snapshot["entity_count"], 5)
+        self.assertEqual(snapshot["temperatures"][0]["value"], 22.4)
+        self.assertEqual(snapshot["humidity"][0]["value"], 48)
+        self.assertEqual(snapshot["smoke_alerts"][0]["name"], "Flur Rauchmelder")
+        self.assertEqual(snapshot["active_problems"][0]["name"], "Kueche Problem")
+        self.assertEqual(snapshot["low_batteries"][0]["level"], 21)
+
+    def test_fallback_answer_uses_homeassistant_temperatures_for_temperature_questions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = self._service(tmp, RecordingTelegramClient())
+            context = {
+                "home_assistant": {
+                    "temperatures": [
+                        {"entity_id": "sensor.wohnzimmer_temperatur", "name": "Wohnzimmer Temperatur", "value": 22.4, "unit": "°C"}
+                    ]
+                }
+            }
+
+            answer = service._fallback_answer("Wie ist die Temperatur?", context)
+
+            self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
+
     def _service(self, tmp, client):
         config = TelegramConfig(enabled=True, bot_token="secret", allowed_chat_ids=("6516768203",), database_path=str(Path(tmp) / "telegram.db"))
         return TestTelegramService(config, store=TelegramStore(config.database_path), client=client, messaging=FakeMessaging())
@@ -145,6 +176,15 @@ def update(text, chat_id="6516768203", update_id=1001):
             "from": {"is_bot": False},
             "text": text,
         },
+    }
+
+
+def ha_state(entity_id, value, name="", **attrs):
+    return {
+        "entity_id": entity_id,
+        "state": value,
+        "attributes": {"friendly_name": name, **attrs},
+        "last_updated": "2026-08-21T07:00:00+00:00",
     }
 
 

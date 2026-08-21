@@ -521,13 +521,27 @@ class TelegramService:
         except Exception as exc:
             context["garden_error"] = str(exc)
         try:
-            context["energy"] = HomeAssistantService().get_energy_overview()
+            ha_service = HomeAssistantService()
+            states = ha_service.get_states()
+            context["home_assistant"] = _home_assistant_snapshot(states)
+            context["energy"] = ha_service.get_energy_overview()
         except Exception as exc:
-            context["energy_error"] = str(exc)
+            context["home_assistant_error"] = str(exc)
         return context
 
     def _fallback_answer(self, question: str, context: dict[str, Any]) -> str:
         parts = ["Ich kann gerade keine KI-Antwort erzeugen, aber ich habe den Systemstatus gelesen."]
+        ha = context.get("home_assistant") if isinstance(context.get("home_assistant"), dict) else {}
+        if _question_mentions_temperature(question) and ha:
+            temperatures = ha.get("temperatures") if isinstance(ha.get("temperatures"), list) else []
+            if temperatures:
+                values = [
+                    f"{item.get('name') or item.get('entity_id')}: {item.get('value'):g} {item.get('unit') or '°C'}"
+                    for item in temperatures[:8]
+                    if isinstance(item.get("value"), (int, float))
+                ]
+                if values:
+                    parts.append("Temperaturen: " + "; ".join(values) + ".")
         garden = context.get("garden") if isinstance(context.get("garden"), dict) else {}
         if garden:
             summary = garden.get("summary") if isinstance(garden.get("summary"), dict) else {}
@@ -638,3 +652,145 @@ def _message_id(result: dict[str, Any] | None) -> int | None:
 
 def _question_hash(question: str) -> str:
     return hashlib.sha256(question.encode("utf-8")).hexdigest()
+
+
+def _home_assistant_snapshot(states: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "entity_count": len(states),
+        "temperatures": _sensor_items(states, _is_temperature_state, limit=30),
+        "humidity": _sensor_items(states, _is_humidity_state, limit=20),
+        "smoke_alerts": _binary_items(states, _is_smoke_or_gas_state, active_only=False, limit=30),
+        "active_problems": _binary_items(states, _is_problem_state, active_only=True, limit=30),
+        "openings": _binary_items(states, _is_opening_state, active_only=False, limit=40),
+        "low_batteries": _low_battery_items(states, limit=30),
+        "unavailable": _simple_state_items(
+            [state for state in states if str(state.get("state") or "").lower() in {"unavailable", "unknown"}],
+            limit=30,
+        ),
+        "updated_at": _latest_state_updated_at(states),
+    }
+
+
+def _sensor_items(states: list[dict[str, Any]], predicate: Any, limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if not predicate(state):
+            continue
+        value = _numeric_state(state)
+        if value is None:
+            continue
+        attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        items.append({
+            **_simple_state_item(state),
+            "value": value,
+            "unit": attrs.get("unit_of_measurement"),
+        })
+    return sorted(items, key=lambda item: (item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _binary_items(states: list[dict[str, Any]], predicate: Any, active_only: bool, limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if not predicate(state):
+            continue
+        item = _simple_state_item(state)
+        item["active"] = _is_active_state(state)
+        if active_only and not item["active"]:
+            continue
+        items.append(item)
+    return sorted(items, key=lambda item: (not item.get("active", False), item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _low_battery_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if not _is_battery_state(state):
+            continue
+        level = _numeric_state(state)
+        text_state = str(state.get("state") or "").strip().lower()
+        if level is not None and level >= 40 and text_state not in {"low", "critical", "empty"}:
+            continue
+        item = _simple_state_item(state)
+        item["level"] = level
+        items.append(item)
+    return sorted(items, key=lambda item: (item.get("level") is None, item.get("level") or 999, item.get("name") or ""))[:limit]
+
+
+def _simple_state_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    return sorted((_simple_state_item(state) for state in states), key=lambda item: (item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _simple_state_item(state: dict[str, Any]) -> dict[str, Any]:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    return {
+        "entity_id": state.get("entity_id"),
+        "name": attrs.get("friendly_name") or state.get("entity_id"),
+        "state": state.get("state"),
+        "device_class": attrs.get("device_class"),
+        "last_updated": state.get("last_updated"),
+    }
+
+
+def _is_temperature_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    device_class = str(attrs.get("device_class") or "").lower()
+    unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+    return _domain(state) == "sensor" and (device_class == "temperature" or unit in {"°c", "c", "°f", "f"}) and _numeric_state(state) is not None
+
+
+def _is_humidity_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    device_class = str(attrs.get("device_class") or "").lower()
+    unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
+    text = f"{state.get('entity_id') or ''} {attrs.get('friendly_name') or ''}".lower()
+    return _domain(state) == "sensor" and (device_class == "humidity" or (unit == "%" and any(term in text for term in ("humidity", "luftfeuchtigkeit", "feuchtigkeit")))) and _numeric_state(state) is not None
+
+
+def _is_smoke_or_gas_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    device_class = str(attrs.get("device_class") or "").lower()
+    text = f"{state.get('entity_id') or ''} {attrs.get('friendly_name') or ''}".lower()
+    return _domain(state) == "binary_sensor" and (device_class in {"smoke", "gas", "carbon_monoxide"} or any(term in text for term in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid")))
+
+
+def _is_problem_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    return _domain(state) == "binary_sensor" and str(attrs.get("device_class") or "").lower() == "problem"
+
+
+def _is_opening_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    return _domain(state) == "binary_sensor" and str(attrs.get("device_class") or "").lower() in {"door", "window", "opening", "garage_door"}
+
+
+def _is_battery_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    entity_id = str(state.get("entity_id") or "").lower()
+    device_class = str(attrs.get("device_class") or "").lower()
+    return _domain(state) in {"sensor", "binary_sensor"} and (device_class == "battery" or entity_id.endswith(("_battery", "_batterie")))
+
+
+def _is_active_state(state: dict[str, Any]) -> bool:
+    return str(state.get("state") or "").strip().lower() in {"on", "open", "detected", "problem", "unsafe", "home"}
+
+
+def _numeric_state(state: dict[str, Any]) -> float | None:
+    try:
+        return float(str(state.get("state") or "").replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _domain(state: dict[str, Any]) -> str:
+    entity_id = str(state.get("entity_id") or "")
+    return entity_id.split(".", 1)[0] if "." in entity_id else ""
+
+
+def _latest_state_updated_at(states: list[dict[str, Any]]) -> str | None:
+    values = [str(state.get("last_updated") or "") for state in states if state.get("last_updated")]
+    return max(values) if values else None
+
+
+def _question_mentions_temperature(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("temperatur", "temperature", "warm", "kalt", "grad"))
