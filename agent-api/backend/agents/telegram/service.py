@@ -381,17 +381,19 @@ class TelegramService:
     def answer(self, question: str) -> str:
         context = self._context_snapshot()
         house_answer = _house_status_answer(question, context)
-        if house_answer:
-            return house_answer
         system = (
             "Du bist Roboter Steve im privaten Haushalt von Nawid. "
             "Antworte kurz, konkret und auf Deutsch. "
             "Du darfst ueber Status, Termine, Nachrichten, Garten, Energie und Home Assistant informieren. "
             "Wenn Home-Assistant-Daten im Kontext enthalten sind, nutze diese konkret mit Entity-Namen und Status. "
+            "Nutze fuer Rauchmelder-, Temperatur-, Sicherheits-, Fenster-, Tuer- und Garagenfragen nur den gefilterten "
+            "Home-Assistant-Snapshot und die lokale Hausstatus-Zusammenfassung im Prompt. "
+            "Nenne keine internen Geraete-, Router-, CPU-, Batterie-, Board- oder Diagnose-Temperaturen. "
             "Sage nicht, dass Informationen fehlen, wenn passende Daten im Kontext stehen. "
             "Fuehre ueber Telegram keine Aktionen an Geraeten aus und behaupte keine Aktion ausgefuehrt zu haben."
         )
-        prompt = f"Kontext:\n{json.dumps(context, ensure_ascii=False, indent=2)[:12000]}\n\nNutzerfrage:\n{question}"
+        local_summary = f"\n\nLokale gefilterte Hausstatus-Zusammenfassung:\n{house_answer}" if house_answer else ""
+        prompt = f"Kontext:\n{json.dumps(context, ensure_ascii=False, indent=2)[:12000]}{local_summary}\n\nNutzerfrage:\n{question}"
         try:
             response = create_llm_client().generate(prompt=prompt, system=system)
             text = str(response.text or "").strip()
@@ -399,6 +401,8 @@ class TelegramService:
                 return text[:4000]
         except Exception as exc:
             self._last_error = str(exc)
+        if house_answer:
+            return house_answer
         return self._fallback_answer(question, context)
 
     def store(self, config: TelegramConfig | None = None) -> TelegramStore:

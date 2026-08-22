@@ -1,8 +1,10 @@
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 from dataclasses import replace
+from unittest.mock import patch
 
 from backend.agents.telegram.service import TelegramConfig, TelegramService, TelegramStore, _home_assistant_snapshot, _house_status_answer
 
@@ -222,6 +224,49 @@ class TelegramAgentTests(unittest.TestCase):
 
         self.assertIn("Temperaturen", answer)
         self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
+
+    def test_answer_sends_house_sensor_questions_to_llm_with_local_summary(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
+                ha_state("sensor.server_cpu_temperature", "72", "Server CPU Temperature", device_class="temperature", unit_of_measurement="°C"),
+            ])
+        }
+        service = TelegramService(messaging=FakeMessaging())
+        service._context_snapshot = lambda: context
+
+        with patch("backend.agents.telegram.service.create_llm_client") as factory:
+            llm = factory.return_value
+            llm.generate.return_value = SimpleNamespace(text="KI Antwort mit Wohnzimmer Temperatur.")
+
+            answer = service.answer("Wie ist die Temperatur?")
+
+        self.assertEqual(answer, "KI Antwort mit Wohnzimmer Temperatur.")
+        llm.generate.assert_called_once()
+        prompt = llm.generate.call_args.kwargs["prompt"]
+        system = llm.generate.call_args.kwargs["system"]
+        self.assertIn("Lokale gefilterte Hausstatus-Zusammenfassung", prompt)
+        self.assertIn("Wohnzimmer Temperatur: 22.4 °C", prompt)
+        self.assertNotIn("Server CPU Temperature: 72", prompt)
+        self.assertIn("Nenne keine internen Geraete", system)
+
+    def test_answer_falls_back_to_local_house_summary_when_llm_fails(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
+            ])
+        }
+        service = TelegramService(messaging=FakeMessaging())
+        service._context_snapshot = lambda: context
+
+        with patch("backend.agents.telegram.service.create_llm_client") as factory:
+            factory.return_value.generate.side_effect = RuntimeError("llm down")
+
+            answer = service.answer("Wie ist die Temperatur?")
+
+        self.assertIn("Temperaturen", answer)
+        self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
+        self.assertNotIn("Ich kann gerade keine KI-Antwort erzeugen", answer)
 
     def test_homeassistant_snapshot_ignores_device_internal_temperatures(self):
         snapshot = _home_assistant_snapshot([
