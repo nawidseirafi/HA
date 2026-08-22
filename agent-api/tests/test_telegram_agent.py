@@ -223,6 +223,17 @@ class TelegramAgentTests(unittest.TestCase):
         self.assertIn("Temperaturen", answer)
         self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
 
+    def test_homeassistant_snapshot_ignores_device_internal_temperatures(self):
+        snapshot = _home_assistant_snapshot([
+            ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
+            ha_state("sensor.fritzbox_router_temperature", "61", "FritzBox Router Temperature", device_class="temperature", unit_of_measurement="°C"),
+            ha_state("sensor.server_cpu_temperature", "72", "Server CPU Temperature", device_class="temperature", unit_of_measurement="°C"),
+        ])
+
+        names = [item["name"] for item in snapshot["temperatures"]]
+
+        self.assertEqual(names, ["Wohnzimmer Temperatur"])
+
     def _service(self, tmp, client):
         config = TelegramConfig(enabled=True, bot_token="secret", allowed_chat_ids=("6516768203",), database_path=str(Path(tmp) / "telegram.db"))
         return TestTelegramService(config, store=TelegramStore(config.database_path), client=client, messaging=FakeMessaging())

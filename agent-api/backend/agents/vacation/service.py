@@ -116,7 +116,6 @@ class VacationService:
             current_status = "error"
             error = str(exc)
             vacation_mode["error"] = str(exc)
-        reminders = self.get_reminders(status="open", limit=20)
         calendar = self.resolve_calendar_entity()
         calendar_period = self.calendar_vacation_period(calendar.get("entity_id"), calendar)
         if not calendar_period:
@@ -158,6 +157,10 @@ class VacationService:
             "calendar_entity": (calendar_period or {}).get("calendar_entity"),
             "duration_days": self._duration_days((calendar_period or active_period or {}).get("start_date"), (calendar_period or active_period or {}).get("end_date")),
         }
+        has_vacation_context = self._has_vacation_context(vacation_mode.get("active"), period)
+        if not has_vacation_context:
+            self._close_generated_reminders()
+        reminders = self.get_reminders(status="open", limit=20) if has_vacation_context else []
         return {
             "agent": agent,
             "vacation_mode": vacation_mode,
@@ -529,7 +532,7 @@ class VacationService:
     def refresh_reminders(self, vacation_mode: bool | None = None, period: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         period = period or {}
         pre_departure = self._is_pre_departure_window(period)
-        has_vacation_context = bool(vacation_mode) or pre_departure
+        has_vacation_context = self._has_vacation_context(vacation_mode, period, pre_departure=pre_departure)
         try:
             states = self._ha().get_states()
         except Exception as exc:
@@ -549,8 +552,10 @@ class VacationService:
                 self._message_from_reminder(reminder)
             return reminders
         self._close_generated_reminders()
+        if not has_vacation_context:
+            return []
         candidates = self._reminder_candidates(states, vacation_mode=bool(vacation_mode), period=period, pre_departure=pre_departure)
-        candidates.extend(self._waste_reminders_from_service(period, pre_departure=pre_departure))
+        candidates.extend(self._waste_reminders_from_service(period, has_vacation_context=has_vacation_context, pre_departure=pre_departure))
         reminders = [self._save_reminder_candidate(candidate) for candidate in candidates]
         for reminder in reminders:
             self._message_from_reminder(reminder)
@@ -1297,7 +1302,9 @@ class VacationService:
             })
         return candidates
 
-    def _waste_reminders_from_service(self, period: dict[str, Any], pre_departure: bool = False) -> list[dict[str, Any]]:
+    def _waste_reminders_from_service(self, period: dict[str, Any], has_vacation_context: bool = False, pre_departure: bool = False) -> list[dict[str, Any]]:
+        if not has_vacation_context:
+            return []
         period_dates = self._vacation_period_dates(period)
         if not period_dates:
             return []
@@ -1507,6 +1514,9 @@ class VacationService:
         today = datetime.now(timezone.utc).date()
         days = (start_date - today).days
         return 0 <= days <= self.config()["pre_departure_days"]
+
+    def _has_vacation_context(self, vacation_mode: bool | None, period: dict[str, Any], pre_departure: bool | None = None) -> bool:
+        return bool(vacation_mode) or (self._is_pre_departure_window(period) if pre_departure is None else bool(pre_departure))
 
     def _notification_already_sent(self, tag: str) -> bool:
         with self._connect() as connection:

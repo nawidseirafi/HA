@@ -367,6 +367,7 @@ function houseClimateSummary(data: WallDashboardData) {
     const basementHums: number[] = [];
 
     for (const sensor of data.temperature_sensors ?? []) {
+        if (!isRoomTemperatureSensor(sensor)) continue;
         const area = sensor.area || '';
         const temp = Number(sensor.temperature);
         const hum = Number((sensor as WallTemperatureSensor & { humidity?: number | null }).humidity);
@@ -2936,6 +2937,7 @@ function LightsSection({
 function averageHouseTemperature(data: WallDashboardData) {
     const values = [
         ...(data.temperature_sensors ?? [])
+            .filter(isRoomTemperatureSensor)
             .map((sensor) => sensor.temperature)
             .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
         ...data.climate
@@ -3006,7 +3008,9 @@ function ClimateSection({
                           {(() => {
                             const visibleTemperatureChips = [
                                 ...room.climate.filter((item) => item.current_temperature !== null && item.current_temperature !== undefined),
-                                ...room.items.filter((item) => item.temperature !== null && item.temperature !== undefined),
+                                ...room.items
+                                    .filter(isRoomTemperatureSensor)
+                                    .filter((item) => item.temperature !== null && item.temperature !== undefined),
                             ].length;
                             return visibleTemperatureChips > 2 ? <span>+{visibleTemperatureChips - 2}</span> : null;
                           })()}
@@ -3040,7 +3044,7 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <MetricCard icon={<BatteryWarning size={24}/>} label="Batterie"
                         value={`${wallLowBatteries.length}`} detail="niedrig"
                         tone={wallLowBatteries.length ? 'critical' : 'ok'}/>
-            <SmokeDetectorPanel detectors={smokeDetectors}/>
+            <SmokeDetectorPanel detectors={smokeDetectors} data={data}/>
             {openItems.length > 0 && <ListPanel title="Offene Fenster & Türen" items={openItems}/>}
             {wallLowBatteries.length > 0 && <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>}
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
@@ -3049,8 +3053,9 @@ function SecuritySection({data}: { data: WallDashboardData }) {
     );
 }
 
-function SmokeDetectorPanel({detectors}: {
-    detectors: Array<WallEntity & { active?: boolean; last_updated?: string | null; last_changed?: string | null; test_entity_id?: string | null }>
+function SmokeDetectorPanel({detectors, data}: {
+    detectors: Array<WallEntity & { active?: boolean; last_updated?: string | null; last_changed?: string | null; test_entity_id?: string | null }>;
+    data: WallDashboardData;
 }) {
     const [testing, setTesting] = useState('');
     const [testResult, setTestResult] = useState<Record<string, 'ok' | 'error'>>({});
@@ -3088,6 +3093,7 @@ function SmokeDetectorPanel({detectors}: {
                     const tone = smokeDetectorTone(detector);
                     const testEntity = smokeDetectorTestEntity(detector);
                     const result = testResult[detector.entity_id];
+                    const battery = batteryForDeviceName(data, detector.area || '', detector.name);
                     return (
                         <article key={detector.entity_id} className={`wall-smoke-row ${tone}`}>
                             <span className={`wall-smoke-dot ${tone}`} aria-hidden="true"/>
@@ -3096,6 +3102,7 @@ function SmokeDetectorPanel({detectors}: {
                                 <span>{detector.area || 'Haus'} · {smokeDetectorStatus(detector)}</span>
                             </div>
                             <div className="wall-smoke-actions">
+                                {battery && <BatteryPill battery={battery}/>}
                                 {result && <span className={`wall-smoke-test-result ${result}`}>{result === 'ok' ? 'Gesendet' : 'Fehler'}</span>}
                                 <button
                                     type="button"
@@ -3812,6 +3819,7 @@ function floorTemperature(data: WallDashboardData, floor: string) {
     const values = [
         ...(data.temperature_sensors ?? [])
             .filter((sensor) => roomNames.has(normalizeArea(sensor.area)))
+            .filter(isRoomTemperatureSensor)
             .map((sensor) => sensor.temperature),
         ...data.climate
             .filter((item) => roomNames.has(normalizeArea(item.area)))
@@ -4256,6 +4264,7 @@ function roomSensorChips(data: WallDashboardData, room: string) {
 
     for (const sensor of data.temperature_sensors ?? []) {
         if (!sameArea(sensor.area, room)) continue;
+        if (!isRoomTemperatureSensor(sensor)) continue;
         if (sensor.temperature !== null && sensor.temperature !== undefined) {
             add(`${sensor.entity_id}:temperature`, 'Temperatur', `${formatNumber(sensor.temperature)}°C`, 'climate');
         }
@@ -4441,18 +4450,14 @@ function climateToneClass(mode: string) {
     return 'off';
 }
 function isRoomTemperatureSensor(item: { name?: string; entity_id?: string }) {
-    const text = `${item.name || ''} ${item.entity_id || ''}`.toLowerCase();
-    return !/cpu|prozessor|processor|soc|chip|fritz/.test(text);
+    const text = normalizeArea(`${item.name || ''} ${item.entity_id || ''}`);
+    return !/fritz|router|gateway|modem|repeater|unifi|udm|switch|cpu|gpu|prozessor|processor|soc|chip|core|nvme|ssd|battery|batterie|akku|device temperature|gerätetemperatur|geraetetemperatur|internal temperature|interne temperatur|board temperature|pcb|case temperature|power supply|netzteil|inverter|wechselrichter|phase|l1|l2|l3/.test(text);
 }
-function isRealRoomTemperatureSensorName(name?: string) {
-    return !/cpu|prozessor|processor|device temperature|gerätetemperatur|geraetetemperatur|soc|chip|fritz/i.test(String(name || ''));
-}
-
 function roomTemperature(data: WallDashboardData, room: string) {
     const values = [
         ...(data.temperature_sensors ?? [])
             .filter((sensor) => sameArea(sensor.area, room))
-            .filter((sensor) => isRealRoomTemperatureSensorName(sensor.name))
+            .filter(isRoomTemperatureSensor)
             .map((sensor) => sensor.temperature),
         ...data.climate
             .filter((item) => sameArea(item.area, room))
@@ -4679,6 +4684,7 @@ function temperatureRooms(data: WallDashboardData, selectedFloor: string) {
 
     const areas = new Set<string>();
     for (const sensor of data.temperature_sensors ?? []) {
+        if (!isRoomTemperatureSensor(sensor)) continue;
         const hasTemperature = sensor.temperature !== null && sensor.temperature !== undefined;
         const hasHumidity = sensor.humidity !== null && sensor.humidity !== undefined;
         if (hasTemperature || hasHumidity) areas.add(sensor.area || 'Haus');

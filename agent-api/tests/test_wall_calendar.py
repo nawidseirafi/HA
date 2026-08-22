@@ -79,6 +79,36 @@ class WallCalendarTests(unittest.TestCase):
 
         self.assertEqual([item["entity_id"] for item in smoke_items], ["binary_sensor.living_room_smoke_detector_smoke"])
 
+    def test_wall_temperature_items_ignore_device_internal_temperatures(self):
+        from backend.api.homeassistant_routes import _temperature_items
+
+        states = [
+            {
+                "entity_id": "sensor.wohnzimmer_temperatur",
+                "state": "22.4",
+                "attributes": {"friendly_name": "Wohnzimmer Temperatur", "device_class": "temperature", "unit_of_measurement": "°C"},
+            },
+            {
+                "entity_id": "sensor.fritzbox_router_temperature",
+                "state": "61",
+                "attributes": {"friendly_name": "FritzBox Router Temperature", "device_class": "temperature", "unit_of_measurement": "°C"},
+            },
+            {
+                "entity_id": "sensor.server_cpu_temperature",
+                "state": "72",
+                "attributes": {"friendly_name": "Server CPU Temperature", "device_class": "temperature", "unit_of_measurement": "°C"},
+            },
+            {
+                "entity_id": "sensor.hobby_room_water_leak_sensor_left_device_temperature",
+                "state": "29",
+                "attributes": {"friendly_name": "Hobby Room Water Leak", "device_class": "temperature", "unit_of_measurement": "°C"},
+            },
+        ]
+
+        items = _temperature_items(states)
+
+        self.assertEqual([item["entity_id"] for item in items], ["sensor.wohnzimmer_temperatur"])
+
 
 if __name__ == "__main__":
     unittest.main()

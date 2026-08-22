@@ -830,7 +830,24 @@ def _is_temperature_state(state: dict[str, Any]) -> bool:
     unit = str(attributes.get("unit_of_measurement") or "").strip().lower()
     if device_class != "temperature" and unit not in {"°c", "c", "°f", "f"}:
         return False
+    if _is_device_internal_temperature_state(state):
+        return False
     return _numeric_value(state.get("state")) is not None
+
+
+def _is_device_internal_temperature_state(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes", {}) if isinstance(state.get("attributes"), dict) else {}
+    entity_id = str(state.get("entity_id") or "").lower()
+    name = str(attributes.get("friendly_name") or "").lower()
+    text = f"{entity_id} {name}".replace("_", " ").replace("-", " ")
+    internal_tokens = (
+        "fritz", "router", "gateway", "modem", "repeater", "unifi", "udm", "switch",
+        "cpu", "gpu", "soc", "chip", "processor", "prozessor", "core", "nvme", "ssd",
+        "battery", "batterie", "akku", "device temperature", "gerätetemperatur", "geraetetemperatur",
+        "internal temperature", "interne temperatur", "board temperature", "pcb", "case temperature",
+        "power supply", "netzteil", "inverter", "wechselrichter", "phase", "l1", "l2", "l3",
+    )
+    return any(token in text for token in internal_tokens)
 
 
 def _is_humidity_state(state: dict[str, Any]) -> bool:

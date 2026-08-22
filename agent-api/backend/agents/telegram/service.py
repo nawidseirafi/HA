@@ -801,7 +801,27 @@ def _is_temperature_state(state: dict[str, Any]) -> bool:
     attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
     device_class = str(attrs.get("device_class") or "").lower()
     unit = str(attrs.get("unit_of_measurement") or "").strip().lower()
-    return _domain(state) == "sensor" and (device_class == "temperature" or unit in {"°c", "c", "°f", "f"}) and _numeric_state(state) is not None
+    return (
+        _domain(state) == "sensor"
+        and (device_class == "temperature" or unit in {"°c", "c", "°f", "f"})
+        and _numeric_state(state) is not None
+        and not _is_device_internal_temperature_state(state)
+    )
+
+
+def _is_device_internal_temperature_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    entity_id = str(state.get("entity_id") or "").lower()
+    name = str(attrs.get("friendly_name") or "").lower()
+    text = f"{entity_id} {name}"
+    internal_tokens = (
+        "fritz", "router", "gateway", "modem", "repeater", "unifi", "udm", "switch",
+        "cpu", "gpu", "soc", "chip", "processor", "prozessor", "core", "nvme", "ssd",
+        "battery", "batterie", "akku", "device temperature", "gerätetemperatur", "geraetetemperatur",
+        "internal temperature", "interne temperatur", "board temperature", "pcb", "case temperature",
+        "power supply", "netzteil", "inverter", "wechselrichter", "phase", "l1", "l2", "l3",
+    )
+    return any(token in text for token in internal_tokens)
 
 
 def _is_humidity_state(state: dict[str, Any]) -> bool:

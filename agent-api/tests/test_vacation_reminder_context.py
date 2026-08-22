@@ -55,6 +55,26 @@ class VacationReminderContextTests(unittest.TestCase):
 
         self.assertEqual(reminders, [])
 
+    def test_future_vacation_period_is_not_preparation_context_by_itself(self):
+        self.service.config = lambda: {"pre_departure_days": 3}
+
+        self.assertFalse(
+            self.service._has_vacation_context(
+                vacation_mode=False,
+                period={"start_date": "2026-09-10", "end_date": "2026-10-09"},
+                pre_departure=False,
+            )
+        )
+
+    def test_waste_reminders_are_skipped_without_vacation_context(self):
+        reminders = self.service._waste_reminders_from_service(
+            {"start_date": "2026-09-10", "end_date": "2026-10-09"},
+            has_vacation_context=False,
+            pre_departure=False,
+        )
+
+        self.assertEqual(reminders, [])
+
     def test_active_smoke_alarm_creates_critical_vacation_reminder(self):
         reminders = self.service._reminder_candidates(
             [
