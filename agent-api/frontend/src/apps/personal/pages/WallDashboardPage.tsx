@@ -31,6 +31,7 @@ import {
     Plus,
     Trash2,
     RefreshCw,
+    Siren,
     ShieldAlert,
     Square,
     Sprout,
@@ -3022,14 +3023,14 @@ function ClimateSection({
 
 function SecuritySection({data}: { data: WallDashboardData }) {
     const openItems = data.security.openings.filter((item) => item.state === 'on');
-    const safetyAlerts = data.security.safety_alerts ?? [];
-    const safetyDetectors = data.security.safety_detectors ?? data.security.smoke_alerts ?? [];
+    const smokeDetectors = data.security.smoke_alerts ?? [];
+    const activeSmokeDetectors = smokeDetectors.filter((item) => item.active || ['on', 'detected', 'problem', 'unsafe'].includes(String(item.state || '').toLowerCase()));
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const batteries = wallBatteryEntities(data.health.batteries ?? data.health.low_batteries).sort(compareBatteryStatus);
     return (
         <div className="wall-card-grid">
-            <MetricCard icon={<Flame size={24}/>} label="Rauch/Gas/CO" value={`${safetyAlerts.length}`}
-                        detail={`${safetyDetectors.length} Melder`} tone={safetyAlerts.length ? 'critical' : 'ok'}/>
+            <MetricCard icon={<Flame size={24}/>} label="Rauchalarm" value={`${activeSmokeDetectors.length}`}
+                        detail={`${smokeDetectors.length} Rauchmelder`} tone={activeSmokeDetectors.length ? 'critical' : 'ok'}/>
             <MetricCard icon={<DoorOpen size={24}/>} label="Offene Kontakte" value={`${openItems.length}`}
                         detail={`${data.security.openings_total} gesamt`} tone={openItems.length ? 'critical' : 'ok'}/>
             <MetricCard icon={<ShieldAlert size={24}/>} label="Probleme" value={`${data.security.problems.length}`}
@@ -3039,12 +3040,78 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <MetricCard icon={<BatteryWarning size={24}/>} label="Batterie"
                         value={`${wallLowBatteries.length}`} detail="niedrig"
                         tone={wallLowBatteries.length ? 'critical' : 'ok'}/>
-            <ListPanel title="Offene Fenster & Türen" items={openItems}/>
-            <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>
+            <SmokeDetectorPanel detectors={smokeDetectors}/>
+            {openItems.length > 0 && <ListPanel title="Offene Fenster & Türen" items={openItems}/>}
+            {wallLowBatteries.length > 0 && <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>}
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
             <BatteryStatusPanel batteries={batteries}/>
-            <ListPanel title="Sicherheitsmelder" items={safetyDetectors}/>
         </div>
+    );
+}
+
+function SmokeDetectorPanel({detectors}: {
+    detectors: Array<WallEntity & { active?: boolean; last_updated?: string | null; last_changed?: string | null; test_entity_id?: string | null }>
+}) {
+    const [testing, setTesting] = useState('');
+    const [testResult, setTestResult] = useState<Record<string, 'ok' | 'error'>>({});
+    const sorted = [...detectors].sort((a, b) => {
+        const toneDiff = smokeDetectorRank(smokeDetectorTone(b)) - smokeDetectorRank(smokeDetectorTone(a));
+        if (toneDiff) return toneDiff;
+        return `${a.area || ''}${a.name || ''}`.localeCompare(`${b.area || ''}${b.name || ''}`, 'de');
+    });
+
+    const testDetector = async (detector: WallEntity) => {
+        const entityId = smokeDetectorTestEntity(detector);
+        if (!entityId) return;
+        setTesting(detector.entity_id);
+        try {
+            await api.callHomeAssistantService({domain: 'button', service: 'press', entity_id: entityId});
+            setTestResult((current) => ({...current, [detector.entity_id]: 'ok'}));
+        } catch {
+            setTestResult((current) => ({...current, [detector.entity_id]: 'error'}));
+        } finally {
+            setTesting('');
+        }
+    };
+
+    return (
+        <section className="wall-panel wall-smoke-panel">
+            <div className="wall-smoke-panel-head">
+                <div>
+                    <span>Rauchmelder</span>
+                    <strong>{sorted.length}</strong>
+                </div>
+                <Siren size={24}/>
+            </div>
+            <div className="wall-smoke-list">
+                {sorted.length === 0 ? <p>Keine Rauchmelder wie binary_sensor.*_smoke gefunden.</p> : sorted.map((detector) => {
+                    const tone = smokeDetectorTone(detector);
+                    const testEntity = smokeDetectorTestEntity(detector);
+                    const result = testResult[detector.entity_id];
+                    return (
+                        <article key={detector.entity_id} className={`wall-smoke-row ${tone}`}>
+                            <span className={`wall-smoke-dot ${tone}`} aria-hidden="true"/>
+                            <div className="wall-smoke-copy">
+                                <strong>{detector.name}</strong>
+                                <span>{detector.area || 'Haus'} · {smokeDetectorStatus(detector)}</span>
+                            </div>
+                            <div className="wall-smoke-actions">
+                                {result && <span className={`wall-smoke-test-result ${result}`}>{result === 'ok' ? 'Gesendet' : 'Fehler'}</span>}
+                                <button
+                                    type="button"
+                                    disabled={!testEntity || testing === detector.entity_id}
+                                    onClick={() => testDetector(detector)}
+                                    title={testEntity ? 'Testsignal auslösen' : 'Keine passende Test-Button-Entity gefunden'}
+                                    aria-label={`${detector.name} testen`}
+                                >
+                                    {testing === detector.entity_id ? 'Testet' : 'Test'}
+                                </button>
+                            </div>
+                        </article>
+                    );
+                })}
+            </div>
+        </section>
     );
 }
 
@@ -3349,6 +3416,30 @@ function ListPanel({title, items}: {
 
 function InternetStatusPill({info}: { info: FritzboxInfo }) {
     return <span className={`wall-internet-pill ${info.status}`}/>;
+}
+
+function smokeDetectorTone(detector: WallEntity & { active?: boolean }) {
+    const state = String(detector.state || '').toLowerCase();
+    if (detector.active || ['on', 'detected', 'problem', 'unsafe'].includes(state)) return 'alarm';
+    if (['unavailable', 'unknown'].includes(state)) return 'offline';
+    return 'ready';
+}
+
+function smokeDetectorRank(tone: string) {
+    if (tone === 'alarm') return 3;
+    if (tone === 'offline') return 2;
+    return 1;
+}
+
+function smokeDetectorStatus(detector: WallEntity & { active?: boolean }) {
+    const tone = smokeDetectorTone(detector);
+    if (tone === 'alarm') return 'Alarm';
+    if (tone === 'offline') return 'Nicht erreichbar';
+    return 'Betriebsbereit';
+}
+
+function smokeDetectorTestEntity(detector: WallEntity) {
+    return String((detector as WallEntity & { test_entity_id?: string | null }).test_entity_id || '');
 }
 
 function unknownFritzboxInfo(): FritzboxInfo {

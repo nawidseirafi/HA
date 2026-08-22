@@ -762,6 +762,7 @@ export type WallSafetyEntity = WallEntity & {
   active?: boolean;
   last_changed?: string | null;
   last_updated?: string | null;
+  test_entity_id?: string | null;
 };
 
 export type WallLight = WallEntity & {

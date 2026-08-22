@@ -87,7 +87,7 @@ def wall_dashboard():
         if state.get("attributes", {}).get("device_class") == "problem" and state.get("state") == "on"
     ]
     safety_detectors = [
-        _safety_item(state)
+        _safety_item(state, states)
         for state in states
         if _is_safety_state(state)
     ]
@@ -129,7 +129,7 @@ def wall_dashboard():
             "problems": problems,
             "safety_detectors": safety_detectors,
             "safety_alerts": active_safety_alerts,
-            "smoke_alerts": [item for item in safety_detectors if str(item.get("device_class") or "").lower() == "smoke"],
+            "smoke_alerts": [item for item in safety_detectors if _is_smoke_detector_smoke_item(item)],
         },
         "health": {
             "battery_total": len(battery_items),
@@ -419,7 +419,7 @@ def _wall_reminders(
 
 def _wall_safety_status(states: list[dict[str, Any]]) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    detectors = [_safety_item(state) for state in states if _is_safety_state(state)]
+    detectors = [_safety_item(state, states) for state in states if _is_safety_state(state)]
     active_alerts = [item for item in detectors if item.get("active")]
     offline = [item for item in detectors if str(item.get("state") or "").lower() in {"unavailable", "unknown"}]
     return {
@@ -560,11 +560,12 @@ def _simple_item(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _safety_item(state: dict[str, Any]) -> dict[str, Any]:
+def _safety_item(state: dict[str, Any], states: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     item = _simple_item(state)
     item["active"] = str(state.get("state") or "").lower() in ACTIVE_SAFETY_STATES
     item["last_changed"] = state.get("last_changed")
     item["last_updated"] = state.get("last_updated")
+    item["test_entity_id"] = _safety_test_entity_id(state, states or [])
     return item
 
 
@@ -576,6 +577,23 @@ def _is_safety_state(state: dict[str, Any]) -> bool:
     return _domain(state) == "binary_sensor" and (
         device_class in SAFETY_DEVICE_CLASSES
         or any(token in haystack for token in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid", "carbon_monoxide"))
+    )
+
+
+def _is_smoke_detector_smoke_item(item: dict[str, Any]) -> bool:
+    entity_id = str(item.get("entity_id") or "").lower()
+    name = str(item.get("name") or "").lower()
+    device_class = str(item.get("device_class") or "").lower()
+    text = f"{entity_id} {name}"
+    if not entity_id.startswith("binary_sensor."):
+        return False
+    if device_class != "smoke":
+        return False
+    return (
+        entity_id.endswith("_smoke")
+        or "smoke_detector_smoke" in entity_id
+        or "rauchmelder" in text
+        or "smoke detector" in text
     )
 
 
@@ -595,6 +613,40 @@ def _safety_message(active_alerts: list[dict[str, Any]]) -> str:
     names = [str(item.get("name") or item.get("entity_id") or "Melder") for item in active_alerts[:5]]
     suffix = f" und {len(active_alerts) - 5} weitere" if len(active_alerts) > 5 else ""
     return "Aktiv: " + ", ".join(names) + suffix
+
+
+def _safety_test_entity_id(state: dict[str, Any], states: list[dict[str, Any]]) -> str:
+    detector_id = str(state.get("entity_id") or "")
+    object_id = detector_id.split(".", 1)[-1]
+    base = _safety_base_object_id(object_id)
+    candidates = []
+    for item in states:
+        entity_id = str(item.get("entity_id") or "")
+        if _domain(item) != "button":
+            continue
+        attrs = item.get("attributes") if isinstance(item.get("attributes"), dict) else {}
+        text = f"{entity_id} {attrs.get('friendly_name') or ''}".lower()
+        score = 0
+        if object_id and object_id in text:
+            score += 20
+        if base and base in text:
+            score += 12
+        if any(token in text for token in ("test", "self_test", "self test", "prüf", "pruef", "identify", "identifizieren")):
+            score += 10
+        if any(token in text for token in ("rauch", "smoke", "gas", "co", "kohlenmonoxid", "alarm")):
+            score += 3
+        if score >= 12:
+            candidates.append((score, entity_id))
+    candidates.sort(reverse=True)
+    return candidates[0][1] if candidates else ""
+
+
+def _safety_base_object_id(object_id: str) -> str:
+    text = str(object_id or "").lower()
+    for suffix in ("_smoke", "_rauch", "_rauchmelder", "_gas", "_carbon_monoxide", "_kohlenmonoxid", "_co_melder"):
+        if text.endswith(suffix):
+            return text[: -len(suffix)]
+    return text
 
 
 def _light_item(state: dict[str, Any]) -> dict[str, Any]:

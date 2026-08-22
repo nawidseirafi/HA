@@ -4301,6 +4301,164 @@ button.wall-room-card {
   grid-column: span 2;
 }
 
+.wall-smoke-panel {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 22px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--card) 92%, white), color-mix(in srgb, var(--card) 88%, black)),
+    var(--card);
+}
+
+.wall-smoke-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.wall-smoke-panel-head span {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wall-smoke-panel-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--foreground);
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.wall-smoke-panel-head svg {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.wall-smoke-list {
+  display: grid;
+  gap: 10px;
+}
+
+.wall-smoke-row {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+
+.wall-smoke-row.alarm {
+  border-color: color-mix(in srgb, var(--state-critical) 48%, transparent);
+  background: color-mix(in srgb, var(--state-critical) 10%, var(--card));
+}
+
+.wall-smoke-row.offline {
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+}
+
+.wall-smoke-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.wall-smoke-dot.ready {
+  color: var(--state-ok);
+  background: var(--state-ok);
+}
+
+.wall-smoke-dot.offline {
+  color: var(--state-neutral);
+  background: var(--state-neutral);
+}
+
+.wall-smoke-dot.alarm {
+  color: var(--state-critical);
+  background: var(--state-critical);
+}
+
+.wall-smoke-copy {
+  min-width: 0;
+}
+
+.wall-smoke-copy strong,
+.wall-smoke-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wall-smoke-copy strong {
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.wall-smoke-copy span {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.wall-smoke-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.wall-smoke-actions button {
+  min-width: 74px;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--card) 78%, white);
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, opacity 140ms ease;
+}
+
+.wall-smoke-actions button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--state-ok) 42%, var(--border));
+  background: color-mix(in srgb, var(--state-ok) 16%, var(--card));
+  transform: translateY(-1px);
+}
+
+.wall-smoke-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.wall-smoke-test-result {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.wall-smoke-test-result.ok {
+  color: var(--state-ok);
+}
+
+.wall-smoke-test-result.error {
+  color: var(--state-critical);
+}
+
 .wall-list-panel article {
   display: flex;
   justify-content: space-between;
