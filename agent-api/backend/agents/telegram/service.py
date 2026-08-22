@@ -813,7 +813,7 @@ def _is_device_internal_temperature_state(state: dict[str, Any]) -> bool:
     attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
     entity_id = str(state.get("entity_id") or "").lower()
     name = str(attrs.get("friendly_name") or "").lower()
-    text = f"{entity_id} {name}"
+    text = f"{entity_id} {name}".replace("_", " ").replace("-", " ")
     internal_tokens = (
         "fritz", "router", "gateway", "modem", "repeater", "unifi", "udm", "switch",
         "cpu", "gpu", "soc", "chip", "processor", "prozessor", "core", "nvme", "ssd",

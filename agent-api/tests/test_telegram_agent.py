@@ -228,6 +228,7 @@ class TelegramAgentTests(unittest.TestCase):
             ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
             ha_state("sensor.fritzbox_router_temperature", "61", "FritzBox Router Temperature", device_class="temperature", unit_of_measurement="°C"),
             ha_state("sensor.server_cpu_temperature", "72", "Server CPU Temperature", device_class="temperature", unit_of_measurement="°C"),
+            ha_state("sensor.hobby_room_water_leak_sensor_left_device_temperature", "29", "Hobby Room Water Leak", device_class="temperature", unit_of_measurement="°C"),
         ])
 
         names = [item["name"] for item in snapshot["temperatures"]]
