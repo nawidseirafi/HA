@@ -162,6 +162,40 @@ class TelegramAgentTests(unittest.TestCase):
 
             self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
 
+    def test_fallback_answer_uses_house_status_sensors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = self._service(tmp, RecordingTelegramClient())
+            context = {
+                "home_assistant": {
+                    "smoke_alerts": [{"entity_id": "binary_sensor.flur_rauchmelder", "name": "Flur Rauchmelder", "state": "off", "active": False}],
+                    "openings": [{"entity_id": "binary_sensor.kueche_fenster", "name": "Kueche Fenster", "state": "on", "active": True}],
+                    "active_problems": [],
+                    "low_batteries": [],
+                    "temperatures": [{"entity_id": "sensor.wohnzimmer_temperatur", "name": "Wohnzimmer Temperatur", "value": 22.4, "unit": "°C"}],
+                    "humidity": [{"entity_id": "sensor.bad_luftfeuchtigkeit", "name": "Bad Luftfeuchtigkeit", "value": 48, "unit": "%"}],
+                }
+            }
+
+            answer = service._fallback_answer("Wie ist der Status des Hauses, Temperatur und Feuchtigkeit?", context)
+
+            self.assertIn("Rauch/Gas/CO: kein aktiver Alarm", answer)
+            self.assertIn("Offen: Kueche Fenster", answer)
+            self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
+            self.assertIn("Bad Luftfeuchtigkeit: 48 %", answer)
+
+    def test_fallback_answer_warns_about_active_smoke_alarm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = self._service(tmp, RecordingTelegramClient())
+            context = {
+                "home_assistant": {
+                    "smoke_alerts": [{"entity_id": "binary_sensor.flur_rauchmelder", "name": "Flur Rauchmelder", "state": "on", "active": True}],
+                }
+            }
+
+            answer = service._fallback_answer("Rauchmelder status?", context)
+
+            self.assertIn("Sicherheitsalarm: Flur Rauchmelder", answer)
+
     def _service(self, tmp, client):
         config = TelegramConfig(enabled=True, bot_token="secret", allowed_chat_ids=("6516768203",), database_path=str(Path(tmp) / "telegram.db"))
         return TestTelegramService(config, store=TelegramStore(config.database_path), client=client, messaging=FakeMessaging())

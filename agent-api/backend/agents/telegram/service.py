@@ -532,6 +532,25 @@ class TelegramService:
     def _fallback_answer(self, question: str, context: dict[str, Any]) -> str:
         parts = ["Ich kann gerade keine KI-Antwort erzeugen, aber ich habe den Systemstatus gelesen."]
         ha = context.get("home_assistant") if isinstance(context.get("home_assistant"), dict) else {}
+        if ha and _question_mentions_house_status(question):
+            safety = ha.get("smoke_alerts") if isinstance(ha.get("smoke_alerts"), list) else []
+            active_safety = [item for item in safety if item.get("active")]
+            if active_safety:
+                parts.append("Sicherheitsalarm: " + _item_names(active_safety, fallback="Melder") + ".")
+            elif safety:
+                parts.append(f"Rauch/Gas/CO: kein aktiver Alarm bei {len(safety)} Melder(n).")
+            openings = ha.get("openings") if isinstance(ha.get("openings"), list) else []
+            open_items = [item for item in openings if item.get("active")]
+            if open_items:
+                parts.append("Offen: " + _item_names(open_items, fallback="Kontakt") + ".")
+            elif openings:
+                parts.append(f"Fenster/Türen: alle {len(openings)} Kontakte geschlossen.")
+            problems = ha.get("active_problems") if isinstance(ha.get("active_problems"), list) else []
+            if problems:
+                parts.append("Probleme: " + _item_names(problems, fallback="Problem") + ".")
+            low_batteries = ha.get("low_batteries") if isinstance(ha.get("low_batteries"), list) else []
+            if low_batteries:
+                parts.append("Niedrige Batterien: " + _item_names(low_batteries[:5], fallback="Batterie") + ".")
         if _question_mentions_temperature(question) and ha:
             temperatures = ha.get("temperatures") if isinstance(ha.get("temperatures"), list) else []
             if temperatures:
@@ -542,6 +561,34 @@ class TelegramService:
                 ]
                 if values:
                     parts.append("Temperaturen: " + "; ".join(values) + ".")
+        if _question_mentions_humidity(question) and ha:
+            humidity = ha.get("humidity") if isinstance(ha.get("humidity"), list) else []
+            if humidity:
+                values = [
+                    f"{item.get('name') or item.get('entity_id')}: {item.get('value'):g} {item.get('unit') or '%'}"
+                    for item in humidity[:8]
+                    if isinstance(item.get("value"), (int, float))
+                ]
+                if values:
+                    parts.append("Feuchtigkeit: " + "; ".join(values) + ".")
+        if _question_mentions_safety(question) and ha and not _question_mentions_house_status(question):
+            safety = ha.get("smoke_alerts") if isinstance(ha.get("smoke_alerts"), list) else []
+            active_safety = [item for item in safety if item.get("active")]
+            if active_safety:
+                parts.append("Sicherheitsalarm: " + _item_names(active_safety, fallback="Melder") + ".")
+            elif safety:
+                parts.append(f"Rauch/Gas/CO: kein aktiver Alarm bei {len(safety)} Melder(n).")
+            else:
+                parts.append("Ich habe keine Rauch-, Gas- oder CO-Melder im Home-Assistant-Snapshot gefunden.")
+        if _question_mentions_openings(question) and ha and not _question_mentions_house_status(question):
+            openings = ha.get("openings") if isinstance(ha.get("openings"), list) else []
+            open_items = [item for item in openings if item.get("active")]
+            if open_items:
+                parts.append("Offen: " + _item_names(open_items, fallback="Kontakt") + ".")
+            elif openings:
+                parts.append(f"Fenster/Türen: alle {len(openings)} Kontakte geschlossen.")
+            else:
+                parts.append("Ich habe keine Fenster- oder Türkontakte im Home-Assistant-Snapshot gefunden.")
         garden = context.get("garden") if isinstance(context.get("garden"), dict) else {}
         if garden:
             summary = garden.get("summary") if isinstance(garden.get("summary"), dict) else {}
@@ -794,3 +841,34 @@ def _latest_state_updated_at(states: list[dict[str, Any]]) -> str | None:
 def _question_mentions_temperature(question: str) -> bool:
     text = str(question or "").lower()
     return any(term in text for term in ("temperatur", "temperature", "warm", "kalt", "grad"))
+
+
+def _question_mentions_humidity(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("feuchtigkeit", "luftfeuchtigkeit", "humidity", "feucht", "trocken"))
+
+
+def _question_mentions_safety(question: str) -> bool:
+    text = str(question or "").lower()
+    padded = f" {text.replace('-', ' ').replace('_', ' ')} "
+    return (
+        any(term in text for term in ("rauch", "rauchmelder", "smoke", "gas", "kohlenmonoxid", "carbon monoxide", "alarm", "sicherheit"))
+        or " co " in padded
+        or " co2 " in padded
+    )
+
+
+def _question_mentions_openings(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("fenster", "tür", "tuer", "offen", "kontakt", "kontakte", "door", "window"))
+
+
+def _question_mentions_house_status(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("hausstatus", "status des hauses", "haus", "zuhause", "daheim", "home status", "house status"))
+
+
+def _item_names(items: list[dict[str, Any]], fallback: str) -> str:
+    names = [str(item.get("name") or item.get("entity_id") or fallback) for item in items[:6]]
+    suffix = f" und {len(items) - 6} weitere" if len(items) > 6 else ""
+    return ", ".join(names) + suffix

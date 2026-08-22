@@ -55,6 +55,24 @@ class VacationReminderContextTests(unittest.TestCase):
 
         self.assertEqual(reminders, [])
 
+    def test_active_smoke_alarm_creates_critical_vacation_reminder(self):
+        reminders = self.service._reminder_candidates(
+            [
+                {
+                    "entity_id": "binary_sensor.flur_rauchmelder",
+                    "state": "on",
+                    "attributes": {"friendly_name": "Flur Rauchmelder", "device_class": "smoke"},
+                }
+            ],
+            vacation_mode=True,
+            period={"start_date": "2026-06-11", "end_date": "2026-06-14"},
+            pre_departure=False,
+        )
+
+        reminder = next(item for item in reminders if item.get("reminder_type") == "safety_alarm")
+        self.assertEqual(reminder["severity"], "critical")
+        self.assertIn("Flur Rauchmelder", reminder["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

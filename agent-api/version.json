@@ -1,7 +1,7 @@
 {
-  "version": "0.2.2",
-  "build": "2026.08.12",
+  "version": "0.2.4",
+  "build": "2026.08.21",
   "commit": "development",
-  "updated_at": "2026-08-12T09:59:12+00:00",
-  "app_version": "0.2.2"
+  "updated_at": "2026-08-21T09:59:12+00:00",
+  "app_version": "0.2.4"
 }

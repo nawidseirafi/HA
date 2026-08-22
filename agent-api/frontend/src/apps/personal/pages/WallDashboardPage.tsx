@@ -16,6 +16,7 @@ import {
     CloudSun,
     DoorOpen,
     Fan,
+    Flame,
     DoorClosed,
     Droplets,
     Gauge,
@@ -1419,6 +1420,17 @@ function buildImportantNowState(
     const lowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const activeIrrigationZones = gardenActiveIrrigationZones(gardenStatus);
     const garage = garageCover(data);
+    const safetyAlerts = data.security.safety_alerts ?? [];
+    if (safetyAlerts.length > 0) {
+        items.push({
+            id: 'safety-alerts',
+            tone: 'critical',
+            icon: <Flame size={30}/>,
+            title: safetyAlerts.length === 1 ? 'Sicherheitsalarm erkannt' : `${safetyAlerts.length} Sicherheitsalarme erkannt`,
+            detail: safetyAlerts.slice(0, 2).map((item) => item.name).join(' · ') || 'Rauch/Gas/CO prüfen',
+            critical: true,
+        });
+    }
     if (postStatus(data)) {
         items.push({
             id: 'post',
@@ -3010,10 +3022,14 @@ function ClimateSection({
 
 function SecuritySection({data}: { data: WallDashboardData }) {
     const openItems = data.security.openings.filter((item) => item.state === 'on');
+    const safetyAlerts = data.security.safety_alerts ?? [];
+    const safetyDetectors = data.security.safety_detectors ?? data.security.smoke_alerts ?? [];
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const batteries = wallBatteryEntities(data.health.batteries ?? data.health.low_batteries).sort(compareBatteryStatus);
     return (
         <div className="wall-card-grid">
+            <MetricCard icon={<Flame size={24}/>} label="Rauch/Gas/CO" value={`${safetyAlerts.length}`}
+                        detail={`${safetyDetectors.length} Melder`} tone={safetyAlerts.length ? 'critical' : 'ok'}/>
             <MetricCard icon={<DoorOpen size={24}/>} label="Offene Kontakte" value={`${openItems.length}`}
                         detail={`${data.security.openings_total} gesamt`} tone={openItems.length ? 'critical' : 'ok'}/>
             <MetricCard icon={<ShieldAlert size={24}/>} label="Probleme" value={`${data.security.problems.length}`}
@@ -3027,6 +3043,7 @@ function SecuritySection({data}: { data: WallDashboardData }) {
             <ListPanel title="Niedrige Batterien" items={wallLowBatteries}/>
             <ListPanel title="Nicht erreichbar" items={data.health.unavailable.slice(0, 12)}/>
             <BatteryStatusPanel batteries={batteries}/>
+            <ListPanel title="Sicherheitsmelder" items={safetyDetectors}/>
         </div>
     );
 }

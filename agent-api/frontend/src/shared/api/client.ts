@@ -758,6 +758,12 @@ export type WallEntity = {
   unit?: string | null;
 };
 
+export type WallSafetyEntity = WallEntity & {
+  active?: boolean;
+  last_changed?: string | null;
+  last_updated?: string | null;
+};
+
 export type WallLight = WallEntity & {
   on: boolean;
   brightness_pct?: number | null;
@@ -1016,6 +1022,9 @@ export type WallDashboardData = {
     openings_open: number;
     openings: WallEntity[];
     problems: WallEntity[];
+    safety_detectors?: WallSafetyEntity[];
+    safety_alerts?: WallSafetyEntity[];
+    smoke_alerts?: WallSafetyEntity[];
   };
   health: {
     battery_total: number;

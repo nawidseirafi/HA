@@ -1030,12 +1030,15 @@ class VacationService:
         open_doors: list[str] = []
         critical_batteries: list[str] = []
         device_issues: list[str] = []
+        safety_alerts: list[str] = []
         internet_problem = False
         for state in states:
             entity_id = str(state.get("entity_id") or "")
             value = str(state.get("state") or "").lower()
             attributes = state.get("attributes") or {}
             device_class = str(attributes.get("device_class") or "").lower()
+            if self._is_safety_state(state) and value in {"on", "detected", "problem", "unsafe"}:
+                safety_alerts.append(self._entity_label(state))
             if entity_id.startswith("binary_sensor.") and device_class in {"door", "window", "opening"} and value == "on":
                 target = open_doors if device_class == "door" else open_windows
                 target.append(self._entity_label(state))
@@ -1051,6 +1054,7 @@ class VacationService:
             "open_windows": sorted(set(open_windows)),
             "open_doors": sorted(set(open_doors)),
             "critical_batteries": sorted(set(critical_batteries)),
+            "safety_alerts": sorted(set(safety_alerts)),
             "internet_status": {"status": "unstable" if internet_problem else "ok"},
             "device_issues": sorted(set(device_issues))[:20],
         }
@@ -1184,6 +1188,7 @@ class VacationService:
         lights_on = False
         internet_problem = False
         safety_problem = False
+        safety_alerts: list[str] = []
         mailbox = False
 
         for state in states:
@@ -1197,6 +1202,8 @@ class VacationService:
                 lights_on = True
             if entity_id == "input_boolean.post_im_briefkasten" and value == "on" and (vacation_mode or pre_departure):
                 mailbox = True
+            if has_vacation_context and self._is_safety_state(state) and value in {"on", "detected", "problem", "unsafe"}:
+                safety_alerts.append(self._entity_label(state))
             if entity_id.startswith("binary_sensor.") and device_class in {"door", "window", "opening"} and value == "on" and (vacation_mode or pre_departure):
                 if device_class == "door":
                     doors.append(self._entity_label(state))
@@ -1265,6 +1272,13 @@ class VacationService:
                 "reminder_type": "internet",
                 "title": "Internetproblem erkannt",
                 "message": "Die Internetverbindung war zuletzt gestört. Bitte Router und Fernzugriff vor dem Urlaub prüfen.",
+                "severity": "critical",
+            })
+        if safety_alerts:
+            candidates.append({
+                "reminder_type": "safety_alarm",
+                "title": "Sicherheitsalarm aktiv",
+                "message": "Folgende Rauch-, Gas- oder CO-Melder melden Alarm:\n" + self._bullet_list(sorted(set(safety_alerts))),
                 "severity": "critical",
             })
         if batteries:
@@ -1415,6 +1429,16 @@ class VacationService:
     def _looks_like_internet_state(self, state: dict[str, Any]) -> bool:
         text = f"{state.get('entity_id', '')} {(state.get('attributes') or {}).get('friendly_name', '')}".lower()
         return any(token in text for token in ("internet", "wan", "router", "fritz", "ping", "connectivity", "network", "online"))
+
+    def _is_safety_state(self, state: dict[str, Any]) -> bool:
+        attributes = state.get("attributes") or {}
+        entity_id = str(state.get("entity_id") or "")
+        device_class = str(attributes.get("device_class") or "").lower()
+        text = f"{entity_id} {attributes.get('friendly_name') or ''}".lower()
+        return entity_id.startswith("binary_sensor.") and (
+            device_class in {"smoke", "gas", "carbon_monoxide"}
+            or any(token in text for token in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid", "carbon_monoxide"))
+        )
 
     def _friendly_name(self, state: dict[str, Any]) -> str:
         attributes = state.get("attributes") or {}

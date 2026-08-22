@@ -14,6 +14,8 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
 
 
 OPENING_DEVICE_CLASSES = {"door", "window", "opening"}
+SAFETY_DEVICE_CLASSES = {"smoke", "gas", "carbon_monoxide"}
+ACTIVE_SAFETY_STATES = {"on", "detected", "problem", "unsafe"}
 
 
 class HouseholdService:
@@ -45,7 +47,8 @@ class HouseholdService:
         calendar = self._calendar_status()
         comfort = self._comfort_status()
         openings = self.openings_status()
-        reminders = self._reminders(waste, post, vacation, infrastructure, openings)
+        safety = self.safety_status()
+        reminders = self._reminders(waste, post, vacation, infrastructure, openings, safety)
         return {
             "ok": not any(item.get("priority") == "critical" for item in reminders),
             "updated_at": self._now(),
@@ -59,6 +62,7 @@ class HouseholdService:
             "calendar": calendar,
             "comfort": comfort,
             "openings": openings,
+            "safety": safety,
             "reminders": reminders,
         }
 
@@ -71,6 +75,7 @@ class HouseholdService:
         calendar = status["calendar"]
         comfort = status["comfort"]
         openings = status["openings"]
+        safety = status["safety"]
         return {
             "ok": status["ok"],
             "updated_at": status["updated_at"],
@@ -81,6 +86,7 @@ class HouseholdService:
             "calendar": calendar,
             "comfort": comfort,
             "openings": openings,
+            "safety": safety,
             "reminders": status["reminders"],
             "counts": {
                 "reminders": len(status["reminders"]),
@@ -88,6 +94,7 @@ class HouseholdService:
                 "waste_items": len(waste.get("items", [])) if isinstance(waste, dict) else 0,
                 "calendar_events_today": int(calendar.get("today_count") or 0) if isinstance(calendar, dict) else 0,
                 "openings_open": len(openings.get("open", [])) if isinstance(openings, dict) else 0,
+                "safety_alerts": len(safety.get("active_alerts", [])) if isinstance(safety, dict) else 0,
             },
             "state": {
                 "mailbox_has_mail": post.get("has_mail"),
@@ -97,6 +104,7 @@ class HouseholdService:
                 "infrastructure_status": infrastructure.get("status") if isinstance(infrastructure, dict) else "unknown",
                 "bedroom_fan_status": comfort.get("bedroom_fan", {}).get("decision", {}).get("status") if isinstance(comfort, dict) else "unknown",
                 "openings_open": len(openings.get("open", [])) if isinstance(openings, dict) else 0,
+                "safety_alerts": len(safety.get("active_alerts", [])) if isinstance(safety, dict) else 0,
             },
         }
 
@@ -111,6 +119,7 @@ class HouseholdService:
                 "vacation_mode": status["vacation"].get("vacation_mode"),
                 "infrastructure_status": status["infrastructure"].get("status"),
                 "openings_open": len(status.get("openings", {}).get("open", [])) if isinstance(status.get("openings"), dict) else 0,
+                "safety_alerts": len(status.get("safety", {}).get("active_alerts", [])) if isinstance(status.get("safety"), dict) else 0,
             },
         }
 
@@ -139,6 +148,24 @@ class HouseholdService:
             "updated_at": updated_at,
             "total": len(openings),
             "open": open_items,
+        }
+
+    def safety_status(self) -> dict[str, Any]:
+        updated_at = self._now()
+        try:
+            states = self.ha_service.get_states()
+        except Exception as exc:
+            return {"ok": False, "updated_at": updated_at, "total": 0, "detectors": [], "active_alerts": [], "offline": [], "error": str(exc)}
+        detectors = [self._safety_entity(state) for state in states if self._is_safety_state(state)]
+        active_alerts = [item for item in detectors if item["active"]]
+        offline = [item for item in detectors if str(item.get("state") or "").lower() in {"unavailable", "unknown"}]
+        return {
+            "ok": not active_alerts,
+            "updated_at": updated_at,
+            "total": len(detectors),
+            "detectors": detectors,
+            "active_alerts": active_alerts,
+            "offline": offline,
         }
 
     def check_openings(self, notify: bool = True) -> dict[str, Any]:
@@ -255,7 +282,15 @@ class HouseholdService:
             "ground_floor_shutters": self.shutter_service.status(),
         }
 
-    def _reminders(self, waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any], infrastructure: dict[str, Any], openings: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    def _reminders(
+        self,
+        waste: dict[str, Any],
+        post: dict[str, Any],
+        vacation: dict[str, Any],
+        infrastructure: dict[str, Any],
+        openings: dict[str, Any] | None = None,
+        safety: dict[str, Any] | None = None,
+    ) -> list[dict[str, str]]:
         reminders: list[dict[str, str]] = []
         for item in waste.get("reminders", []) if isinstance(waste, dict) else []:
             if isinstance(item, dict):
@@ -288,6 +323,15 @@ class HouseholdService:
                 "priority": "high",
                 "message": self._openings_title(open_items),
                 "reason": self._openings_message(open_items),
+                "source": "household",
+            })
+
+        active_alerts = safety.get("active_alerts", []) if isinstance(safety, dict) else []
+        if active_alerts:
+            reminders.append({
+                "priority": "critical",
+                "message": self._safety_title(active_alerts),
+                "reason": self._safety_message(active_alerts),
                 "source": "household",
             })
 
@@ -334,12 +378,45 @@ class HouseholdService:
         device_class = str(attributes.get("device_class") or "").lower()
         return entity_id.startswith("binary_sensor.") and device_class in OPENING_DEVICE_CLASSES
 
+    def _is_safety_state(self, state: dict[str, Any]) -> bool:
+        attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        entity_id = str(state.get("entity_id") or "")
+        device_class = str(attributes.get("device_class") or "").lower()
+        haystack = f"{entity_id} {attributes.get('friendly_name') or ''}".lower()
+        return entity_id.startswith("binary_sensor.") and (
+            device_class in SAFETY_DEVICE_CLASSES
+            or any(token in haystack for token in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid", "carbon_monoxide"))
+        )
+
     def _opening_entity(self, state: dict[str, Any]) -> dict[str, Any]:
         item = self._simple_entity(state)
         item["open"] = str(state.get("state") or "").lower() == "on"
         item["last_changed"] = state.get("last_changed")
         item["last_updated"] = state.get("last_updated")
         return item
+
+    def _safety_entity(self, state: dict[str, Any]) -> dict[str, Any]:
+        item = self._simple_entity(state)
+        item["active"] = str(state.get("state") or "").lower() in ACTIVE_SAFETY_STATES
+        item["last_changed"] = state.get("last_changed")
+        item["last_updated"] = state.get("last_updated")
+        return item
+
+    def _safety_title(self, active_alerts: list[dict[str, Any]]) -> str:
+        count = len(active_alerts)
+        if count == 1:
+            device_class = str(active_alerts[0].get("device_class") or "").lower()
+            if device_class == "carbon_monoxide":
+                return "CO-Alarm erkannt"
+            if device_class == "gas":
+                return "Gas-Alarm erkannt"
+            return "Rauchalarm erkannt"
+        return f"{count} Sicherheitsalarme erkannt"
+
+    def _safety_message(self, active_alerts: list[dict[str, Any]]) -> str:
+        names = [str(item.get("name") or item.get("entity_id") or "Melder") for item in active_alerts[:5]]
+        suffix = f" und {len(active_alerts) - 5} weitere" if len(active_alerts) > 5 else ""
+        return "Aktiv: " + ", ".join(names) + suffix
 
     def _openings_title(self, open_items: list[dict[str, Any]]) -> str:
         count = len(open_items)

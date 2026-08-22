@@ -56,7 +56,7 @@ def orchestrator_map(live: bool = Query(default=False)) -> dict[str, Any]:
             }
             for agent in agents
             for agent_id in [agent["id"]]
-            if agent_id in {"invoices", "mywellness", "market", "vacation", "garden"}
+            if agent_id in {"invoices", "mywellness", "market", "vacation", "garden", "telegram"}
         ],
         *[
             {
@@ -69,9 +69,29 @@ def orchestrator_map(live: bool = Query(default=False)) -> dict[str, Any]:
             }
             for agent in agents
             for agent_id in [agent["id"]]
-            if agent_id in {"invoices", "mywellness", "market", "garden"}
+            if agent_id in {"invoices", "mywellness", "market", "garden", "telegram"}
         ],
     ]
+    if "telegram" in agent_ids:
+        telegram = next(agent for agent in agents if agent["id"] == "telegram")
+        if "homeassistant" in {service["id"] for service in services}:
+            edges.append({
+                "id": "telegram-homeassistant",
+                "from": "telegram",
+                "to": "homeassistant",
+                "kind": "secondary",
+                "active": _is_active(telegram["status"]),
+                "status": telegram["status"],
+            })
+        if "messaging" in {service["id"] for service in services}:
+            edges.append({
+                "id": "telegram-messaging",
+                "from": "telegram",
+                "to": "messaging",
+                "kind": "secondary",
+                "active": _is_active(telegram["status"]),
+                "status": telegram["status"],
+            })
     if "vacation" in agent_ids:
         vacation = next(agent for agent in agents if agent["id"] == "vacation")
         edges.extend([
@@ -238,6 +258,15 @@ def _primary_edges(agents: list[dict[str, Any]], services: list[dict[str, Any]],
                 "id": f"scheduler-{agent['id']}",
                 "from": "scheduler",
                 "to": agent["id"],
+                "kind": "primary",
+                "active": _is_active(agent["status"]),
+                "status": agent["status"],
+            })
+        elif agent["id"] == "telegram":
+            edges.append({
+                "id": "orchestrator-telegram",
+                "from": "orchestrator",
+                "to": "telegram",
                 "kind": "primary",
                 "active": _is_active(agent["status"]),
                 "status": agent["status"],

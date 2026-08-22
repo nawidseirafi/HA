@@ -13,6 +13,8 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, VACATION_ENTITY_ID
 router = APIRouter(prefix="/api/homeassistant", tags=["homeassistant"])
 ha_service = HomeAssistantService()
 LOW_BATTERY_THRESHOLD = 40
+SAFETY_DEVICE_CLASSES = {"smoke", "gas", "carbon_monoxide"}
+ACTIVE_SAFETY_STATES = {"on", "detected", "problem", "unsafe"}
 WALL_DEVICE_DOMAIN_PRIORITY = [
     "humidifier",
     "climate",
@@ -84,6 +86,12 @@ def wall_dashboard():
         for state in states
         if state.get("attributes", {}).get("device_class") == "problem" and state.get("state") == "on"
     ]
+    safety_detectors = [
+        _safety_item(state)
+        for state in states
+        if _is_safety_state(state)
+    ]
+    active_safety_alerts = [item for item in safety_detectors if item.get("active")]
     openings = [
         _simple_item(state)
         for state in states
@@ -119,6 +127,9 @@ def wall_dashboard():
             "openings_open": len([item for item in openings if item["state"] == "on"]),
             "openings": openings,
             "problems": problems,
+            "safety_detectors": safety_detectors,
+            "safety_alerts": active_safety_alerts,
+            "smoke_alerts": [item for item in safety_detectors if str(item.get("device_class") or "").lower() == "smoke"],
         },
         "health": {
             "battery_total": len(battery_items),
@@ -268,9 +279,10 @@ def _wall_household_summary(states: list[dict[str, Any]], calendar: dict[str, An
     }
     calendar = calendar or _calendar_summary()
     comfort = {"bedroom_fan": {"ok": True, "status": "unknown", "decision": {"status": "unknown"}}}
-    reminders = _wall_reminders(waste, post, vacation, infrastructure)
+    safety = _wall_safety_status(states)
+    reminders = _wall_reminders(waste, post, vacation, infrastructure, safety)
     return {
-        "ok": True,
+        "ok": not safety.get("active_alerts"),
         "updated_at": now,
         "waste": waste,
         "post": post,
@@ -278,12 +290,14 @@ def _wall_household_summary(states: list[dict[str, Any]], calendar: dict[str, An
         "infrastructure": infrastructure,
         "calendar": calendar,
         "comfort": comfort,
+        "safety": safety,
         "reminders": reminders,
         "counts": {
             "reminders": len(reminders),
             "high_priority": len([item for item in reminders if item.get("priority") == "high"]),
             "waste_items": len(waste.get("items", [])) if isinstance(waste, dict) else 0,
             "calendar_events_today": int(calendar.get("today_count") or 0) if isinstance(calendar, dict) else 0,
+            "safety_alerts": len(safety.get("active_alerts", [])) if isinstance(safety, dict) else 0,
         },
         "state": {
             "mailbox_has_mail": post.get("has_mail"),
@@ -292,6 +306,7 @@ def _wall_household_summary(states: list[dict[str, Any]], calendar: dict[str, An
             "next_calendar_event": calendar.get("next_event") if isinstance(calendar, dict) else None,
             "infrastructure_status": "unknown",
             "bedroom_fan_status": "unknown",
+            "safety_alerts": len(safety.get("active_alerts", [])) if isinstance(safety, dict) else 0,
         },
     }
 
@@ -361,7 +376,13 @@ def _wall_waste_status(state: dict[str, Any] | None, vacation_mode: bool | None,
         }
 
 
-def _wall_reminders(waste: dict[str, Any], post: dict[str, Any], vacation: dict[str, Any], infrastructure: dict[str, Any]) -> list[dict[str, str]]:
+def _wall_reminders(
+    waste: dict[str, Any],
+    post: dict[str, Any],
+    vacation: dict[str, Any],
+    infrastructure: dict[str, Any],
+    safety: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     reminders: list[dict[str, str]] = []
     for item in waste.get("reminders", []) if isinstance(waste, dict) else []:
         if isinstance(item, dict):
@@ -380,12 +401,35 @@ def _wall_reminders(waste: dict[str, Any], post: dict[str, Any], vacation: dict[
             "reason": "Urlaubsmodus ist aktiv und Briefkasten meldet Post.",
             "source": "household",
         })
+    active_alerts = safety.get("active_alerts", []) if isinstance(safety, dict) else []
+    if active_alerts:
+        reminders.append({
+            "priority": "critical",
+            "message": _safety_title(active_alerts),
+            "reason": _safety_message(active_alerts),
+            "source": "household",
+        })
     infrastructure_status = str(infrastructure.get("status") or "")
     if infrastructure_status in {"down", "critical"}:
         reminders.append({"priority": "high", "message": "Internet oder Netzwerk gestört", "reason": str(infrastructure.get("detail") or ""), "source": "infrastructure"})
     elif infrastructure_status in {"unstable", "warning"}:
         reminders.append({"priority": "medium", "message": "Internet oder Netzwerk instabil", "reason": str(infrastructure.get("detail") or ""), "source": "infrastructure"})
     return reminders
+
+
+def _wall_safety_status(states: list[dict[str, Any]]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    detectors = [_safety_item(state) for state in states if _is_safety_state(state)]
+    active_alerts = [item for item in detectors if item.get("active")]
+    offline = [item for item in detectors if str(item.get("state") or "").lower() in {"unavailable", "unknown"}]
+    return {
+        "ok": not active_alerts,
+        "updated_at": now,
+        "total": len(detectors),
+        "detectors": detectors,
+        "active_alerts": active_alerts,
+        "offline": offline,
+    }
 
 
 def _waste_status() -> dict[str, Any]:
@@ -514,6 +558,43 @@ def _simple_item(state: dict[str, Any]) -> dict[str, Any]:
         "device_class": attributes.get("device_class"),
         "unit": attributes.get("unit_of_measurement"),
     }
+
+
+def _safety_item(state: dict[str, Any]) -> dict[str, Any]:
+    item = _simple_item(state)
+    item["active"] = str(state.get("state") or "").lower() in ACTIVE_SAFETY_STATES
+    item["last_changed"] = state.get("last_changed")
+    item["last_updated"] = state.get("last_updated")
+    return item
+
+
+def _is_safety_state(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    entity_id = str(state.get("entity_id") or "")
+    device_class = str(attributes.get("device_class") or "").lower()
+    haystack = f"{entity_id} {attributes.get('friendly_name') or ''}".lower()
+    return _domain(state) == "binary_sensor" and (
+        device_class in SAFETY_DEVICE_CLASSES
+        or any(token in haystack for token in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid", "carbon_monoxide"))
+    )
+
+
+def _safety_title(active_alerts: list[dict[str, Any]]) -> str:
+    count = len(active_alerts)
+    if count == 1:
+        device_class = str(active_alerts[0].get("device_class") or "").lower()
+        if device_class == "carbon_monoxide":
+            return "CO-Alarm erkannt"
+        if device_class == "gas":
+            return "Gas-Alarm erkannt"
+        return "Rauchalarm erkannt"
+    return f"{count} Sicherheitsalarme erkannt"
+
+
+def _safety_message(active_alerts: list[dict[str, Any]]) -> str:
+    names = [str(item.get("name") or item.get("entity_id") or "Melder") for item in active_alerts[:5]]
+    suffix = f" und {len(active_alerts) - 5} weitere" if len(active_alerts) > 5 else ""
+    return "Aktiv: " + ", ".join(names) + suffix
 
 
 def _light_item(state: dict[str, Any]) -> dict[str, Any]:

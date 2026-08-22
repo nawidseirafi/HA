@@ -10,3 +10,4 @@ websockets
 pypdf
 openpyxl
 pillow
+pytest
