@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 from dataclasses import replace
 
-from backend.agents.telegram.service import TelegramConfig, TelegramService, TelegramStore, _home_assistant_snapshot
+from backend.agents.telegram.service import TelegramConfig, TelegramService, TelegramStore, _home_assistant_snapshot, _house_status_answer
 
 
 class RecordingTelegramClient:
@@ -136,14 +136,16 @@ class TelegramAgentTests(unittest.TestCase):
             ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
             ha_state("sensor.bad_luftfeuchtigkeit", "48", "Bad Luftfeuchtigkeit", device_class="humidity", unit_of_measurement="%"),
             ha_state("binary_sensor.flur_rauchmelder", "off", "Flur Rauchmelder", device_class="smoke"),
+            ha_state("cover.garage_garagentor", "closed", "Garage Garagentor", device_class="garage"),
             ha_state("binary_sensor.kueche_problem", "on", "Kueche Problem", device_class="problem"),
             ha_state("sensor.tuerkontakt_battery", "21", "Tuerkontakt Batterie", device_class="battery", unit_of_measurement="%"),
         ])
 
-        self.assertEqual(snapshot["entity_count"], 5)
+        self.assertEqual(snapshot["entity_count"], 6)
         self.assertEqual(snapshot["temperatures"][0]["value"], 22.4)
         self.assertEqual(snapshot["humidity"][0]["value"], 48)
         self.assertEqual(snapshot["smoke_alerts"][0]["name"], "Flur Rauchmelder")
+        self.assertTrue(snapshot["garage"][0]["closed"])
         self.assertEqual(snapshot["active_problems"][0]["name"], "Kueche Problem")
         self.assertEqual(snapshot["low_batteries"][0]["level"], 21)
 
@@ -195,6 +197,31 @@ class TelegramAgentTests(unittest.TestCase):
             answer = service._fallback_answer("Rauchmelder status?", context)
 
             self.assertIn("Sicherheitsalarm: Flur Rauchmelder", answer)
+
+    def test_answer_uses_homeassistant_snapshot_for_garage_question(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("cover.garage_garagentor", "closed", "Garage Garagentor", device_class="garage"),
+            ])
+        }
+
+        answer = _house_status_answer("Ist das Garagentor geschlossen?", context)
+
+        self.assertIn("Garage geschlossen", answer)
+        self.assertIn("Garage Garagentor", answer)
+
+    def test_answer_uses_homeassistant_snapshot_for_house_temperature_question(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("sensor.wohnzimmer_temperatur", "22.4", "Wohnzimmer Temperatur", device_class="temperature", unit_of_measurement="°C"),
+                ha_state("sensor.bad_luftfeuchtigkeit", "48", "Bad Luftfeuchtigkeit", device_class="humidity", unit_of_measurement="%"),
+            ])
+        }
+
+        answer = _house_status_answer("Im hausstaus die Temperatur des Hauses ermitteln", context)
+
+        self.assertIn("Temperaturen", answer)
+        self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
 
     def _service(self, tmp, client):
         config = TelegramConfig(enabled=True, bot_token="secret", allowed_chat_ids=("6516768203",), database_path=str(Path(tmp) / "telegram.db"))

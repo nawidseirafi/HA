@@ -380,10 +380,15 @@ class TelegramService:
 
     def answer(self, question: str) -> str:
         context = self._context_snapshot()
+        house_answer = _house_status_answer(question, context)
+        if house_answer:
+            return house_answer
         system = (
             "Du bist Roboter Steve im privaten Haushalt von Nawid. "
             "Antworte kurz, konkret und auf Deutsch. "
             "Du darfst ueber Status, Termine, Nachrichten, Garten, Energie und Home Assistant informieren. "
+            "Wenn Home-Assistant-Daten im Kontext enthalten sind, nutze diese konkret mit Entity-Namen und Status. "
+            "Sage nicht, dass Informationen fehlen, wenn passende Daten im Kontext stehen. "
             "Fuehre ueber Telegram keine Aktionen an Geraeten aus und behaupte keine Aktion ausgefuehrt zu haben."
         )
         prompt = f"Kontext:\n{json.dumps(context, ensure_ascii=False, indent=2)[:12000]}\n\nNutzerfrage:\n{question}"
@@ -709,6 +714,7 @@ def _home_assistant_snapshot(states: list[dict[str, Any]]) -> dict[str, Any]:
         "smoke_alerts": _binary_items(states, _is_smoke_or_gas_state, active_only=False, limit=30),
         "active_problems": _binary_items(states, _is_problem_state, active_only=True, limit=30),
         "openings": _binary_items(states, _is_opening_state, active_only=False, limit=40),
+        "garage": _garage_items(states, limit=10),
         "low_batteries": _low_battery_items(states, limit=30),
         "unavailable": _simple_state_items(
             [state for state in states if str(state.get("state") or "").lower() in {"unavailable", "unknown"}],
@@ -746,6 +752,19 @@ def _binary_items(states: list[dict[str, Any]], predicate: Any, active_only: boo
             continue
         items.append(item)
     return sorted(items, key=lambda item: (not item.get("active", False), item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _garage_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if not _is_garage_state(state):
+            continue
+        item = _simple_state_item(state)
+        value = str(state.get("state") or "").strip().lower()
+        item["open"] = value in {"open", "opening", "on"}
+        item["closed"] = value in {"closed", "closing", "off"}
+        items.append(item)
+    return sorted(items, key=lambda item: (not item.get("open", False), item.get("name") or "", item.get("entity_id") or ""))[:limit]
 
 
 def _low_battery_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -810,6 +829,15 @@ def _is_opening_state(state: dict[str, Any]) -> bool:
     return _domain(state) == "binary_sensor" and str(attrs.get("device_class") or "").lower() in {"door", "window", "opening", "garage_door"}
 
 
+def _is_garage_state(state: dict[str, Any]) -> bool:
+    attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    device_class = str(attrs.get("device_class") or "").lower()
+    text = f"{state.get('entity_id') or ''} {attrs.get('friendly_name') or ''}".lower()
+    if "garage" not in text and "garagen" not in text and "garagentor" not in text:
+        return False
+    return _domain(state) in {"cover", "binary_sensor"} and device_class not in {"problem", "battery"}
+
+
 def _is_battery_state(state: dict[str, Any]) -> bool:
     attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
     entity_id = str(state.get("entity_id") or "").lower()
@@ -838,6 +866,106 @@ def _latest_state_updated_at(states: list[dict[str, Any]]) -> str | None:
     return max(values) if values else None
 
 
+def _house_status_answer(question: str, context: dict[str, Any]) -> str:
+    ha = context.get("home_assistant") if isinstance(context.get("home_assistant"), dict) else {}
+    if not ha:
+        return ""
+    wants_house = _question_mentions_house_status(question)
+    wants_temperature = _question_mentions_temperature(question)
+    wants_humidity = _question_mentions_humidity(question)
+    wants_safety = _question_mentions_safety(question)
+    wants_openings = _question_mentions_openings(question)
+    wants_garage = _question_mentions_garage(question)
+    if not any((wants_house, wants_temperature, wants_humidity, wants_safety, wants_openings, wants_garage)):
+        return ""
+
+    parts: list[str] = []
+    if wants_house:
+        parts.append("Hausstatus:")
+    if wants_garage or wants_house:
+        garage = _garage_summary(ha)
+        if garage:
+            parts.append(garage)
+    if wants_safety or wants_house:
+        parts.append(_safety_summary(ha))
+    if wants_openings or wants_house:
+        parts.append(_openings_summary(ha))
+    if wants_temperature or wants_house:
+        temperature = _numeric_sensor_summary(ha, "temperatures", "Temperaturen", "°C")
+        if temperature:
+            parts.append(temperature)
+    if wants_humidity or wants_house:
+        humidity = _numeric_sensor_summary(ha, "humidity", "Feuchtigkeit", "%")
+        if humidity:
+            parts.append(humidity)
+
+    return " ".join(part for part in parts if part).strip()[:4000]
+
+
+def _garage_summary(ha: dict[str, Any]) -> str:
+    items = ha.get("garage") if isinstance(ha.get("garage"), list) else []
+    if not items:
+        return "Garage: keine Garagen-Entity im Home-Assistant-Snapshot gefunden."
+    open_items = [item for item in items if item.get("open")]
+    closed_items = [item for item in items if item.get("closed")]
+    if open_items:
+        return "Garage offen: " + _item_names(open_items, fallback="Garage") + "."
+    if closed_items:
+        return "Garage geschlossen: " + _item_names(closed_items, fallback="Garage") + "."
+    return "Garage: " + "; ".join(f"{item.get('name') or item.get('entity_id')}: {label_state_text(item.get('state'))}" for item in items[:4]) + "."
+
+
+def _safety_summary(ha: dict[str, Any]) -> str:
+    safety = ha.get("smoke_alerts") if isinstance(ha.get("smoke_alerts"), list) else []
+    active_safety = [item for item in safety if item.get("active")]
+    if active_safety:
+        return "Rauch/Gas/CO Alarm: " + _item_names(active_safety, fallback="Melder") + "."
+    if safety:
+        return f"Rauchmelder: kein aktiver Alarm bei {len(safety)} Melder(n)."
+    return "Rauchmelder: keine Melder im Home-Assistant-Snapshot gefunden."
+
+
+def _openings_summary(ha: dict[str, Any]) -> str:
+    openings = ha.get("openings") if isinstance(ha.get("openings"), list) else []
+    if not openings:
+        return "Fenster/Türen: keine Kontakte im Home-Assistant-Snapshot gefunden."
+    open_items = [item for item in openings if item.get("active")]
+    if open_items:
+        return "Offen: " + _item_names(open_items, fallback="Kontakt") + "."
+    return f"Fenster/Türen: alle {len(openings)} Kontakte geschlossen."
+
+
+def _numeric_sensor_summary(ha: dict[str, Any], key: str, label: str, default_unit: str) -> str:
+    items = ha.get(key) if isinstance(ha.get(key), list) else []
+    values = [
+        item for item in items
+        if isinstance(item.get("value"), (int, float))
+    ]
+    if not values:
+        return f"{label}: keine passenden Sensordaten gefunden."
+    avg = sum(float(item["value"]) for item in values) / len(values)
+    shown = "; ".join(
+        f"{item.get('name') or item.get('entity_id')}: {float(item['value']):g} {item.get('unit') or default_unit}"
+        for item in values[:8]
+    )
+    return f"{label}: Ø {avg:.1f} {values[0].get('unit') or default_unit}. {shown}."
+
+
+def label_state_text(value: Any) -> str:
+    state = str(value or "").lower()
+    labels = {
+        "open": "offen",
+        "opening": "öffnet",
+        "closed": "geschlossen",
+        "closing": "schließt",
+        "on": "aktiv",
+        "off": "aus",
+        "unknown": "unbekannt",
+        "unavailable": "nicht verfügbar",
+    }
+    return labels.get(state, str(value or "unbekannt"))
+
+
 def _question_mentions_temperature(question: str) -> bool:
     text = str(question or "").lower()
     return any(term in text for term in ("temperatur", "temperature", "warm", "kalt", "grad"))
@@ -863,9 +991,14 @@ def _question_mentions_openings(question: str) -> bool:
     return any(term in text for term in ("fenster", "tür", "tuer", "offen", "kontakt", "kontakte", "door", "window"))
 
 
+def _question_mentions_garage(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("garage", "garagentor", "garagen", "tor"))
+
+
 def _question_mentions_house_status(question: str) -> bool:
     text = str(question or "").lower()
-    return any(term in text for term in ("hausstatus", "status des hauses", "haus", "zuhause", "daheim", "home status", "house status"))
+    return any(term in text for term in ("hausstatus", "hausstaus", "status des hauses", "haus", "zuhause", "daheim", "home status", "house status"))
 
 
 def _item_names(items: list[dict[str, Any]], fallback: str) -> str:
