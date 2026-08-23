@@ -19,7 +19,7 @@
               id: presence_on
             - condition: numeric_state
               entity_id: sensor.guest_wc_presence_sensor_illuminance
-              below: 20
+              below: 150
           sequence:
             - action: light.turn_on
               target:
