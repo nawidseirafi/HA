@@ -26,19 +26,4 @@ frontend:
 automation: !include_dir_merge_list automations
 script: !include scripts.yaml
 scene: !include scenes.yaml
-lovelace:
-    mode: storage
-    dashboards:
-        ipad-dashboard:
-            mode: yaml
-            title: IPad
-            icon: mdi:tablet
-            show_in_sidebar: true
-            filename: dashboard/ipad-dashboard.yaml
-        iphone-dashboard:
-            mode: yaml
-            title: iPhone
-            icon: mdi:phone
-            show_in_sidebar: true
-            filename: dashboard/iphone-dashboard.yaml
 template: !include_dir_merge_list templates
