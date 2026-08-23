@@ -109,6 +109,34 @@ class WallCalendarTests(unittest.TestCase):
 
         self.assertEqual([item["entity_id"] for item in items], ["sensor.wohnzimmer_temperatur"])
 
+    def test_wall_lights_ignore_auxiliary_dnd_entities(self):
+        from backend.api.homeassistant_routes import _wall_device_groups, _wall_state_is_primary
+
+        states = [
+            {
+                "entity_id": "light.powder_room_guest_wc_roller_shutter_dnd",
+                "state": "off",
+                "attributes": {
+                    "friendly_name": "Guest WC Roller Shutter Dnd",
+                    "device_class": "DNDMode",
+                    "supported_color_modes": ["onoff"],
+                },
+            },
+            {
+                "entity_id": "light.powder_room_wc",
+                "state": "on",
+                "attributes": {
+                    "friendly_name": "WC",
+                    "supported_color_modes": ["color_temp"],
+                    "brightness": 144,
+                },
+            },
+        ]
+        groups = _wall_device_groups(states)
+
+        self.assertFalse(_wall_state_is_primary(states[0], groups, "light"))
+        self.assertTrue(_wall_state_is_primary(states[1], groups, "light"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -466,8 +466,29 @@ def _wall_state_is_primary(state: dict[str, Any], groups: dict[str, list[dict[st
     domain = _domain(state)
     if domain != expected_domain:
         return False
+    if expected_domain == "light" and _wall_light_is_auxiliary(state):
+        return False
     group = groups.get(_wall_device_key(state), [state])
     return _wall_primary_domain(group) == expected_domain
+
+
+def _wall_light_is_auxiliary(state: dict[str, Any]) -> bool:
+    attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+    entity_id = str(state.get("entity_id") or "").lower()
+    device_class = str(attributes.get("device_class") or "").lower()
+    name = str(attributes.get("friendly_name") or "").lower()
+    text = f" {entity_id.replace('_', ' ')} {name.replace('_', ' ')} "
+    auxiliary_tokens = (
+        " dnd ",
+        " do not disturb ",
+        " indicator ",
+        " identify ",
+        " child lock ",
+        " mode ",
+    )
+    if device_class and device_class not in {"light"}:
+        return True
+    return any(token in text for token in auxiliary_tokens)
 
 
 def _wall_primary_domain(states: list[dict[str, Any]]) -> str:
