@@ -1,4 +1,5 @@
 - alias: WC-Licht bei Präsenz und Dunkelheit
+  id: wc_licht_praesenz_dunkelheit
   description: Schaltet das WC-Licht bei Präsenz ein, wenn es dunkel ist, und bei Abwesenheit wieder aus.
   triggers:
     - trigger: state
