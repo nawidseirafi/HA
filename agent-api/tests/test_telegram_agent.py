@@ -139,15 +139,21 @@ class TelegramAgentTests(unittest.TestCase):
             ha_state("sensor.bad_luftfeuchtigkeit", "48", "Bad Luftfeuchtigkeit", device_class="humidity", unit_of_measurement="%"),
             ha_state("binary_sensor.flur_rauchmelder", "off", "Flur Rauchmelder", device_class="smoke"),
             ha_state("cover.garage_garagentor", "closed", "Garage Garagentor", device_class="garage"),
+            ha_state("light.wohnzimmer", "on", "Wohnzimmer Licht", brightness=128),
+            ha_state("climate.wohnzimmer", "heat", "Wohnzimmer Klima", hvac_action="heating", current_temperature=21.5, temperature=22),
             ha_state("binary_sensor.kueche_problem", "on", "Kueche Problem", device_class="problem"),
             ha_state("sensor.tuerkontakt_battery", "21", "Tuerkontakt Batterie", device_class="battery", unit_of_measurement="%"),
         ])
 
-        self.assertEqual(snapshot["entity_count"], 6)
+        self.assertEqual(snapshot["entity_count"], 8)
         self.assertEqual(snapshot["temperatures"][0]["value"], 22.4)
         self.assertEqual(snapshot["humidity"][0]["value"], 48)
         self.assertEqual(snapshot["smoke_alerts"][0]["name"], "Flur Rauchmelder")
         self.assertTrue(snapshot["garage"][0]["closed"])
+        self.assertTrue(snapshot["lights"][0]["on"])
+        self.assertEqual(snapshot["lights"][0]["brightness_percent"], 50)
+        self.assertEqual(snapshot["climate"][0]["current_temperature"], 21.5)
+        self.assertEqual(snapshot["batteries"][0]["level"], 21)
         self.assertEqual(snapshot["active_problems"][0]["name"], "Kueche Problem")
         self.assertEqual(snapshot["low_batteries"][0]["level"], 21)
 
@@ -224,6 +230,45 @@ class TelegramAgentTests(unittest.TestCase):
 
         self.assertIn("Temperaturen", answer)
         self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
+
+    def test_answer_uses_homeassistant_snapshot_for_full_house_status(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("light.wohnzimmer", "on", "Wohnzimmer Licht", brightness=128),
+                ha_state("light.flur", "off", "Flur Licht"),
+                ha_state("climate.wohnzimmer", "heat", "Wohnzimmer Klima", hvac_action="heating", current_temperature=21.5, temperature=22),
+                ha_state("sensor.tuerkontakt_battery", "21", "Tuerkontakt Batterie", device_class="battery", unit_of_measurement="%"),
+                ha_state("binary_sensor.kueche_fenster", "off", "Kueche Fenster", device_class="window"),
+            ]),
+            "energy": {
+                "power": 412,
+                "power_avg": 390,
+                "phases": {"l1": 100, "l2": 140, "l3": 172},
+            },
+        }
+
+        answer = _house_status_answer("Ich bin nicht zuhause, wie ist der Hausstatus mit Lichter, Akku, Klima und Strom?", context)
+
+        self.assertIn("Strom: aktuell 412 W", answer)
+        self.assertIn("Lichter an: 1 von 2. Wohnzimmer Licht (50%)", answer)
+        self.assertIn("Klima: Wohnzimmer Klima", answer)
+        self.assertIn("Akkus/Batterien: 1 niedrig. Tuerkontakt Batterie: 21%", answer)
+        self.assertIn("Fenster/Türen: alle 1 Kontakte geschlossen", answer)
+
+    def test_answer_handles_targeted_light_climate_battery_and_energy_questions(self):
+        context = {
+            "home_assistant": _home_assistant_snapshot([
+                ha_state("light.wohnzimmer", "on", "Wohnzimmer Licht"),
+                ha_state("climate.schlafzimmer", "cool", "Schlafzimmer Klima", hvac_action="cooling", current_temperature=25, temperature=22),
+                ha_state("sensor.sensor_battery", "88", "Sensor Batterie", device_class="battery", unit_of_measurement="%"),
+            ]),
+            "energy": {"power": 280, "phases": {}},
+        }
+
+        self.assertIn("Lichter an: 1 von 1", _house_status_answer("Welche Lichter sind an?", context))
+        self.assertIn("Schlafzimmer Klima", _house_status_answer("Was macht die Klimaanlage?", context))
+        self.assertIn("keine niedrigen Werte unter 40%", _house_status_answer("Wie sind die Akkus?", context))
+        self.assertIn("Strom: aktuell 280 W", _house_status_answer("Wie ist der Stromverbrauch?", context))
 
     def test_answer_sends_house_sensor_questions_to_llm_with_local_summary(self):
         context = {

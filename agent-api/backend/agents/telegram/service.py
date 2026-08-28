@@ -386,7 +386,7 @@ class TelegramService:
             "Antworte kurz, konkret und auf Deutsch. "
             "Du darfst ueber Status, Termine, Nachrichten, Garten, Energie und Home Assistant informieren. "
             "Wenn Home-Assistant-Daten im Kontext enthalten sind, nutze diese konkret mit Entity-Namen und Status. "
-            "Nutze fuer Rauchmelder-, Temperatur-, Sicherheits-, Fenster-, Tuer- und Garagenfragen nur den gefilterten "
+            "Nutze fuer Rauchmelder-, Temperatur-, Sicherheits-, Fenster-, Tuer-, Garagen-, Licht-, luftqualität-, Klima-, Akku- und Stromfragen nur den gefilterten "
             "Home-Assistant-Snapshot und die lokale Hausstatus-Zusammenfassung im Prompt. "
             "Nenne keine internen Geraete-, Router-, CPU-, Batterie-, Board- oder Diagnose-Temperaturen. "
             "Sage nicht, dass Informationen fehlen, wenn passende Daten im Kontext stehen. "
@@ -719,6 +719,9 @@ def _home_assistant_snapshot(states: list[dict[str, Any]]) -> dict[str, Any]:
         "active_problems": _binary_items(states, _is_problem_state, active_only=True, limit=30),
         "openings": _binary_items(states, _is_opening_state, active_only=False, limit=40),
         "garage": _garage_items(states, limit=10),
+        "lights": _light_items(states, limit=80),
+        "climate": _climate_items(states, limit=20),
+        "batteries": _battery_items(states, limit=60),
         "low_batteries": _low_battery_items(states, limit=30),
         "unavailable": _simple_state_items(
             [state for state in states if str(state.get("state") or "").lower() in {"unavailable", "unknown"}],
@@ -771,17 +774,59 @@ def _garage_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, An
     return sorted(items, key=lambda item: (not item.get("open", False), item.get("name") or "", item.get("entity_id") or ""))[:limit]
 
 
-def _low_battery_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def _light_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if _domain(state) != "light":
+            continue
+        attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        item = _simple_state_item(state)
+        item["on"] = str(state.get("state") or "").strip().lower() == "on"
+        brightness = attrs.get("brightness")
+        if isinstance(brightness, (int, float)):
+            item["brightness_percent"] = round(float(brightness) / 255 * 100)
+        items.append(item)
+    return sorted(items, key=lambda item: (not item.get("on", False), item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _climate_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    items = []
+    for state in states:
+        if _domain(state) != "climate":
+            continue
+        attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        item = _simple_state_item(state)
+        for source_key, target_key in (
+            ("hvac_action", "action"),
+            ("current_temperature", "current_temperature"),
+            ("temperature", "target_temperature"),
+            ("current_humidity", "current_humidity"),
+        ):
+            value = attrs.get(source_key)
+            if value not in (None, ""):
+                item[target_key] = value
+        items.append(item)
+    return sorted(items, key=lambda item: (item.get("name") or "", item.get("entity_id") or ""))[:limit]
+
+
+def _battery_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     items = []
     for state in states:
         if not _is_battery_state(state):
             continue
-        level = _numeric_state(state)
-        text_state = str(state.get("state") or "").strip().lower()
+        item = _simple_state_item(state)
+        item["level"] = _numeric_state(state)
+        items.append(item)
+    return sorted(items, key=lambda item: (item.get("level") is None, item.get("level") or 999, item.get("name") or ""))[:limit]
+
+
+def _low_battery_items(states: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    items = []
+    for item in _battery_items(states, limit=500):
+        level = item.get("level")
+        text_state = str(item.get("state") or "").strip().lower()
         if level is not None and level >= 40 and text_state not in {"low", "critical", "empty"}:
             continue
-        item = _simple_state_item(state)
-        item["level"] = level
         items.append(item)
     return sorted(items, key=lambda item: (item.get("level") is None, item.get("level") or 999, item.get("name") or ""))[:limit]
 
@@ -900,12 +945,30 @@ def _house_status_answer(question: str, context: dict[str, Any]) -> str:
     wants_safety = _question_mentions_safety(question)
     wants_openings = _question_mentions_openings(question)
     wants_garage = _question_mentions_garage(question)
-    if not any((wants_house, wants_temperature, wants_humidity, wants_safety, wants_openings, wants_garage)):
+    wants_lights = _question_mentions_lights(question)
+    wants_climate = _question_mentions_climate(question)
+    wants_battery = _question_mentions_battery(question)
+    wants_energy = _question_mentions_energy(question)
+    if not any((wants_house, wants_temperature, wants_humidity, wants_safety, wants_openings, wants_garage, wants_lights, wants_climate, wants_battery, wants_energy)):
         return ""
 
     parts: list[str] = []
     if wants_house:
         parts.append("Hausstatus:")
+    if wants_energy or wants_house:
+        energy = _energy_summary(context)
+        if energy:
+            parts.append(energy)
+    if wants_lights or wants_house:
+        parts.append(_lights_summary(ha))
+    if wants_climate or wants_house:
+        climate = _climate_summary(ha)
+        if climate:
+            parts.append(climate)
+    if wants_battery or wants_house:
+        battery = _battery_summary(ha)
+        if battery:
+            parts.append(battery)
     if wants_garage or wants_house:
         garage = _garage_summary(ha)
         if garage:
@@ -937,6 +1000,98 @@ def _garage_summary(ha: dict[str, Any]) -> str:
     if closed_items:
         return "Garage geschlossen: " + _item_names(closed_items, fallback="Garage") + "."
     return "Garage: " + "; ".join(f"{item.get('name') or item.get('entity_id')}: {label_state_text(item.get('state'))}" for item in items[:4]) + "."
+
+
+def _lights_summary(ha: dict[str, Any]) -> str:
+    items = ha.get("lights") if isinstance(ha.get("lights"), list) else []
+    if not items:
+        return "Lichter: keine Licht-Entities im Home-Assistant-Snapshot gefunden."
+    on_items = [item for item in items if item.get("on")]
+    if not on_items:
+        return f"Lichter: alle {len(items)} bekannten Lichter aus."
+    shown = "; ".join(_light_label(item) for item in on_items[:10])
+    suffix = f" und {len(on_items) - 10} weitere" if len(on_items) > 10 else ""
+    return f"Lichter an: {len(on_items)} von {len(items)}. {shown}{suffix}."
+
+
+def _light_label(item: dict[str, Any]) -> str:
+    name = str(item.get("name") or item.get("entity_id") or "Licht")
+    brightness = item.get("brightness_percent")
+    if isinstance(brightness, (int, float)):
+        return f"{name} ({brightness:g}%)"
+    return name
+
+
+def _climate_summary(ha: dict[str, Any]) -> str:
+    items = ha.get("climate") if isinstance(ha.get("climate"), list) else []
+    if not items:
+        return "Klima: keine Climate-Entities im Home-Assistant-Snapshot gefunden."
+    return "Klima: " + "; ".join(_climate_label(item) for item in items[:8]) + "."
+
+
+def _climate_label(item: dict[str, Any]) -> str:
+    name = str(item.get("name") or item.get("entity_id") or "Klima")
+    parts = [f"{name}: {label_state_text(item.get('state'))}"]
+    action = item.get("action")
+    if action not in (None, ""):
+        parts.append(f"Aktion {label_state_text(action)}")
+    current = item.get("current_temperature")
+    target = item.get("target_temperature")
+    if isinstance(current, (int, float)) or isinstance(target, (int, float)):
+        temp = []
+        if isinstance(current, (int, float)):
+            temp.append(f"ist {float(current):g} °C")
+        if isinstance(target, (int, float)):
+            temp.append(f"soll {float(target):g} °C")
+        parts.append(", ".join(temp))
+    return ", ".join(parts)
+
+
+def _battery_summary(ha: dict[str, Any]) -> str:
+    batteries = ha.get("batteries") if isinstance(ha.get("batteries"), list) else []
+    low_batteries = ha.get("low_batteries") if isinstance(ha.get("low_batteries"), list) else []
+    if not batteries and not low_batteries:
+        return "Akkus/Batterien: keine Batterie-Entities im Home-Assistant-Snapshot gefunden."
+    if low_batteries:
+        values = "; ".join(_battery_label(item) for item in low_batteries[:10])
+        suffix = f" und {len(low_batteries) - 10} weitere" if len(low_batteries) > 10 else ""
+        return f"Akkus/Batterien: {len(low_batteries)} niedrig. {values}{suffix}."
+    lowest = [item for item in batteries if isinstance(item.get("level"), (int, float))][:5]
+    if lowest:
+        return f"Akkus/Batterien: keine niedrigen Werte unter 40%. Niedrigste: " + "; ".join(_battery_label(item) for item in lowest) + "."
+    return f"Akkus/Batterien: {len(batteries)} Batterie-Entities vorhanden, keine niedrigen Werte erkannt."
+
+
+def _battery_label(item: dict[str, Any]) -> str:
+    name = str(item.get("name") or item.get("entity_id") or "Batterie")
+    level = item.get("level")
+    if isinstance(level, (int, float)):
+        return f"{name}: {float(level):g}%"
+    return f"{name}: {label_state_text(item.get('state'))}"
+
+
+def _energy_summary(context: dict[str, Any]) -> str:
+    energy = context.get("energy") if isinstance(context.get("energy"), dict) else {}
+    if not energy:
+        return ""
+    power = energy.get("power")
+    power_avg = energy.get("power_avg")
+    phases = energy.get("phases") if isinstance(energy.get("phases"), dict) else {}
+    parts = []
+    if isinstance(power, (int, float)):
+        parts.append(f"aktuell {power:g} W")
+    if isinstance(power_avg, (int, float)):
+        parts.append(f"Schnitt {power_avg:g} W")
+    phase_parts = [
+        f"{label.upper()} {value:g} W"
+        for label, value in phases.items()
+        if isinstance(value, (int, float))
+    ]
+    if phase_parts:
+        parts.append(", ".join(phase_parts))
+    if not parts:
+        return "Strom: keine aktuellen Leistungsdaten."
+    return "Strom: " + "; ".join(parts) + "."
 
 
 def _safety_summary(ha: dict[str, Any]) -> str:
@@ -1020,9 +1175,29 @@ def _question_mentions_garage(question: str) -> bool:
     return any(term in text for term in ("garage", "garagentor", "garagen", "tor"))
 
 
+def _question_mentions_lights(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("licht", "lichter", "lampe", "lampen", "beleuchtung", "light", "lights"))
+
+
+def _question_mentions_climate(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("klima", "klimaanlage", "heizung", "thermostat", "climate", "hvac", "air condition", "airconditioning"))
+
+
+def _question_mentions_battery(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("akku", "akkus", "batterie", "batterien", "battery", "batteries"))
+
+
+def _question_mentions_energy(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(term in text for term in ("strom", "energie", "verbrauch", "leistung", "watt", "power", "energy"))
+
+
 def _question_mentions_house_status(question: str) -> bool:
     text = str(question or "").lower()
-    return any(term in text for term in ("hausstatus", "hausstaus", "status des hauses", "haus", "zuhause", "daheim", "home status", "house status"))
+    return any(term in text for term in ("hausstatus", "hausstaus", "status des hauses", "haus", "zuhause", "daheim", "nicht zuhause", "unterwegs", "home status", "house status"))
 
 
 def _item_names(items: list[dict[str, Any]], fallback: str) -> str:
