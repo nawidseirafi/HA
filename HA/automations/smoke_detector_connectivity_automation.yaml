@@ -1,0 +1,259 @@
+- id: smoke_detector_connectivity_upstairs_hallway
+  alias: Zigbee Rauchmelder Verbindungsüberwachung - Upstairs Hallway
+  description: Meldet den Upstairs-Hallway-Rauchmelder offline und gibt bei Rückkehr Entwarnung
+
+  variables:
+    device_name: Upstairs Hallway Smoke Detector
+    notification_id: smoke_upstairs_hallway_smoke_detector
+
+  triggers:
+    - trigger: mqtt
+      id: offline
+      topic: "zigbee2mqtt/Upstairs Hallway Smoke Detector/availability"
+      payload: "offline"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+    - trigger: mqtt
+      id: online
+      topic: "zigbee2mqtt/Upstairs Hallway Smoke Detector/availability"
+      payload: "online"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+  conditions: []
+
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: offline
+          sequence:
+            - wait_for_trigger:
+                - trigger: mqtt
+                  topic: "zigbee2mqtt/Upstairs Hallway Smoke Detector/availability"
+                  payload: "online"
+                  value_template: "{{ value_json.state if value_json is mapping else value }}"
+              timeout: "00:05:00"
+              continue_on_timeout: true
+
+            - condition: template
+              value_template: "{{ wait.trigger is none }}"
+
+            - action: persistent_notification.create
+              data:
+                notification_id: "{{ notification_id }}"
+                title: "⚠️ Rauchmelder nicht erreichbar"
+                message: >
+                  „{{ device_name }}“ ist weiterhin nicht über Zigbee
+                  erreichbar. Bitte Batterie und Zigbee-Verbindung prüfen.
+
+            - action: notify.mobile_app_system_error_404
+              data:
+                title: "⚠️ Rauchmelder offline"
+                message: >
+                  {{ device_name }} ist weiterhin nicht erreichbar.
+                  Bitte Rauchmelder prüfen.
+
+        - conditions:
+            - condition: trigger
+              id: online
+          sequence:
+            - action: persistent_notification.dismiss
+              data:
+                notification_id: "{{ notification_id }}"
+
+  mode: restart
+
+- id: smoke_detector_connectivity_living_room
+  alias: Zigbee Rauchmelder Verbindungsüberwachung - Living Room
+  description: Meldet den Living-Room-Rauchmelder offline und gibt bei Rückkehr Entwarnung
+
+  variables:
+    device_name: Living Room Smoke Detector
+    notification_id: smoke_living_room_smoke_detector
+
+  triggers:
+    - trigger: mqtt
+      id: offline
+      topic: "zigbee2mqtt/Living Room Smoke Detector/availability"
+      payload: "offline"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+    - trigger: mqtt
+      id: online
+      topic: "zigbee2mqtt/Living Room Smoke Detector/availability"
+      payload: "online"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+  conditions: []
+
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: offline
+          sequence:
+            - wait_for_trigger:
+                - trigger: mqtt
+                  topic: "zigbee2mqtt/Living Room Smoke Detector/availability"
+                  payload: "online"
+                  value_template: "{{ value_json.state if value_json is mapping else value }}"
+              timeout: "00:05:00"
+              continue_on_timeout: true
+
+            - condition: template
+              value_template: "{{ wait.trigger is none }}"
+
+            - action: persistent_notification.create
+              data:
+                notification_id: "{{ notification_id }}"
+                title: "⚠️ Rauchmelder nicht erreichbar"
+                message: >
+                  „{{ device_name }}“ ist weiterhin nicht über Zigbee
+                  erreichbar. Bitte Batterie und Zigbee-Verbindung prüfen.
+
+            - action: notify.mobile_app_system_error_404
+              data:
+                title: "⚠️ Rauchmelder offline"
+                message: >
+                  {{ device_name }} ist weiterhin nicht erreichbar.
+                  Bitte Rauchmelder prüfen.
+
+        - conditions:
+            - condition: trigger
+              id: online
+          sequence:
+            - action: persistent_notification.dismiss
+              data:
+                notification_id: "{{ notification_id }}"
+
+  mode: restart
+
+- id: smoke_detector_connectivity_bedroom
+  alias: Zigbee Rauchmelder Verbindungsüberwachung - Bedroom
+  description: Meldet den Bedroom-Rauchmelder offline und gibt bei Rückkehr Entwarnung
+
+  variables:
+    device_name: Bedroom Smoke Detector
+    notification_id: smoke_bedroom_smoke_detector
+
+  triggers:
+    - trigger: mqtt
+      id: offline
+      topic: "zigbee2mqtt/Bedroom Smoke Detector/availability"
+      payload: "offline"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+    - trigger: mqtt
+      id: online
+      topic: "zigbee2mqtt/Bedroom Smoke Detector/availability"
+      payload: "online"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+  conditions: []
+
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: offline
+          sequence:
+            - wait_for_trigger:
+                - trigger: mqtt
+                  topic: "zigbee2mqtt/Bedroom Smoke Detector/availability"
+                  payload: "online"
+                  value_template: "{{ value_json.state if value_json is mapping else value }}"
+              timeout: "00:05:00"
+              continue_on_timeout: true
+
+            - condition: template
+              value_template: "{{ wait.trigger is none }}"
+
+            - action: persistent_notification.create
+              data:
+                notification_id: "{{ notification_id }}"
+                title: "⚠️ Rauchmelder nicht erreichbar"
+                message: >
+                  „{{ device_name }}“ ist weiterhin nicht über Zigbee
+                  erreichbar. Bitte Batterie und Zigbee-Verbindung prüfen.
+
+            - action: notify.mobile_app_system_error_404
+              data:
+                title: "⚠️ Rauchmelder offline"
+                message: >
+                  {{ device_name }} ist weiterhin nicht erreichbar.
+                  Bitte Rauchmelder prüfen.
+
+        - conditions:
+            - condition: trigger
+              id: online
+          sequence:
+            - action: persistent_notification.dismiss
+              data:
+                notification_id: "{{ notification_id }}"
+
+  mode: restart
+
+- id: smoke_detector_connectivity_nika
+  alias: Zigbee Rauchmelder Verbindungsüberwachung - Nika
+  description: Meldet den Nika-Rauchmelder offline und gibt bei Rückkehr Entwarnung
+
+  variables:
+    device_name: Nika Smoke Detector
+    notification_id: smoke_nika_smoke_detector
+
+  triggers:
+    - trigger: mqtt
+      id: offline
+      topic: "zigbee2mqtt/Nika Smoke Detector/availability"
+      payload: "offline"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+    - trigger: mqtt
+      id: online
+      topic: "zigbee2mqtt/Nika Smoke Detector/availability"
+      payload: "online"
+      value_template: "{{ value_json.state if value_json is mapping else value }}"
+
+  conditions: []
+
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: offline
+          sequence:
+            - wait_for_trigger:
+                - trigger: mqtt
+                  topic: "zigbee2mqtt/Nika Smoke Detector/availability"
+                  payload: "online"
+                  value_template: "{{ value_json.state if value_json is mapping else value }}"
+              timeout: "00:05:00"
+              continue_on_timeout: true
+
+            - condition: template
+              value_template: "{{ wait.trigger is none }}"
+
+            - action: persistent_notification.create
+              data:
+                notification_id: "{{ notification_id }}"
+                title: "⚠️ Rauchmelder nicht erreichbar"
+                message: >
+                  „{{ device_name }}“ ist weiterhin nicht über Zigbee
+                  erreichbar. Bitte Batterie und Zigbee-Verbindung prüfen.
+
+            - action: notify.mobile_app_system_error_404
+              data:
+                title: "⚠️ Rauchmelder offline"
+                message: >
+                  {{ device_name }} ist weiterhin nicht erreichbar.
+                  Bitte Rauchmelder prüfen.
+
+        - conditions:
+            - condition: trigger
+              id: online
+          sequence:
+            - action: persistent_notification.dismiss
+              data:
+                notification_id: "{{ notification_id }}"
+
+  mode: restart

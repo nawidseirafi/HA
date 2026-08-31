@@ -1,4 +1,5 @@
 - alias: Wasser erkannt - Handy Notification
+  id: wasser_erkannt_handy_notification
   description: Erkennt automatisch alle Feuchtigkeitssensoren und sendet eine Notification ans Handy
   mode: single
 

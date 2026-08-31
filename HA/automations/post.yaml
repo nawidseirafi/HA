@@ -1,4 +1,5 @@
 - alias: "📬 Briefkasten - Post angekündigt"
+  id: briefkasten_post_angekuendigt
   description: "Setzt Meldung wenn Post da ist (persistent bis manuell zurückgesetzt)"
   trigger:
     - platform: state
@@ -21,6 +22,7 @@
   mode: single
 
 - alias: "📬 Briefkasten - Manuelles Zurücksetzen"
+  id: briefkasten_post_manuell_zuruecksetzen
   description: "Setzt den Status zurück wenn manuell bestätigt (nur durch User-Aktion)"
   trigger:
     - platform: state

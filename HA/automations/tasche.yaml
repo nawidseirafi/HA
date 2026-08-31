@@ -1,4 +1,5 @@
 - alias: "🚨 Tasche - Bewegung erkannt"
+  id: tasche_bewegung_erkannt
   description: "Benachrichtigt, wenn Zigbee2MQTT fuer den Office Theft Sensor eine Bewegung meldet"
 
   trigger:
