@@ -538,6 +538,18 @@ class SchedulerStore:
                 "default_key": "platform:household:window-check",
             },
             {
+                "name": "Household Sicherheitsalarme",
+                "description": "Prueft Rauch-, Gas-, CO-, Wasserleck- und Luftqualitaetsalarme und verteilt kritische Meldungen.",
+                "schedule_type": "cron",
+                "schedule": {"cron": "*/1 * * * *", "timezone": "Europe/Berlin"},
+                "target_agent": "household",
+                "target_action": "alerts",
+                "action_type": "household_check",
+                "action_payload": {"check": "alerts"},
+                "source": "platform",
+                "default_key": "platform:household:alert-check",
+            },
+            {
                 "name": "Schlafzimmer Ventilator Komfortregel",
                 "description": "Schaltet den Schlafzimmer-Ventilator regelbasiert nach Anwesenheit, Schlafzeit und Temperatur.",
                 "schedule_type": "cron",

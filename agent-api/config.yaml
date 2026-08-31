@@ -50,6 +50,9 @@ household:
   notifications:
     notify_service: "notify.mobile_app_system_error_404"
     openings_push_enabled: true
+    alert_push_enabled: true
+    alert_telegram_enabled: true
+    alert_dedupe_minutes: 30
   front_light:
     enabled: true
     control_enabled: true

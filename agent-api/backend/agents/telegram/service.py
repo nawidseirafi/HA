@@ -423,6 +423,26 @@ class TelegramService:
         result = self.client(config).send_message(config.allowed_chat_ids[0], text)
         return {"ok": True, "result": result}
 
+    def send_notification(self, title: str, message: str, severity: str = "info") -> dict[str, Any]:
+        config = self.config()
+        if not config.enabled:
+            return {"ok": False, "skipped": "disabled"}
+        if not config.bot_token or not config.allowed_chat_ids:
+            return {"ok": False, "skipped": "not_configured"}
+        prefix = {
+            "critical": "KRITISCH",
+            "warning": "WARNUNG",
+            "info": "INFO",
+        }.get(str(severity or "").lower(), "INFO")
+        text = f"{prefix}: {title}\n{message}".strip()
+        sent = []
+        for chat_id in _effective_allowed_chat_ids(config):
+            result = self.client(config).send_message(chat_id, _telegram_text(text))
+            message_id = _message_id(result)
+            sent.append({"chat_id": chat_id, "message_id": message_id})
+        self._last_sent_at = utc_now()
+        return {"ok": bool(sent), "sent": sent}
+
     def bot_info(self) -> dict[str, Any]:
         config = self.config()
         if not config.bot_token:

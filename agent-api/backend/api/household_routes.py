@@ -18,6 +18,10 @@ class OpeningsCheckPayload(BaseModel):
     notify: bool = True
 
 
+class AlertsCheckPayload(BaseModel):
+    notify: bool = True
+
+
 @router.get("/status")
 def household_status():
     return household_service.status()
@@ -36,6 +40,16 @@ def household_reminders():
 @router.get("/openings")
 def household_openings():
     return household_service.openings_status()
+
+
+@router.get("/alerts")
+def household_alerts():
+    return household_service.alerts_status()
+
+
+@router.post("/alerts/check")
+def check_household_alerts(payload: AlertsCheckPayload | None = None):
+    return household_service.check_alerts(notify=payload.notify if payload else True)
 
 
 @router.post("/openings/check")

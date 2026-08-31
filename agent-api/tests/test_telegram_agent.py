@@ -116,6 +116,18 @@ class TelegramAgentTests(unittest.TestCase):
             self.assertIn("jetzt mit Roboter Steve verbunden", client.sent[0]["text"])
             self.assertIn("Antwort auf: Hallo", client.sent[1]["text"])
 
+    def test_send_notification_uses_allowed_telegram_chat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client = RecordingTelegramClient()
+            service = self._service(tmp, client)
+
+            result = service.send_notification("Rauchalarm erkannt", "Aktiv: Flur Rauchmelder", severity="critical")
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(client.sent[-1]["chat_id"], "6516768203")
+            self.assertIn("KRITISCH: Rauchalarm erkannt", client.sent[-1]["text"])
+            self.assertIn("Aktiv: Flur Rauchmelder", client.sent[-1]["text"])
+
     def test_bot_id_from_token_is_not_treated_as_allowed_chat(self):
         with tempfile.TemporaryDirectory() as tmp:
             client = RecordingTelegramClient()

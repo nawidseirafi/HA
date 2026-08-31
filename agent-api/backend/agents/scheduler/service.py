@@ -225,6 +225,8 @@ class SchedulerService:
                 )
             if payload.get("check") == "openings" or str(task.get("default_key") or "") == "platform:household:window-check":
                 return HouseholdService().check_openings(notify=True)
+            if payload.get("check") == "alerts" or str(task.get("default_key") or "") == "platform:household:alert-check":
+                return HouseholdService().check_alerts(notify=True)
             return HouseholdService().summary()
         if action_type == "update_check":
             from backend.services.update_service import UpdateService

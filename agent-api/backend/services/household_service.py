@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from backend.config import load_global_config
@@ -16,10 +16,19 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
 OPENING_DEVICE_CLASSES = {"door", "window", "opening"}
 SAFETY_DEVICE_CLASSES = {"smoke", "gas", "carbon_monoxide"}
 ACTIVE_SAFETY_STATES = {"on", "detected", "problem", "unsafe"}
+WATER_LEAK_DEVICE_CLASSES = {"moisture"}
+AIR_QUALITY_DEVICE_CLASSES = {"aqi", "carbon_dioxide", "pm25", "volatile_organic_compounds"}
+AIR_QUALITY_THRESHOLDS = {
+    "aqi": (100.0, 150.0),
+    "carbon_dioxide": (1500.0, 2000.0),
+    "pm25": (35.0, 75.0),
+    "volatile_organic_compounds": (500.0, 1000.0),
+}
 
 
 class HouseholdService:
-    def __init__(        self,
+    def __init__(
+        self,
         ha_service: HomeAssistantService | None = None,
         waste_service: WasteService | None = None,
         infrastructure_service: InfrastructureService | None = None,
@@ -121,6 +130,68 @@ class HouseholdService:
                 "openings_open": len(status.get("openings", {}).get("open", [])) if isinstance(status.get("openings"), dict) else 0,
                 "safety_alerts": len(status.get("safety", {}).get("active_alerts", [])) if isinstance(status.get("safety"), dict) else 0,
             },
+        }
+
+    def check_alerts(self, notify: bool = True) -> dict[str, Any]:
+        alerts = self.alerts_status()
+        active_alerts = alerts.get("active_alerts", []) if isinstance(alerts, dict) else []
+        delivered: list[dict[str, Any]] = []
+        suppressed: list[dict[str, Any]] = []
+        for alert in active_alerts:
+            signature = str(alert.get("signature") or "")
+            if not signature:
+                continue
+            if self._recent_alert_message_exists(signature):
+                suppressed.append({"signature": signature, "reason": "deduplicated"})
+                continue
+            channels = self._alert_channels(alert) if notify else ["message_center"]
+            message = self.messaging_service.create_message(
+                source="household",
+                category=str(alert.get("category") or "household"),
+                severity=str(alert.get("severity") or "warning"),
+                title=str(alert.get("title") or "Haushaltsalarm"),
+                message=str(alert.get("message") or ""),
+                payload={"kind": "household_alert", "signature": signature, "channels": channels, "alert": alert},
+            )
+            channel_results = {"message_center": {"ok": True, "message_id": message.get("id")}}
+            if notify and "mobile_push" in channels:
+                channel_results["mobile_push"] = self._send_alert_push(alert)
+            if notify and "telegram" in channels:
+                channel_results["telegram"] = self._send_alert_telegram(alert)
+            delivered.append({"signature": signature, "channels": channels, "results": channel_results})
+        return {
+            "ok": not any(str(item.get("severity") or "") == "critical" for item in active_alerts),
+            "updated_at": alerts.get("updated_at") if isinstance(alerts, dict) else self._now(),
+            "active_alerts": active_alerts,
+            "delivered": delivered,
+            "suppressed": suppressed,
+            "notified": bool(delivered),
+        }
+
+    def alerts_status(self) -> dict[str, Any]:
+        updated_at = self._now()
+        try:
+            states = self.ha_service.get_states()
+        except Exception as exc:
+            return {"ok": False, "updated_at": updated_at, "active_alerts": [], "error": str(exc)}
+        alerts: list[dict[str, Any]] = []
+        for state in states:
+            safety = self._safety_alert(state)
+            if safety:
+                alerts.append(safety)
+                continue
+            water = self._water_leak_alert(state)
+            if water:
+                alerts.append(water)
+                continue
+            air = self._air_quality_alert(state)
+            if air:
+                alerts.append(air)
+        alerts.sort(key=lambda item: (0 if item.get("severity") == "critical" else 1, item.get("title") or ""))
+        return {
+            "ok": not any(str(item.get("severity") or "") == "critical" for item in alerts),
+            "updated_at": updated_at,
+            "active_alerts": alerts,
         }
 
     def comfort_bedroom_fan(self, apply: bool = False, include_ai: bool | None = None) -> dict[str, Any]:
@@ -388,6 +459,85 @@ class HouseholdService:
             or any(token in haystack for token in ("rauch", "smoke", "gas", "co_melder", "kohlenmonoxid", "carbon_monoxide"))
         )
 
+    def _safety_alert(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        if not self._is_safety_state(state):
+            return None
+        item = self._safety_entity(state)
+        if not item["active"]:
+            return None
+        return {
+            "kind": "safety",
+            "category": "security",
+            "severity": "critical",
+            "signature": f"safety:{item.get('entity_id')}:{item.get('state')}",
+            "title": self._safety_title([item]),
+            "message": self._safety_message([item]),
+            "entity": item,
+        }
+
+    def _water_leak_alert(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        if not self._is_water_leak_state(state):
+            return None
+        item = self._simple_entity(state)
+        if str(item.get("state") or "").lower() not in ACTIVE_SAFETY_STATES | {"wet", "moist"}:
+            return None
+        return {
+            "kind": "water_leak",
+            "category": "security",
+            "severity": "critical",
+            "signature": f"water_leak:{item.get('entity_id')}:{item.get('state')}",
+            "title": "Wasserleck erkannt",
+            "message": f"Aktiv: {item.get('name') or item.get('entity_id') or 'Wassersensor'}",
+            "entity": item,
+        }
+
+    def _air_quality_alert(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        if not str(state.get("entity_id") or "").startswith("sensor."):
+            return None
+        device_class = str(attributes.get("device_class") or "").lower()
+        haystack = f"{state.get('entity_id') or ''} {attributes.get('friendly_name') or ''}".lower()
+        inferred_class = device_class
+        if not inferred_class:
+            if "co2" in haystack or "carbon dioxide" in haystack:
+                inferred_class = "carbon_dioxide"
+            elif "pm2" in haystack or "feinstaub" in haystack:
+                inferred_class = "pm25"
+            elif "voc" in haystack:
+                inferred_class = "volatile_organic_compounds"
+            elif "aqi" in haystack or "luftqual" in haystack or "air quality" in haystack:
+                inferred_class = "aqi"
+        if inferred_class not in AIR_QUALITY_DEVICE_CLASSES:
+            return None
+        value = self._numeric_state(state)
+        if value is None:
+            return None
+        warning, critical = AIR_QUALITY_THRESHOLDS.get(inferred_class, (100.0, 150.0))
+        if value < warning:
+            return None
+        item = self._simple_entity(state)
+        severity = "critical" if value >= critical else "warning"
+        unit = item.get("unit") or ""
+        return {
+            "kind": "air_quality",
+            "category": "environment",
+            "severity": severity,
+            "signature": f"air_quality:{item.get('entity_id')}:{severity}",
+            "title": "Luftqualität kritisch" if severity == "critical" else "Luftqualität auffällig",
+            "message": f"{item.get('name') or item.get('entity_id')}: {value:g} {unit}".strip(),
+            "entity": {**item, "value": value, "air_quality_class": inferred_class},
+        }
+
+    def _is_water_leak_state(self, state: dict[str, Any]) -> bool:
+        attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+        entity_id = str(state.get("entity_id") or "")
+        device_class = str(attributes.get("device_class") or "").lower()
+        haystack = f"{entity_id} {attributes.get('friendly_name') or ''}".lower()
+        return entity_id.startswith("binary_sensor.") and (
+            device_class in WATER_LEAK_DEVICE_CLASSES
+            or any(token in haystack for token in ("wasser", "water", "leck", "leak", "moisture", "feucht"))
+        )
+
     def _opening_entity(self, state: dict[str, Any]) -> dict[str, Any]:
         item = self._simple_entity(state)
         item["open"] = str(state.get("state") or "").lower() == "on"
@@ -436,6 +586,73 @@ class HouseholdService:
                 return True
         return False
 
+    def _recent_alert_message_exists(self, signature: str) -> bool:
+        notifications = self.config.get("notifications") if isinstance(self.config.get("notifications"), dict) else {}
+        cooldown_minutes = self._int_config(notifications.get("alert_dedupe_minutes"), 30, minimum=1)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=cooldown_minutes)
+        for message in self.messaging_service.get_messages_by_source("household", limit=100):
+            payload = message.get("payload") if isinstance(message.get("payload"), dict) else {}
+            if payload.get("kind") != "household_alert" or payload.get("signature") != signature:
+                continue
+            if not message.get("read"):
+                return True
+            try:
+                created_at = datetime.fromisoformat(str(message.get("created_at") or ""))
+            except ValueError:
+                return True
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if created_at >= cutoff:
+                return True
+        return False
+
+    def _alert_channels(self, alert: dict[str, Any]) -> list[str]:
+        notifications = self.config.get("notifications") if isinstance(self.config.get("notifications"), dict) else {}
+        channels = ["message_center"]
+        severity = str(alert.get("severity") or "warning")
+        away = self._house_is_away()
+        if severity == "critical" or away:
+            if notifications.get("alert_push_enabled", True) is not False:
+                channels.append("mobile_push")
+            if notifications.get("alert_telegram_enabled", True) is not False:
+                channels.append("telegram")
+        return channels
+
+    def _send_alert_push(self, alert: dict[str, Any]) -> dict[str, Any]:
+        notifications = self.config.get("notifications") if isinstance(self.config.get("notifications"), dict) else {}
+        notify_service = str(notifications.get("notify_service") or "notify.mobile_app_system_error_404").strip()
+        if not notify_service:
+            return {"ok": False, "skipped": "missing_notify_service"}
+        try:
+            result = self.ha_service.call_service(
+                "notify",
+                notify_service.replace("notify.", ""),
+                {
+                    "title": str(alert.get("title") or "Haushaltsalarm"),
+                    "message": str(alert.get("message") or ""),
+                    "data": {
+                        "tag": str(alert.get("signature") or "household_alert"),
+                        "group": "household",
+                        "priority": str(alert.get("severity") or "warning"),
+                    },
+                },
+            )
+            return {"ok": True, "result": result}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def _send_alert_telegram(self, alert: dict[str, Any]) -> dict[str, Any]:
+        try:
+            from backend.agents.telegram.service import TelegramService
+
+            return TelegramService().send_notification(
+                title=str(alert.get("title") or "Haushaltsalarm"),
+                message=str(alert.get("message") or ""),
+                severity=str(alert.get("severity") or "warning"),
+            )
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
     def _send_openings_push(self, title: str, message: str, signature: str) -> None:
         notifications = self.config.get("notifications") if isinstance(self.config.get("notifications"), dict) else {}
         if notifications.get("openings_push_enabled", True) is False:
@@ -453,6 +670,20 @@ class HouseholdService:
             # Message Center remains the reliable local notification channel.
             return
 
+    def _house_is_away(self) -> bool:
+        auth = load_global_config().get("auth") or {}
+        away = auth.get("away_reauth") if isinstance(auth.get("away_reauth"), dict) else {}
+        entity_id = str(away.get("presence_entity") or "").strip()
+        home_states = {str(item).lower() for item in away.get("home_states", ["home"]) if str(item).strip()} if isinstance(away.get("home_states", ["home"]), list) else {"home"}
+        if not entity_id:
+            return False
+        try:
+            state = self.ha_service.fetch_entity_state(entity_id)
+        except Exception:
+            return False
+        value = str((state or {}).get("state") or "").lower()
+        return bool(value and value not in home_states)
+
     def _simple_entity(self, state: dict[str, Any]) -> dict[str, Any]:
         attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         return {
@@ -463,6 +694,18 @@ class HouseholdService:
             "device_class": attributes.get("device_class"),
             "unit": attributes.get("unit_of_measurement"),
         }
+
+    def _numeric_state(self, state: dict[str, Any]) -> float | None:
+        try:
+            return float(str(state.get("state") or "").replace(",", "."))
+        except (TypeError, ValueError):
+            return None
+
+    def _int_config(self, value: Any, fallback: int, minimum: int = 0) -> int:
+        try:
+            return max(int(value), minimum)
+        except (TypeError, ValueError):
+            return fallback
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat(timespec="seconds")
