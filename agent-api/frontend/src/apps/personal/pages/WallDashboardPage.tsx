@@ -4176,7 +4176,8 @@ function groupOpeningsByRoom(items: WallEntity[], data: WallDashboardData) {
     const knownRooms = data.light_groups.flatMap((group) => floorRooms(data, group.area).map((room) => room.area));
     const groups = new Map<string, WallEntity[]>();
     for (const item of items) {
-        const matchedRoom = knownRooms.find((room) => roomEntityMatches(item, room));
+        const exactRoom = knownRooms.find((room) => sameArea(item.area, room));
+        const matchedRoom = exactRoom || knownRooms.find((room) => roomEntityMatches(item, room));
         const area = matchedRoom || item.area || 'Ohne Raum';
         groups.set(area, [...(groups.get(area) ?? []), item]);
     }
@@ -4222,14 +4223,14 @@ function roomAliases(room: string) {
         büro: ['büro', 'buero', 'office', 'arbeitszimmer'],
         buero: ['buero', 'büro', 'office', 'arbeitszimmer'],
         arbeitszimmer: ['arbeitszimmer', 'office', 'büro', 'buero'],
-        terrace: ['terrace', 'terrasse', 'teras', 'terasse', 'patio', 'balkon', 'balcony', 'garten', 'garden'],
-        terrasse: ['terrasse', 'terrace', 'teras', 'terasse', 'patio', 'balkon', 'balcony', 'garten', 'garden'],
-        terasse: ['terasse', 'terrasse', 'terrace', 'patio', 'balkon', 'garten'],
-        patio: ['patio', 'terrasse', 'terrace', 'balkon', 'garden', 'garten'],
+        terrace: ['terrace', 'terrasse', 'teras', 'terasse', 'patio', 'balkon', 'balcony'],
+        terrasse: ['terrasse', 'terrace', 'teras', 'terasse', 'patio', 'balkon', 'balcony'],
+        terasse: ['terasse', 'terrasse', 'terrace', 'patio', 'balkon'],
+        patio: ['patio', 'terrasse', 'terrace', 'balkon'],
         balcony: ['balcony', 'balkon', 'terrasse', 'terrace'],
         balkon: ['balkon', 'balcony', 'terrasse', 'terrace'],
-        garden: ['garden', 'garten', 'terrasse', 'terrace'],
-        garten: ['garten', 'garden', 'terrasse', 'terrace'],
+        garden: ['garden', 'garten'],
+        garten: ['garten', 'garden'],
         toilet: ['toilet', 'wc', 'gaeste wc', 'gäste wc'],
         wc: ['wc', 'toilet', 'gaeste wc', 'gäste wc'],
     };
