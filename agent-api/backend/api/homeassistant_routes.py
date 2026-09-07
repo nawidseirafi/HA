@@ -559,10 +559,28 @@ def _area_name(state: dict[str, Any]) -> str:
             return _label(str(value))
     entity_id = str(state.get("entity_id", ""))
     slug = entity_id.split(".", 1)[-1]
+    inferred = _area_from_entity_slug(slug)
+    if inferred:
+        return inferred
     first = slug.split("_", 1)[0]
     if first and first not in {"light", "switch", "sensor", "binary"}:
         return _label(first)
     return "Haus"
+
+
+def _area_from_entity_slug(slug: str) -> str:
+    tokens = [token for token in str(slug or "").lower().split("_") if token]
+    opening_markers = {"window", "fenster", "door", "tuer", "tur", "skylight", "contact"}
+    for index, token in enumerate(tokens):
+        if token not in opening_markers or index == 0:
+            continue
+        area_tokens = tokens[:index]
+        deduped: list[str] = []
+        for area_token in area_tokens:
+            if not deduped or deduped[-1] != area_token:
+                deduped.append(area_token)
+        return _label("_".join(deduped))
+    return ""
 
 
 def _label(value: str) -> str:

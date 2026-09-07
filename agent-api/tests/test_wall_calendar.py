@@ -137,6 +137,28 @@ class WallCalendarTests(unittest.TestCase):
         self.assertFalse(_wall_state_is_primary(states[0], groups, "light"))
         self.assertTrue(_wall_state_is_primary(states[1], groups, "light"))
 
+    def test_wall_opening_area_uses_full_room_prefix_from_entity_id(self):
+        from backend.api.homeassistant_routes import _simple_item
+
+        item = _simple_item({
+            "entity_id": "binary_sensor.laundry_room_window_contact_contact",
+            "state": "on",
+            "attributes": {"friendly_name": "Fenster", "device_class": "window"},
+        })
+
+        self.assertEqual(item["area"], "Laundry Room")
+
+    def test_wall_opening_area_collapses_repeated_device_prefix(self):
+        from backend.api.homeassistant_routes import _simple_item
+
+        item = _simple_item({
+            "entity_id": "binary_sensor.office_office_skylight_contact_tur",
+            "state": "on",
+            "attributes": {"friendly_name": "Office Skylight Contact Tür", "device_class": "window"},
+        })
+
+        self.assertEqual(item["area"], "Office")
+
 
 if __name__ == "__main__":
     unittest.main()

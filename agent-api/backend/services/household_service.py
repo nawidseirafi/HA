@@ -533,10 +533,11 @@ class HouseholdService:
         entity_id = str(state.get("entity_id") or "")
         device_class = str(attributes.get("device_class") or "").lower()
         haystack = f"{entity_id} {attributes.get('friendly_name') or ''}".lower()
-        return entity_id.startswith("binary_sensor.") and (
-            device_class in WATER_LEAK_DEVICE_CLASSES
-            or any(token in haystack for token in ("wasser", "water", "leck", "leak", "moisture", "feucht"))
-        )
+        if not entity_id.startswith("binary_sensor."):
+            return False
+        if device_class:
+            return device_class in WATER_LEAK_DEVICE_CLASSES
+        return any(token in haystack for token in ("wasserleck", "water_leak", "water leak", "leck", "leak", "moisture", "feucht"))
 
     def _opening_entity(self, state: dict[str, Any]) -> dict[str, Any]:
         item = self._simple_entity(state)

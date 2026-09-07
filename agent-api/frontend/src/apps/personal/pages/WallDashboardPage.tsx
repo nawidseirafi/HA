@@ -4190,18 +4190,19 @@ function groupOpeningsByRoom(items: WallEntity[], data: WallDashboardData) {
 }
 
 function openingKind(item: WallEntity) {
+    const deviceClass = String(item.device_class || '').toLowerCase();
+    if (deviceClass === 'window') return 'window';
+    if (deviceClass === 'door') return 'door';
     const text = normalizeArea(`${item.name || ''} ${item.entity_id || ''}`);
     if (/\b(fenster|window)\b/.test(text)) return 'window';
     if (/\b(tür|tuer|tur|door|terrassentür|terrassentuer|terrassentur)\b/.test(text)) return 'door';
-    if (item.device_class === 'window') return 'window';
-    if (item.device_class === 'door') return 'door';
     return 'contact';
 }
 
 function roomEntityMatches(entity: WallEntity, room: string) {
     if (sameArea(entity.area, room)) return true;
     const text = normalizeArea(`${entity.area || ''} ${entity.name || ''} ${entity.entity_id || ''}`);
-    return roomAliases(room).some((alias) => alias.length >= 2 && text.includes(alias));
+    return roomAliases(room).some((alias) => alias.length >= 3 && text.includes(alias));
 }
 
 function roomAliases(room: string) {
@@ -4232,7 +4233,8 @@ function roomAliases(room: string) {
         toilet: ['toilet', 'wc', 'gaeste wc', 'gäste wc'],
         wc: ['wc', 'toilet', 'gaeste wc', 'gäste wc'],
     };
-    const parts = normalized.split(/\s+/).filter(Boolean);
+    const genericParts = new Set(['area', 'door', 'front', 'room', 'sensor']);
+    const parts = normalized.split(/\s+/).filter((part) => part.length >= 3 && !genericParts.has(part));
     return Array.from(new Set([
         normalized,
         ...parts,

@@ -131,6 +131,20 @@ class HouseholdSafetyTests(unittest.TestCase):
         self.assertEqual(result["active_alerts"][0]["title"], "Wasserleck erkannt")
         self.assertEqual(messaging.messages[0]["payload"]["alert"]["kind"], "water_leak")
 
+    def test_check_alerts_ignores_vacuum_water_tank_attachment(self):
+        service = self.service([
+            ha_state(
+                "binary_sensor.laundry_room_laundry_room_robot_vacuum_wasserkasten_angebracht",
+                "on",
+                "Laundry Room Robot Vacuum Wasserkasten angebracht",
+                device_class="connectivity",
+            ),
+        ])
+
+        result = service.alerts_status()
+
+        self.assertEqual(result["active_alerts"], [])
+
     def test_check_alerts_detects_air_quality_warning(self):
         service = self.service([
             ha_state("sensor.wohnzimmer_co2", "1650", "Wohnzimmer CO2", device_class="carbon_dioxide", unit_of_measurement="ppm"),
