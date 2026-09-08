@@ -58,6 +58,33 @@ class GardenDiscoveryAdapterStoreTests(unittest.TestCase):
         self.assertEqual(bindings["irrigation"].entity_id, "switch.rasensprenganlage_power")
         self.assertEqual(bindings["irrigation"].source, "auto")
 
+    def test_discovery_prefers_soil_moisture_over_room_humidity(self):
+        states = [
+            state("sensor.kitchen_temperature_sensor_humidity", "62", "Kitchen Temperature Sensor Luftfeuchtigkeit", device_class="humidity", unit_of_measurement="%"),
+            state("sensor.garden_bodenfeuchte_rasen_soil_moisture", "unknown", "Garden Bodenfeuchte Rasen Feuchtigkeit", device_class="moisture", unit_of_measurement="%"),
+        ]
+
+        bindings = GardenEntityDiscovery().bind_zone_entities(states, {"entities": {}}, auto_discovery=True)
+
+        self.assertEqual(bindings["moisture"].entity_id, "sensor.garden_bodenfeuchte_rasen_soil_moisture")
+
+    def test_discovery_exposes_moisture_and_irrigation_batteries(self):
+        states = [
+            state("sensor.garden_bodenfeuchte_rasen_soil_moisture", "41", "Garden Bodenfeuchte Rasen Feuchtigkeit", device_class="moisture", unit_of_measurement="%"),
+            state("sensor.garden_bodenfeuchte_rasen_battery", "87", "Garden Bodenfeuchte Rasen Batterie", device_class="battery", unit_of_measurement="%"),
+            state("switch.garden_garden_lawn_sprinkler", "off", "Garden Lawn Sprinkler"),
+            state("sensor.garden_garden_lawn_sprinkler_battery", "55", "Garden Lawn Sprinkler Battery", device_class="battery", unit_of_measurement="%"),
+        ]
+
+        bindings = GardenEntityDiscovery().bind_zone_entities(
+            states,
+            {"entities": {"irrigation": "switch.garden_garden_lawn_sprinkler", "battery": "sensor.garden_garden_lawn_sprinkler_battery"}},
+            auto_discovery=True,
+        )
+
+        self.assertEqual(bindings["moisture_battery"].entity_id, "sensor.garden_bodenfeuchte_rasen_battery")
+        self.assertEqual(bindings["irrigation_battery"].entity_id, "sensor.garden_garden_lawn_sprinkler_battery")
+
     def test_irrigation_adapter_switch(self):
         self._assert_adapter("switch.eve_aqua", "turn_on", "turn_off")
 

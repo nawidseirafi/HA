@@ -36,7 +36,7 @@ IRRIGATION_TOKENS = (
 class GardenEntityDiscovery:
     def bind_zone_entities(self, states: list[dict[str, Any]], zone: dict[str, Any], auto_discovery: bool = True) -> dict[str, EntityBinding]:
         configured = zone.get("entities") if isinstance(zone.get("entities"), dict) else {}
-        return {
+        bindings = {
             "moisture": self._bind(states, configured.get("moisture"), self._is_moisture, auto_discovery),
             "temperature": self._bind(states, configured.get("temperature"), self._is_soil_temperature, auto_discovery),
             "battery": self._bind(states, configured.get("battery"), self._is_battery, auto_discovery),
@@ -46,6 +46,9 @@ class GardenEntityDiscovery:
             "weather": self._bind(states, configured.get("weather"), lambda state: self._domain(state) == "weather", auto_discovery),
             "rain": self._bind(states, configured.get("rain"), self._is_rain, auto_discovery),
         }
+        bindings["moisture_battery"] = self._related_battery(states, bindings["moisture"])
+        bindings["irrigation_battery"] = bindings["battery"] if bindings["battery"].entity_id else self._related_battery(states, bindings["irrigation"])
+        return bindings
 
     def _bind(self, states: list[dict[str, Any]], configured: Any, predicate: Callable[[dict[str, Any]], bool], auto: bool) -> EntityBinding:
         entity_id = str(configured or "").strip()
@@ -97,9 +100,16 @@ class GardenEntityDiscovery:
         attrs = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
         device_class = str(attrs.get("device_class") or "").lower()
         unit = str(attrs.get("unit_of_measurement") or "").strip()
+        looks_like_soil = any(token in haystack for token in ("soil", "boden", "rasen", "lawn"))
+        if device_class in {"battery", "temperature"}:
+            return False
+        if device_class == "humidity" and not looks_like_soil:
+            return False
         return (
-            device_class in {"moisture", "humidity"}
-            or any(token in haystack for token in ("soil moisture", "soil humidity", "bodenfeuchte", "bodenfeuchtigkeit", "moisture", "feuchte", "feuchtigkeit"))
+            device_class == "moisture"
+            or (device_class == "humidity" and looks_like_soil)
+            or any(token in haystack for token in ("soil moisture", "soil humidity", "bodenfeuchte", "bodenfeuchtigkeit"))
+            or (looks_like_soil and any(token in haystack for token in ("moisture", "feuchte", "feuchtigkeit")))
         ) and unit in {"%", ""}
 
     def _is_soil_temperature(self, state: dict[str, Any]) -> bool:
@@ -150,6 +160,38 @@ class GardenEntityDiscovery:
         if not state:
             return False
         return state.get("state") not in {None, "", "unknown", "unavailable"}
+
+    def _related_battery(self, states: list[dict[str, Any]], binding: EntityBinding) -> EntityBinding:
+        if not binding.entity_id:
+            return EntityBinding()
+        base = self._battery_base(binding.entity_id)
+        matches = [
+            state for state in states
+            if self._is_battery(state) and self._battery_base(str(state.get("entity_id") or "")) == base
+        ]
+        if not matches:
+            return EntityBinding()
+        available_matches = [state for state in matches if self._state_available(state)]
+        return self._binding((available_matches or matches)[0], "auto")
+
+    def _battery_base(self, entity_id: str) -> str:
+        object_id = str(entity_id or "").split(".", 1)[-1].lower()
+        suffixes = (
+            "_soil_moisture",
+            "_moisture",
+            "_humidity",
+            "_feuchtigkeit",
+            "_battery",
+            "_batterie",
+        )
+        changed = True
+        while changed:
+            changed = False
+            for suffix in suffixes:
+                if object_id.endswith(suffix):
+                    object_id = object_id[: -len(suffix)]
+                    changed = True
+        return object_id
 
     def _score(self, state: dict[str, Any]) -> int:
         haystack = self._haystack(state)

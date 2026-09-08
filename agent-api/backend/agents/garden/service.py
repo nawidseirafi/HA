@@ -344,6 +344,8 @@ class GardenService:
                 "moisture": decision_input.moisture,
                 "soil_temperature": decision_input.soil_temperature,
                 "battery": decision_input.battery,
+                "moisture_battery": _float_value(bindings["moisture_battery"].state),
+                "irrigation_battery": _float_value(bindings["irrigation_battery"].state),
                 "soil_warning": decision_input.soil_warning,
                 "irrigation_active": decision_input.irrigation_active,
                 "mower_status": decision_input.mower_status,

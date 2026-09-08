@@ -326,6 +326,8 @@ export type GardenZoneStatus = {
     temperature: number | null;
     soil_temperature?: number | null;
     battery: number | null;
+    moisture_battery?: number | null;
+    irrigation_battery?: number | null;
     soil_warning: boolean | null;
     irrigation_active: boolean | null;
     mower_status: string;

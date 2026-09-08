@@ -1687,13 +1687,13 @@ function WallIrrigationCard({
     const moisture = zone?.values?.moisture;
     const temperature = zone?.values?.temperature ?? zone?.values?.soil_temperature;
     const battery = zone?.values?.battery;
+    const moistureBattery = zone?.values?.moisture_battery;
+    const irrigationBattery = zone?.values?.irrigation_battery ?? battery;
     const decision = zone?.decision;
     const canStart = Boolean(zone && !active && zoneCanStartManualIrrigation(zone));
     const canStop = Boolean(zone && active);
     const disabled = busy || !zone || (!canStart && !canStop);
     const moisturePercent = typeof moisture === 'number' && Number.isFinite(moisture) ? clampPercent(moisture) : null;
-    const batteryPercent = typeof battery === 'number' && Number.isFinite(battery) ? clampPercent(battery) : null;
-    const showMoisture = moisturePercent !== null;
     const nonSensorBlock = decision?.blocks?.find((block) => block.code !== 'soil_moisture_unavailable' && block.code !== 'soil_moisture_invalid');
     const detail = zone
         ? active
@@ -1734,12 +1734,12 @@ function WallIrrigationCard({
                             cy="60"
                             r="48"
                             pathLength="100"
-                            style={{strokeDasharray: `${showMoisture ? moisturePercent : batteryPercent ?? 0} 100`}}
+                            style={{strokeDasharray: `${moisturePercent ?? 0} 100`}}
                         />
                     </svg>
-                    <span>{showMoisture ? <Droplets size={24}/> : <BatteryMedium size={24}/>}</span>
-                    <strong>{showMoisture ? `${Math.round(moisturePercent ?? 0)}%` : batteryPercent !== null ? `${Math.round(batteryPercent)}%` : '--'}</strong>
-                    <small>{showMoisture ? 'Bodenfeuchte' : 'Batterie'}</small>
+                    <span><Droplets size={24}/></span>
+                    <strong>{moisturePercent !== null ? `${Math.round(moisturePercent)}%` : '--'}</strong>
+                    <small>Bodenfeuchte</small>
                 </div>
             )}
             <div className="wall-irrigation-status">
@@ -1748,23 +1748,23 @@ function WallIrrigationCard({
             </div>
             <div className="wall-irrigation-metrics">
                 <div>
-                    <span>Feuchte</span>
-                    <strong>{typeof moisture === 'number' ? `${Math.round(moisture)}%` : '-'}</strong>
+                    <span>Sensor Akku</span>
+                    <strong>{typeof moistureBattery === 'number' ? `${Math.round(moistureBattery)}%` : '-'}</strong>
                 </div>
                 <div>
-                    <span>Boden</span>
-                    <strong>{typeof temperature === 'number' ? `${temperature.toFixed(1).replace('.', ',')}°` : '-'}</strong>
+                    <span>Sprinkler Akku</span>
+                    <strong>{typeof irrigationBattery === 'number' ? `${Math.round(irrigationBattery)}%` : '-'}</strong>
                 </div>
+                {compact && (
+                    <div>
+                        <span>Boden</span>
+                        <strong>{typeof temperature === 'number' ? `${temperature.toFixed(1).replace('.', ',')}°` : '-'}</strong>
+                    </div>
+                )}
                 <div>
                     <span>Dauer</span>
                     <strong>{decision?.recommended_duration_minutes ? `${decision.recommended_duration_minutes} min` : '-'}</strong>
                 </div>
-                {compact && (
-                    <div>
-                        <span>Batterie</span>
-                        <strong>{typeof battery === 'number' ? `${Math.round(battery)}%` : '-'}</strong>
-                    </div>
-                )}
             </div>
         </article>
     );
@@ -2222,6 +2222,7 @@ function RoomSection({
     const humidifierEntityIds = humidifierAssociatedEntityIds(humidifiers);
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const mowers = (data.lawn_mowers ?? []).filter((mower) => sameArea(mower.area, room));
+    const openings = roomOpenings(data, room);
     const outlets = roomOutlets(data, room).filter((outlet) => !gardenEntityIds.has(outlet.entity_id) && !humidifierEntityIds.has(outlet.entity_id));
     const outletGroups = groupRoomOutlets(outlets, room, data);
     const sensorChips = roomSensorChips(data, room).filter((chip) => {
@@ -2237,6 +2238,7 @@ function RoomSection({
         ...humidifierEntityIds,
         ...fans.map((fan) => fan.entity_id),
         ...mowers.map((mower) => mower.entity_id),
+        ...openings.map((opening) => opening.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
         ...sensorChips.map((chip) => chip.entity_id),
         ...gardenEntityIds,
@@ -2245,7 +2247,7 @@ function RoomSection({
     const roomTemp = roomTemperature(data, room);
     const roomHumidityValue = roomHumidity(data, room);
     const activeLights = lights.filter((light) => light.on).length;
-    const deviceCount = lights.length + covers.length + climates.length + humidifiers.length + fans.length + mowers.length + outlets.length + sensorChips.length + otherDevices.length + (gardenZone ? 1 : 0);
+    const deviceCount = lights.length + covers.length + climates.length + humidifiers.length + fans.length + mowers.length + openings.length + outlets.length + sensorChips.length + otherDevices.length + (gardenZone ? 1 : 0);
     const mood = roomMood(data, room, climates);
     const temperatureClass = roomTemperatureClass(roomTemp);
     const openingSummary = roomOpeningSummary(data, room);
@@ -2335,13 +2337,24 @@ function RoomSection({
                 {mowers.map((mower) => (
                     <WallMowerCard key={mower.entity_id} mower={mower} onUpdated={onMowerUpdated}/>
                 ))}
-                                {gardenZone && (
+                {gardenZone && (
                     <WallIrrigationCard
                         zone={gardenZone}
                         busy={busyEntity === `garden-irrigation:${gardenZoneId(gardenZone)}`}
                         onToggle={onToggleIrrigation}
                         compact
                     />
+                )}
+                {openings.length > 0 && (
+                    <section className="wall-room-panel wall-room-openings">
+                        <div className="wall-room-panel-title">
+                            <span>Fenster & Türen</span>
+                            <strong>{openings.filter(openingIsOpen).length}/{openings.length} offen</strong>
+                        </div>
+                        <div className="wall-openings-list">
+                            {openings.map((item) => <OpeningCard key={item.entity_id} item={item}/>)}
+                        </div>
+                    </section>
                 )}
                 {sensorChips.length > 0 && (
                     <section className="wall-room-panel wall-room-sensors">
@@ -2373,7 +2386,7 @@ function RoomSection({
                         </div>
                     </section>
                 )}
-                {lights.length === 0 && climates.length === 0 && covers.length === 0 && humidifiers.length === 0 && fans.length === 0 && mowers.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
+                {lights.length === 0 && climates.length === 0 && covers.length === 0 && humidifiers.length === 0 && fans.length === 0 && mowers.length === 0 && openings.length === 0 && outlets.length === 0 && sensorChips.length === 0 && otherDevices.length === 0 && (
                     <section className="wall-room-panel">Keine Geräte für diesen Raum gefunden.</section>
                 )}
             </div>
@@ -3151,24 +3164,7 @@ function OpeningsSection({data}: { data: WallDashboardData }) {
                                     <small>{groupClosed}/{group.items.length} zu</small>
                                 </div>
                                 <div className="wall-openings-list">
-                                    {group.items.map((item) => {
-                                        const isOpen = openingIsOpen(item);
-                                        const kind = openingKind(item);
-                                        return (
-                                            <article className={`wall-opening-card ${isOpen ? 'open' : 'closed'}`} key={item.entity_id}>
-                                                <span className="wall-opening-icon">
-                                                    {kind === 'window'
-                                                        ? <Square size={22}/>
-                                                        : isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
-                                                </span>
-                                                <div>
-                                                    <strong>{item.name}</strong>
-                                                    <small>{openingKindLabel(item)}</small>
-                                                </div>
-                                                <b>{isOpen ? 'Offen' : 'Zu'}</b>
-                                            </article>
-                                        );
-                                    })}
+                                    {group.items.map((item) => <OpeningCard key={item.entity_id} item={item}/>)}
                                 </div>
                             </section>
                         );
@@ -3176,6 +3172,25 @@ function OpeningsSection({data}: { data: WallDashboardData }) {
                 </div>
             )}
         </div>
+    );
+}
+
+function OpeningCard({item}: { item: WallEntity }) {
+    const isOpen = openingIsOpen(item);
+    const kind = openingKind(item);
+    return (
+        <article className={`wall-opening-card ${isOpen ? 'open' : 'closed'}`}>
+            <span className="wall-opening-icon">
+                {kind === 'window'
+                    ? <Square size={22}/>
+                    : isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
+            </span>
+            <div>
+                <strong>{item.name}</strong>
+                <small>{openingKindLabel(item)}</small>
+            </div>
+            <b>{isOpen ? 'Offen' : 'Zu'}</b>
+        </article>
     );
 }
 
@@ -4091,6 +4106,7 @@ function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
     const humidifierEntityIds = humidifierAssociatedEntityIds(humidifiers);
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const outlets = roomOutlets(data, room).filter((outlet) => !humidifierEntityIds.has(outlet.entity_id));
+    const openings = roomOpenings(data, room);
     const sensors = roomSensorChips(data, room).filter((sensor) => !humidifierEntityIds.has(sensor.entity_id) && !humidifierEntityIds.has(sensor.entity_id.split(':')[0] ?? sensor.entity_id));
     const excluded = new Set([
         ...lights.map((light) => light.entity_id),
@@ -4100,9 +4116,10 @@ function roomOverviewDeviceCount(data: WallDashboardData, room: string) {
         ...humidifierEntityIds,
         ...fans.map((fan) => fan.entity_id),
         ...outlets.map((outlet) => outlet.entity_id),
+        ...openings.map((opening) => opening.entity_id),
         ...sensors.map((sensor) => sensor.entity_id),
     ]);
-    return lights.length + covers.length + climates.length + humidifiers.length + fans.length + outlets.length + sensors.length + roomDevices(data, room, excluded).length;
+    return lights.length + covers.length + climates.length + humidifiers.length + fans.length + outlets.length + openings.length + sensors.length + roomDevices(data, room, excluded).length;
 }
 
 function roomMood(data: WallDashboardData, room: string, climates: WallDashboardData['climate']) {
@@ -4143,7 +4160,7 @@ function roomMood(data: WallDashboardData, room: string, climates: WallDashboard
 }
 
 function roomOpeningSummary(data: WallDashboardData, room: string) {
-    const openings = (data.security.openings ?? []).filter((item) => roomEntityMatches(item, room));
+    const openings = roomOpenings(data, room);
     if (!openings.length) return '';
     const openItems = openings.filter((item) => item.state === 'on');
     if (openings.length === 1) {
@@ -4159,6 +4176,16 @@ function roomOpeningSummary(data: WallDashboardData, room: string) {
         openWindows ? `${openWindows} Fenster offen` : '',
         openOther ? `${openOther} ${openOther === 1 ? 'Kontakt' : 'Kontakte'} offen` : '',
     ].filter(Boolean).join(' · ');
+}
+
+function roomOpenings(data: WallDashboardData, room: string) {
+    return [...(data.security.openings ?? [])]
+        .filter((item) => roomEntityMatches(item, room))
+        .sort((a, b) => {
+            const openDiff = Number(openingIsOpen(b)) - Number(openingIsOpen(a));
+            if (openDiff) return openDiff;
+            return `${a.name || ''}${a.entity_id || ''}`.localeCompare(`${b.name || ''}${b.entity_id || ''}`, 'de');
+        });
 }
 
 function openingKindLabel(item: WallEntity) {
@@ -4282,17 +4309,6 @@ function roomSensorChips(data: WallDashboardData, room: string) {
         if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery' || isPowerSensor(sensor)) continue;
         const label = sensorLabel(sensor);
         add(sensor.entity_id, label, sensorValue(sensor), sensorTone(sensor), batteryForDeviceName(data, room, sensor.name));
-    }
-
-    for (const opening of data.security.openings ?? []) {
-        if (!roomEntityMatches(opening, room)) continue;
-        add(
-            opening.entity_id,
-            openingKindLabel(opening),
-            opening.state === 'on' ? 'Offen' : 'Geschlossen',
-            opening.state === 'on' ? 'warn' : 'ok',
-            batteryForDeviceName(data, room, opening.name),
-        );
     }
 
     return [...chips.values()].sort((left, right) => left.label.localeCompare(right.label));
