@@ -337,6 +337,46 @@ class TelegramAgentTests(unittest.TestCase):
 
         self.assertEqual(names, ["Wohnzimmer Temperatur"])
 
+    def test_device_availability_answer_uses_registry_device_names(self):
+        states = [
+            ha_state("binary_sensor.bathroom_window_contact_contact", "unavailable", "Fenster", device_class="window"),
+            ha_state("binary_sensor.bathroom_window_contact_tamper", "unavailable", "Bathroom Window Contact Manipulation"),
+            ha_state("sensor.garden_bodenfeuchte_rasen_battery", "unavailable", "Garden Bodenfeuchte Rasen Batterie", device_class="battery"),
+            ha_state("light.bad_spot_1", "unavailable", "Bath spot 1"),
+        ]
+        lookup = {
+            "binary_sensor.bathroom_window_contact_contact": {"device_id": "contact-1", "name": "Bathroom Window Contact", "is_zigbee2mqtt": True},
+            "binary_sensor.bathroom_window_contact_tamper": {"device_id": "contact-1", "name": "Bathroom Window Contact", "is_zigbee2mqtt": True},
+            "sensor.garden_bodenfeuchte_rasen_battery": {"device_id": "soil-1", "name": "Garden Bodenfeuchte Rasen", "is_zigbee2mqtt": True},
+            "light.bad_spot_1": {"device_id": "hue-1", "name": "Bath spot 1", "is_zigbee2mqtt": False},
+        }
+        context = {"home_assistant": _home_assistant_snapshot(states, lookup)}
+
+        answer = _house_status_answer("Sind alle Geräte erreichbar?", context)
+
+        self.assertEqual(answer, "2 Zigbee-Geräte sind nicht erreichbar: Bathroom Window Contact, Garden Bodenfeuchte Rasen.")
+        self.assertNotIn("Batterie", answer)
+        self.assertNotIn("Manipulation", answer)
+        self.assertNotIn("Bath spot", answer)
+
+    def test_answer_returns_deterministic_device_availability_without_llm(self):
+        context = {
+            "home_assistant": {
+                "unavailable_devices": [
+                    {"name": "Bathroom Window Contact", "state": "unavailable"},
+                    {"name": "Garden Bodenfeuchte Rasen", "state": "unavailable"},
+                ],
+            },
+        }
+        service = TelegramService(messaging=FakeMessaging())
+        service._context_snapshot = lambda: context
+
+        with patch("backend.agents.telegram.service.create_llm_client") as factory:
+            answer = service.answer("Sind alle Geräte erreichbar?")
+
+        self.assertEqual(answer, "2 Zigbee-Geräte sind nicht erreichbar: Bathroom Window Contact, Garden Bodenfeuchte Rasen.")
+        factory.assert_not_called()
+
     def _service(self, tmp, client):
         config = TelegramConfig(enabled=True, bot_token="secret", allowed_chat_ids=("6516768203",), database_path=str(Path(tmp) / "telegram.db"))
         return TestTelegramService(config, store=TelegramStore(config.database_path), client=client, messaging=FakeMessaging())

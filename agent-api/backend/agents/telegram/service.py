@@ -381,13 +381,16 @@ class TelegramService:
     def answer(self, question: str) -> str:
         context = self._context_snapshot()
         house_answer = _house_status_answer(question, context)
+        if house_answer and _question_mentions_device_availability(question):
+            return house_answer
         system = (
             "Du bist Roboter Steve im privaten Haushalt von Nawid. "
             "Antworte kurz, konkret und auf Deutsch. "
             "Du darfst ueber Status, Termine, Nachrichten, Garten, Energie und Home Assistant informieren. "
-            "Wenn Home-Assistant-Daten im Kontext enthalten sind, nutze diese konkret mit Entity-Namen und Status. "
+            "Wenn Home-Assistant-Daten im Kontext enthalten sind, nutze diese konkret mit Gerätenamen und Status. "
             "Nutze fuer Rauchmelder-, Temperatur-, Sicherheits-, Fenster-, Tuer-, Garagen-, Licht-, luftqualität-, Klima-, Akku- und Stromfragen nur den gefilterten "
             "Home-Assistant-Snapshot und die lokale Hausstatus-Zusammenfassung im Prompt. "
+            "Nenne bei Erreichbarkeitsfragen nur Gerätenamen, niemals einzelne Entities oder Diagnosesensoren. "
             "Nenne keine internen Geraete-, Router-, CPU-, Batterie-, Board- oder Diagnose-Temperaturen. "
             "Sage nicht, dass Informationen fehlen, wenn passende Daten im Kontext stehen. "
             "Fuehre ueber Telegram keine Aktionen an Geraeten aus und behaupte keine Aktion ausgefuehrt zu haben."
@@ -552,7 +555,11 @@ class TelegramService:
         try:
             ha_service = HomeAssistantService()
             states = ha_service.get_states()
-            context["home_assistant"] = _home_assistant_snapshot(states)
+            try:
+                device_lookup = ha_service.get_device_metadata_by_entity()
+            except Exception:
+                device_lookup = {}
+            context["home_assistant"] = _home_assistant_snapshot(states, device_lookup)
             context["energy"] = ha_service.get_energy_overview()
         except Exception as exc:
             context["home_assistant_error"] = str(exc)
@@ -730,7 +737,11 @@ def _question_hash(question: str) -> str:
     return hashlib.sha256(question.encode("utf-8")).hexdigest()
 
 
-def _home_assistant_snapshot(states: list[dict[str, Any]]) -> dict[str, Any]:
+def _home_assistant_snapshot(
+    states: list[dict[str, Any]],
+    device_lookup: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    unavailable_devices = _unavailable_device_items(states, device_lookup)
     return {
         "entity_count": len(states),
         "temperatures": _sensor_items(states, _is_temperature_state, limit=30),
@@ -743,12 +754,29 @@ def _home_assistant_snapshot(states: list[dict[str, Any]]) -> dict[str, Any]:
         "climate": _climate_items(states, limit=20),
         "batteries": _battery_items(states, limit=60),
         "low_batteries": _low_battery_items(states, limit=30),
-        "unavailable": _simple_state_items(
-            [state for state in states if str(state.get("state") or "").lower() in {"unavailable", "unknown"}],
-            limit=30,
-        ),
+        "unavailable": unavailable_devices,
+        "unavailable_devices": unavailable_devices,
         "updated_at": _latest_state_updated_at(states),
     }
+
+
+def _unavailable_device_items(
+    states: list[dict[str, Any]],
+    device_lookup: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    devices: dict[str, dict[str, Any]] = {}
+    for state in states:
+        if str(state.get("state") or "").lower() != "unavailable":
+            continue
+        entity_id = str(state.get("entity_id") or "")
+        metadata = device_lookup.get(entity_id) if device_lookup is not None else None
+        if device_lookup is not None and (not metadata or not metadata.get("is_zigbee2mqtt")):
+            continue
+        device_id = str((metadata or {}).get("device_id") or "").strip()
+        key = f"device:{device_id}" if device_id else f"entity:{entity_id}"
+        name = str((metadata or {}).get("name") or _simple_state_item(state).get("name") or entity_id)
+        devices[key] = {"device_id": device_id or None, "name": name, "state": "unavailable"}
+    return sorted(devices.values(), key=lambda item: str(item.get("name") or ""))
 
 
 def _sensor_items(states: list[dict[str, Any]], predicate: Any, limit: int) -> list[dict[str, Any]]:
@@ -969,12 +997,15 @@ def _house_status_answer(question: str, context: dict[str, Any]) -> str:
     wants_climate = _question_mentions_climate(question)
     wants_battery = _question_mentions_battery(question)
     wants_energy = _question_mentions_energy(question)
-    if not any((wants_house, wants_temperature, wants_humidity, wants_safety, wants_openings, wants_garage, wants_lights, wants_climate, wants_battery, wants_energy)):
+    wants_availability = _question_mentions_device_availability(question)
+    if not any((wants_house, wants_temperature, wants_humidity, wants_safety, wants_openings, wants_garage, wants_lights, wants_climate, wants_battery, wants_energy, wants_availability)):
         return ""
 
     parts: list[str] = []
     if wants_house:
         parts.append("Hausstatus:")
+    if wants_availability or wants_house:
+        parts.append(_availability_summary(ha))
     if wants_energy or wants_house:
         energy = _energy_summary(context)
         if energy:
@@ -1134,6 +1165,16 @@ def _openings_summary(ha: dict[str, Any]) -> str:
     return f"Fenster/Türen: alle {len(openings)} Kontakte geschlossen."
 
 
+def _availability_summary(ha: dict[str, Any]) -> str:
+    devices = ha.get("unavailable_devices") if isinstance(ha.get("unavailable_devices"), list) else []
+    if not devices:
+        return "Alle Zigbee-Geräte sind erreichbar."
+    count = len(devices)
+    names = _item_names(devices, fallback="Gerät")
+    label = "Zigbee-Gerät ist" if count == 1 else "Zigbee-Geräte sind"
+    return f"{count} {label} nicht erreichbar: {names}."
+
+
 def _numeric_sensor_summary(ha: dict[str, Any], key: str, label: str, default_unit: str) -> str:
     items = ha.get(key) if isinstance(ha.get(key), list) else []
     values = [
@@ -1213,6 +1254,13 @@ def _question_mentions_battery(question: str) -> bool:
 def _question_mentions_energy(question: str) -> bool:
     text = str(question or "").lower()
     return any(term in text for term in ("strom", "energie", "verbrauch", "leistung", "watt", "power", "energy"))
+
+
+def _question_mentions_device_availability(question: str) -> bool:
+    text = str(question or "").lower()
+    availability = any(term in text for term in ("erreichbar", "nicht erreichbar", "offline", "verfügbar", "verfuegbar"))
+    device = any(term in text for term in ("gerät", "geräte", "geraet", "geraete", "device", "devices", "zigbee"))
+    return availability and device
 
 
 def _question_mentions_house_status(question: str) -> bool:
