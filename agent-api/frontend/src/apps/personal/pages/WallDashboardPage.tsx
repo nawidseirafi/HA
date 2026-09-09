@@ -2533,6 +2533,9 @@ function RoomCoverControl({
     onPosition: (cover: WallCover, position: number) => void;
 }) {
     const position = clampPercent(cover.position ?? (cover.state === 'open' ? 100 : 0));
+    const unavailable = ['unknown', 'unavailable'].includes(cover.state);
+    const fullyOpen = cover.position != null ? position >= 100 : cover.state === 'open';
+    const fullyClosed = cover.position != null ? position <= 0 : cover.state === 'closed';
     return (
         <section className="wall-room-panel wall-cover-control">
             <div className="wall-room-panel-title">
@@ -2540,25 +2543,25 @@ function RoomCoverControl({
                 <strong>{coverStatus(cover)}{battery && <BatteryPill battery={battery}/>}</strong>
             </div>
             <div className="wall-cover-body">
-                <div className="wall-cover-visual" aria-hidden="true">
+                <div className={`wall-cover-visual ${unavailable ? 'unavailable' : ''}`} aria-hidden="true">
                     <i style={{height: `${100 - position}%`}}/>
                 </div>
                 <div>
-                    <h3>{cover.name}</h3>
-                    <p>{formatNumber(position)}% offen</p>
+                    <h3>{cover.name.replace(/roller shutter(?: shutter)?/gi, 'Jalousie')}</h3>
+                    <p className="wall-cover-position"><strong>{unavailable ? '—' : `${formatNumber(position)}%`}</strong><span>{unavailable ? 'Nicht verfügbar' : 'geöffnet'}</span></p>
                     <label className="wall-room-slider compact">
-                        <input type="range" min="0" max="100" value={position} disabled={busy}
+                        <input type="range" min="0" max="100" value={position} disabled={busy || unavailable} aria-label={`${cover.name} Öffnung`} aria-valuetext={`${formatNumber(position)} Prozent geöffnet`}
                                onChange={(event) => onPosition(cover, Number(event.target.value))}/>
                     </label>
                     <div className="wall-cover-actions">
-                        <button type="button" disabled={busy || cover.state === 'open'}
-                                onClick={() => onCommand(cover, 'open_cover')}><ArrowUp size={18}/> Hoch
+                        <button type="button" disabled={busy || unavailable || fullyOpen} title="Öffnen" aria-label={`${cover.name} öffnen`}
+                                onClick={() => onCommand(cover, 'open_cover')}><ArrowUp size={21}/>
                         </button>
-                        <button type="button" disabled={busy} onClick={() => onCommand(cover, 'stop_cover')}><Square
-                            size={14}/> Stop
+                        <button type="button" disabled={busy || unavailable} title="Stoppen" aria-label={`${cover.name} stoppen`} onClick={() => onCommand(cover, 'stop_cover')}><Square
+                            size={16}/>
                         </button>
-                        <button type="button" disabled={busy || cover.state === 'closed'}
-                                onClick={() => onCommand(cover, 'close_cover')}><ArrowDown size={18}/> Runter
+                        <button type="button" disabled={busy || unavailable || fullyClosed} title="Schließen" aria-label={`${cover.name} schließen`}
+                                onClick={() => onCommand(cover, 'close_cover')}><ArrowDown size={21}/>
                         </button>
                     </div>
                 </div>
