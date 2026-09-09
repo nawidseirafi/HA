@@ -2,6 +2,8 @@ import {Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useS
 import type {DragEvent, ErrorInfo, PointerEvent, ReactNode} from 'react';
 import {
     Activity,
+    Settings2,
+    X,
     ArrowDown,
     ArrowUp,
     Battery,
@@ -1225,16 +1227,14 @@ function ImportantNowItem({item}: { item: ImportantNowItemData }) {
 }
 
 function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowItemData[] = []) {
-    const laundry = status?.washing_machine;
-    const laundrySummary = laundry && ['running', 'finished'].includes(laundry.state) ? ` ${laundry.summary}` : '';
     if (items.length > 0) {
         const critical = items.filter((item) => item.critical);
         const primary = critical[0] ?? items[0];
         const remaining = items.length - 1;
         if (remaining > 0) {
-            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.${laundrySummary}`;
+            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.`;
         }
-        return `Ich sehe einen offenen Punkt: ${primary.title}.${laundrySummary}`;
+        return `Ich sehe einen offenen Punkt: ${primary.title}.`;
     }
     return status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
 }
@@ -2281,6 +2281,10 @@ function RoomSection({
     const temperatureClass = roomTemperatureClass(roomTemp);
     const openingSummary = roomOpeningSummary(data, room);
 
+    const detailsRef = useRef<HTMLDialogElement>(null);
+    useEffect(() => { detailsRef.current?.close(); }, [room, floor]);
+    const cycles = (data.sensors ?? []).filter((item) => sameArea(item.area, room) && isCycleStatusSensor(item) && ['läuft', 'beendet'].includes(item.state.toLowerCase()));
+
     return (
         <div className="wall-page-stack wall-room-detail-page">
 
@@ -2294,14 +2298,26 @@ function RoomSection({
                         {roomTemp !== null ? `${formatNumber(roomTemp)}°C` : '--°C'}
                         {roomHumidityValue !== null ? ` · ${formatNumber(roomHumidityValue)}% Luftfeuchte` : ''}
                     </p>
-                    <p>{activeLights ? `${activeLights} Licht an` : 'Licht aus'} · {deviceCount} Geräte{openingSummary ? ` · ${openingSummary}` : ''}</p>
+                    <p>{activeLights ? `${activeLights} Licht an` : 'Licht aus'}{openingSummary ? ` · ${openingSummary}` : ''}</p>
                     {mood.chips.length > 0 && (
                         <div className="wall-room-mood-chips">
                             {mood.chips.map((chip) => <span key={chip.label} className={chip.tone}>{chip.label}</span>)}
                         </div>
                     )}
                 </div>
+                <button type="button" className="wall-room-details-button" title="Raumdetails" aria-label="Raumdetails öffnen" onClick={() => detailsRef.current?.showModal()}><Settings2 size={21}/></button>
             </section>
+            {cycles.length > 0 && <div className="wall-room-activity">{cycles.map((item) => <span key={item.entity_id}><Activity size={16}/>{item.name.replace(/[_ ]status$/i, '')}: {labelState(item.state)}</span>)}</div>}
+            <dialog ref={detailsRef} className="wall-room-drawer" aria-labelledby="room-details-title" onClick={(event) => { if (event.target === event.currentTarget) detailsRef.current?.close(); }}>
+                <div className="wall-room-drawer-content">
+                    <header><div><small>{room}</small><h2 id="room-details-title">Raumdetails</h2></div><button type="button" autoFocus aria-label="Raumdetails schließen" title="Schließen" onClick={() => detailsRef.current?.close()}><X size={22}/></button></header>
+                    <div className="wall-room-drawer-body">
+                        {sensorChips.length > 0 && <section><h3>Messwerte <span>{sensorChips.length}</span></h3><dl>{sensorChips.map((chip) => <div key={chip.entity_id}><dt>{chip.label}</dt><dd>{chip.value}</dd></div>)}</dl></section>}
+                        {otherDevices.length > 0 && <section><h3>Geräte <span>{otherDevices.length}</span></h3>{otherDevices.map((device) => <RoomDeviceCard key={device.entity_id} device={device} battery={batteryForDeviceName(data, room, device.name)} busy={busyEntity === device.entity_id} onToggle={onDeviceToggle}/>)}</section>}
+                        {sensorChips.length === 0 && otherDevices.length === 0 && <p className="wall-room-details-empty">Keine weiteren Gerätedetails vorhanden.</p>}
+                    </div>
+                </div>
+            </dialog>
             <div className="wall-room-control-grid">
                 {lights.length > 0 && (
                     <RoomLightControl
@@ -2384,36 +2400,6 @@ function RoomSection({
                         </div>
                         <div className="wall-openings-list">
                             {openings.map((item) => <OpeningCard key={item.entity_id} item={item}/>)}
-                        </div>
-                    </section>
-                )}
-                {sensorChips.length > 0 && (
-                    <section className="wall-room-panel wall-room-sensors">
-                        <div className="wall-room-panel-title">
-                            <span>Sensoren</span>
-                            <strong>{sensorChips.length}</strong>
-                        </div>
-                        <div className="wall-sensor-chip-grid">
-                            {sensorChips.map((chip) => (
-                                <article key={chip.entity_id} className={`wall-sensor-chip ${chip.tone}`}>
-                                    <small>{chip.label}</small>
-                                    <strong>{chip.value}{chip.battery && <BatteryPill battery={chip.battery}/>}</strong>
-                                </article>
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {otherDevices.length > 0 && (
-                    <section className="wall-room-panel wall-room-devices">
-                        <div className="wall-room-panel-title">
-                            <span>Geräte</span>
-                            <strong>{otherDevices.length}</strong>
-                        </div>
-                        <div className="wall-device-card-grid">
-                            {otherDevices.map((device) => <RoomDeviceCard key={device.entity_id} device={device}
-                                                                          battery={batteryForDeviceName(data, room, device.name)}
-                                                                          busy={busyEntity === device.entity_id}
-                                                                          onToggle={onDeviceToggle}/>)}
                         </div>
                     </section>
                 )}
@@ -4426,10 +4412,42 @@ function roomSensorChips(data: WallDashboardData, room: string) {
     for (const sensor of data.sensors ?? []) {
         if (!sameArea(sensor.area, room)) continue;
         if (outletStatusEntityIds.has(sensor.entity_id)) continue;
+
         const deviceClass = String(sensor.device_class || '').toLowerCase();
+        const state = String(sensor.state || '').trim().toLowerCase();
+        const searchText = `${sensor.name || ''} ${sensor.entity_id || ''}`.toLowerCase();
+        const battery = batteryForDeviceName(data, room, sensor.name);
+
+        // /wall is a room dashboard, not a Home-Assistant entity browser. Keep only
+        // useful physical room sensors and hide stale/cloud telemetry.
+        if (state === 'unavailable' || state === 'unknown' || state === '') continue;
+        if (searchText.includes('withings')) continue;
         if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery' || isPowerSensor(sensor)) continue;
-        const label = sensorLabel(sensor);
-        add(sensor.entity_id, label, sensorValue(sensor), sensorTone(sensor), batteryForDeviceName(data, room, sensor.name));
+
+        const roomSensorClasses = new Set([
+            'aqi', 'atmospheric_pressure', 'carbon_dioxide', 'carbon_monoxide',
+            'current', 'gas', 'illuminance', 'moisture', 'nitrogen_dioxide',
+            'nitrogen_monoxide', 'nitrous_oxide', 'ozone', 'pm1', 'pm10', 'pm25',
+            'pressure', 'signal_strength', 'sulphur_dioxide',
+            'volatile_organic_compounds', 'volatile_organic_compounds_parts', 'voltage',
+        ]);
+
+        // Voltage values are only useful here when they belong to a battery-powered
+        // room sensor. Generic sensor entities stay out of the room UI.
+        if (deviceClass === 'voltage' && !battery) continue;
+        if (!roomSensorClasses.has(deviceClass) && !battery) continue;
+
+        const isBatteryVoltage = deviceClass === 'voltage' && Boolean(battery);
+        const label = isBatteryVoltage
+            ? sensorLabel(sensor).replace(/\s+(spannung|voltage)$/i, '').trim()
+            : sensorLabel(sensor);
+        add(
+            sensor.entity_id,
+            label,
+            isBatteryVoltage ? 'Batterie' : sensorValue(sensor),
+            sensorTone(sensor),
+            battery,
+        );
     }
 
     return [...chips.values()].sort((left, right) => left.label.localeCompare(right.label));
