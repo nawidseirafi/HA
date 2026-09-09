@@ -758,6 +758,8 @@ export type WallEntity = {
   area: string;
   device_class?: string | null;
   unit?: string | null;
+  device_key?: string;
+  entity_count?: number;
 };
 
 export type WallSafetyEntity = WallEntity & {

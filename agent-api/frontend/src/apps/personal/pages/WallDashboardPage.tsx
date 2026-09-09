@@ -40,6 +40,7 @@ import {
     Zap,
     Warehouse,
     Wifi,
+    WifiOff,
 } from 'lucide-react';
 import {
     api,
@@ -896,6 +897,12 @@ function WallDashboardContent() {
         setSection('batteries');
     };
 
+    const openSecurity = () => {
+        setFloorView('');
+        setRoomView('');
+        setSection('security');
+    };
+
     const openOpenings = () => {
         setFloorView('');
         setRoomView('');
@@ -944,7 +951,7 @@ function WallDashboardContent() {
     const totalLights = data?.lights.length ?? 0;
     const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
     const internetInfo = data ? fritzboxInfo(data) : unknownFritzboxInfo();
-    const homeImportantState = data ? buildImportantNowState(data, contextStatus, gardenStatus, clearPost, openOpenings, openBatteries, openLights, callCover, toggleIrrigation) : null;
+    const homeImportantState = data ? buildImportantNowState(data, contextStatus, gardenStatus, clearPost, openOpenings, openBatteries, openSecurity, openLights, callCover, toggleIrrigation) : null;
     const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
     const headerIcon = iconFor(section);
 
@@ -1000,6 +1007,7 @@ function WallDashboardContent() {
                     <HomeSection data={data} busyEntity={busyEntity} onLights={openLights} onFloor={openFloor}
                                  onBatteries={openBatteries} onAgents={openAgents} onClimate={openClimates}
                                  onOpenings={openOpenings}
+                                 onSecurity={openSecurity}
                                  onClearPost={clearPost} onToggleVacation={toggleVacation}
                                  gardenStatus={gardenStatus}
                                  onToggleIrrigation={toggleIrrigation}
@@ -1083,6 +1091,7 @@ function HomeSection({
                          onAgents,
                          onClimate,
                          onOpenings,
+                         onSecurity,
                          onClearPost,
                          onToggleVacation,
                          gardenStatus,
@@ -1106,6 +1115,7 @@ function HomeSection({
     onAgents: () => void;
     onClimate: () => void;
     onOpenings: () => void;
+    onSecurity: () => void;
     onClearPost: () => void;
     onToggleVacation: () => void;
     gardenStatus: GardenStatus | null;
@@ -1125,7 +1135,7 @@ function HomeSection({
     const wallLowBatteries = wallLowBatteryEntities(data.health.low_batteries ?? []);
     const garage = garageCover(data);
     const internetInfo = fritzboxInfo(data);
-    const importantState = important ?? buildImportantNowState(data, contextStatus, gardenStatus, () => onClearPost(), () => onOpenings(), () => onBatteries(), () => onLights(), onGarageCommand, onToggleIrrigation);
+    const importantState = important ?? buildImportantNowState(data, contextStatus, gardenStatus, () => onClearPost(), () => onOpenings(), () => onBatteries(), () => onSecurity(), () => onLights(), onGarageCommand, onToggleIrrigation);
     const calendar = data.calendar ?? data.household?.calendar ?? null;
     const primaryClimate = primaryClimateEntity(data);
     const peopleValue = peopleAtHomeLabel(contextStatus);
@@ -1412,6 +1422,7 @@ function buildImportantNowState(
     onPost: () => void,
     onOpenings: () => void,
     onBatteries: () => void,
+    onUnavailableDevices: () => void,
     onLights: () => void,
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void,
     onToggleIrrigation: (zone: GardenZoneStatus) => void,
@@ -1431,6 +1442,20 @@ function buildImportantNowState(
             title: safetyAlerts.length === 1 ? 'Sicherheitsalarm erkannt' : `${safetyAlerts.length} Sicherheitsalarme erkannt`,
             detail: safetyAlerts.slice(0, 2).map((item) => item.name).join(' · ') || 'Rauch/Gas/CO prüfen',
             critical: true,
+        });
+    }
+    const unavailableDevices = data.health.unavailable ?? [];
+    if (unavailableDevices.length > 0) {
+        const names = unavailableDevices.slice(0, 2).map((device) => device.name).join(' · ');
+        items.push({
+            id: 'unavailable-devices',
+            tone: 'warn',
+            icon: <WifiOff size={30}/>,
+            title: unavailableDevices.length === 1
+                ? '1 Gerät nicht erreichbar'
+                : `${unavailableDevices.length} Geräte nicht erreichbar`,
+            detail: names || 'Verbindung in Home Assistant prüfen',
+            onClick: onUnavailableDevices,
         });
     }
     if (postStatus(data)) {
@@ -2223,6 +2248,7 @@ function RoomSection({
     const fans = (data.fans ?? []).filter((fan) => sameArea(fan.area, room));
     const mowers = (data.lawn_mowers ?? []).filter((mower) => sameArea(mower.area, room));
     const openings = roomOpenings(data, room);
+    const unavailableOpenings = openings.filter(openingIsUnavailable).length;
     const outlets = roomOutlets(data, room).filter((outlet) => !gardenEntityIds.has(outlet.entity_id) && !humidifierEntityIds.has(outlet.entity_id));
     const outletGroups = groupRoomOutlets(outlets, room, data);
     const sensorChips = roomSensorChips(data, room).filter((chip) => {
@@ -2349,7 +2375,9 @@ function RoomSection({
                     <section className="wall-room-panel wall-room-openings">
                         <div className="wall-room-panel-title">
                             <span>Fenster & Türen</span>
-                            <strong>{openings.filter(openingIsOpen).length}/{openings.length} offen</strong>
+                            <strong>{unavailableOpenings
+                                ? `${unavailableOpenings} nicht erreichbar`
+                                : `${openings.filter(openingIsOpen).length}/${openings.length} offen`}</strong>
                         </div>
                         <div className="wall-openings-list">
                             {openings.map((item) => <OpeningCard key={item.entity_id} item={item}/>)}
@@ -3137,8 +3165,8 @@ function SmokeDetectorPanel({detectors, data}: {
 
 function OpeningsSection({data}: { data: WallDashboardData }) {
     const openings = [...(data.security.openings ?? [])].sort((a, b) => {
-        const openDiff = Number(openingIsOpen(b)) - Number(openingIsOpen(a));
-        if (openDiff) return openDiff;
+        const stateDiff = openingStateRank(b) - openingStateRank(a);
+        if (stateDiff) return stateDiff;
         return `${a.area || ''}${a.name || ''}`.localeCompare(`${b.area || ''}${b.name || ''}`, 'de');
     });
     const groups = groupOpeningsByRoom(openings, data);
@@ -3153,15 +3181,23 @@ function OpeningsSection({data}: { data: WallDashboardData }) {
                 <div className="wall-openings-groups">
                     {groups.map((group) => {
                         const groupOpen = group.items.filter(openingIsOpen).length;
-                        const groupClosed = group.items.length - groupOpen;
+                        const groupUnavailable = group.items.filter(openingIsUnavailable).length;
+                        const groupClosed = group.items.length - groupOpen - groupUnavailable;
+                        const groupTone = groupOpen ? 'has-open' : groupUnavailable ? 'has-unavailable' : 'all-closed';
                         return (
-                            <section className={`wall-openings-room-card ${groupOpen ? 'has-open' : 'all-closed'}`} key={group.area}>
+                            <section className={`wall-openings-room-card ${groupTone}`} key={group.area}>
                                 <div className="wall-openings-group-head">
                                     <div>
                                         <span>{group.area}</span>
-                                        <strong>{groupOpen ? `${groupOpen} offen` : 'alles geschlossen'}</strong>
+                                        <strong>{groupOpen
+                                            ? `${groupOpen} offen`
+                                            : groupUnavailable
+                                                ? `${groupUnavailable} nicht erreichbar`
+                                                : 'alles geschlossen'}</strong>
                                     </div>
-                                    <small>{groupClosed}/{group.items.length} zu</small>
+                                    <small>{groupUnavailable
+                                        ? `${groupClosed}/${group.items.length} sicher zu`
+                                        : `${groupClosed}/${group.items.length} zu`}</small>
                                 </div>
                                 <div className="wall-openings-list">
                                     {group.items.map((item) => <OpeningCard key={item.entity_id} item={item}/>)}
@@ -3177,11 +3213,14 @@ function OpeningsSection({data}: { data: WallDashboardData }) {
 
 function OpeningCard({item}: { item: WallEntity }) {
     const isOpen = openingIsOpen(item);
+    const isUnavailable = openingIsUnavailable(item);
     const kind = openingKind(item);
     return (
-        <article className={`wall-opening-card ${isOpen ? 'open' : 'closed'}`}>
+        <article className={`wall-opening-card ${isOpen ? 'open' : isUnavailable ? 'unavailable' : 'closed'}`}>
             <span className="wall-opening-icon">
-                {kind === 'window'
+                {isUnavailable
+                    ? <WifiOff size={22}/>
+                    : kind === 'window'
                     ? <Square size={22}/>
                     : isOpen ? <DoorOpen size={22}/> : <DoorClosed size={22}/>}
             </span>
@@ -3189,7 +3228,7 @@ function OpeningCard({item}: { item: WallEntity }) {
                 <strong>{item.name}</strong>
                 <small>{openingKindLabel(item)}</small>
             </div>
-            <b>{isOpen ? 'Offen' : 'Zu'}</b>
+            <b>{isOpen ? 'Offen' : isUnavailable ? 'Offline' : 'Zu'}</b>
         </article>
     );
 }
@@ -3670,7 +3709,12 @@ function subtitleFor(section: WallSection, activeLights: number, totalLights: nu
     if (section === 'batteries') return 'Batteriestände und Status aller Batterie-Geräte';
     if (section === 'energy') return 'Leistung, Zählerstände und Phasen';
     if (section === 'security') return problemCount ? `${problemCount} Geräte prüfen` : 'Keine Geräte auffällig';
-    if (section === 'openings' && data) return data.security.openings_open ? `${data.security.openings_open} Kontakte offen` : 'Alle Fenster und Türen geschlossen';
+    if (section === 'openings' && data) {
+        const unavailable = (data.security.openings ?? []).filter(openingIsUnavailable).length;
+        if (data.security.openings_open) return `${data.security.openings_open} Kontakte offen`;
+        if (unavailable) return `${unavailable} ${unavailable === 1 ? 'Kontakt nicht erreichbar' : 'Kontakte nicht erreichbar'}`;
+        return 'Alle Fenster und Türen geschlossen';
+    }
     if (section === 'agents') return 'Lokale Automationen und Agentenstatus';
     if (section === 'climate') return 'Temperaturen, Luftfeuchte und Thermostate';
     if (section === 'home' && data?.home_assistant.status === 'error') return 'Home Assistant momentan nicht erreichbar';
@@ -4165,7 +4209,12 @@ function roomOpeningSummary(data: WallDashboardData, room: string) {
     const openItems = openings.filter((item) => item.state === 'on');
     if (openings.length === 1) {
         const item = openings[0];
-        return `${openingKindLabel(item)} ${item.state === 'on' ? 'offen' : 'geschlossen'}`;
+        if (openingIsUnavailable(item)) return `${openingKindLabel(item)} nicht erreichbar`;
+        return `${openingKindLabel(item)} ${openingIsOpen(item) ? 'offen' : 'geschlossen'}`;
+    }
+    const unavailableItems = openings.filter(openingIsUnavailable);
+    if (unavailableItems.length) {
+        return `${unavailableItems.length} ${unavailableItems.length === 1 ? 'Kontakt nicht erreichbar' : 'Kontakte nicht erreichbar'}`;
     }
     if (!openItems.length) return `${openings.length} Kontakte geschlossen`;
     const openDoors = openItems.filter((item) => openingKind(item) === 'door').length;
@@ -4199,6 +4248,16 @@ function openingIsOpen(item: WallEntity) {
     return String(item.state).toLowerCase() === 'on';
 }
 
+function openingIsUnavailable(item: WallEntity) {
+    return ['unavailable', 'unknown', ''].includes(String(item.state || '').toLowerCase());
+}
+
+function openingStateRank(item: WallEntity) {
+    if (openingIsOpen(item)) return 2;
+    if (openingIsUnavailable(item)) return 1;
+    return 0;
+}
+
 function groupOpeningsByRoom(items: WallEntity[], data: WallDashboardData) {
     const knownRooms = data.light_groups.flatMap((group) => floorRooms(data, group.area).map((room) => room.area));
     const groups = new Map<string, WallEntity[]>();
@@ -4213,6 +4272,8 @@ function groupOpeningsByRoom(items: WallEntity[], data: WallDashboardData) {
         .sort((a, b) => {
             const openDiff = b.items.filter(openingIsOpen).length - a.items.filter(openingIsOpen).length;
             if (openDiff) return openDiff;
+            const unavailableDiff = b.items.filter(openingIsUnavailable).length - a.items.filter(openingIsUnavailable).length;
+            if (unavailableDiff) return unavailableDiff;
             return a.area.localeCompare(b.area, 'de');
         });
 }

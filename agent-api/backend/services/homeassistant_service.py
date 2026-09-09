@@ -297,7 +297,46 @@ class HomeAssistantService:
             raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
         return asyncio.run(self._websocket_command(command, timeout=timeout))
 
+    def get_device_metadata_by_entity(self) -> dict[str, dict[str, Any]]:
+        responses = asyncio.run(self._websocket_commands([
+            {"type": "config/entity_registry/list"},
+            {"type": "config/device_registry/list"},
+        ]))
+        entity_entries = responses[0].get("result", []) if responses else []
+        device_entries = responses[1].get("result", []) if len(responses) > 1 else []
+        devices = {str(item.get("id") or ""): item for item in device_entries if isinstance(item, dict)}
+        result: dict[str, dict[str, Any]] = {}
+        for entity in entity_entries:
+            if not isinstance(entity, dict):
+                continue
+            entity_id = str(entity.get("entity_id") or "")
+            device_id = str(entity.get("device_id") or "")
+            device = devices.get(device_id)
+            if not entity_id or not device:
+                continue
+            identifiers = device.get("identifiers") if isinstance(device.get("identifiers"), list) else []
+            is_zigbee2mqtt = any(
+                isinstance(identifier, (list, tuple))
+                and len(identifier) >= 2
+                and str(identifier[0]).lower() == "mqtt"
+                and str(identifier[1]).lower().startswith("zigbee2mqtt_")
+                for identifier in identifiers
+            )
+            result[entity_id] = {
+                "device_id": device_id,
+                "name": device.get("name_by_user") or device.get("name") or entity.get("name") or entity.get("original_name"),
+                "area_id": device.get("area_id") or entity.get("area_id"),
+                "manufacturer": device.get("manufacturer"),
+                "model": device.get("model"),
+                "is_zigbee2mqtt": is_zigbee2mqtt,
+            }
+        return result
+
     async def _websocket_command(self, command: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
+        responses = await self._websocket_commands([command], timeout=timeout)
+        return responses[0] if responses else {"success": False, "error": "Keine Antwort von Home Assistant."}
+
+    async def _websocket_commands(self, commands: list[dict[str, Any]], timeout: int = 30) -> list[dict[str, Any]]:
         try:
             import websockets
         except Exception as exc:
@@ -314,11 +353,14 @@ class HomeAssistantService:
             if auth_result.get("type") != "auth_ok":
                 raise RuntimeError(f"Home Assistant WebSocket Auth fehlgeschlagen: {auth_result}")
 
-            payload = dict(command)
-            payload["id"] = 1
-            await websocket.send(json.dumps(payload))
-            response = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
-            return response if isinstance(response, dict) else {"success": False, "response": response}
+            responses: list[dict[str, Any]] = []
+            for command_id, command in enumerate(commands, start=1):
+                payload = dict(command)
+                payload["id"] = command_id
+                await websocket.send(json.dumps(payload))
+                response = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
+                responses.append(response if isinstance(response, dict) else {"success": False, "response": response})
+            return responses
 
     # ------------------------------------------------------------------
     # Matter Commissioning — Matter Server WebSocket (Port 5580, kein Auth)

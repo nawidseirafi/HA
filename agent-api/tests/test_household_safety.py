@@ -183,6 +183,48 @@ class HouseholdSafetyTests(unittest.TestCase):
         self.assertEqual(len(messaging.messages), 1)
         self.assertEqual(second["suppressed"][0]["reason"], "deduplicated")
 
+    def test_unavailable_device_alert_is_grouped_and_sent_to_telegram(self):
+        messaging = FakeMessaging()
+        service = self.service([
+            ha_state("binary_sensor.bad_fenster_contact", "unavailable", "Bad Fensterkontakt", device_id="window-1", device_class="window"),
+            ha_state("sensor.bad_fenster_battery", "unavailable", "Bad Fensterkontakt Batterie", device_id="window-1", device_class="battery"),
+            ha_state("button.bad_fenster_identify", "unknown", "Bad Fenster identifizieren"),
+        ], messaging=messaging)
+        sent = []
+        service._send_alert_telegram = lambda alert: sent.append(alert) or {"ok": True}
+
+        result = service.check_alerts()
+
+        self.assertEqual(len(result["active_alerts"]), 1)
+        self.assertEqual(result["active_alerts"][0]["title"], "Gerät nicht erreichbar")
+        self.assertEqual(len(result["active_alerts"][0]["devices"]), 1)
+        self.assertIn("telegram", result["delivered"][0]["channels"])
+        self.assertNotIn("mobile_push", result["delivered"][0]["channels"])
+        self.assertEqual(len(sent), 1)
+
+        repeated = service.check_alerts()
+        self.assertFalse(repeated["notified"])
+        self.assertEqual(len(sent), 1)
+
+    def test_unavailable_device_alert_uses_device_registry_name_and_ignores_hue(self):
+        service = self.service([])
+        states = [
+            ha_state("light.bad_spot_1", "unavailable", "Bath spot 1"),
+            ha_state("binary_sensor.bathroom_window_contact_tamper", "unavailable", "Bathroom Window Contact Manipulation"),
+            ha_state("sensor.garden_bodenfeuchte_rasen_battery", "unavailable", "Garden Bodenfeuchte Rasen Batterie"),
+        ]
+        lookup = {
+            "light.bad_spot_1": {"device_id": "hue-1", "name": "Bath spot 1", "is_zigbee2mqtt": False},
+            "binary_sensor.bathroom_window_contact_tamper": {"device_id": "contact-1", "name": "Bathroom Window Contact", "is_zigbee2mqtt": True},
+            "sensor.garden_bodenfeuchte_rasen_battery": {"device_id": "soil-1", "name": "Garden Bodenfeuchte Rasen", "is_zigbee2mqtt": True},
+        }
+
+        alert = service._unavailable_device_alert(states, lookup)
+
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert["title"], "2 Geräte nicht erreichbar")
+        self.assertEqual([item["name"] for item in alert["devices"]], ["Bathroom Window Contact", "Garden Bodenfeuchte Rasen"])
+
 
 if __name__ == "__main__":
     unittest.main()

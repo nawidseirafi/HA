@@ -159,6 +159,94 @@ class WallCalendarTests(unittest.TestCase):
 
         self.assertEqual(item["area"], "Office")
 
+    def test_unavailable_devices_are_grouped_and_unknown_states_are_ignored(self):
+        from backend.api.homeassistant_routes import _unavailable_device_items
+
+        states = [
+            {
+                "entity_id": "binary_sensor.bad_fenster_contact",
+                "state": "unavailable",
+                "device_id": "window-1",
+                "attributes": {"friendly_name": "Bad Fensterkontakt", "device_class": "window"},
+            },
+            {
+                "entity_id": "sensor.bad_fenster_battery",
+                "state": "unavailable",
+                "device_id": "window-1",
+                "attributes": {"friendly_name": "Bad Fensterkontakt Batterie", "device_class": "battery"},
+            },
+            {
+                "entity_id": "button.bad_fenster_identify",
+                "state": "unknown",
+                "attributes": {"friendly_name": "Bad Fenster identifizieren"},
+            },
+        ]
+
+        items = _unavailable_device_items(states)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["device_key"], "device:window-1")
+        self.assertEqual(items[0]["entity_count"], 2)
+        self.assertEqual(items[0]["state"], "unavailable")
+
+    def test_unavailable_zigbee_entities_group_without_device_id(self):
+        from backend.api.homeassistant_routes import _unavailable_device_items
+
+        states = [
+            {"entity_id": "binary_sensor.bathroom_window_contact_contact", "state": "unavailable", "attributes": {"friendly_name": "Bathroom Window Contact"}},
+            {"entity_id": "sensor.bathroom_window_contact_battery", "state": "unavailable", "attributes": {"friendly_name": "Bathroom Window Contact Battery"}},
+            {"entity_id": "sensor.garden_bodenfeuchte_rasen_soil_moisture", "state": "unavailable", "attributes": {"friendly_name": "Garden Bodenfeuchte Rasen"}},
+            {"entity_id": "sensor.garden_bodenfeuchte_rasen_battery", "state": "unavailable", "attributes": {"friendly_name": "Garden Bodenfeuchte Rasen Battery"}},
+        ]
+
+        items = _unavailable_device_items(states)
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual({item["name"] for item in items}, {"Bathroom Window Contact", "Garden Bodenfeuchte Rasen"})
+
+    def test_unavailable_devices_use_registry_names_and_only_zigbee2mqtt(self):
+        from backend.api.homeassistant_routes import _unavailable_device_items
+
+        states = [
+            {"entity_id": "light.bad_spot_1", "state": "unavailable", "attributes": {"friendly_name": "Bath spot 1"}},
+            {"entity_id": "binary_sensor.bathroom_window_contact_contact", "state": "unavailable", "attributes": {"friendly_name": "Fenster"}},
+            {"entity_id": "binary_sensor.bathroom_window_contact_tamper", "state": "unavailable", "attributes": {"friendly_name": "Bathroom Window Contact Manipulation"}},
+            {"entity_id": "sensor.garden_bodenfeuchte_rasen_battery", "state": "unavailable", "attributes": {"friendly_name": "Garden Bodenfeuchte Rasen Batterie"}},
+        ]
+        lookup = {
+            "light.bad_spot_1": {"device_id": "hue-1", "name": "Bath spot 1", "is_zigbee2mqtt": False},
+            "binary_sensor.bathroom_window_contact_contact": {"device_id": "contact-1", "name": "Bathroom Window Contact", "is_zigbee2mqtt": True},
+            "binary_sensor.bathroom_window_contact_tamper": {"device_id": "contact-1", "name": "Bathroom Window Contact", "is_zigbee2mqtt": True},
+            "sensor.garden_bodenfeuchte_rasen_battery": {"device_id": "soil-1", "name": "Garden Bodenfeuchte Rasen", "is_zigbee2mqtt": True},
+        }
+
+        items = _unavailable_device_items(states, lookup)
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual({item["name"] for item in items}, {"Bathroom Window Contact", "Garden Bodenfeuchte Rasen"})
+        self.assertNotIn("Bath spot 1", {item["name"] for item in items})
+
+    def test_unavailable_opening_uses_device_name_without_changing_state(self):
+        from backend.api.homeassistant_routes import _opening_item
+
+        state = {
+            "entity_id": "binary_sensor.bathroom_window_contact_contact",
+            "state": "unavailable",
+            "attributes": {"friendly_name": "Fenster", "device_class": "window"},
+        }
+        lookup = {
+            state["entity_id"]: {
+                "device_id": "contact-1",
+                "name": "Bathroom Window Contact",
+                "is_zigbee2mqtt": True,
+            },
+        }
+
+        item = _opening_item(state, lookup)
+
+        self.assertEqual(item["name"], "Bathroom Window Contact")
+        self.assertEqual(item["state"], "unavailable")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3927,6 +3927,13 @@ button.wall-room-card {
   border-color: rgba(239,68,68,0.18);
 }
 
+.wall-openings-room-card.has-unavailable {
+  border-color: color-mix(in srgb, var(--state-warn) 34%, var(--border));
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.84), rgba(255,255,255,0.58)),
+    radial-gradient(circle at 18% 12%, rgba(245,158,11,0.14), transparent 34%);
+}
+
 .wall-openings-group-head {
   display: flex;
   align-items: center;
@@ -3958,6 +3965,10 @@ button.wall-room-card {
 
 .wall-openings-room-card.all-closed .wall-openings-group-head strong {
   color: var(--state-ok);
+}
+
+.wall-openings-room-card.has-unavailable .wall-openings-group-head strong {
+  color: var(--state-warn);
 }
 
 .wall-openings-group-head small {
@@ -4004,6 +4015,11 @@ button.wall-room-card {
   background: color-mix(in srgb, var(--state-critical) 14%, var(--card));
 }
 
+.wall-opening-card.unavailable .wall-opening-icon {
+  color: var(--state-warn);
+  background: color-mix(in srgb, var(--state-warn) 14%, var(--card));
+}
+
 .wall-opening-card strong,
 .wall-opening-card small {
   display: block;
@@ -4030,6 +4046,11 @@ button.wall-room-card {
 .wall-opening-card.open b {
   color: #991b1b;
   background: rgba(239,68,68,0.12);
+}
+
+.wall-opening-card.unavailable b {
+  color: #92400e;
+  background: rgba(245,158,11,0.14);
 }
 
 .wall-openings-empty {

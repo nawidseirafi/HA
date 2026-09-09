@@ -14,6 +14,10 @@ from backend.services.waste_service import MAILBOX_ENTITY_ID, WasteService
 
 
 OPENING_DEVICE_CLASSES = {"door", "window", "opening"}
+UNAVAILABLE_DEVICE_DOMAINS = {
+    "binary_sensor", "climate", "cover", "fan", "humidifier", "lawn_mower",
+    "light", "lock", "media_player", "sensor", "switch", "vacuum", "water_heater",
+}
 SAFETY_DEVICE_CLASSES = {"smoke", "gas", "carbon_monoxide"}
 ACTIVE_SAFETY_STATES = {"on", "detected", "problem", "unsafe"}
 WATER_LEAK_DEVICE_CLASSES = {"moisture"}
@@ -187,6 +191,10 @@ class HouseholdService:
             air = self._air_quality_alert(state)
             if air:
                 alerts.append(air)
+        device_lookup = self._device_metadata_by_entity()
+        unavailable = self._unavailable_device_alert(states, device_lookup)
+        if unavailable:
+            alerts.append(unavailable)
         alerts.sort(key=lambda item: (0 if item.get("severity") == "critical" else 1, item.get("title") or ""))
         return {
             "ok": not any(str(item.get("severity") or "") == "critical" for item in alerts),
@@ -539,6 +547,85 @@ class HouseholdService:
             return device_class in WATER_LEAK_DEVICE_CLASSES
         return any(token in haystack for token in ("wasserleck", "water_leak", "water leak", "leck", "leak", "moisture", "feucht"))
 
+    def _unavailable_device_alert(
+        self,
+        states: list[dict[str, Any]],
+        device_lookup: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any] | None:
+        devices: dict[str, dict[str, Any]] = {}
+        for state in states:
+            entity_id = str(state.get("entity_id") or "")
+            domain, _, object_id = entity_id.partition(".")
+            if domain not in UNAVAILABLE_DEVICE_DOMAINS or str(state.get("state") or "").lower() != "unavailable":
+                continue
+            attributes = state.get("attributes") if isinstance(state.get("attributes"), dict) else {}
+            metadata = device_lookup.get(entity_id) if device_lookup is not None else None
+            if device_lookup is not None and (not metadata or not metadata.get("is_zigbee2mqtt")):
+                continue
+            device_id = str((metadata or {}).get("device_id") or attributes.get("device_id") or state.get("device_id") or "").strip()
+            device_key = f"device:{device_id}" if device_id else f"entity:{self._device_base_object_id(object_id)}"
+            item = self._simple_entity(state)
+            if metadata and metadata.get("name"):
+                item["name"] = str(metadata["name"])
+            current = devices.get(device_key)
+            candidate_rank = (self._unavailable_device_is_diagnostic(object_id), len(str(item.get("name") or "")))
+            current_entity_id = str((current or {}).get("entity_id") or "")
+            current_object_id = current_entity_id.partition(".")[2]
+            current_rank = (self._unavailable_device_is_diagnostic(current_object_id), len(str((current or {}).get("name") or "")))
+            if current is None or candidate_rank < current_rank:
+                devices[device_key] = {**item, "device_key": device_key}
+        if not devices:
+            return None
+
+        ordered = sorted(devices.values(), key=lambda item: str(item.get("name") or item.get("entity_id") or ""))
+        names = [str(item.get("name") or item.get("entity_id") or "Gerät") for item in ordered]
+        count = len(ordered)
+        suffix = f" und {count - 5} weitere" if count > 5 else ""
+        return {
+            "kind": "device_unavailable",
+            "category": "devices",
+            "severity": "warning",
+            "signature": "device_unavailable:" + ",".join(sorted(str(item["device_key"]) for item in ordered)),
+            "title": "Gerät nicht erreichbar" if count == 1 else f"{count} Geräte nicht erreichbar",
+            "message": "Betroffen: " + ", ".join(names[:5]) + suffix,
+            "devices": ordered,
+        }
+
+    def _device_base_object_id(self, object_id: str) -> str:
+        text = str(object_id or "").lower()
+        suffixes = (
+            "linkquality", "link_quality", "lqi", "battery", "batterie", "voltage",
+            "contact", "window", "door", "opening", "humidity", "temperature",
+            "soil_moisture", "moisture",
+            "illuminance", "power", "energy", "signal_strength", "rssi", "status", "state",
+        )
+        changed = True
+        while changed:
+            changed = False
+            for suffix in suffixes:
+                token = f"_{suffix}"
+                if text.endswith(token) and len(text) > len(token) + 2:
+                    text = text[:-len(token)]
+                    changed = True
+        return text or str(object_id or "").lower()
+
+    def _device_metadata_by_entity(self) -> dict[str, dict[str, Any]] | None:
+        loader = getattr(self.ha_service, "get_device_metadata_by_entity", None)
+        if not callable(loader):
+            return None
+        try:
+            result = loader()
+            return result if isinstance(result, dict) else {}
+        except Exception:
+            return {}
+
+    def _unavailable_device_is_diagnostic(self, object_id: str) -> bool:
+        text = str(object_id or "").lower()
+        return any(text.endswith(f"_{suffix}") for suffix in (
+            "battery", "batterie", "voltage", "linkquality", "link_quality", "lqi",
+            "signal_strength", "rssi", "device_temperature",
+        ))
+
     def _opening_entity(self, state: dict[str, Any]) -> dict[str, Any]:
         item = self._simple_entity(state)
         item["open"] = str(state.get("state") or "").lower() == "on"
@@ -612,9 +699,11 @@ class HouseholdService:
         channels = ["message_center"]
         severity = str(alert.get("severity") or "warning")
         away = self._house_is_away()
+        telegram_required = str(alert.get("kind") or "") == "device_unavailable"
         if severity == "critical" or away:
             if notifications.get("alert_push_enabled", True) is not False:
                 channels.append("mobile_push")
+        if severity == "critical" or away or telegram_required:
             if notifications.get("alert_telegram_enabled", True) is not False:
                 channels.append("telegram")
         return channels

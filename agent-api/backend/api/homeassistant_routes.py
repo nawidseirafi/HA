@@ -43,11 +43,17 @@ class ServicePayload(BaseModel):
 @router.get("/wall")
 def wall_dashboard():
     ha_error = None
+    device_lookup: dict[str, dict[str, Any]] | None = None
     try:
         states = ha_service.get_states()
     except Exception as exc:
         states = []
         ha_error = str(exc)
+    if states:
+        try:
+            device_lookup = ha_service.get_device_metadata_by_entity()
+        except Exception:
+            device_lookup = {}
 
     floor_map = _floor_area_entity_map()
     area_lookup = _entity_area_lookup(floor_map)
@@ -76,11 +82,7 @@ def wall_dashboard():
         item for item in battery_items
         if (item["level"] is not None and item["level"] < LOW_BATTERY_THRESHOLD) or str(item["state"]).lower() == "low"
     ]
-    unavailable = [
-        _simple_item(state)
-        for state in states
-        if state.get("state") in {"unavailable", "unknown"}
-    ][:40]
+    unavailable = _unavailable_device_items(states, device_lookup)[:40]
     problems = [
         _simple_item(state)
         for state in states
@@ -93,7 +95,7 @@ def wall_dashboard():
     ]
     active_safety_alerts = [item for item in safety_detectors if item.get("active")]
     openings = [
-        _simple_item(state)
+        _opening_item(state, device_lookup)
         for state in states
         if _domain(state) == "binary_sensor"
         and state.get("attributes", {}).get("device_class") in {"door", "window", "opening"}
@@ -507,6 +509,50 @@ def _wall_device_key(state: dict[str, Any]) -> str:
     return f"name:{_wall_base_object_id(object_id, domain)}"
 
 
+def _unavailable_device_items(
+    states: list[dict[str, Any]],
+    device_lookup: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    supported_domains = set(WALL_DEVICE_DOMAIN_PRIORITY) | {"binary_sensor"}
+    for state in states:
+        if str(state.get("state") or "").lower() != "unavailable" or _domain(state) not in supported_domains:
+            continue
+        entity_id = str(state.get("entity_id") or "")
+        metadata = device_lookup.get(entity_id) if device_lookup is not None else None
+        if device_lookup is not None and (not metadata or not metadata.get("is_zigbee2mqtt")):
+            continue
+        device_key = f"device:{metadata.get('device_id')}" if metadata else _wall_device_key(state)
+        groups.setdefault(device_key, []).append(state)
+
+    items: list[dict[str, Any]] = []
+    for device_key, group in groups.items():
+        representative = min(
+            group,
+            key=lambda item: (
+                _wall_device_is_diagnostic(item),
+                WALL_DEVICE_DOMAIN_RANK.get(_domain(item), len(WALL_DEVICE_DOMAIN_RANK)),
+                len(str(_name(item))),
+            ),
+        )
+        item = _simple_item(representative)
+        metadata = device_lookup.get(str(representative.get("entity_id") or "")) if device_lookup is not None else None
+        if metadata and metadata.get("name"):
+            item["name"] = str(metadata["name"])
+        item["device_key"] = device_key
+        item["entity_count"] = len(group)
+        items.append(item)
+    return sorted(items, key=lambda item: (item.get("area") or "", item.get("name") or ""))
+
+
+def _wall_device_is_diagnostic(state: dict[str, Any]) -> bool:
+    object_id = str(state.get("entity_id") or "").split(".", 1)[-1].lower()
+    return any(object_id.endswith(f"_{suffix}") for suffix in (
+        "battery", "batterie", "voltage", "linkquality", "link_quality", "lqi",
+        "signal_strength", "rssi", "device_temperature",
+    ))
+
+
 def _wall_base_object_id(object_id: str, domain: str = "") -> str:
     text = str(object_id or "").lower()
     suffixes = [
@@ -519,6 +565,17 @@ def _wall_base_object_id(object_id: str, domain: str = "") -> str:
         "current_temperature",
         "temperature",
         "temperatur",
+        "soil_moisture",
+        "moisture",
+        "battery",
+        "batterie",
+        "voltage",
+        "linkquality",
+        "link_quality",
+        "lqi",
+        "signal_strength",
+        "rssi",
+        "contact",
         "water_tank",
         "tank_status",
         "tank_full",
@@ -597,6 +654,17 @@ def _simple_item(state: dict[str, Any]) -> dict[str, Any]:
         "device_class": attributes.get("device_class"),
         "unit": attributes.get("unit_of_measurement"),
     }
+
+
+def _opening_item(
+    state: dict[str, Any],
+    device_lookup: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    item = _simple_item(state)
+    metadata = device_lookup.get(str(state.get("entity_id") or "")) if device_lookup is not None else None
+    if metadata and metadata.get("is_zigbee2mqtt") and metadata.get("name"):
+        item["name"] = str(metadata["name"])
+    return item
 
 
 def _safety_item(state: dict[str, Any], states: list[dict[str, Any]] | None = None) -> dict[str, Any]:
