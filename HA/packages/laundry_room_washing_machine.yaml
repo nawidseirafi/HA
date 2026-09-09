@@ -115,6 +115,13 @@ automation:
         from: Läuft
         to: Beendet
     actions:
+      - action: notify.mobile_app_system_error_404
+        continue_on_error: true
+        data:
+          title: Waschmaschine fertig
+          message: Die Waschmaschine ist fertig. Die Wäsche kann entnommen werden.
+          data:
+            tag: laundry_room_washing_machine_finished
       - action: persistent_notification.create
         data:
           notification_id: laundry_room_washing_machine_finished
