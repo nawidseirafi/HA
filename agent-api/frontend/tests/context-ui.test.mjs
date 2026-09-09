@@ -123,6 +123,18 @@ test('responsive and wall-specific styles are present', () => {
   assert.match(wallCss, /@media \(max-width: 1100px\)[\s\S]*wall-home-status-bar/);
 });
 
+test('wall classifies English plug entities as outlets', () => {
+  const outletClassifier = wallDashboard.match(/function isOutletDevice[\s\S]*?function isNonOutletSwitch/)?.[0] ?? '';
+  assert.match(outletClassifier, /'plug'/);
+});
+
+test('wall associates appliance cycle sensors with outlet cards', () => {
+  assert.match(wallDashboard, /function outletCycleStatus/);
+  assert.match(wallDashboard, /cycle_status: outletCycleStatus\(data, room, outlet\)/);
+  assert.match(wallDashboard, /wall-outlet-cycle/);
+  assert.match(wallCss, /\.wall-outlet-group-head strong b\.wall-outlet-cycle\.finished/);
+});
+
 function read(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 }

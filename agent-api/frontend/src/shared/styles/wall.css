@@ -3392,6 +3392,21 @@ button.wall-room-card {
   line-height: 1;
 }
 
+.wall-outlet-group-head strong b.wall-outlet-cycle.standby {
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--muted) 84%, var(--card));
+}
+
+.wall-outlet-group-head strong b.wall-outlet-cycle.running {
+  color: var(--state-ok);
+  background: color-mix(in srgb, var(--state-ok) 14%, var(--card));
+}
+
+.wall-outlet-group-head strong b.wall-outlet-cycle.finished {
+  color: var(--state-warn);
+  background: color-mix(in srgb, var(--state-warn) 14%, var(--card));
+}
+
 .wall-outlet-group-head small {
   margin-top: 3px;
   color: var(--muted-foreground);

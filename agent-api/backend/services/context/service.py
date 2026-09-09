@@ -17,6 +17,7 @@ from backend.services.context.models import (
 )
 from backend.services.context.store import ContextStore
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.washing_machine import STATUS_ENTITY, washing_machine_status
 
 
 HOME_STATES = {"home", "on", "true", "present", "detected", "occupied"}
@@ -120,6 +121,10 @@ class ContextService:
             metrics=metrics,
         )
 
+        washing_machine = washing_machine_status(states if not ha_error else [])
+        if washing_machine["state"] in {"running", "finished"}:
+            summary = f"{summary} {washing_machine['summary']}"
+
         return ContextSnapshot(
             presence=presence,
             departure=departure,
@@ -133,6 +138,7 @@ class ContextService:
             updated_at=now.astimezone(timezone.utc).isoformat(timespec="seconds"),
             summary=summary,
             reason=reason,
+            washing_machine=washing_machine,
             signals={key: self._signal_payload(value) for key, value in signals.items()},
             active_rules=active_rules,
             metrics=metrics,
@@ -453,6 +459,7 @@ class ContextService:
     def _collect_signals(self, states: list[dict[str, Any]], by_entity: dict[str, dict[str, Any]]) -> dict[str, EntitySignal | list[EntitySignal] | None]:
         entities = self.config.get("entities") if isinstance(self.config.get("entities"), dict) else {}
         signals: dict[str, EntitySignal | list[EntitySignal] | None] = {
+            "washing_machine": self._signal(by_entity[STATUS_ENTITY]) if STATUS_ENTITY in by_entity else None,
             "person": self._configured_or_detected(entities, "person", states, by_entity, lambda item: self._domain(item) == "person"),
             "garage_door": self._configured_or_detected(
                 entities,

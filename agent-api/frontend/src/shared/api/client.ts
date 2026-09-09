@@ -709,6 +709,7 @@ export type ContextSignal = {
 };
 
 export type ContextStatus = {
+  washing_machine?: { state: 'running' | 'finished' | 'standby' | 'unknown'; summary: string; entity_id: string; updated_at?: string | null };
   presence: string;
   departure?: string;
   garage: string;

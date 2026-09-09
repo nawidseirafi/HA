@@ -18,6 +18,7 @@ from backend.agents.garden.service import GardenService
 from backend.config import load_agent_section, resolve_api_path
 from backend.paths import AGENTS_DIR
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.washing_machine import washing_machine_status
 from backend.services.llm.factory import create_llm_client
 from backend.services.messaging import MessagingService
 
@@ -379,6 +380,12 @@ class TelegramService:
             raise
 
     def answer(self, question: str) -> str:
+        if _question_mentions_washing_machine(question):
+            try:
+                states = HomeAssistantService().get_states()
+            except Exception:
+                states = []
+            return washing_machine_status(states)["summary"]
         context = self._context_snapshot()
         house_answer = _house_status_answer(question, context)
         if house_answer and _question_mentions_device_availability(question):
@@ -744,6 +751,7 @@ def _home_assistant_snapshot(
     unavailable_devices = _unavailable_device_items(states, device_lookup)
     return {
         "entity_count": len(states),
+        "washing_machine": washing_machine_status(states),
         "temperatures": _sensor_items(states, _is_temperature_state, limit=30),
         "humidity": _sensor_items(states, _is_humidity_state, limit=20),
         "smoke_alerts": _binary_items(states, _is_smoke_or_gas_state, active_only=False, limit=30),
@@ -983,6 +991,11 @@ def _latest_state_updated_at(states: list[dict[str, Any]]) -> str | None:
     return max(values) if values else None
 
 
+def _question_mentions_washing_machine(question: str) -> bool:
+    text = question.casefold()
+    return any(word in text for word in ("waschmaschine", "waschmasch", "waschgang", "wäsche", "waesche", "washing machine"))
+
+
 def _house_status_answer(question: str, context: dict[str, Any]) -> str:
     ha = context.get("home_assistant") if isinstance(context.get("home_assistant"), dict) else {}
     if not ha:
@@ -1004,6 +1017,9 @@ def _house_status_answer(question: str, context: dict[str, Any]) -> str:
     parts: list[str] = []
     if wants_house:
         parts.append("Hausstatus:")
+        laundry = ha.get("washing_machine") or {}
+        if laundry.get("summary"):
+            parts.append(laundry["summary"])
     if wants_availability or wants_house:
         parts.append(_availability_summary(ha))
     if wants_energy or wants_house:

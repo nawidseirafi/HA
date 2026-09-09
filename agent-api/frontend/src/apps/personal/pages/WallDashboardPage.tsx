@@ -71,8 +71,9 @@ type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'ag
 type BatteryBadge = { level: number | null; charging?: boolean };
 type EnergyPowerPoint = { timestamp: string; value: number };
 type OutletPower = { watts: number; label: string };
-type OutletEntity = WallEntity & { outlet_power?: OutletPower | null };
-type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null };
+type OutletCycleStatus = { entity_id: string; label: string; tone: 'standby' | 'running' | 'finished' | 'unknown' };
+type OutletEntity = WallEntity & { outlet_power?: OutletPower | null; cycle_status?: OutletCycleStatus | null };
+type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null; cycle_status?: OutletCycleStatus | null };
 type InternetStatus = 'ok' | 'down' | 'unstable' | 'unknown';
 type ImportantTone = 'info' | 'warn' | 'critical' | 'ok';
 type ImportantNowItemData = {
@@ -1224,14 +1225,16 @@ function ImportantNowItem({item}: { item: ImportantNowItemData }) {
 }
 
 function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowItemData[] = []) {
+    const laundry = status?.washing_machine;
+    const laundrySummary = laundry && ['running', 'finished'].includes(laundry.state) ? ` ${laundry.summary}` : '';
     if (items.length > 0) {
         const critical = items.filter((item) => item.critical);
         const primary = critical[0] ?? items[0];
         const remaining = items.length - 1;
         if (remaining > 0) {
-            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.`;
+            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.${laundrySummary}`;
         }
-        return `Ich sehe einen offenen Punkt: ${primary.title}.`;
+        return `Ich sehe einen offenen Punkt: ${primary.title}.${laundrySummary}`;
     }
     return status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
 }
@@ -2639,7 +2642,11 @@ function RoomOutletControl({
                             <div className="wall-outlet-group-head">
                                 <span><Plug size={22}/></span>
                                 <div>
-                                    <strong>{group.name}{group.power && <b>{group.power.label}</b>}</strong>
+                                    <strong>
+                                        {group.name}
+                                        {group.cycle_status && <b className={`wall-outlet-cycle ${group.cycle_status.tone}`}>{group.cycle_status.label}</b>}
+                                        {group.power && <b>{group.power.label}</b>}
+                                    </strong>
                                     <small>{group.items.length > 1 ? `${groupActive}/${group.items.length} Ausgänge an` : outletStateLabel(group.items[0])}</small>
                                 </div>
                             </div>
@@ -3917,6 +3924,7 @@ function isOutletDevice(device: WallEntity, data?: WallDashboardData, room?: str
         'zwischenstecker',
         'socket',
         'outlet',
+        'plug',
         'power strip',
         'powerstrip',
     ].some((needle) => text.includes(needle));
@@ -3945,6 +3953,12 @@ function isNonOutletSwitch(device: WallEntity) {
         'led_disabled',
         'led disable',
         'indicator mode',
+        // Device configuration switches exposed by some smart plugs are not
+        // physical outlets and must not appear as separate sockets on /wall.
+        'network indicator',
+        'network_indicator',
+        'outlet control protect',
+        'outlet_control_protect',
         'power outage memory',
         'power_outage_memory',
         'restore power',
@@ -3966,7 +3980,11 @@ function groupRoomOutlets(outlets: WallEntity[], room: string, data: WallDashboa
     const buckets = new Map<string, OutletEntity[]>();
     for (const outlet of outlets) {
         const key = outletGroupKey(outlet, room);
-        buckets.set(key, [...(buckets.get(key) ?? []), {...outlet, outlet_power: outletPower(data, room, outlet)}]);
+        buckets.set(key, [...(buckets.get(key) ?? []), {
+            ...outlet,
+            outlet_power: outletPower(data, room, outlet),
+            cycle_status: outletCycleStatus(data, room, outlet),
+        }]);
     }
     return [...buckets.entries()]
         .map(([key, items]) => {
@@ -3980,6 +3998,7 @@ function groupRoomOutlets(outlets: WallEntity[], room: string, data: WallDashboa
                 name: sorted.length > 1 ? outletGroupName(sorted[0], room) : sorted[0].name,
                 items: sorted,
                 power: groupPower,
+                cycle_status: sorted.find((item) => item.cycle_status)?.cycle_status ?? null,
             };
         })
         .sort((left, right) => left.name.localeCompare(right.name));
@@ -4029,6 +4048,41 @@ function outletStateLabel(outlet: WallEntity) {
 
 function outletPowerLabel(outlet: OutletEntity) {
     return outlet.outlet_power?.label || '';
+}
+
+function outletCycleStatus(data: WallDashboardData, room: string, outlet: WallEntity): OutletCycleStatus | null {
+    const outletTokens = outletMatchTokens(outlet, room);
+    if (!outletTokens.length) return null;
+    const match = (data.sensors ?? [])
+        .filter((sensor) => sameArea(sensor.area, room) && isCycleStatusSensor(sensor))
+        .map((sensor) => {
+            const sensorTokens = cycleStatusMatchTokens(sensor, room);
+            const overlap = sensorTokens.filter((token) => outletTokens.includes(token));
+            return {sensor, score: overlap.length * 4};
+        })
+        .filter((item) => item.score >= 8)
+        .sort((left, right) => right.score - left.score)[0]?.sensor;
+    if (!match) return null;
+    const state = String(match.state || '').trim();
+    const normalized = state.toLowerCase();
+    const tone = normalized === 'läuft' ? 'running'
+        : normalized === 'beendet' ? 'finished'
+            : normalized === 'standby' ? 'standby'
+                : 'unknown';
+    return {entity_id: match.entity_id, label: labelState(state), tone};
+}
+
+function isCycleStatusSensor(sensor: WallEntity) {
+    const state = String(sensor.state || '').trim().toLowerCase();
+    const text = `${sensor.entity_id} ${sensor.name}`.toLowerCase();
+    return ['standby', 'läuft', 'beendet', 'unavailable', 'unknown'].includes(state)
+        && ['status', 'cycle', 'zyklus'].some((needle) => text.includes(needle));
+}
+
+function cycleStatusMatchTokens(sensor: WallEntity, room: string) {
+    const cycleNoise = new Set(['status', 'cycle', 'zyklus']);
+    return uniqueTokens(`${normalizeOutletName(sensor.name, room)} ${normalizedEntityBase(sensor)}`)
+        .filter((token) => !outletNoiseTokens().has(token) && !cycleNoise.has(token));
 }
 
 function outletPower(data: WallDashboardData, room: string, outlet: WallEntity): OutletPower | null {
@@ -4352,6 +4406,11 @@ function roomSensorChips(data: WallDashboardData, room: string) {
     const add = (entity_id: string, label: string, value: string, tone = 'neutral', battery?: BatteryBadge | null) => {
         chips.set(entity_id, {entity_id, label, value, tone, battery});
     };
+    const outletStatusEntityIds = new Set(
+        roomOutlets(data, room)
+            .map((outlet) => outletCycleStatus(data, room, outlet)?.entity_id)
+            .filter((entityId): entityId is string => Boolean(entityId)),
+    );
 
     for (const sensor of data.temperature_sensors ?? []) {
         if (!sameArea(sensor.area, room)) continue;
@@ -4366,6 +4425,7 @@ function roomSensorChips(data: WallDashboardData, room: string) {
 
     for (const sensor of data.sensors ?? []) {
         if (!sameArea(sensor.area, room)) continue;
+        if (outletStatusEntityIds.has(sensor.entity_id)) continue;
         const deviceClass = String(sensor.device_class || '').toLowerCase();
         if (deviceClass === 'temperature' || deviceClass === 'humidity' || deviceClass === 'battery' || isPowerSensor(sensor)) continue;
         const label = sensorLabel(sensor);

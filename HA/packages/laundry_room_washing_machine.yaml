@@ -1,0 +1,149 @@
+# Home Assistant Package: Waschmaschinenstatus
+# Installation: Diese Datei nach /config/packages/ kopieren.
+# In configuration.yaml (vorhandenen homeassistant-Block ergaenzen):
+# homeassistant:
+#   packages: !include_dir_named packages
+# Danach Konfiguration pruefen und Home Assistant neu starten.
+# Quelle: sensor.laundry_room_washing_machine_plug_power, Einheit W.
+# Startwerte sind unkalibriert: >10 W fuer 1 Minute, <3 W fuer 10 Minuten.
+# Schwellen und Zeiten unten direkt in den beiden binary_sensor anpassen.
+# Bei Neustart/Template-Neuladen beginnen laufende Wartezeiten erneut.
+# Fehlende/ungueltige Messwerte unterbrechen die Erkennung.
+# Ein eingefrorener, weiterhin numerischer Messwert ist nicht erkennbar.
+# Beendet bleibt bis zum naechsten Start oder manuellen Zuruecksetzen erhalten.
+# Schleudern/Spuelen/Aufheizen sind noch nicht separat implementiert.
+# Dokumentation:
+# https://www.home-assistant.io/integrations/template/
+# https://www.home-assistant.io/docs/configuration/packages/
+
+input_select:
+  laundry_room_washing_machine_cycle:
+    name: Waschmaschine gespeicherter Status
+    options:
+      - Standby
+      - Läuft
+      - Beendet
+    icon: mdi:washing-machine
+    # Kein initial: Der letzte Status wird nach Neustart wiederhergestellt.
+
+template:
+  - binary_sensor:
+      - name: laundry_room_washing_machine_start_confirmed
+        unique_id: laundry_room_washing_machine_start_confirmed
+        state: >-
+          {% set p = states('sensor.laundry_room_washing_machine_plug_power') %}
+          {{ is_number(p) and (p | float(0)) > 10 }}
+        delay_on:
+          minutes: 1
+
+      - name: laundry_room_washing_machine_finish_confirmed
+        unique_id: laundry_room_washing_machine_finish_confirmed
+        state: >-
+          {% set p = states('sensor.laundry_room_washing_machine_plug_power') %}
+          {{ is_state('input_select.laundry_room_washing_machine_cycle', 'Läuft')
+             and is_number(p) and 0 <= (p | float(0)) < 3 }}
+        delay_on:
+          minutes: 10
+
+  - sensor:
+      - name: laundry_room_washing_machine_status
+        unique_id: laundry_room_washing_machine_status
+        icon: mdi:washing-machine
+        availability: >-
+          {% set p = states('sensor.laundry_room_washing_machine_plug_power') %}
+          {{ is_number(p) and (p | float(0)) >= 0
+             and states('input_select.laundry_room_washing_machine_cycle')
+                 in ['Standby', 'Läuft', 'Beendet'] }}
+        state: >-
+          {{ states('input_select.laundry_room_washing_machine_cycle') }}
+
+automation:
+  - id: laundry_room_washing_machine_update_cycle
+    alias: Waschmaschine – Status aktualisieren
+    description: Speichert Start und Ende anhand zeitlich bestaetigter Leistung.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id:
+          - binary_sensor.laundry_room_washing_machine_start_confirmed
+          - binary_sensor.laundry_room_washing_machine_finish_confirmed
+        to: "on"
+      # Holt einen verpassten Zustandswechsel z.B. nach Automation-Reload nach.
+      - trigger: time_pattern
+        seconds: "/15"
+    conditions:
+      - condition: template
+        value_template: >-
+          {% set p = states('sensor.laundry_room_washing_machine_plug_power') %}
+          {{ is_number(p) and (p | float(0)) >= 0 }}
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.laundry_room_washing_machine_start_confirmed
+                state: "on"
+              - condition: template
+                value_template: >-
+                  {{ states('input_select.laundry_room_washing_machine_cycle')
+                     in ['Standby', 'Beendet'] }}
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.laundry_room_washing_machine_cycle
+                data:
+                  option: Läuft
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.laundry_room_washing_machine_finish_confirmed
+                state: "on"
+              - condition: state
+                entity_id: input_select.laundry_room_washing_machine_cycle
+                state: Läuft
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.laundry_room_washing_machine_cycle
+                data:
+                  option: Beendet
+
+  - id: laundry_room_washing_machine_finished_notification
+    alias: Waschmaschine fertig melden
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: input_select.laundry_room_washing_machine_cycle
+        from: Läuft
+        to: Beendet
+    actions:
+      - action: persistent_notification.create
+        data:
+          notification_id: laundry_room_washing_machine_finished
+          title: Waschmaschine fertig
+          message: Die Waschmaschine ist fertig. Die Wäsche kann entnommen werden.
+
+script:
+  laundry_room_washing_machine_reset:
+    alias: Waschmaschine – Wäsche entnommen
+    icon: mdi:basket-check
+    mode: single
+    sequence:
+      - condition: state
+        entity_id: input_select.laundry_room_washing_machine_cycle
+        state: Beendet
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.laundry_room_washing_machine_cycle
+        data:
+          option: Standby
+
+# Optionale Dashboard-Karte (separat als manuelle Karte einfuegen):
+# type: entities
+# title: Waschmaschine
+# show_header_toggle: false
+# entities:
+#   - entity: sensor.laundry_room_washing_machine_status
+#     name: Status
+#   - entity: sensor.laundry_room_washing_machine_plug_power
+#     name: Leistung
+#   - entity: script.laundry_room_washing_machine_reset
+#     name: Wäsche entnommen
