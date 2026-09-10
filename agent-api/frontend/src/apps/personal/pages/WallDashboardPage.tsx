@@ -31,10 +31,12 @@ import {
     Plane,
     Plug,
     Plus,
+    Power,
     Trash2,
     RefreshCw,
     Siren,
     ShieldAlert,
+    Snowflake,
     Square,
     Sprout,
     Thermometer,
@@ -2499,7 +2501,7 @@ function RoomClimateControl({
                         onClick={() => onTemperature(item, Math.round((target - 0.5) * 10) / 10)}
                         aria-label="Zieltemperatur senken"><Minus size={20}/></button>
                 <div className="wall-thermostat-circle">
-                    <strong>{formatNumber(target)}°C</strong>
+                    <strong>{formatNumber(target)}<sup>°C</sup></strong>
                     <span>Zieltemperatur</span>
                     <small>Aktuell {formatNumber(item.current_temperature)}°C</small>
                 </div>
@@ -2507,13 +2509,49 @@ function RoomClimateControl({
                         onClick={() => onTemperature(item, Math.round((target + 0.5) * 10) / 10)}
                         aria-label="Zieltemperatur erhöhen"><Plus size={20}/></button>
             </div>
-            <div className="wall-mode-buttons">
-                {modes.map((nextMode) => (
-                    <button key={nextMode} type="button" className={mode === nextMode ? 'active' : ''} disabled={busy}
-                            onClick={() => onMode(item, nextMode)}>
-                        {labelClimateMode(nextMode)}
-                    </button>
-                ))}
+            <div className="wall-mode-buttons" role="group" aria-label="Klimamodus">
+                {modes.map((nextMode) => {
+                    const icon = (() => {
+                        switch (nextMode) {
+                            case 'off':
+                                return <Power size={28}/>;
+
+                            case 'heat':
+                                return <Flame size={28}/>;
+
+                            case 'dry':
+                                return <Droplets size={28}/>;
+
+                            case 'fan_only':
+                                return <Fan size={28}/>;
+
+                            case 'cool':
+                                return <Snowflake size={28}/>;
+
+                            case 'heat_cool':
+                            case 'auto':
+                                return <RefreshCw size={28}/>;
+
+                            default:
+                                return <Thermometer size={28}/>;
+                        }
+                    })();
+
+                    return (
+                        <button
+                            key={nextMode}
+                            type="button"
+                            className={mode === nextMode ? 'active' : ''}
+                            disabled={busy}
+                            onClick={() => onMode(item, nextMode)}
+                            aria-pressed={mode === nextMode}
+                            aria-label={labelClimateMode(nextMode)}
+                            title={labelClimateMode(nextMode)}
+                        >
+                            {icon}
+                        </button>
+                    );
+                })}
             </div>
         </section>
     );

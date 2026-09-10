@@ -2566,212 +2566,187 @@ button.wall-room-card {
   padding: 0 15px;
 }
 
-.wall-climate-control.heat {
-  border-color: color-mix(in srgb, var(--state-warn) 30%, var(--border));
-  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-warn) 16%, transparent);
+.wall-room-panel.wall-climate-control {
+  --climate-accent: #a1a1a6;
+  min-width: 0;
+  border-color: rgba(255, 255, 255, 0.09);
+  background: #1c1c1e;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+  color: #f5f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
 }
 
-.wall-climate-control.cool {
-  border-color: color-mix(in srgb, var(--state-climate) 34%, var(--border));
-  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-climate) 16%, transparent);
+.wall-climate-control.heat { --climate-accent: #ff9f0a; }
+.wall-climate-control.cool { --climate-accent: #64d2ff; }
+.wall-climate-control.auto { --climate-accent: #30d158; }
+.wall-climate-control.dry { --climate-accent: #5ac8fa; }
+
+.wall-room-panel.wall-climate-control:is(.heat, .cool, .auto, .dry) {
+  background: color-mix(in srgb, var(--climate-accent) 9%, #1c1c1e);
+  border-color: color-mix(in srgb, var(--climate-accent) 18%, #303033);
 }
 
-.wall-climate-control.auto {
-  border-color: color-mix(in srgb, var(--state-ok) 28%, var(--border));
-  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, var(--state-ok) 14%, transparent);
+.wall-climate-control .wall-room-panel-title > span {
+  font-size: 1rem;
+  font-weight: 600;
 }
 
-.wall-climate-control.dry {
-  border-color: color-mix(in srgb, #f59e0b 28%, var(--border));
-  box-shadow: var(--shadow-card), 0 14px 34px color-mix(in srgb, #f59e0b 14%, transparent);
-}
-
-.wall-climate-status {
+.wall-climate-control .wall-climate-status {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  color: var(--muted-foreground);
-  background: var(--surface);
+  padding: 0;
+  color: var(--climate-accent);
+  background: transparent;
   font-size: 0.78rem;
+  font-weight: 500;
 }
 
-.wall-climate-status.heat {
-  color: #ffd9aa;
-  background: color-mix(in srgb, var(--state-warn) 18%, #080808);
-}
-
-.wall-climate-status.cool {
-  color: #9cf0df;
-  background: color-mix(in srgb, var(--state-climate) 16%, #080808);
-}
-
-.wall-climate-status.auto {
-  color: #9af0c9;
-  background: color-mix(in srgb, var(--state-ok) 14%, #080808);
-}
-
-.wall-climate-status.dry {
-  color: #ffcf92;
-  background: color-mix(in srgb, #f59e0b 14%, #080808);
+.wall-climate-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .wall-climate-dial {
-  min-height: 194px;
   display: grid;
-  grid-template-columns: 64px auto 64px;
-  justify-content: center;
-  gap: 4px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  min-height: 184px;
+  margin: 8px auto;
   text-align: center;
 }
 
 .wall-climate-dial button {
-  width: 50px;
-  height: 50px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: color-mix(in srgb, var(--foreground) 72%, transparent);
-  background: rgba(255,255,255,0.07);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
-  justify-self: center;
-  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease, background 140ms ease;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  color: #f5f5f7;
+  background: #303033;
+  box-shadow: none;
+  transition: transform 140ms ease, background 140ms ease;
 }
 
 .wall-climate-dial button:not(:disabled):hover {
-  background: rgba(245, 158, 11, 0.16);
+  background: #414145;
 }
 
 .wall-climate-dial button:not(:disabled):active {
-  transform: scale(0.95);
-  box-shadow: none;
-}
-
-.wall-climate-control.off .wall-climate-dial button {
-  color: var(--muted-foreground);
-  background: rgba(255,255,255,0.05);
+  transform: scale(0.94);
 }
 
 .wall-thermostat-circle {
-  width: 172px;
-  height: 172px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 38% 30%, rgba(255,184,108,0.16), rgba(255,184,108,0.06) 42%, rgba(255,255,255,0.03) 70%),
-    linear-gradient(145deg, #1b1b1b, #0a0a0a);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    inset 0 -16px 28px rgba(0, 0, 0, 0.28),
-    0 18px 38px rgba(0, 0, 0, 0.34);
-  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-}
-
-.wall-climate-control.heat .wall-thermostat-circle {
-  background:
-    radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--state-warn) 24%, #151515) 0%, color-mix(in srgb, var(--state-warn) 12%, #080808) 58%, #050505);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    0 0 0 8px color-mix(in srgb, var(--state-warn) 9%, transparent),
-    0 18px 46px color-mix(in srgb, var(--state-warn) 34%, transparent);
-}
-
-.wall-climate-control.cool .wall-thermostat-circle {
-  background:
-    radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--state-climate) 18%, #151515) 0%, color-mix(in srgb, #ffb65c 10%, #080808) 62%, #050505),
-    linear-gradient(145deg, #1b1b1b, color-mix(in srgb, var(--state-climate) 12%, #080808));
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    0 0 0 8px color-mix(in srgb, var(--state-climate) 8%, transparent),
-    0 18px 46px color-mix(in srgb, var(--state-climate) 34%, transparent);
-}
-
-.wall-climate-control.auto .wall-thermostat-circle {
-  background:
-    radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--state-ok) 18%, #151515) 0%, color-mix(in srgb, var(--state-climate) 10%, #080808) 62%, #050505);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    0 0 0 8px color-mix(in srgb, var(--state-ok) 7%, transparent),
-    0 18px 46px color-mix(in srgb, var(--state-ok) 26%, transparent);
-}
-
-.wall-climate-control.dry .wall-thermostat-circle {
-  background:
-    radial-gradient(circle at 38% 30%, color-mix(in srgb, #f59e0b 18%, #151515) 0%, color-mix(in srgb, #ffb65c 10%, #080808) 62%, #050505);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    0 0 0 8px color-mix(in srgb, #f59e0b 7%, transparent),
-    0 18px 46px color-mix(in srgb, #f59e0b 24%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 160px;
+  gap: 8px;
 }
 
 .wall-thermostat-circle strong {
-  color: var(--foreground);
-  font-size: 2.9rem;
-  line-height: 1;
+  color: #f5f5f7;
+  font-size: 3rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
-.wall-thermostat-circle span,
+.wall-thermostat-circle strong sup {
+  margin-left: 2px;
+  font-size: 1.25rem;
+  font-weight: 400;
+  vertical-align: super;
+}
+
+.wall-thermostat-circle > span,
 .wall-thermostat-circle small {
-  display: block;
-  color: var(--muted-foreground);
-  font-size: 0.82rem;
-  font-weight: 800;
+  color: #a1a1a6;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.wall-thermostat-circle > span {
+  order: -1;
 }
 
 .wall-thermostat-circle small {
-  margin-top: 8px;
-  font-weight: 700;
+  margin-top: 2px;
 }
 
-.wall-mode-buttons {
+.wall-climate-control .wall-mode-buttons {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px;
-  padding: 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 184, 108, 0.12);
-  background: rgba(0,0,0,0.32);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 22px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(12px);
-}
-
-.wall-mode-buttons button {
-  min-height: 38px;
-  padding: 0 10px;
-  color: color-mix(in srgb, var(--foreground) 68%, transparent);
-  border-color: transparent;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(44px, 1fr);
+  grid-template-columns: none;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 5px;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 14px;
+  background: #111113;
   box-shadow: none;
-  background: rgba(255,255,255,0.05);
 }
 
-.wall-mode-buttons button.active {
-  color: var(--primary-foreground);
-  border-color: var(--state-climate);
-  background: var(--state-climate);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-climate) 28%, transparent);
+.wall-climate-control .wall-mode-buttons button {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #a1a1a6;
+  background: transparent;
+  box-shadow: none;
 }
 
-.wall-climate-control.heat .wall-mode-buttons button.active {
-  color: #1f2937;
-  border-color: var(--state-warn);
-  background: var(--state-warn);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-warn) 30%, transparent);
+.wall-climate-control .wall-mode-buttons button svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75;
 }
 
-.wall-climate-control.auto .wall-mode-buttons button.active {
-  border-color: var(--state-ok);
-  background: var(--state-ok);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--state-ok) 24%, transparent);
+.wall-climate-control .wall-mode-buttons button:not(:disabled):hover {
+  background: #262629;
 }
 
-.wall-climate-control.dry .wall-mode-buttons button.active {
-  border-color: #f59e0b;
-  background: #f59e0b;
-  box-shadow: 0 8px 18px color-mix(in srgb, #f59e0b 26%, transparent);
+.wall-climate-control .wall-mode-buttons button.active {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--climate-accent);
+  background: #363639;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.wall-climate-control button:focus-visible {
+  outline: 2px solid #64d2ff;
+  outline-offset: 2px;
+}
+
+.wall-climate-control button:disabled {
+  cursor: wait;
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-climate-control button {
+    transition: none;
+  }
 }
 
 .wall-cover-body {
