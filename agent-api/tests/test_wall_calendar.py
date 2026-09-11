@@ -4,6 +4,25 @@ from backend.api.homeassistant_routes import _wall_household_summary
 
 
 class WallCalendarTests(unittest.TestCase):
+    def test_wall_retains_electrical_sensors_alongside_primary_switch(self):
+        from backend.api.homeassistant_routes import _wall_device_groups, _wall_state_is_primary, _simple_item
+
+        for device_id in (None, "washing-machine-plug"):
+            states = [{"entity_id": "switch.laundry_room_washing_machine_plug", "state": "on", "attributes": {}}]
+            for suffix, device_class, unit, value in [("power", "power", "W", "97"), ("current", "current", "A", "0.63")]:
+                states.append({
+                    "entity_id": f"sensor.laundry_room_washing_machine_plug_{suffix}",
+                    "state": value,
+                    "attributes": {"device_class": device_class, "unit_of_measurement": unit},
+                })
+            if device_id:
+                for state in states:
+                    state["attributes"]["device_id"] = device_id
+            groups = _wall_device_groups(states)
+            self.assertTrue(_wall_state_is_primary(states[0], groups, "switch"))
+            sensors = [_simple_item(state) for state in states if _wall_state_is_primary(state, groups, "sensor")]
+            self.assertEqual([(item["state"], item["unit"]) for item in sensors], [("97", "W"), ("0.63", "A")])
+
     def test_wall_household_summary_keeps_calendar_events(self):
         calendar = {
             "ok": True,

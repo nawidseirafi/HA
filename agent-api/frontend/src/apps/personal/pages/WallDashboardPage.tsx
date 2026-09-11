@@ -43,6 +43,7 @@ import {
     Users,
     Zap,
     Warehouse,
+    WashingMachine,
     Wifi,
     WifiOff,
 } from 'lucide-react';
@@ -76,7 +77,7 @@ type BatteryBadge = { level: number | null; charging?: boolean };
 type EnergyPowerPoint = { timestamp: string; value: number };
 type OutletPower = { watts: number; label: string };
 type OutletCycleStatus = { entity_id: string; label: string; tone: 'standby' | 'running' | 'finished' | 'unknown' };
-type OutletEntity = WallEntity & { outlet_power?: OutletPower | null; cycle_status?: OutletCycleStatus | null };
+type OutletEntity = WallEntity & { outlet_power?: OutletPower | null; outlet_current?: string | null; cycle_status?: OutletCycleStatus | null };
 type OutletGroup = { id: string; name: string; items: OutletEntity[]; power?: OutletPower | null; cycle_status?: OutletCycleStatus | null };
 type InternetStatus = 'ok' | 'down' | 'unstable' | 'unknown';
 type ImportantTone = 'info' | 'warn' | 'critical' | 'ok';
@@ -1233,12 +1234,29 @@ function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowIt
         const critical = items.filter((item) => item.critical);
         const primary = critical[0] ?? items[0];
         const remaining = items.length - 1;
+        const washingMachine = items.find((item) => item.id === 'washing-machine');
+        const applianceSummary = washingMachine && washingMachine !== primary ? ` ${washingMachine.title}.` : '';
         if (remaining > 0) {
-            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.`;
+            return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.${applianceSummary}`;
         }
         return `Ich sehe einen offenen Punkt: ${primary.title}.`;
     }
     return status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
+}
+
+function washingMachineImportantItem(data: WallDashboardData, status: ContextStatus | null): ImportantNowItemData | null {
+    const sensor = (data.sensors ?? []).find((item) => item.entity_id === 'sensor.laundry_room_washing_machine_status');
+    const raw = String(sensor?.state || '').trim().toLowerCase();
+    const state = sensor ? ({'läuft': 'running', beendet: 'finished', standby: 'standby'}[raw] ?? 'unknown')
+        : status?.washing_machine?.state;
+    if (state !== 'running' && state !== 'finished') return null;
+    return {
+        id: 'washing-machine',
+        tone: state === 'finished' ? 'warn' : 'info',
+        icon: <WashingMachine size={30}/>,
+        title: state === 'running' ? 'Die Waschmaschine läuft gerade' : 'Die Waschmaschine ist fertig',
+        detail: state === 'running' ? 'Waschgang aktiv' : 'Die Wäsche kann entnommen werden.',
+    };
 }
 
 function confidencePercent(value?: number | null) {
@@ -1557,6 +1575,8 @@ function buildImportantNowState(
         });
     }
 
+    const washingMachine = washingMachineImportantItem(data, contextStatus);
+    if (washingMachine) items.push(washingMachine);
     const openCount = items.length;
     const hasCritical = items.some((item) => item.critical);
     const peopleCount = peopleAtHomeCount(contextStatus);
@@ -2690,7 +2710,10 @@ function RoomOutletControl({
                                             onClick={() => onToggle(outlet)}
                                             aria-pressed={isOn}
                                         >
-                                            <span>{outletDisplayName(outlet, group.name)}{outletPowerLabel(outlet) && <small>{outletPowerLabel(outlet)}</small>}</span>
+                                            <span>{outletDisplayName(outlet, group.name)}
+                                                <small>Leistung: {outletPowerLabel(outlet) || '--'}</small>
+                                                <small>Stromstärke: {outlet.outlet_current || '--'}</small>
+                                            </span>
                                             <i className={`wall-switch ${isOn ? 'on' : ''}`} aria-hidden="true"/>
                                         </button>
                                     );
@@ -4010,6 +4033,7 @@ function groupRoomOutlets(outlets: WallEntity[], room: string, data: WallDashboa
         buckets.set(key, [...(buckets.get(key) ?? []), {
             ...outlet,
             outlet_power: outletPower(data, room, outlet),
+            outlet_current: outletCurrent(data, room, outlet),
             cycle_status: outletCycleStatus(data, room, outlet),
         }]);
     }
@@ -4113,36 +4137,55 @@ function cycleStatusMatchTokens(sensor: WallEntity, room: string) {
 }
 
 function outletPower(data: WallDashboardData, room: string, outlet: WallEntity): OutletPower | null {
+    const sensor = outletMeasurementSensor(data, room, outlet, 'power');
+    return sensor ? powerFromSensor(sensor) : null;
+}
+
+function outletCurrent(data: WallDashboardData, room: string, outlet: WallEntity): string | null {
+    const sensor = outletMeasurementSensor(data, room, outlet, 'current');
+    if (!sensor) return null;
+    const raw = _numericWallState(sensor);
+    if (raw === null) return null;
+    const amps = String(sensor.unit || '').toLowerCase() === 'ma' ? raw / 1000 : raw;
+    return `${amps.toLocaleString('de-DE', {maximumFractionDigits: 3})} A`;
+}
+
+function outletMeasurementSensor(data: WallDashboardData, room: string, outlet: WallEntity, metric: 'power' | 'current'): WallEntity | null {
+    const sensors = (data.sensors ?? []).filter((sensor) => metric === 'power' ? isPowerSensor(sensor) : isCurrentSensor(sensor));
+    const base = normalizedEntityBase(outlet);
+    const suffixes = metric === 'power' ? ['power', 'leistung', 'active power', 'electric power'] : ['current', 'electric current', 'stromstaerke', 'stromstärke'];
+    const exact = sensors.filter((sensor) => base && suffixes.some((suffix) => normalizedEntityBase(sensor) === `${base} ${suffix}`));
+    if (exact.length === 1) return exact[0];
+    if (exact.length > 1) return null;
     const outletTokens = outletMatchTokens(outlet, room);
     if (!outletTokens.length) return null;
-    const candidates = roomPowerSensors(data, room)
+    const candidates = sensors.filter((sensor) => sameArea(sensor.area, room))
         .map((sensor) => {
             const sensorTokens = powerSensorMatchTokens(sensor, room);
             const overlap = sensorTokens.filter((token) => outletTokens.includes(token));
-            const contains = normalizedEntityBase(sensor).includes(normalizedEntityBase(outlet))
-                || normalizedEntityBase(outlet).includes(normalizedEntityBase(sensor));
             return {
                 sensor,
-                score: overlap.length * 4 + (contains ? 6 : 0) + (sameArea(sensor.area, outlet.area) ? 2 : 0),
+                score: overlap.length === outletTokens.length ? overlap.length * 4 : 0,
             };
         })
-        .filter((item) => item.score >= 6)
+        .filter((item) => item.score > 0)
         .sort((left, right) => right.score - left.score);
-    return candidates[0] ? powerFromSensor(candidates[0].sensor) : null;
+    if (candidates.length > 1 && candidates[0].score === candidates[1].score) return null;
+    return candidates[0]?.sensor ?? null;
+}
+
+function isCurrentSensor(sensor: WallEntity) {
+    const unit = String(sensor.unit || '').trim().toLowerCase();
+    const deviceClass = String(sensor.device_class || '').toLowerCase();
+    return _numericWallState(sensor) !== null
+        && (!deviceClass || deviceClass === 'current')
+        && (!unit || unit === 'a' || unit === 'ma')
+        && (deviceClass === 'current' || unit === 'a' || unit === 'ma');
 }
 
 function outletGroupPower(data: WallDashboardData, room: string, groupKey: string, outlets: OutletEntity[]): OutletPower | null {
-    const sensors = roomPowerSensors(data, room)
-        .filter((sensor) => !outlets.some((outlet) => outlet.outlet_power && outletPower(data, room, outlet)?.label === outlet.outlet_power?.label));
-    const match = sensors
-        .map((sensor) => {
-            const tokens = powerSensorMatchTokens(sensor, room);
-            const score = tokens.includes(groupKey) ? 10 : tokens.filter((token) => groupKey.includes(token) || token.includes(groupKey)).length * 3;
-            return {sensor, score};
-        })
-        .filter((item) => item.score > 0)
-        .sort((left, right) => right.score - left.score)[0];
-    return match ? powerFromSensor(match.sensor) : null;
+    if (outlets.length < 2 || groupKey === 'steckdosen') return null;
+    return outletPower(data, room, { ...outlets[0], entity_id: '', name: groupKey });
 }
 
 function roomPowerSensors(data: WallDashboardData, room: string) {
@@ -4153,6 +4196,8 @@ function isPowerSensor(sensor: WallEntity) {
     const deviceClass = String(sensor.device_class || '').toLowerCase();
     const unit = String(sensor.unit || '').trim().toLowerCase();
     const text = `${sensor.entity_id} ${sensor.name}`.toLowerCase();
+    if (unit && unit !== 'w' && unit !== 'kw') return false;
+    if (deviceClass && deviceClass !== 'power') return false;
     return _numericWallState(sensor) !== null && (
         deviceClass === 'power' ||
         unit === 'w' ||
@@ -4180,12 +4225,12 @@ function outletPowerFromWatts(watts: number): OutletPower | null {
 }
 
 function outletMatchTokens(outlet: WallEntity, room: string) {
-    return uniqueTokens(`${normalizeOutletName(outlet.name, room)} ${normalizedEntityBase(outlet)}`)
+    return uniqueTokens(`${normalizeOutletName(outlet.name, room)} ${normalizeOutletName(normalizedEntityBase(outlet), room)}`)
         .filter((token) => !outletNoiseTokens().has(token));
 }
 
 function powerSensorMatchTokens(sensor: WallEntity, room: string) {
-    return uniqueTokens(`${normalizeOutletName(sensor.name, room)} ${normalizedEntityBase(sensor)}`)
+    return uniqueTokens(`${normalizeOutletName(sensor.name, room)} ${normalizeOutletName(normalizedEntityBase(sensor), room)}`)
         .filter((token) => !outletNoiseTokens().has(token) && !new Set(['leistung', 'power', 'energy', 'verbrauch', 'watt', 'w']).has(token));
 }
 
@@ -4650,33 +4695,35 @@ function climateToneClass(mode: string) {
 }
 function isRoomTemperatureSensor(item: { name?: string; entity_id?: string }) {
     const text = normalizeArea(`${item.name || ''} ${item.entity_id || ''}`);
+    if (/\b(outdoor|outside|external|aussen\w*|außen\w*|draussen|draußen|exterior|coil|compressor|discharge|suction|refrigerant|evaporator|condenser)\b/.test(text)) return false;
     return !/fritz|router|gateway|modem|repeater|unifi|udm|switch|cpu|gpu|prozessor|processor|soc|chip|core|nvme|ssd|battery|batterie|akku|device temperature|gerätetemperatur|geraetetemperatur|internal temperature|interne temperatur|board temperature|pcb|case temperature|power supply|netzteil|inverter|wechselrichter|phase|l1|l2|l3/.test(text);
 }
 function roomTemperature(data: WallDashboardData, room: string) {
-    const values = [
-        ...(data.temperature_sensors ?? [])
-            .filter((sensor) => sameArea(sensor.area, room))
-            .filter(isRoomTemperatureSensor)
-            .map((sensor) => sensor.temperature),
-        ...data.climate
-            .filter((item) => sameArea(item.area, room))
-            .map((item) => item.current_temperature),
-    ].filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value)));
-    return avg(values.map(Number));
+    return roomClimateValue(data, room, 'temperature');
 }
 
 function roomHumidity(data: WallDashboardData, room: string) {
-    const values = [
-        ...(data.temperature_sensors ?? [])
-            .filter((sensor) => sameArea(sensor.area, room))
-            .map((sensor) => sensor.humidity)
-            .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
-        ...data.climate
-            .filter((item) => sameArea(item.area, room))
-            .map((item) => item.humidity)
-            .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(Number(value))),
-    ];
-    return avg(values.map(Number));
+    return roomClimateValue(data, room, 'humidity');
+}
+
+function roomClimateValue(data: WallDashboardData, room: string, metric: 'temperature' | 'humidity') {
+    const validValue = (value: unknown): value is number =>
+        (typeof value === 'number' || (typeof value === 'string' && value.trim() !== ''))
+        && Number.isFinite(Number(value));
+    const usable = (item: { area?: string; name?: string; entity_id?: string; state?: string }) =>
+        sameArea(item.area, room) && isRoomTemperatureSensor(item)
+        && !['unknown', 'unavailable'].includes(String(item.state || '').toLowerCase());
+    const sensorValues = (data.temperature_sensors ?? [])
+        .filter(usable)
+        .map((sensor) => sensor[metric])
+        .filter(validValue);
+    // Prefer room measurements independently for each metric; HVAC is a fallback.
+    if (sensorValues.length) return avg(sensorValues.map(Number));
+    const climateValues = data.climate
+        .filter(usable)
+        .map((item) => metric === 'temperature' ? item.current_temperature : item.humidity)
+        .filter(validValue);
+    return avg(climateValues.map(Number));
 }
 
 function roomClimateLine(data: WallDashboardData, room: string) {

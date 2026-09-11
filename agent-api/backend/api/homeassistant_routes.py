@@ -468,6 +468,11 @@ def _wall_state_is_primary(state: dict[str, Any], groups: dict[str, list[dict[st
     domain = _domain(state)
     if domain != expected_domain:
         return False
+    if expected_domain == "sensor":
+        attributes = state.get("attributes", {})
+        if attributes.get("device_class") in {"power", "current"} or str(attributes.get("unit_of_measurement") or "").lower() in {"w", "kw", "a", "ma"}:
+            # Electrical readings remain available alongside their device's switch.
+            return True
     if expected_domain == "light" and _wall_light_is_auxiliary(state):
         return False
     group = groups.get(_wall_device_key(state), [state])
