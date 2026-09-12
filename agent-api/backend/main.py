@@ -1,4 +1,5 @@
 from importlib import import_module
+import os
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -51,6 +52,7 @@ app.add_middleware(
 )
 
 PUBLIC_API_PATHS = {"/health", "/api/auth/login", "/api/product"}
+MONITOR_ONLY = os.getenv("ROBOTERSTEVE_MONITOR_ONLY", "0") == "1"
 
 
 @app.middleware("http")
@@ -61,6 +63,8 @@ async def require_api_auth(request, call_next):
             user_from_request(request)
         except Exception as exc:
             return JSONResponse({"detail": getattr(exc, "detail", "Nicht angemeldet.")}, status_code=getattr(exc, "status_code", 401))
+    if MONITOR_ONLY and path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and path not in {"/api/auth/login", "/api/home-hub/chat", "/api/home-hub/conversation"}:
+        return JSONResponse({"detail": "Beobachtungsmodus: Aktionen sind deaktiviert."}, status_code=403)
     return await call_next(request)
 
 
@@ -78,6 +82,7 @@ include_core_router("system", "backend.api.system_routes")
 include_core_router("household", "backend.api.household_routes")
 include_core_router("infrastructure", "backend.api.infrastructure_routes")
 include_core_router("homeassistant", "backend.api.homeassistant_routes")
+include_core_router("homeassistant", "backend.api.home_hub_routes")
 include_core_router("context", "backend.api.context_routes")
 include_core_router("orchestrator", "backend.api.orchestrator_routes")
 include_core_router("waste", "backend.api.waste_routes")
@@ -127,6 +132,11 @@ app.openapi = custom_openapi
 
 @app.on_event("startup")
 def start_schedulers() -> None:
+    if is_core_service_enabled("homeassistant"):
+        from backend.services.home_hub.service import HomeHub
+        HomeHub.default().start(dispatch_notifications=not MONITOR_ONLY)
+    if MONITOR_ONLY:
+        return
     for service in agent_runtime_services():
         start_scheduler = getattr(service, "start_scheduler", None)
         if callable(start_scheduler):
@@ -135,6 +145,9 @@ def start_schedulers() -> None:
 
 @app.on_event("shutdown")
 def stop_schedulers() -> None:
+    from backend.services.home_hub.service import HomeHub
+    if HomeHub._instance is not None:
+        HomeHub._instance.stop()
     for service in agent_runtime_services():
         stop_scheduler = getattr(service, "stop_scheduler", None)
         if callable(stop_scheduler):

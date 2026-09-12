@@ -39,6 +39,7 @@ class HouseholdService:
         calendar_service: CalendarService | None = None,
         messaging_service: MessagingService | None = None,
         vacation_status_provider: Callable[[], dict[str, Any]] | None = None,
+        delivery_service=None,
     ) -> None:
         self.ha_service = ha_service or HomeAssistantService()
         self.waste_service = waste_service or WasteService(self.ha_service)
@@ -51,6 +52,7 @@ class HouseholdService:
         self.messaging_service = messaging_service or MessagingService()
         self.config = load_global_config().get("household") or {}
         self.vacation_status_provider = vacation_status_provider
+        self.delivery_service = delivery_service
 
     def status(self) -> dict[str, Any]:
         waste = self._waste_status()
@@ -138,6 +140,8 @@ class HouseholdService:
 
     def check_alerts(self, notify: bool = True) -> dict[str, Any]:
         alerts = self.alerts_status()
+        if alerts.get("error"):
+            return {**alerts, "delivered": [], "suppressed": [], "notified": False}
         active_alerts = alerts.get("active_alerts", []) if isinstance(alerts, dict) else []
         delivered: list[dict[str, Any]] = []
         suppressed: list[dict[str, Any]] = []
@@ -149,19 +153,27 @@ class HouseholdService:
                 suppressed.append({"signature": signature, "reason": "deduplicated"})
                 continue
             channels = self._alert_channels(alert) if notify else ["message_center"]
-            message = self.messaging_service.create_message(
+            retry_message = next((item for item in self.messaging_service.get_messages_by_source("household", limit=100)
+                                  if (item.get("payload") or {}).get("signature") == signature
+                                  and any(value.get("ok") is False for value in ((item.get("payload") or {}).get("delivery_results") or {}).values() if isinstance(value, dict))), None)
+            message = retry_message or self.messaging_service.create_message(
                 source="household",
                 category=str(alert.get("category") or "household"),
                 severity=str(alert.get("severity") or "warning"),
                 title=str(alert.get("title") or "Haushaltsalarm"),
                 message=str(alert.get("message") or ""),
-                payload={"kind": "household_alert", "signature": signature, "channels": channels, "alert": alert},
+                payload={"kind": "household_alert", "signature": signature, "channels": channels, "alert": alert,
+                         "delivery_results": {channel: {"ok": False, "status": "pending"} for channel in channels if channel != "message_center"}},
             )
-            channel_results = {"message_center": {"ok": True, "message_id": message.get("id")}}
-            if notify and "mobile_push" in channels:
+            channel_results = {**((message.get("payload") or {}).get("delivery_results") or {}), "message_center": {"ok": True, "message_id": message.get("id")}}
+            alert = {**alert, "delivery_key": f"household:{message.get('id')}"}
+            if notify and "mobile_push" in channels and not channel_results.get("mobile_push", {}).get("ok"):
                 channel_results["mobile_push"] = self._send_alert_push(alert)
-            if notify and "telegram" in channels:
+            if notify and "telegram" in channels and not channel_results.get("telegram", {}).get("ok"):
                 channel_results["telegram"] = self._send_alert_telegram(alert)
+            update_payload = getattr(self.messaging_service, "update_payload", None)
+            if callable(update_payload):
+                update_payload(message["id"], {"kind": "household_alert", "signature": signature, "channels": channels, "alert": alert, "delivery_results": channel_results})
             delivered.append({"signature": signature, "channels": channels, "results": channel_results})
         return {
             "ok": not any(str(item.get("severity") or "") == "critical" for item in active_alerts),
@@ -170,6 +182,7 @@ class HouseholdService:
             "delivered": delivered,
             "suppressed": suppressed,
             "notified": bool(delivered),
+            "execution_ok": all(result.get("ok") is not False for item in delivered for result in item["results"].values()),
         }
 
     def alerts_status(self) -> dict[str, Any]:
@@ -682,6 +695,9 @@ class HouseholdService:
             payload = message.get("payload") if isinstance(message.get("payload"), dict) else {}
             if payload.get("kind") != "household_alert" or payload.get("signature") != signature:
                 continue
+            results = payload.get("delivery_results")
+            if isinstance(results, dict) and any(item.get("ok") is False for item in results.values() if isinstance(item, dict)):
+                return False
             if not message.get("read"):
                 return True
             try:
@@ -714,8 +730,9 @@ class HouseholdService:
         if not notify_service:
             return {"ok": False, "skipped": "missing_notify_service"}
         try:
-            result = self.ha_service.call_service(
-                "notify",
+            delivery_id = self._delivery_service().enqueue(
+                str(alert.get("delivery_key") or alert.get("signature")),
+                "mobile_push",
                 notify_service.replace("notify.", ""),
                 {
                     "title": str(alert.get("title") or "Haushaltsalarm"),
@@ -727,21 +744,29 @@ class HouseholdService:
                     },
                 },
             )
-            return {"ok": True, "result": result}
+            return {"ok": True, "status": "queued", "delivery_id": delivery_id}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
     def _send_alert_telegram(self, alert: dict[str, Any]) -> dict[str, Any]:
         try:
-            from backend.agents.telegram.service import TelegramService
-
-            return TelegramService().send_notification(
-                title=str(alert.get("title") or "Haushaltsalarm"),
-                message=str(alert.get("message") or ""),
-                severity=str(alert.get("severity") or "warning"),
-            )
+            from backend.agents.telegram.service import TelegramService, _effective_allowed_chat_ids
+            config = TelegramService().config()
+            targets = _effective_allowed_chat_ids(config)
+            if not targets:
+                return {"ok": False, "error": "Telegram-Ziel fehlt"}
+            text = f"{str(alert.get('severity', 'warning')).upper()}: {alert.get('title', 'Haushaltsalarm')}\n{alert.get('message', '')}"
+            deliveries = [self._delivery_service().enqueue(str(alert.get("delivery_key") or alert.get("signature")), "telegram", target, {"text": text[:4000]}) for target in targets]
+            return {"ok": True, "status": "queued", "delivery_ids": deliveries}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
+
+    def _delivery_service(self):
+        if self.delivery_service is None:
+            from backend.services.home_hub.service import HomeHub
+            from backend.services.home_hub.delivery import DeliveryService
+            self.delivery_service = DeliveryService(HomeHub.default().store)
+        return self.delivery_service
 
     def _send_openings_push(self, title: str, message: str, signature: str) -> None:
         notifications = self.config.get("notifications") if isinstance(self.config.get("notifications"), dict) else {}

@@ -119,6 +119,8 @@ class SchedulerService:
                 updated_task = self.store.mark_task_run(task, "skipped")
                 return {**run, "task": updated_task}
             result = self._execute_action(task)
+            if isinstance(result, dict) and (result.get("execution_ok", result.get("ok")) is False or result.get("status") == "error"):
+                raise RuntimeError(str(result.get("error") or result.get("message") or "Task meldet einen Fehler."))
             message = f"Task {task.get('name')} erfolgreich ausgefuehrt."
             run = self.store.record_run(task, "completed", message, started_at, utc_now(), {"result": result})
             updated_task = self.store.mark_task_run(task, "completed")

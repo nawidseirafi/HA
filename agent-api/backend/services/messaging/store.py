@@ -52,30 +52,34 @@ class MessagingStore:
             row = connection.execute("select * from messages where id = ?", (cursor.lastrowid,)).fetchone()
         return self._decode_message(dict(row))
 
-    def get_messages(self, limit: int = 100, unread_only: bool = False) -> list[dict[str, Any]]:
+    def get_messages(self, limit: int = 100, unread_only: bool = False, offset: int = 0) -> list[dict[str, Any]]:
         limit = min(max(int(limit or 100), 1), 500)
         query = "select * from messages"
         params: list[Any] = []
         if unread_only:
             query += " where read = 0"
-        query += " order by created_at desc, id desc limit ?"
-        params.append(limit)
+        query += " order by created_at desc, id desc limit ? offset ?"
+        params.extend([limit, max(0, int(offset))])
         with self.connect() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [self._decode_message(dict(row)) for row in rows]
 
-    def get_messages_by_source(self, source: str, limit: int = 100) -> list[dict[str, Any]]:
+    def get_messages_by_source(self, source: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         limit = min(max(int(limit or 100), 1), 500)
         with self.connect() as connection:
             rows = connection.execute(
-                "select * from messages where source = ? order by created_at desc, id desc limit ?",
-                (source, limit),
+                "select * from messages where source = ? order by created_at desc, id desc limit ? offset ?",
+                (source, limit, max(0, int(offset))),
             ).fetchall()
         return [self._decode_message(dict(row)) for row in rows]
 
     def get_unread_count(self) -> int:
         with self.connect() as connection:
             return int(connection.execute("select count(*) from messages where read = 0").fetchone()[0])
+
+    def update_payload(self, message_id: int, payload: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute("update messages set payload_json = ? where id = ?", (json.dumps(payload), message_id))
 
     def mark_read(self, message_id: int) -> dict[str, Any] | None:
         with self.connect() as connection:

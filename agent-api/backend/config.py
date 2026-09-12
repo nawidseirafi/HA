@@ -1,4 +1,5 @@
 from copy import deepcopy
+import os
 from pathlib import Path
 from typing import Any
 
@@ -50,4 +51,7 @@ def resolve_api_path(value: Any, default: Path | str) -> Path:
     path = Path(raw).expanduser()
     if path.is_absolute():
         return path
+    data_dir = os.getenv("ROBOTERSTEVE_DATA_DIR")
+    if data_dir and path.parts and path.parts[0] == "data":
+        return (Path(data_dir).expanduser() / Path(*path.parts[1:])).resolve()
     return (API_DIR / path).resolve()

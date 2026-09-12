@@ -61,6 +61,10 @@ class ContextService:
         return cls.default().evaluate_current()
 
     def evaluate_current(self, persist: bool = True) -> ContextSnapshot:
+        from backend.services.home_hub.service import HomeHub
+        hub = HomeHub._instance
+        if hub is not None and hub.healthy() and hub.context_snapshot is not None:
+            return hub.context_snapshot
         now = self._now()
         try:
             states = self.ha_service.get_states()

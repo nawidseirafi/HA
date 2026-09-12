@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 
 from backend.services.household_service import HouseholdService
 
@@ -57,6 +58,9 @@ class FakeMessaging:
     def get_messages_by_source(self, source, limit=100):
         return [message for message in reversed(self.messages) if message["source"] == source][:limit]
 
+    def update_payload(self, message_id, payload):
+        self.messages[message_id - 1]["payload"] = payload
+
 
 def ha_state(entity_id, value, name="", **attrs):
     return {
@@ -77,6 +81,7 @@ class HouseholdSafetyTests(unittest.TestCase):
             calendar_service=empty,
             messaging_service=messaging,
             vacation_status_provider=lambda: {"vacation_mode": False, "reminders": []},
+            delivery_service=Mock(enqueue=Mock(return_value="test-delivery")),
         )
 
     def test_safety_status_detects_active_smoke_alarm(self):

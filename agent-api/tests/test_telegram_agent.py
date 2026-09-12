@@ -51,7 +51,7 @@ class TestTelegramService(TelegramService):
         )
         return self.status()
 
-    def answer(self, question):
+    def answer(self, question, principal="telegram:test"):
         return f"Antwort auf: {question}"
 
 
@@ -296,7 +296,7 @@ class TelegramAgentTests(unittest.TestCase):
             llm = factory.return_value
             llm.generate.return_value = SimpleNamespace(text="KI Antwort mit Wohnzimmer Temperatur.")
 
-            answer = service.answer("Wie ist die Temperatur?")
+            answer = service.legacy_status_answer("Wie ist die Temperatur?")
 
         self.assertEqual(answer, "KI Antwort mit Wohnzimmer Temperatur.")
         llm.generate.assert_called_once()
@@ -319,7 +319,7 @@ class TelegramAgentTests(unittest.TestCase):
         with patch("backend.agents.telegram.service.create_llm_client") as factory:
             factory.return_value.generate.side_effect = RuntimeError("llm down")
 
-            answer = service.answer("Wie ist die Temperatur?")
+            answer = service.legacy_status_answer("Wie ist die Temperatur?")
 
         self.assertIn("Temperaturen", answer)
         self.assertIn("Wohnzimmer Temperatur: 22.4 °C", answer)
@@ -372,7 +372,7 @@ class TelegramAgentTests(unittest.TestCase):
         service._context_snapshot = lambda: context
 
         with patch("backend.agents.telegram.service.create_llm_client") as factory:
-            answer = service.answer("Sind alle Geräte erreichbar?")
+            answer = service.legacy_status_answer("Sind alle Geräte erreichbar?")
 
         self.assertEqual(answer, "2 Zigbee-Geräte sind nicht erreichbar: Bathroom Window Contact, Garden Bodenfeuchte Rasen.")
         factory.assert_not_called()

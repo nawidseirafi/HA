@@ -51,6 +51,8 @@ class TelegramApiClient:
         response = requests.get(self._url("getUpdates"), params=params, timeout=self.config.timeout_seconds + 5)
         response.raise_for_status()
         data = response.json()
+        if not isinstance(data, dict) or not data.get("ok"):
+            raise RuntimeError("Telegram API hat die Anfrage abgelehnt.")
         result = data.get("result") if isinstance(data, dict) else None
         return result if isinstance(result, list) else []
 
@@ -62,6 +64,8 @@ class TelegramApiClient:
         )
         response.raise_for_status()
         data = response.json()
+        if not isinstance(data, dict) or not data.get("ok"):
+            raise RuntimeError("Telegram API hat die Nachricht nicht angenommen.")
         result = data.get("result") if isinstance(data, dict) else None
         return result if isinstance(result, dict) else None
 
@@ -367,7 +371,7 @@ class TelegramService:
             self._record(store, update_id, message_id, chat_id, question, "rate_limited", "rate_limit", started, received_at)
             return {"status": "rate_limited"}
         try:
-            answer = self.answer(question)
+            answer = self.answer(question, principal=f"telegram:{chat_id}:{from_user.get('id') or chat_id}")
             result = self._send(config, chat_id, answer)
             response_id = _message_id(result)
             self._last_sent_at = utc_now()
@@ -379,7 +383,11 @@ class TelegramService:
             self.messaging.create_message("telegram", "telegram", "warning", "Telegram-Antwort fehlgeschlagen", str(exc), {"chat_id": chat_id})
             raise
 
-    def answer(self, question: str) -> str:
+    def answer(self, question: str, principal: str = "telegram:local") -> str:
+        from backend.services.home_hub.assistant import HouseAssistant
+        return HouseAssistant().answer(question, principal)
+
+    def legacy_status_answer(self, question: str) -> str:
         if _question_mentions_washing_machine(question):
             try:
                 states = HomeAssistantService().get_states()
@@ -751,6 +759,7 @@ def _home_assistant_snapshot(
     unavailable_devices = _unavailable_device_items(states, device_lookup)
     return {
         "entity_count": len(states),
+        "inventory_complete": device_lookup is None or bool(device_lookup),
         "washing_machine": washing_machine_status(states),
         "temperatures": _sensor_items(states, _is_temperature_state, limit=30),
         "humidity": _sensor_items(states, _is_humidity_state, limit=20),
@@ -1182,6 +1191,8 @@ def _openings_summary(ha: dict[str, Any]) -> str:
 
 
 def _availability_summary(ha: dict[str, Any]) -> str:
+    if ha.get("inventory_complete") is False:
+        return "Geräte-Erreichbarkeit unbekannt: Geräteverzeichnis fehlt oder konnte nicht geladen werden."
     devices = ha.get("unavailable_devices") if isinstance(ha.get("unavailable_devices"), list) else []
     if not devices:
         return "Alle Zigbee-Geräte sind erreichbar."

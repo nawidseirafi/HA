@@ -64,7 +64,9 @@ class AgentControlAdapter:
         raw = self._execute_supported(action, payload)
         data = raw if isinstance(raw, dict) else {"result": raw} if raw is not None else {}
         status = self._status_from_data(data)
-        ok = status not in {"error", "failed", "unsupported"}
+        ok = data.get("ok") is not False and status not in {"error", "failed", "unsupported"}
+        if not ok and status not in {"error", "failed", "unsupported"}:
+            status = "error"
         return self._result(action, ok, status, self._message(action, ok, data), data)
 
     def _execute_supported(self, action: AgentControlCapability, payload: dict[str, Any]) -> Any:

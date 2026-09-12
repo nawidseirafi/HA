@@ -1,4 +1,5 @@
 export type Route =
+  | { name: 'homeHub' }
   | { name: 'wall' }
   | { name: 'contextDashboard' }
   | { name: 'agents' }

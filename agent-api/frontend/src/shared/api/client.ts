@@ -1309,7 +1309,7 @@ function apiUrl(path: string) {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   let response: Response;
   try {

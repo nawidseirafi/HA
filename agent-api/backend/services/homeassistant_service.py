@@ -90,6 +90,13 @@ class HomeAssistantService:
         return bool(self.base_url and self.token)
 
     def get_states(self) -> list[dict[str, Any]]:
+        from backend.services.home_hub.service import HomeHub
+        hub = HomeHub._instance
+        if hub is not None and hub.healthy() and hub.ha.base_url == self.base_url and hub.ha.token == self.token:
+            return hub.states()
+        return self.fetch_states()
+
+    def fetch_states(self) -> list[dict[str, Any]]:
         if not self.configured():
             raise RuntimeError("Home Assistant URL oder Token ist nicht konfiguriert.")
         try:
@@ -145,8 +152,22 @@ class HomeAssistantService:
             return None
         return state
 
-    def get_energy_overview(self) -> dict[str, Any]:
-        states = self.get_states()
+    def get_entity_history(self, entity_id: str, start: str, end: str) -> list[dict[str, Any]]:
+        start_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        end_time = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        if not start_time.tzinfo or not end_time.tzinfo or not 0 < (end_time - start_time).total_seconds() <= 7 * 86400:
+            raise ValueError("Historie braucht Zeitzonen und ein Zeitfenster von maximal sieben Tagen.")
+        if not self.configured() or not re.fullmatch(r"[a-z0-9_]+\.[a-z0-9_]+", entity_id):
+            raise ValueError("Home Assistant oder Entity-ID ungueltig.")
+        with httpx.Client(timeout=15) as client:
+            response = client.get(self._api_url(f"/api/history/period/{start_time.isoformat()}"), headers=self._headers(),
+                                  params={"filter_entity_id": entity_id, "end_time": end_time.isoformat()})
+            response.raise_for_status()
+            data = response.json()
+        return [state for group in data if isinstance(group, list) for state in group if isinstance(state, dict)] if isinstance(data, list) else []
+
+    def get_energy_overview(self, states: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        states = self.get_states() if states is None else states
         ecotracker_api = _find_attr_state(states, ("power", "powerAvg", "energyCounterIn"))
 
         power = _first_number(

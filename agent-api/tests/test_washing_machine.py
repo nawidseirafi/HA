@@ -34,16 +34,17 @@ class WashingMachineTests(unittest.TestCase):
 
     def test_telegram_reads_current_state_without_llm(self):
         service = TelegramService(messaging=object())
-        with patch("backend.agents.telegram.service.HomeAssistantService") as ha, patch("backend.agents.telegram.service.create_llm_client") as llm:
+        with patch("backend.services.home_hub.service.HomeHub.default") as hub, patch("backend.services.llm.factory.create_llm_client") as llm:
+            hub.return_value.healthy.return_value = True
             for question, value, text in [
                 ("Läuft die Waschmaschine?", "Läuft", "läuft gerade"),
                 ("Ist die Waschmaschine fertig?", "Beendet", "ist fertig"),
                 ("Läuft die Waschmaschine oder nicht?", "Standby", "läuft nicht"),
                 ("Ist die Wäsche fertig?", "unavailable", "nicht verfügbar"),
             ]:
-                ha.return_value.get_states.return_value = self.states(value)
+                hub.return_value.states.return_value = self.states(value)
                 self.assertIn(text, service.answer(question))
-            ha.return_value.get_states.side_effect = RuntimeError("offline")
+            hub.return_value.healthy.return_value = False
             self.assertIn("nicht verfügbar", service.answer("Läuft die Waschmaschine?"))
             llm.assert_not_called()
 

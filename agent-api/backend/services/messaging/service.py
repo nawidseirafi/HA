@@ -32,6 +32,9 @@ class MessagingService:
     def mark_read(self, message_id: int) -> dict[str, Any] | None:
         return self.store.mark_read(message_id)
 
+    def update_payload(self, message_id: int, payload: dict[str, Any]) -> None:
+        self.store.update_payload(message_id, payload)
+
     def mark_all_read(self) -> int:
         return self.store.mark_all_read()
 
@@ -41,11 +44,11 @@ class MessagingService:
     def delete_all_messages(self) -> int:
         return self.store.delete_all_messages()
 
-    def get_messages(self, limit: int = 100, unread_only: bool = False) -> list[dict[str, Any]]:
-        return self.store.get_messages(limit=limit, unread_only=unread_only)
+    def get_messages(self, limit: int = 100, unread_only: bool = False, offset: int = 0) -> list[dict[str, Any]]:
+        return self.store.get_messages(limit=limit, unread_only=unread_only, offset=offset)
 
     def get_unread_count(self) -> int:
         return self.store.get_unread_count()
 
-    def get_messages_by_source(self, source: str, limit: int = 100) -> list[dict[str, Any]]:
-        return self.store.get_messages_by_source(source=source, limit=limit)
+    def get_messages_by_source(self, source: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+        return self.store.get_messages_by_source(source=source, limit=limit, offset=offset)

@@ -141,6 +141,9 @@ export function Sidebar({ route, navigate, onLogout, isOpen = false, onClose }: 
             <button className={route.name === 'contextDashboard' ? 'active' : ''} onClick={() => navigate({ name: 'contextDashboard' })}>
               <BrainCircuit size={18} /> Context
             </button>
+            <button className={route.name === 'homeHub' ? 'active' : ''} onClick={() => navigate({ name: 'homeHub' })}>
+              <Bot size={18} /> Hauszentrale
+            </button>
             <button className={route.name === 'agentMessages' ? 'active' : ''} onClick={() => navigate({ name: 'agentMessages' })}>
               <Bell size={18} /> Nachrichten
             </button>

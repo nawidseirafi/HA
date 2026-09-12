@@ -25,6 +25,7 @@ import { VacationDashboard } from './pages/VacationDashboard';
 import { SchedulerDashboardPage } from './pages/scheduler/SchedulerDashboardPage';
 import { GardenDashboardPage } from './pages/garden/GardenDashboardPage';
 import { TelegramDashboardPage } from './pages/TelegramDashboardPage';
+import { HomeHubPage } from './pages/HomeHubPage';
 import { WallDashboardPage } from './pages/WallDashboardPage';
 import { ContextDashboardPage } from './pages/context/ContextDashboardPage';
 import { Layout } from './components/Layout';
@@ -34,6 +35,7 @@ export type { Route } from './routes/routes';
 
 function parseRoute(): Route {
   const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'home-hub') return { name: 'homeHub' };
   if (parts[0] === 'wall') return { name: 'wall' };
   if (parts[0] === 'context' || parts[0] === 'steve-context') return { name: 'contextDashboard' };
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2] && parts[3] === 'months' && parts[4]) {
@@ -109,6 +111,7 @@ function AppContent() {
   };
 
   const page = useMemo(() => {
+    if (route.name === 'homeHub') return <HomeHubPage />;
     if (route.name === 'wall') return <WallDashboardPage />;
     if (route.name === 'contextDashboard') return <ContextDashboardPage />;
     if (route.name === 'agents') return <AgentsPage navigate={navigate} variant="overview" />;
@@ -155,6 +158,7 @@ function AppContent() {
 }
 
 function routeToPath(route: Route) {
+  if (route.name === 'homeHub') return '/home-hub';
   if (route.name === 'wall') return '/wall';
   if (route.name === 'contextDashboard') return '/context';
   if (route.name === 'agents') return '/agents';
