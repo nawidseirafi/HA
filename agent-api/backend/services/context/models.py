@@ -69,6 +69,8 @@ class ContextSnapshot:
     summary: str = ""
     reason: str = ""
     washing_machine: dict[str, Any] = field(default_factory=dict)
+    house_summary: str = ""
+    vacuums: list[dict[str, Any]] = field(default_factory=list)
     signals: dict[str, Any] = field(default_factory=dict)
     active_rules: list[str] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
@@ -88,6 +90,8 @@ class ContextSnapshot:
             "summary": self.summary,
             "reason": self.reason,
             "washing_machine": self.washing_machine,
+            "house_summary": self.house_summary,
+            "vacuums": self.vacuums,
         }
         if include_debug:
             payload["signals"] = self.signals

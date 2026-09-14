@@ -312,6 +312,23 @@ class HomeAssistantService:
             raise self._runtime_error("Home Assistant Service-Aufruf fehlgeschlagen", exc) from exc
         return {"ok": True, "result": data}
 
+    def get_image(self, entity_id: str) -> tuple[bytes, str]:
+        if not re.fullmatch(r"image\.[a-z0-9_]+", entity_id):
+            raise ValueError("Ungueltige Bild-Entity.")
+        with httpx.Client(timeout=12, follow_redirects=False) as client:
+            with client.stream("GET", self._api_url(f"/api/image_proxy/{entity_id}"), headers=self._headers()) as response:
+                response.raise_for_status()
+                mime = response.headers.get("content-type", "").split(";")[0]
+                if mime not in {"image/png", "image/jpeg", "image/webp"}:
+                    raise ValueError("Kein unterstuetztes Kartenbild.")
+                chunks, size = [], 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > 8 * 1024 * 1024:
+                        raise ValueError("Kartenbild ist zu gross.")
+                    chunks.append(chunk)
+        return b"".join(chunks), mime
+
     def websocket_command(self, command: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
         """Sendet einen Command an die HA Core WebSocket API (Port 8123, mit Auth)."""
         if not self.configured():

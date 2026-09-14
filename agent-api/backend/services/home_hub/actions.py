@@ -15,6 +15,7 @@ SERVICES = {
     "input_boolean": {"turn_on": "on", "turn_off": "off"},
     "cover": {"open_cover": "open", "close_cover": "closed"},
     "climate": {"set_temperature": None},
+    "vacuum": {"start": ("cleaning",), "pause": ("paused",), "stop": ("idle", "paused", "docked"), "return_to_base": ("returning", "docked")},
 }
 
 
@@ -46,6 +47,10 @@ class ActionService:
         if not state or state.get("state") in {"unavailable", "unknown"}:
             raise ValueError("Ziel fehlt oder ist nicht verfuegbar.")
         parameters = {}
+        if domain == "vacuum":
+            from backend.services.vacuum_service import FEATURES
+            if not int(state.get("attributes", {}).get("supported_features") or 0) & FEATURES[service]:
+                raise ValueError("Der Saugroboter unterstuetzt diese Aktion nicht.")
         if service == "set_temperature":
             temperature = float(payload.get("temperature"))
             attrs = state.get("attributes", {})
@@ -98,6 +103,10 @@ class ActionService:
                         raise ValueError("Ziel wurde seit dem Vorschlag veraendert. Bitte einen neuen Vorschlag anfordern.")
                     domain = entity_id.partition(".")[0]
                     service = payload["service"]
+                    if domain == "vacuum":
+                        from backend.services.vacuum_service import FEATURES
+                        if not int(before.get("attributes", {}).get("supported_features") or 0) & FEATURES[service]:
+                            raise ValueError("Roboterfunktion ist nicht mehr verfuegbar.")
                     data = {"entity_id": entity_id}
                     if "temperature" in payload:
                         data["temperature"] = payload["temperature"]
@@ -119,6 +128,8 @@ class ActionService:
                         if observed:
                             if service == "set_temperature":
                                 verified = observed.get("attributes", {}).get("temperature") == payload["temperature"]
+                            elif domain == "vacuum":
+                                verified = observed.get("state") in SERVICES[domain][service]
                             else:
                                 verified = observed.get("state") == SERVICES[domain][service]
                         if verified:
@@ -127,6 +138,8 @@ class ActionService:
                     status = "verified" if verified else "unverified"
                     self.hub.end_action(entity_id, observed)
                     result = {"before": before, "observed": observed, "service_accepted": response.get("ok", False)}
+                    if domain == "vacuum":
+                        result["observed_state"] = (observed or {}).get("state")
                 self.hub.store.finish(action_id, status, result)
             except Exception as exc:
                 self.hub.store.finish(action_id, "failed", {"error": str(exc) if isinstance(exc, ValueError) else type(exc).__name__})

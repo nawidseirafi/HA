@@ -709,6 +709,8 @@ export type ContextSignal = {
 };
 
 export type ContextStatus = {
+  house_summary?: string;
+  vacuums?: Array<{entity_id: string; name: string; state: string; notice?: VacuumNotice | null}>;
   washing_machine?: { state: 'running' | 'finished' | 'standby' | 'unknown'; summary: string; entity_id: string; updated_at?: string | null };
   presence: string;
   departure?: string;
@@ -999,7 +1001,19 @@ export type InfrastructureFullStatus = {
   summary: Omit<InfrastructureSummary, 'ok' | 'updated_at' | 'checks'>;
 };
 
+export type VacuumNotice = {kind: string; tone: 'info' | 'warn'; title: string; detail: string; summary: string};
+export type VacuumDetail = { entity_id: string; name: string; state: string; unit?: string | null; options: string[]; last_updated?: string };
+export type WallVacuum = {
+  entity_id: string; name: string; state: string; area?: string; manufacturer?: string; model?: string;
+  last_updated?: string; metadata_available: boolean; battery_level: number | null;
+  actions: string[]; fan_speed?: string; fan_speed_list: string[];
+  metrics: Record<string, VacuumDetail>; maps: VacuumDetail[]; selects: VacuumDetail[];
+  routines: VacuumDetail[]; switches: VacuumDetail[]; maintenance: VacuumDetail[];
+  notice?: VacuumNotice | null;
+};
+
 export type WallDashboardData = {
+  vacuums?: WallVacuum[];
   updated_at: string;
   home_assistant: { configured: boolean; entity_count: number; status?: string; error?: string | null };
   weather: WallWeather | null;
@@ -1396,6 +1410,16 @@ export const api = {
       body: JSON.stringify(payload ?? {}),
     }),
   wallDashboard: () => request<WallDashboardData>('/api/homeassistant/wall'),
+  vacuumCommand: (entity: string, action: string, target?: string, option?: string) =>
+    request<{ok: boolean; status: string}>(`/api/homeassistant/vacuums/${encodeURIComponent(entity)}/command`, {method: 'POST', body: JSON.stringify({action, target, option})}),
+  vacuumMap: async (entity: string, image: string, signal?: AbortSignal) => {
+    const token = getAuthToken();
+    const response = await fetch(apiUrl(`/api/homeassistant/vacuums/${encodeURIComponent(entity)}/maps/${encodeURIComponent(image)}`),
+      {signal, credentials: 'include', headers: token ? {Authorization: `Bearer ${token}`} : {}});
+    handleUnauthorizedResponse(response);
+    if (!response.ok) throw new Error('Karte momentan nicht verfügbar.');
+    return response.blob();
+  },
   contextStatus: () => request<ContextStatus>('/api/context/status'),
   contextHistory: (limit = 100) => request<ContextHistory>(`/api/context/history?limit=${limit}`),
   contextDebug: () => request<ContextDebug>('/api/context/debug'),

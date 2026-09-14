@@ -9,14 +9,14 @@ const parsed = ts.createSourceFile('wall.tsx', source, ts.ScriptTarget.Latest, t
 const names = new Set(['outletCurrent', 'outletMeasurementSensor', 'isCurrentSensor', 'outletPower', 'outletGroupPower', 'roomPowerSensors', 'isPowerSensor', 'powerFromSensor',
     'outletPowerFromWatts', 'outletMatchTokens', 'powerSensorMatchTokens', 'normalizedEntityBase',
     'uniqueTokens', 'outletNoiseTokens', '_numericWallState', 'normalizeOutletName', 'escapeRegExp',
-    'normalizeArea', 'sameArea', 'formatNumber', 'washingMachineImportantItem', 'steveThoughtSummary']);
+    'normalizeArea', 'sameArea', 'formatNumber', 'washingMachineImportantItem', 'steveThoughtSummary', 'vacuumImportantItems']);
 const functions = parsed.statements.filter((node) => ts.isFunctionDeclaration(node) && names.has(node.name?.text));
 assert.equal(functions.length, names.size);
-const context = vm.createContext({ React: { createElement: () => null }, WashingMachine: () => null });
+const context = vm.createContext({ React: { createElement: () => null }, WashingMachine: () => null, Bot: () => null });
 vm.runInContext(ts.transpileModule(functions.map((node) => node.getText(parsed)).join('\n'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
 }).outputText, context);
-const { outletCurrent, outletPower, outletGroupPower, washingMachineImportantItem, steveThoughtSummary } = context;
+const { outletCurrent, outletPower, outletGroupPower, washingMachineImportantItem, steveThoughtSummary, vacuumImportantItems } = context;
 const room = 'Laundry Room';
 const outlet = { entity_id: 'switch.laundry_room_washing_machine_plug', name: 'Laundry Room Washing Machine plug', area: room, state: 'on' };
 const power = { entity_id: 'sensor.laundry_room_washing_machine_plug_power', name: 'Laundry Room Washing Machine plug Power', area: room, device_class: 'power', unit: 'W', state: '2353' };
@@ -106,4 +106,18 @@ test('only a finished cycle can be acknowledged and standby removes the item', (
 test('old context cannot reintroduce an acknowledged laundry message', () => {
     const summary = 'Die Waschmaschine ist fertig. Die Wäsche kann entnommen werden.';
     assert.equal(steveThoughtSummary({summary: `Alles ruhig. ${summary}`, washing_machine: {state: 'finished', summary}}, []), 'Alles ruhig.');
+});
+
+test('robot notices appear in Steve thoughts without outranking safety alerts', () => {
+    const robot = {entity_id:'vacuum.robot', notice:{tone:'warn', title:'Roborock braucht Hilfe', detail:'Lasersensor blockiert'}};
+    const items = vacuumImportantItems({vacuums:[robot]});
+    assert.equal(items[0].detail,'Lasersensor blockiert');
+    const summary = steveThoughtSummary(null,[{id:'smoke',title:'Rauch erkannt',critical:true},...items]);
+    assert.ok(summary.includes('Wichtig zuerst: Rauch erkannt.'));
+    assert.ok(summary.includes('Roborock braucht Hilfe.'));
+    assert.equal(vacuumImportantItems({vacuums:[{...robot,notice:null}]}).length,0);
+});
+
+test('expired robot completion is not repeated from the older context summary', () => {
+    assert.equal(steveThoughtSummary({house_summary:'Alles ruhig.',summary:'Alles ruhig. Roborock: Reinigung beendet.'},[]),'Alles ruhig.');
 });

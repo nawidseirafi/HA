@@ -290,6 +290,78 @@ class HomeHubTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             HouseAssistant(self.hub).query("confirm", {}, "alice")
 
+    def vacuum_state(self, value="docked"):
+        item = state("vacuum.robot", value)
+        item["attributes"] = {"friendly_name": "Roborock", "supported_features": 8192 | 4 | 8 | 16}
+        return item
+
+    def test_vacuum_question_reads_device_data_before_model(self):
+        self.store.replace("states", [self.vacuum_state(), state("sensor.robot_batterie", "80")], "entity_id")
+        self.store.replace("entities", [{"entity_id": id, "device_id": "robot"} for id in ("vacuum.robot", "sensor.robot_batterie")], "entity_id")
+        self.store.replace("devices", [{"id": "robot", "manufacturer": "Roborock"}], "id")
+        llm = Mock()
+        llm.generate.return_value = SimpleNamespace(text=json.dumps({"answer": "Roborock ist in der Station, Akku 80 %."}))
+        assistant = HouseAssistant(self.hub, llm_factory=lambda: llm)
+        assistant.answer("Wie geht es dem Saugroboter?", "alice")
+        context = json.loads(llm.generate.call_args.kwargs["prompt"])
+        self.assertEqual(context["tool_results"][0]["tool"], "vacuum_status")
+        self.assertEqual(context["tool_results"][0]["result"]["items"][0]["battery_level"], 80)
+        self.ha.call_service.assert_not_called()
+        self.hub.connected = False
+        self.assertEqual(assistant.query("vacuum_status", {}, "alice")["quality"], "stale")
+
+    def test_vacuum_command_is_proposal_until_explicit_confirmation(self):
+        self.store.replace("states", [self.vacuum_state()], "entity_id")
+        llm = Mock()
+        llm.generate.return_value = SimpleNamespace(text=json.dumps({"tool": "propose_vacuum_action", "arguments": {"entity_id": "vacuum.robot", "service": "start"}}))
+        assistant = HouseAssistant(self.hub, llm_factory=lambda: llm)
+        text = assistant.answer("Starte den Saugroboter", "alice")
+        self.assertIn("/confirm ", text)
+        self.ha.call_service.assert_not_called()
+        command = text.splitlines()[-1]
+        self.ha.get_state.side_effect = [self.vacuum_state(), self.vacuum_state("cleaning")]
+        self.ha.call_service.return_value = {"ok": True}
+        answer = assistant.answer(command, "alice")
+        self.assertIn("Roboterstatus: reinigt", answer)
+        self.ha.call_service.assert_called_once_with("vacuum", "start", {"entity_id": "vacuum.robot"})
+        assistant.answer(command, "alice")
+        self.ha.call_service.assert_called_once()
+
+    def test_vacuum_returning_does_not_claim_arrival(self):
+        self.store.replace("states", [self.vacuum_state("cleaning")], "entity_id")
+        assistant = HouseAssistant(self.hub)
+        proposal = assistant.query("propose_vacuum_action", {"entity_id": "vacuum.robot", "service": "return_to_base"}, "alice")
+        self.ha.get_state.side_effect = [self.vacuum_state("cleaning"), self.vacuum_state("returning")]
+        self.ha.call_service.return_value = {"ok": True}
+        self.assertIn("noch nicht angekommen", assistant.answer("/confirm " + proposal["id"], "alice"))
+
+    def test_vacuum_actions_check_owner_staleness_and_features(self):
+        self.store.replace("states", [self.vacuum_state()], "entity_id")
+        actions = ActionService(self.hub)
+        proposal = actions.propose("alice", {"entity_id": "vacuum.robot", "service": "start"})
+        with self.assertRaises(ValueError):
+            actions.confirm("bob", proposal["id"])
+        self.hub.connected = False
+        self.assertEqual(actions.confirm("alice", proposal["id"])["status"], "failed")
+        self.ha.call_service.assert_not_called()
+        unsupported = self.vacuum_state()
+        unsupported["attributes"]["supported_features"] = 0
+        self.store.replace("states", [unsupported], "entity_id")
+        with self.assertRaises(ValueError):
+            actions.propose("alice", {"entity_id": "vacuum.robot", "service": "start"})
+        with self.assertRaises(ValueError):
+            actions.propose("alice", {"entity_id": "vacuum.robot", "service": "send_command"})
+
+    def test_house_context_contains_robot_notice_and_separate_house_summary(self):
+        from backend.services.context.service import ContextService
+        service = ContextService(database_path=Path(self.tmp.name) / "context.db")
+        snapshot = service.evaluate([self.vacuum_state("cleaning")]).as_dict()
+        self.assertIn("Roborock reinigt gerade", snapshot["summary"])
+        self.assertNotIn("Roborock", snapshot["house_summary"])
+        self.assertEqual(snapshot["vacuums"][0]["notice"]["kind"], "cleaning")
+        stale = service.evaluate([self.vacuum_state("cleaning")], ha_error="offline").as_dict()
+        self.assertNotIn("Roborock reinigt gerade", stale["summary"])
+
     def test_calendar_reads_wall_source_with_explicit_dates(self):
         from backend.services.calendar_service import CalendarService
         ha = Mock()

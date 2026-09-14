@@ -1,0 +1,67 @@
+.wall-home-main-column {display:flex;flex-direction:column;gap:24px;min-width:0}
+.wall-vacuum {--vacuum-accent:#8dc8f6;color:#f4f6f8;background:#191c20;border:1px solid #363b42;border-radius:24px;padding:24px;min-width:0;letter-spacing:0;overflow:hidden}
+.wall-vacuum * {box-sizing:border-box;letter-spacing:0}
+.wall-vacuum-header {display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.wall-vacuum-emblem {width:46px;height:46px;display:grid;place-items:center;border-radius:14px;background:#2c3742;color:var(--vacuum-accent);flex-shrink:0}
+.wall-vacuum-title {flex:1;min-width:100px}
+.wall-vacuum-title small,.wall-vacuum-map-date,.wall-vacuum-session small,.wall-vacuum-device-name {color:#a7afb9;font-size:12px;line-height:1.5}
+.wall-vacuum-title h3 {font-size:22px;line-height:1.25;margin:2px 0 0;overflow-wrap:anywhere}
+.wall-vacuum-state {display:flex;align-items:center;gap:7px;font-size:12px;color:#b1e4ca;max-width:100%;overflow-wrap:anywhere}
+.wall-vacuum-state i {width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.wall-vacuum-state.is-offline {color:#f1bd81}
+.wall-vacuum-content {display:grid;grid-template-columns:minmax(0,1.25fr) minmax(200px,1fr);gap:24px}
+.wall-vacuum-map-column {min-width:0}
+.wall-vacuum-map-tabs {display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;min-height:30px}
+.wall-vacuum-map-tabs button {background:none;border:0;color:#a7afb9;padding:6px 9px;font-size:12px;border-radius:6px;cursor:pointer}
+.wall-vacuum-map-tabs button[aria-selected=true] {background:#36404b;color:#fff}
+.wall-vacuum-map {position:relative;background:#e9eef0;aspect-ratio:1.2;overflow:hidden;border-radius:8px}
+.wall-vacuum-map img {width:100%;height:100%;object-fit:contain;display:block}
+.wall-vacuum-map-image {position:absolute;inset:0;overflow:hidden}
+.wall-vacuum-map-empty {height:100%;display:flex;align-items:center;justify-content:center;gap:12px;flex-direction:column;padding:20px;text-align:center;color:#506272;font-size:13px}
+.wall-vacuum-map-refresh {position:absolute;right:10px;bottom:10px;display:grid;place-items:center;width:36px;height:36px;border:1px solid #c3cdd5;border-radius:8px;background:#fff;color:#263d4c;cursor:pointer}
+.wall-vacuum-map-date {display:block;margin-top:8px}
+.wall-vacuum-overview {display:flex;flex-direction:column;justify-content:center;min-width:0}
+.wall-vacuum-battery {display:flex;align-items:center;gap:9px;color:#a3e0b7}
+.wall-vacuum-battery strong {font-size:30px;color:#f4f6f8;font-weight:600}
+.wall-vacuum-battery span {color:#a7afb9;font-size:12px}
+.wall-vacuum-location {display:flex;align-items:center;gap:7px;color:#a7afb9;font-size:13px;margin-top:10px;overflow-wrap:anywhere}
+.wall-vacuum-session {margin:20px 0;border-top:1px solid #343940;padding-top:14px}
+.wall-vacuum-metrics {display:flex;flex-wrap:wrap;gap:18px;margin:10px 0}
+.wall-vacuum-metrics span {display:flex;align-items:center;gap:7px;color:#a7afb9}
+.wall-vacuum-metrics strong {font-size:17px;color:#f4f6f8;font-weight:500}
+.wall-vacuum-progress {display:flex;align-items:center;gap:10px;font-size:12px;color:#a7afb9}
+.wall-vacuum-progress progress {width:100%;height:5px;accent-color:var(--vacuum-accent)}
+.wall-vacuum-controls {display:flex;gap:8px;flex-wrap:wrap}
+.wall-vacuum-controls button,.wall-vacuum-routine button {display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border:1px solid #45505c;border-radius:12px;background:#282e36;color:#ecf2f7;cursor:pointer}
+.wall-vacuum-controls button.primary {background:var(--vacuum-accent);border-color:var(--vacuum-accent);color:#162637}
+.wall-vacuum button:disabled {opacity:.35;cursor:not-allowed}
+.wall-vacuum button:focus-visible,.wall-vacuum select:focus-visible,.wall-vacuum summary:focus-visible {outline:2px solid var(--vacuum-accent);outline-offset:3px}
+.wall-vacuum-feedback {min-height:30px;font-size:12px;color:#a7afb9;margin-top:10px;overflow-wrap:anywhere}
+.wall-vacuum-feedback [role=alert],.wall-vacuum-alert {color:#ffbf9a}
+.wall-vacuum-alert {display:flex;gap:10px;align-items:center;font-size:13px;padding:14px 0}
+.wall-vacuum-details {border-top:1px solid #343940;margin-top:18px;padding-top:14px}
+.wall-vacuum-details summary {list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#d5dce5;min-height:30px}
+.wall-vacuum-details summary::-webkit-details-marker {display:none}
+.wall-vacuum-details summary svg:last-child {margin-left:auto}
+.wall-vacuum-details[open] summary svg:last-child {transform:rotate(180deg)}
+.wall-vacuum-settings {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.wall-vacuum-settings label {display:flex;flex-direction:column;gap:7px;font-size:12px;color:#a7afb9;min-width:0;overflow-wrap:anywhere}
+.wall-vacuum-settings select {width:100%;min-width:0;height:42px;padding:0 10px;background:#282e36;color:#f4f6f8;border:1px solid #45505c;border-radius:8px;font-size:13px}
+.wall-vacuum-routine {display:flex;align-items:end;gap:8px;min-width:0}
+.wall-vacuum-routine label {flex:1}
+.wall-vacuum-settings label.wall-vacuum-toggle {flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+.wall-vacuum-toggle input {appearance:none;width:42px;height:24px;border-radius:14px;background:#626c76;position:relative;flex-shrink:0;cursor:pointer}
+.wall-vacuum-toggle input:after {content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .15s}
+.wall-vacuum-toggle input:checked {background:#56a87b}
+.wall-vacuum-toggle input:checked:after {transform:translateX(18px)}
+.wall-vacuum-toggle input:disabled {opacity:.4;cursor:not-allowed}
+.wall-vacuum-maintenance {margin:18px 0;font-size:12px}
+.wall-vacuum-maintenance div {display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid #343940}
+.wall-vacuum-maintenance dt {color:#a7afb9;overflow-wrap:anywhere}
+.wall-vacuum-maintenance dd {margin:0;white-space:nowrap}
+.wall-vacuum-device-name {display:block;margin-top:14px;overflow-wrap:anywhere}
+.vacuum-spin {animation:vacuum-spin 1s linear infinite}
+@keyframes vacuum-spin {to {transform:rotate(360deg)}}
+@media (max-width:1050px) {.wall-vacuum-content {grid-template-columns:1fr}.wall-vacuum-map {aspect-ratio:1.5}.wall-vacuum-overview {padding-top:4px}}
+@media (max-width:540px) {.wall-vacuum {padding:18px;border-radius:20px}.wall-vacuum-title h3 {font-size:20px}.wall-vacuum-settings {grid-template-columns:1fr}.wall-vacuum-state {flex-basis:100%;padding-left:58px}.wall-vacuum-controls button {width:42px;height:42px}.wall-vacuum-header {gap:10px}}
+@media (prefers-reduced-motion:reduce) {.vacuum-spin {animation:none}.wall-vacuum-toggle input:after {transition:none}}

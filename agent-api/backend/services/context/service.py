@@ -72,7 +72,13 @@ class ContextService:
         except Exception as exc:
             states = []
             ha_error = str(exc)
-        snapshot = self.evaluate(states, now=now, ha_error=ha_error)
+        device_metadata = {}
+        if any(item.get("entity_id", "").startswith("vacuum.") for item in states):
+            try:
+                device_metadata = self.ha_service.get_device_metadata_by_entity()
+            except Exception:
+                pass
+        snapshot = self.evaluate(states, now=now, ha_error=ha_error, device_metadata=device_metadata)
         self._last_snapshot = snapshot
         if persist:
             self.store.save_snapshot(snapshot.as_dict(include_debug=True))
@@ -92,7 +98,7 @@ class ContextService:
             "config": self._public_config(),
         }
 
-    def evaluate(self, states: list[dict[str, Any]], now: datetime | None = None, ha_error: str | None = None) -> ContextSnapshot:
+    def evaluate(self, states: list[dict[str, Any]], now: datetime | None = None, ha_error: str | None = None, device_metadata: dict | None = None) -> ContextSnapshot:
         now = now or self._now()
         by_entity = {str(item.get("entity_id") or ""): item for item in states if isinstance(item, dict)}
         signals = self._collect_signals(states, by_entity)
@@ -125,6 +131,14 @@ class ContextService:
             metrics=metrics,
         )
 
+        from backend.services.vacuum_service import vacuum_items
+        house_summary = summary
+        vacuums = [{key: item[key] for key in ("entity_id", "name", "state", "battery_level", "notice", "metadata_available")}
+                   for item in vacuum_items(states if not ha_error else [], device_metadata or {}, now)]
+        for vacuum in vacuums:
+            if vacuum["notice"]:
+                summary += " " + vacuum["notice"]["summary"]
+                active_rules.append("vacuum_" + vacuum["notice"]["kind"])
         washing_machine = washing_machine_status(states if not ha_error else [])
         if washing_machine["state"] in {"running", "finished"}:
             summary = f"{summary} {washing_machine['summary']}"
@@ -143,6 +157,8 @@ class ContextService:
             summary=summary,
             reason=reason,
             washing_machine=washing_machine,
+            house_summary=house_summary,
+            vacuums=vacuums,
             signals={key: self._signal_payload(value) for key, value in signals.items()},
             active_rules=active_rules,
             metrics=metrics,

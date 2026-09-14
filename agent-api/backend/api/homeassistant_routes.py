@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from backend.services.homeassistant_service import HomeAssistantService
+from backend.services.vacuum_service import VacuumService, vacuum_items
 from backend.services.waste_service import MAILBOX_ENTITY_ID, VACATION_ENTITY_ID, WASTE_ENTITY_ID, WasteService
 
 
@@ -38,6 +39,33 @@ class ServicePayload(BaseModel):
     service: str
     entity_id: str | list[str] | None = None
     data: dict[str, Any] = {}
+
+
+class VacuumCommandPayload(BaseModel):
+    action: str
+    target: str | None = None
+    option: str | None = None
+
+
+@router.post("/vacuums/{entity_id}/command")
+def vacuum_command(entity_id: str, payload: VacuumCommandPayload):
+    try:
+        return VacuumService(ha_service).command(entity_id, payload.action, payload.target, payload.option)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, "Roboterauftrag konnte nicht bestaetigt werden. Zustand vor erneutem Versuch pruefen.") from exc
+
+
+@router.get("/vacuums/{entity_id}/maps/{image_id}")
+def vacuum_map(entity_id: str, image_id: str):
+    try:
+        content, mime = VacuumService(ha_service).map_image(entity_id, image_id)
+        return Response(content, media_type=mime, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, "Karte momentan nicht verfuegbar.") from exc
 
 
 @router.get("/wall")
@@ -120,6 +148,7 @@ def wall_dashboard():
         "fans": sorted(fans, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "humidifiers": sorted(humidifiers, key=lambda item: (item.get("area") or "", item.get("name") or "")),
         "lawn_mowers": sorted(lawn_mowers, key=lambda item: (item.get("area") or "", item.get("name") or "")),
+        "vacuums": [_with_area_lookup(item, area_lookup) for item in vacuum_items(states, device_lookup or {})],
         "media_players": media_players,
         "climate": climate,
         "temperature_sensors": sorted(temperature_sensors, key=lambda item: (item.get("area") or "", item.get("name") or "")),

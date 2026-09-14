@@ -67,6 +67,7 @@ import {
 } from '@shared/api/client';
 import {WallBatteryStatus} from '../components/common/WallBatteryStatus';
 import {WallMowerCard} from '../components/wall/WallMowerCard';
+import {WallVacuumCard} from '../components/wall/WallVacuumCard';
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
 
@@ -1181,7 +1182,10 @@ function HomeSection({
                 onGarageCommand={onGarageCommand}
             />
             <div className="wall-home-dashboard-grid">
-                <ImportantNowList items={importantState.items} status={contextStatus}/>
+                <div className="wall-home-main-column">
+                    <ImportantNowList items={importantState.items} status={contextStatus}/>
+
+                </div>
                 <div className="wall-home-side-column">
                     <WeatherCard
                         data={data}
@@ -1254,13 +1258,14 @@ function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowIt
         const primary = critical[0] ?? items[0];
         const remaining = items.length - 1;
         const washingMachine = items.find((item) => item.id === 'washing-machine');
-        const applianceSummary = washingMachine && washingMachine !== primary ? ` ${washingMachine.title}.` : '';
+        const vacuum = items.find(item => item.id.startsWith('vacuum:'));
+        const applianceSummary = [washingMachine, vacuum].filter(item => item && item !== primary).map(item => ` ${item!.title}.`).join('');
         if (remaining > 0) {
             return `Ich sehe ${items.length} offene Punkte. Wichtig zuerst: ${primary.title}.${applianceSummary}`;
         }
         return `Ich sehe einen offenen Punkt: ${primary.title}.`;
     }
-    const summary = status?.summary || status?.reason || status?.message || '';
+    const summary = status?.house_summary || status?.summary || status?.reason || status?.message || '';
     const laundry = status?.washing_machine;
     // The wall's fresh sensor may already be Standby while the context cache still says finished.
     const currentSummary = laundry?.summary && (laundry.state === 'finished' || laundry.state === 'running')
@@ -1282,6 +1287,16 @@ function washingMachineImportantItem(data: WallDashboardData, status: ContextSta
         detail: state === 'running' ? 'Waschgang aktiv' : 'Die Wäsche kann entnommen werden.',
         onClick: state === 'finished' ? onAcknowledge : undefined,
     };
+}
+
+function vacuumImportantItems(data: WallDashboardData): ImportantNowItemData[] {
+    return (data.vacuums ?? []).flatMap(vacuum => vacuum.notice ? [{
+        id: `vacuum:${vacuum.entity_id}`,
+        tone: vacuum.notice.tone,
+        icon: <Bot size={30}/>,
+        title: vacuum.notice.title,
+        detail: vacuum.notice.detail,
+    }] : []);
 }
 
 function confidencePercent(value?: number | null) {
@@ -1603,6 +1618,7 @@ function buildImportantNowState(
 
     const washingMachine = washingMachineImportantItem(data, contextStatus, onWashingMachine);
     if (washingMachine) items.push(washingMachine);
+    items.push(...vacuumImportantItems(data));
     const openCount = items.length;
     const hasCritical = items.some((item) => item.critical);
     const peopleCount = peopleAtHomeCount(contextStatus);
@@ -2429,6 +2445,9 @@ function RoomSection({
 
                 {mowers.map((mower) => (
                     <WallMowerCard key={mower.entity_id} mower={mower} onUpdated={onMowerUpdated}/>
+                ))}
+                {(data.vacuums ?? []).filter(vacuum => sameArea(vacuum.area, room)).map(vacuum => (
+                    <WallVacuumCard key={vacuum.entity_id} vacuum={vacuum} onUpdated={onMowerUpdated}/>
                 ))}
                 {gardenZone && (
                     <WallIrrigationCard
@@ -3734,6 +3753,7 @@ function allWallEntities(data: WallDashboardData): WallEntity[] {
         ...(data.humidifiers ?? []),
         ...(data.lawn_mowers ?? []),
         ...(data.media_players ?? []),
+        ...(data.vacuums ?? []),
         ...(data.temperature_sensors ?? []),
     ] as WallEntity[];
 }

@@ -19,12 +19,14 @@ TOOLS = {
     "agent_data": {"agent_id": "invoices|garden|market|mywellness|vacation", "view": "summary|finance_summary|contracts|years|zones|reports|watchlist|bookings|courses|prepared|history", "start_date": "optional YYYY-MM-DD for mywellness", "end_date": "inclusive YYYY-MM-DD, default next 7 days", "offset": 0},
     "calendar_events": {"start_date": "YYYY-MM-DD, default today", "end_date": "inclusive YYYY-MM-DD, default next 7 days", "offset": 0},
     "media_status": {"offset": 0},
+    "vacuum_status": {"entity_id": "optional exact vacuum id; omit for all robots", "offset": 0},
     "messages": {"source": "optional agent id", "offset": 0},
     "scheduler": {},
     "history": {"entity_id": "exact entity id", "before": "optional local event id", "start": "optional ISO timestamp with timezone for HA recorder", "end": "required with start, max 7 days", "offset": 0},
     "action_status": {"id": "action id"},
     "propose_action": {"kind": "ha", "entity_id": "exact id", "service": "turn_on|turn_off|open_cover|close_cover|set_temperature", "temperature": "only for set_temperature"},
     "propose_agent_action": {"agent_id": "exact id", "action": "enable|disable|start|stop|run"},
+    "propose_vacuum_action": {"entity_id": "exact vacuum id", "service": "start|pause|stop|return_to_base"},
     "propose_automation": {"trigger": {"entity_id": "exact id", "to": "state"}, "action": {"kind": "ha", "entity_id": "exact id", "service": "service"}},
     "automations": {},
 }
@@ -71,6 +73,9 @@ class HouseAssistant:
                         "unverified": "Aufruf gesendet, Zielzustand noch nicht bestaetigt",
                         "unknown": "Ausgang unbekannt; bitte Zustand pruefen", "failed": "Aktion fehlgeschlagen"}.get(result["status"], result["status"])
                 text = f"{text}. Aktion {result['id']}. " + str(result.get("result", {}).get("error", ""))
+                observed = result.get("result", {}).get("observed_state")
+                if observed:
+                    text += " Roboterstatus: " + {"cleaning": "reinigt", "paused": "pausiert", "returning": "auf dem Rueckweg, noch nicht angekommen", "docked": "in der Station", "idle": "bereit"}.get(observed, observed) + "."
             except ValueError as exc:
                 text = str(exc)
             self.hub.store.remember(principal, "assistant", text)
@@ -98,6 +103,10 @@ class HouseAssistant:
             "Fehlende Buchungen schliessen Vormerkungen nicht aus. Bei error, stale oder ok=false ist die Quelle unbestaetigt, niemals leer. "
             "Bei Medienfragen media_status nutzen: idle/paused ist nicht off; unknown/unavailable/missing ist unbekannt. "
             "Keine HA-Media-Entity bedeutet nicht, dass physisch kein Fernseher vorhanden ist. "
+            "Bei Saugroboterfragen vacuum_status lesen; Sensoren, Karten, Programme und Fehler kommen aus derselben Device-Zuordnung wie die Wall. "
+            "Bei mehreren Saugrobotern ohne eindeutiges Ziel nachfragen. Roboteraktionen nur mit propose_vacuum_action vorschlagen. "
+            "Start, Pause, Stop und Rueckkehr brauchen separate Nutzerbestaetigung; Programme und Einstellungen sind im Chat noch nicht steuerbar. "
+            "returning bedeutet auf dem Rueckweg, nicht bereits angekommen; letztes Reinigungsende ist kein Beweis fehlerfreier Reinigung. "
             "Bei negativen Aussagen Grenzen der geprueften Quellen und Zeitraeume nennen. "
             "Erfinde keine Entity-IDs, Ereignisse, Messwerte oder ausgefuehrten Aktionen. "
             "Eine Aktion wird nur vorgeschlagen, wenn der Nutzer sie verlangt. "
@@ -144,7 +153,7 @@ class HouseAssistant:
                     result = self.query(tool, args, principal)
                 except Exception as exc:
                     result = {"error": str(exc) if isinstance(exc, ValueError) else type(exc).__name__}
-                if tool in {"propose_action", "propose_agent_action"} and result.get("id"):
+                if tool in {"propose_action", "propose_agent_action", "propose_vacuum_action"} and result.get("id"):
                     text = "Vorgeschlagene Aktion (noch nicht ausgefuehrt):\n" + json.dumps(result["payload"], ensure_ascii=False)
                     text += f"\nBestaetigen innerhalb von 5 Minuten:\n/confirm {result['id']}"
                     self.hub.store.remember(principal, "assistant", text)
@@ -162,6 +171,16 @@ class HouseAssistant:
         return text
 
     def query(self, tool: str, args: dict, principal: str) -> dict:
+        if tool == "vacuum_status":
+            result = self.hub.vacuums()
+            items = result.pop("items")
+            if args.get("entity_id"):
+                items = [item for item in items if item["entity_id"] == args["entity_id"]]
+            return {**result, **self._page(public_data(items), args)}
+        if tool == "propose_vacuum_action":
+            if not str(args.get("entity_id", "")).startswith("vacuum."):
+                raise ValueError("Ein eindeutiger Saugroboter muss ausgewaehlt sein.")
+            return self.actions.propose(principal, {"kind": "ha", "entity_id": args["entity_id"], "service": args.get("service")})
         if tool == "calendar_events":
             from backend.services.calendar_service import CalendarService
             start, end = self._date_window(args)
@@ -295,6 +314,8 @@ class HouseAssistant:
             reads.extend(("agent_data", {"agent_id": "mywellness", "view": view}) for view in ("bookings", "prepared", "courses"))
         if re.search(r"fernseh|\btv\b|media|musik|musikwiedergabe|lautsprecher|sonos", text):
             reads.append(("media_status", {}))
+        if re.search(r"saugroboter|staubsauger|roborock|vacuum|wischroboter|\bsauger\b", text):
+            reads.append(("vacuum_status", {}))
         return reads
 
     def _status_text(self) -> str:

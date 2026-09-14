@@ -229,10 +229,21 @@ class HomeHub:
         snapshot = self.context_snapshot.as_dict() if self.context_snapshot else self.store.meta("context")
         return {**snapshot, "quality": self.status()["quality"], "current_state_confirmed": self.healthy()}
 
+    def vacuum_metadata(self) -> dict:
+        devices = {item["id"]: item for item in self.store.items("devices")}
+        return {item["entity_id"]: {**devices.get(item.get("device_id"), {}), "device_id": item.get("device_id")}
+                for item in self.store.items("entities")}
+
+    def vacuums(self) -> dict:
+        from backend.services.vacuum_service import vacuum_items
+        return {"source": "home_assistant", "quality": self.status()["quality"], "registry_errors": self.registry_errors,
+                "items": vacuum_items(self.states(), self.vacuum_metadata()),
+                "scope": "Nur in Home Assistant eingebundene Saugroboter. Karten sind gespeicherte Aufnahmen mit eigenem Zeitstempel."}
+
     def _update_context(self) -> None:
         from backend.services.context import ContextService
         service = ContextService.default()
-        snapshot = service.evaluate(self.states(), ha_error=None if self.healthy() else "HA snapshot is stale")
+        snapshot = service.evaluate(self.states(), ha_error=None if self.healthy() else "HA snapshot is stale", device_metadata=self.vacuum_metadata())
         self.context_snapshot = snapshot
         self.context_updated_at = time.monotonic()
         self.store.meta("context", snapshot.as_dict())

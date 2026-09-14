@@ -62,6 +62,11 @@ gespeichert; maximal 12 werden fuer die aktuelle Anfrage verwendet.
 
 ## Aktionen und Beobachtungen
 
+Saugroboter sind ueber `vacuum_status` gezielt abfragbar. Start, Pause, Stop und
+Rueckkehr zur Station laufen ueber bestaetigungspflichtige Vorschlaege.
+Gemeinsame Roboterhinweise erscheinen auch in "Steve denkt"; Details und Grenzen
+stehen in [WALL_VACUUM.md](WALL_VACUUM.md).
+
 Im Wall-Dashboard ist der Hinweis einer beendeten Waschmaschine quittierbar wie der
 Briefkasten. Der authentifizierte POST `/api/household/washing-machine/acknowledge`
 ruft das vorhandene HA-Skript `script.laundry_room_washing_machine_reset` synchron auf
@@ -74,7 +79,8 @@ Confirm-Endpunkt bestaetigt ihn fuer dieselbe Identitaet. Vorschlaege verfallen 
 und lassen sich nur einmal beanspruchen. Veraenderte Zielzustaende erfordern einen neuen Vorschlag.
 
 Freigegeben sind Ein/Aus fuer light, switch, fan und input_boolean; Oeffnen/Schliessen fuer cover;
-und Solltemperatur fuer climate innerhalb der vom Geraet gemeldeten Grenzen. Agentensteuerung
+und Solltemperatur fuer climate innerhalb der vom Geraet gemeldeten Grenzen. Fuer vacuum
+sind Start, Pause, Stop und Rueckkehr zur Station nach Funktionspruefung freigegeben. Agentensteuerung
 verwendet den vorhandenen Control-Vertrag. Andere HA-Domaenen bleiben lesbar.
 
 Geraeteaktionen werden nach dem Service-Aufruf bis zu 20 Sekunden auf ihren Zielzustand geprueft:
