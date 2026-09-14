@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.agents.vacation.routes import vacation_service
@@ -7,6 +7,17 @@ from backend.services.household_service import HouseholdService
 
 router = APIRouter(prefix="/api/household", tags=["household"])
 household_service = HouseholdService(vacation_status_provider=vacation_service.status)
+
+
+@router.post("/washing-machine/acknowledge")
+def acknowledge_laundry():
+    from backend.services.washing_machine import acknowledge_washing_machine
+    try:
+        return acknowledge_washing_machine(household_service.ha_service)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Waschmaschinenstatus konnte nicht zurueckgesetzt werden.") from exc
 
 
 class BedroomFanComfortPayload(BaseModel):

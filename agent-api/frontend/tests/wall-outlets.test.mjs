@@ -91,3 +91,19 @@ test('current wall status overrides stale context and does not infer a cycle fro
     assert.equal(washingMachineImportantItem({ sensors: [power] }, null), null);
     assert.equal(washingMachineImportantItem({ sensors: [] }, status).id, 'washing-machine');
 });
+
+test('only a finished cycle can be acknowledged and standby removes the item', () => {
+    let acknowledgements = 0;
+    const acknowledge = () => acknowledgements++;
+    const finished = washingMachineImportantItem(dataWithState('Beendet'), null, acknowledge);
+    assert.equal(finished.onClick, acknowledge);
+    finished.onClick();
+    assert.equal(acknowledgements, 1);
+    assert.equal(washingMachineImportantItem(dataWithState('Läuft'), null, acknowledge).onClick, undefined);
+    assert.equal(washingMachineImportantItem(dataWithState('Standby'), {washing_machine: {state: 'finished'}}, acknowledge), null);
+});
+
+test('old context cannot reintroduce an acknowledged laundry message', () => {
+    const summary = 'Die Waschmaschine ist fertig. Die Wäsche kann entnommen werden.';
+    assert.equal(steveThoughtSummary({summary: `Alles ruhig. ${summary}`, washing_machine: {state: 'finished', summary}}, []), 'Alles ruhig.');
+});

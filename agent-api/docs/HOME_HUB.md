@@ -32,11 +32,25 @@ Agenten bleiben Eigentuemer ihrer Fachdaten. Explizit freigegebene Datenansichte
 - Rechnungen: Zusammenfassungen, Finanzuebersicht, Vertraege, Jahre.
 - Garten: Zonen und Verlauf.
 - Markt: Berichte, Watchlist und Zusammenfassung.
-- MyWellness: Kurse und Buchungen.
+- MyWellness: Kursangebot (`courses`), bestaetigte Buchungen (`bookings`) und lokale
+  Vormerkungen (`prepared`) getrennt. Vormerkungen sind keine Buchungsbestaetigung.
 - Urlaub: Verlauf.
 
 Weitere Fachansichten werden bewusst als benannte Abfrage ergaenzt; es gibt keinen
 beliebigen Methodenaufruf, SQL-Zugriff oder Shell-Zugriff durch das Modell.
+
+Kalenderfragen laden Ereignisse aus derselben konfigurierten Kalenderquelle wie die
+Heute-Kachel (`WALL_CALENDAR_ENTITY`, `HOUSEHOLD_CALENDAR_ENTITY`, sonst `calendar.devcal`
+mit dem bestehenden Kalender-Fallback). Ein Kalender-Entity-Zustand ist keine Agenda.
+`calendar_events` und MyWellness-Abfragen akzeptieren `start_date`/`end_date` inklusive
+im Format YYYY-MM-DD, maximal 31 Tage, standardmaessig heute bis heute + 6 Tage.
+Der Assistent erhaelt die aktuelle Uhrzeit und `HOME_TIMEZONE` (Standard Europe/Berlin).
+Die MyWellness-Daten bleiben auf den vom Agenten tatsaechlich geladenen Bestand begrenzt;
+ein abgefragter Zeitraum erweitert nicht automatisch dessen Ladehorizont.
+Kalender-, Sport- und Medienfragen erzwingen passende Leseabfragen vor der ersten
+Modellantwort. `media_status` liest alle HA-Media-Player unabhaengig vom Geraetenamen,
+liefert Zustandszaehler, Datenqualitaet und paginierte Einzelheiten. Nicht integrierte
+physische Geraete sind damit weiterhin nicht erkennbar.
 Agentenzustaende werden zusaetzlich jede Minute beobachtet; Aenderungen erscheinen im Ereignisverlauf.
 Der bestehende LLM-Provider wird weiterverwendet. Er erhaelt nur die angefragten Ergebnisse
 und den Chatkontext, nicht pauschal alle Datenbanken. Schluessel mit Token-/Passwort-/Secret-Namen
@@ -47,6 +61,13 @@ Gespraeche sind nach angemeldetem Webbenutzer bzw. Telegram-Chat und Absender ge
 gespeichert; maximal 12 werden fuer die aktuelle Anfrage verwendet.
 
 ## Aktionen und Beobachtungen
+
+Im Wall-Dashboard ist der Hinweis einer beendeten Waschmaschine quittierbar wie der
+Briefkasten. Der authentifizierte POST `/api/household/washing-machine/acknowledge`
+ruft das vorhandene HA-Skript `script.laundry_room_washing_machine_reset` synchron auf
+und prueft danach den gespeicherten Zyklusstatus `Standby`. Laufende/unklare Zyklen
+werden nicht quittiert. Bei Fehlern bleibt die Anzeige erhalten. Der Beobachtungsmodus
+blockiert auch diesen Endpunkt. Das HA-Paket muss auf HA installiert sein.
 
 Eine KI-Aktion erzeugt nur einen gespeicherten Vorschlag. `/confirm <id>` oder der authentifizierte
 Confirm-Endpunkt bestaetigt ihn fuer dieselbe Identitaet. Vorschlaege verfallen nach fuenf Minuten

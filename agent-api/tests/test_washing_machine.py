@@ -1,14 +1,40 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.agents.telegram.service import TelegramService, _home_assistant_snapshot, _house_status_answer
 from backend.services.context.service import ContextService
-from backend.services.washing_machine import STATUS_ENTITY, washing_machine_status
+from backend.services.washing_machine import STATUS_ENTITY, CYCLE_ENTITY, washing_machine_status, acknowledge_washing_machine
 
 
 class WashingMachineTests(unittest.TestCase):
+    def test_acknowledge_finished_cycle_uses_guarded_script(self):
+        ha = Mock()
+        ha.get_state.side_effect = [{"state": "Beendet"}, {"state": "Standby"}]
+        ha.call_service.return_value = {"ok": True}
+        self.assertEqual(acknowledge_washing_machine(ha), {"ok": True, "state": "standby"})
+        ha.call_service.assert_called_once_with("script", "laundry_room_washing_machine_reset", {})
+        ha.get_state.assert_called_with(CYCLE_ENTITY)
+
+    def test_acknowledge_does_not_reset_running_or_unknown_cycle(self):
+        for state in ["Läuft", "unknown", "unavailable", None]:
+            ha = Mock()
+            ha.get_state.return_value = {"state": state}
+            with self.assertRaises(ValueError):
+                acknowledge_washing_machine(ha)
+            ha.call_service.assert_not_called()
+
+    def test_acknowledge_is_idempotent_and_checks_result(self):
+        ha = Mock()
+        ha.get_state.return_value = {"state": "Standby"}
+        self.assertTrue(acknowledge_washing_machine(ha)["ok"])
+        ha.call_service.assert_not_called()
+        ha.get_state.return_value = {"state": "Beendet"}
+        ha.call_service.return_value = {"ok": True}
+        with self.assertRaises(ValueError):
+            acknowledge_washing_machine(ha)
+
     def states(self, value):
         return [{"entity_id": STATUS_ENTITY, "state": value, "attributes": {}}]
 

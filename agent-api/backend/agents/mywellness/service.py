@@ -241,6 +241,11 @@ class MyWellnessService:
         self._write_status(state)
         return {"courses": courses}
 
+    def prepared_courses(self) -> dict[str, Any]:
+        # Do not restrict chat queries to the scheduler's single target day.
+        return {"courses": list_prepared_courses(), "source": "local_prepared",
+                "booking_confirmed": False}
+
     def bookings(self, force_refresh: bool = True) -> dict[str, Any]:
         state = self._read_status()
         try:

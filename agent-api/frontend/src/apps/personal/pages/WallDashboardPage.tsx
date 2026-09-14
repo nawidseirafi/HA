@@ -750,6 +750,25 @@ function WallDashboardContent() {
         }
     };
 
+    const clearWashingMachine = async () => {
+        if (!data || busyEntity || washingMachineImportantItem(data, contextStatus)?.tone !== 'warn') return;
+        const entityId = 'sensor.laundry_room_washing_machine_status';
+        setBusyEntity(entityId);
+        setError('');
+        try {
+            const result = await api.acknowledgeWashingMachine();
+            if (!result.ok) throw new Error('Waschmaschinenstatus wurde nicht zurückgesetzt.');
+            setData((current) => current ? {...current, sensors: (current.sensors ?? []).map((sensor) =>
+                sensor.entity_id === entityId ? {...sensor, state: 'Standby'} : sensor)} : current);
+            setContextStatus(null);
+            scheduleRefresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Waschmaschinenstatus konnte nicht zurückgesetzt werden.');
+        } finally {
+            setBusyEntity('');
+        }
+    };
+
     const clearPost = async () => {
         const entityId = data?.post?.entity_id;
         if (!entityId || data?.post?.state !== 'on') return;
@@ -957,7 +976,7 @@ function WallDashboardContent() {
     const totalLights = data?.lights.length ?? 0;
     const problemCount = (data?.security.problems.length ?? 0) + (data?.health.unavailable.length ?? 0);
     const internetInfo = data ? fritzboxInfo(data) : unknownFritzboxInfo();
-    const homeImportantState = data ? buildImportantNowState(data, contextStatus, gardenStatus, clearPost, openOpenings, openBatteries, openSecurity, openLights, callCover, toggleIrrigation) : null;
+    const homeImportantState = data ? buildImportantNowState(data, contextStatus, gardenStatus, clearPost, openOpenings, openBatteries, openSecurity, openLights, callCover, toggleIrrigation, clearWashingMachine) : null;
     const headerTitle = section === 'floor' ? 'Etagen' : section === 'room' ? roomView || 'Raum' : titleFor(section);
     const headerIcon = iconFor(section);
 
@@ -1241,10 +1260,15 @@ function steveThoughtSummary(status: ContextStatus | null, items: ImportantNowIt
         }
         return `Ich sehe einen offenen Punkt: ${primary.title}.`;
     }
-    return status?.summary || status?.reason || status?.message || 'Steve liest den aktuellen Kontext.';
+    const summary = status?.summary || status?.reason || status?.message || '';
+    const laundry = status?.washing_machine;
+    // The wall's fresh sensor may already be Standby while the context cache still says finished.
+    const currentSummary = laundry?.summary && (laundry.state === 'finished' || laundry.state === 'running')
+        ? summary.replace(laundry.summary, '').trim() : summary;
+    return currentSummary || 'Steve liest den aktuellen Kontext.';
 }
 
-function washingMachineImportantItem(data: WallDashboardData, status: ContextStatus | null): ImportantNowItemData | null {
+function washingMachineImportantItem(data: WallDashboardData, status: ContextStatus | null, onAcknowledge?: () => void): ImportantNowItemData | null {
     const sensor = (data.sensors ?? []).find((item) => item.entity_id === 'sensor.laundry_room_washing_machine_status');
     const raw = String(sensor?.state || '').trim().toLowerCase();
     const state = sensor ? ({'läuft': 'running', beendet: 'finished', standby: 'standby'}[raw] ?? 'unknown')
@@ -1256,6 +1280,7 @@ function washingMachineImportantItem(data: WallDashboardData, status: ContextSta
         icon: <WashingMachine size={30}/>,
         title: state === 'running' ? 'Die Waschmaschine läuft gerade' : 'Die Waschmaschine ist fertig',
         detail: state === 'running' ? 'Waschgang aktiv' : 'Die Wäsche kann entnommen werden.',
+        onClick: state === 'finished' ? onAcknowledge : undefined,
     };
 }
 
@@ -1449,6 +1474,7 @@ function buildImportantNowState(
     onLights: () => void,
     onGarageCommand: (cover: WallCover, service: 'open_cover' | 'close_cover' | 'stop_cover') => void,
     onToggleIrrigation: (zone: GardenZoneStatus) => void,
+    onWashingMachine?: () => void,
 ): ImportantNowState {
     const items: ImportantNowItemData[] = [];
     const openingsCount = data.security.openings_open;
@@ -1575,7 +1601,7 @@ function buildImportantNowState(
         });
     }
 
-    const washingMachine = washingMachineImportantItem(data, contextStatus);
+    const washingMachine = washingMachineImportantItem(data, contextStatus, onWashingMachine);
     if (washingMachine) items.push(washingMachine);
     const openCount = items.length;
     const hasCritical = items.some((item) => item.critical);

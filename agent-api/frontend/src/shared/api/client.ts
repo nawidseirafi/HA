@@ -1558,6 +1558,7 @@ export const api = {
   wasteReminders: () => request<Pick<WasteStatus, 'ok' | 'updated_at' | 'context' | 'reminders' | 'source_entity' | 'error'>>('/api/waste/reminders'),
   householdStatus: () => request<HouseholdStatus>('/api/household/status'),
   householdSummary: () => request<HouseholdSummary>('/api/household/summary'),
+  acknowledgeWashingMachine: () => request<{ ok: boolean; state: string }>('/api/household/washing-machine/acknowledge', { method: 'POST' }),
   householdReminders: () => request<Pick<HouseholdStatus, 'ok' | 'updated_at' | 'reminders'> & { context: Record<string, unknown> }>('/api/household/reminders'),
   infrastructureStatus: () => request<InfrastructureFullStatus>('/api/infrastructure/status'),
   infrastructureSummary: () => request<InfrastructureSummary>('/api/infrastructure/summary'),

@@ -60,6 +60,26 @@ class CalendarService:
             "source": f"homeassistant:{entity_id}",
         }
 
+    def events(self, start: datetime, end: datetime) -> dict[str, Any]:
+        """Read the wall calendar for an explicit, timezone-aware interval."""
+        if start.tzinfo is None or end.tzinfo is None or end <= start or (end.date() - start.date()).days > 31:
+            raise ValueError("Kalenderzeitraum braucht Zeitzone und muss zwischen 0 und 31 Tagen liegen.")
+        result = {"source": f"homeassistant:{normalize_entity_id(self.calendar_entity)}",
+                  "start": start.isoformat(), "end_exclusive": end.isoformat(),
+                  "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        try:
+            entity_id = self._resolve_calendar_entity()
+            if not entity_id or not self.ha_service.get_state(entity_id):
+                raise ValueError("Kalender nicht verfuegbar.")
+            result["source"] = f"homeassistant:{entity_id}"
+            events = [item for raw in self.ha_service.get_calendar_events(entity_id, start.isoformat(), end.isoformat())
+                      if (item := self._event_summary(entity_id, raw))]
+            events.sort(key=lambda item: parse_event_datetime(item["start"]) or datetime.max.replace(tzinfo=timezone.utc))
+            return {**result, "ok": True, "items": events}
+        except Exception as exc:
+            return {**result, "ok": False, "items": [], "error": type(exc).__name__,
+                    "message": "Kalender konnte nicht gelesen werden; keine Aussage ueber fehlende Termine moeglich."}
+
     def _resolve_calendar_entity(self) -> str | None:
         configured = normalize_entity_id(self.calendar_entity)
         if configured:

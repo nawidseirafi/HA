@@ -290,6 +290,94 @@ class HomeHubTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             HouseAssistant(self.hub).query("confirm", {}, "alice")
 
+    def test_calendar_reads_wall_source_with_explicit_dates(self):
+        from backend.services.calendar_service import CalendarService
+        ha = Mock()
+        ha.get_state.return_value = {"entity_id": "calendar.devcal"}
+        ha.get_calendar_events.return_value = [{"summary": "Reservation at: padelBOX", "start": "2026-09-12T19:30:00+02:00", "end": "2026-09-12T21:00:00+02:00"}]
+        calendar = CalendarService(ha, "calendar.devcal")
+        start, end = HouseAssistant(self.hub)._date_window({"start_date": "2026-09-12", "end_date": "2026-09-12"})
+        result = calendar.events(start, end)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["items"][0]["title"], "Reservation at: padelBOX")
+        ha.get_calendar_events.assert_called_once_with("calendar.devcal", "2026-09-12T00:00:00+02:00", "2026-09-13T00:00:00+02:00")
+
+    def test_calendar_error_is_not_empty_agenda(self):
+        from backend.services.calendar_service import CalendarService
+        ha = Mock()
+        ha.get_state.side_effect = RuntimeError("offline")
+        start, end = HouseAssistant(self.hub)._date_window({"start_date": "2026-09-12"})
+        result = CalendarService(ha, "calendar.private").events(start, end)
+        self.assertFalse(result["ok"])
+        self.assertIn("keine Aussage", result["message"])
+
+    def test_calendar_is_loaded_before_first_model_answer(self):
+        llm = Mock()
+        llm.generate.return_value = SimpleNamespace(text=json.dumps({"answer": "PadelBOX steht um 19:30 im Kalender."}))
+        assistant = HouseAssistant(self.hub, llm_factory=lambda: llm)
+        result = {"ok": True, "items": [{"title": "padelBOX", "start": "2026-09-12T19:30:00+02:00"}]}
+        with patch("backend.services.calendar_service.CalendarService.events", return_value=result):
+            answer = assistant.answer("Kalendereintrag padelbox um 19:30 siehst du es nicht?", "alice")
+        self.assertIn("19:30", answer)
+        context = json.loads(llm.generate.call_args.kwargs["prompt"])
+        self.assertEqual(context["tool_results"][0]["tool"], "calendar_events")
+        self.assertEqual(context["tool_results"][0]["result"]["items"][0]["title"], "padelBOX")
+        self.assertEqual(context["time_context"]["timezone"], "Europe/Berlin")
+
+    def test_mywellness_prepared_is_separate_from_bookings_and_offers(self):
+        service = Mock()
+        service.prepared_courses.return_value = {"courses": [{"title": "Body Workout", "startTime": "2026-09-14T17:00:00", "booked": False}]}
+        service.bookings.return_value = {"bookings": []}
+        service.upcoming_courses.return_value = {"courses": [{"title": "Another course", "startTime": "2026-09-14T18:00:00"}]}
+        assistant = HouseAssistant(self.hub)
+        args = {"agent_id": "mywellness", "start_date": "2026-09-14", "end_date": "2026-09-14"}
+        with patch("backend.agents.registry.get_agent_control", return_value=SimpleNamespace(service=service)):
+            prepared = assistant.query("agent_data", {**args, "view": "prepared"}, "alice")
+            bookings = assistant.query("agent_data", {**args, "view": "bookings"}, "alice")
+            offers = assistant.query("agent_data", {**args, "view": "courses"}, "alice")
+        self.assertEqual(prepared["items"][0]["start_local"], "2026-09-14T17:00:00+02:00")
+        self.assertIn("keine bestaetigte Buchung", prepared["meaning"])
+        self.assertEqual(bookings["total"], 0)
+        self.assertEqual(offers["items"][0]["title"], "Another course")
+        service.courses.assert_not_called()
+
+    def test_prepared_service_reads_all_target_days(self):
+        from backend.agents.mywellness.service import MyWellnessService
+        service = object.__new__(MyWellnessService)
+        with patch("backend.agents.mywellness.service.list_prepared_courses", return_value=[{"title": "Monday"}]) as prepared:
+            result = service.prepared_courses()
+        prepared.assert_called_once_with()
+        self.assertFalse(result["booking_confirmed"])
+
+    def test_mywellness_errors_and_paging_preserved(self):
+        service = Mock()
+        service.bookings.return_value = {"stale": True, "error": "offline", "bookings": [{"startTime": "2026-09-14T17:00:00"}] * 25}
+        with patch("backend.agents.registry.get_agent_control", return_value=SimpleNamespace(service=service)):
+            result = HouseAssistant(self.hub).query("agent_data", {"agent_id": "mywellness", "view": "bookings", "start_date": "2026-09-14", "end_date": "2026-09-14"}, "alice")
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["stale"])
+        self.assertEqual(result["total"], 25)
+        self.assertEqual(result["next_offset"], 20)
+        self.assertEqual(len(result["items"]), 20)
+
+    def test_media_reads_domain_not_german_device_name(self):
+        self.store.replace("states", [state("media_player.living_room", "playing"), state("media_player.bedroom", "unavailable"), state("media_player.speaker", "idle")], "entity_id")
+        result = HouseAssistant(self.hub).query("media_status", {}, "alice")
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(result["state_counts"], {"idle": 1, "playing": 1, "unavailable": 1})
+        self.assertEqual(HouseAssistant._required_reads("Läuft im Haus irgendwo der Fernseher?"), [("media_status", {})])
+
+    def test_sports_question_checks_both_bookings_and_prepared(self):
+        reads = HouseAssistant._required_reads("Wann ist mein nächster Sport Kurs?")
+        self.assertEqual({args["view"] for _, args in reads}, {"bookings", "prepared", "courses"})
+
+    def test_date_window_crosses_dst_with_local_midnight(self):
+        start, end = HouseAssistant(self.hub)._date_window({"start_date": "2026-10-25", "end_date": "2026-10-25"})
+        self.assertEqual(start.isoformat(), "2026-10-25T00:00:00+02:00")
+        self.assertEqual(end.isoformat(), "2026-10-26T00:00:00+01:00")
+        with self.assertRaises(ValueError):
+            HouseAssistant(self.hub)._date_window({"start_date": "2026-09-14", "end_date": "2026-09-12"})
+
     def test_telegram_uses_shared_assistant_and_identity(self):
         from backend.agents.telegram.service import TelegramService
         with patch("backend.services.home_hub.assistant.HouseAssistant") as factory:
