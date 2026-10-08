@@ -1,20 +1,38 @@
 import { FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, ScanFace } from 'lucide-react';
 import { useAuth } from '@shared/auth/AuthContext';
 import logo from '@shared/assets/logo.svg';
+import { passkeySupportMessage, passkeyError } from '@shared/auth/passkeys';
 
 interface Props {
   onLoggedIn: () => void;
 }
 
 export function LoginForm({ onLoggedIn }: Props) {
-  const { login } = useAuth();
+  const { login, loginWithPasskey } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const supportMessage = passkeySupportMessage();
+
+  const submitPasskey = async () => {
+    setError('');
+    setBusy(true);
+    setPasskeyBusy(true);
+    try {
+      await loginWithPasskey(remember);
+      onLoggedIn();
+    } catch (err) {
+      setError(passkeyError(err));
+    } finally {
+      setBusy(false);
+      setPasskeyBusy(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -100,11 +118,15 @@ export function LoginForm({ onLoggedIn }: Props) {
       {error && <div className="login-error" role="alert">{error}</div>}
 
       <button className="button primary login-button" type="submit" disabled={busy}>
-        <span>{busy ? 'Melde an…' : 'Anmelden'}</span>
+        <span>{busy && !passkeyBusy ? 'Melde an…' : 'Anmelden'}</span>
         <ArrowRight size={18} />
       </button>
 
-      <span className="login-hint"></span>
+      <button className="button secondary passkey-login-button" type="button" onClick={submitPasskey} disabled={busy || Boolean(supportMessage)} aria-describedby="passkey-hint">
+        <ScanFace size={20} />
+        <span>{passkeyBusy ? 'Passkey wird bestätigt…' : 'Mit Face ID / Passkey anmelden'}</span>
+      </button>
+      <span className="login-hint" id="passkey-hint">{supportMessage || 'Zuerst mit Passwort anmelden und unter Settings einen Passkey einrichten. Danach mit Face ID, Touch ID oder Gerätecode bestätigen.'}</span>
     </form>
   );
 }

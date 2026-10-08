@@ -75,10 +75,19 @@ def away_token_ttl_seconds() -> int:
 
 
 def authenticate(username: str, password: str) -> dict[str, Any]:
+    verify_password(username, password)
+    return issue_session(username)
+
+
+def verify_password(username: str, password: str) -> None:
     if not hmac.compare_digest(username, configured_username()):
         raise HTTPException(status_code=401, detail="Benutzername oder Passwort ist falsch.")
     if not hmac.compare_digest(password, configured_password()):
         raise HTTPException(status_code=401, detail="Benutzername oder Passwort ist falsch.")
+
+
+def issue_session(username: str) -> dict[str, Any]:
+    """Issue the same presence-aware session after password or WebAuthn verification."""
     presence = auth_presence_state()
     away = _presence_is_away(presence)
     expires_at = int(time.time()) + (away_token_ttl_seconds() if away else token_ttl_seconds())

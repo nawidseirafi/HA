@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { api, type InfrastructureSummary, type PathSetting, type SettingsInfo } from '@shared/api/client';
 import { UpdatePanel } from '@shared/components/system/UpdatePanel';
+import { PasskeySettings } from '@shared/components/auth/PasskeySettings';
 
 function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
   return <span className={`settings-badge ${ok ? 'ok' : 'warn'}`}>{label ?? (ok ? 'aktiv' : 'fehlt')}</span>;
@@ -77,6 +78,7 @@ export function SettingsPage() {
         </button>
       </header>
       {error && <section className="panel error-panel">{error}</section>}
+      <PasskeySettings />
       {!settings && !error && <section className="panel settings-list">Settings werden geladen...</section>}
       {settings && (
         <section className="settings-grid">

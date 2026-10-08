@@ -2,6 +2,8 @@
 
 Standalone deployment package for RoboterSteve.
 
+Face ID / Passkey login on iPad: [setup and HTTPS configuration](docs/passkeys-ipad.md).
+
 This package is built as a single RoboterSteve product.
 
 ## Contents

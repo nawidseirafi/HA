@@ -1,5 +1,6 @@
 import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { AUTH_EXPIRED_EVENT, api, clearAuthToken, getAuthToken, setAuthToken } from '@shared/api/client';
+import { authenticateWithPasskey } from '@shared/auth/passkeys';
 
 interface LoginInput {
   username: string;
@@ -10,6 +11,7 @@ interface LoginInput {
 interface AuthContextValue {
   isAuthenticated: boolean;
   login: (input: LoginInput) => Promise<boolean>;
+  loginWithPasskey: (remember: boolean) => Promise<void>;
   logout: () => void;
 }
 
@@ -34,6 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => ({
     isAuthenticated,
+    loginWithPasskey: async (remember) => {
+      const response = await authenticateWithPasskey();
+      setAuthToken(response.access_token, remember && !response.force_session);
+      setIsAuthenticated(true);
+    },
     login: async ({ username, password, remember }) => {
       if (!username.trim() || !password.trim()) return false;
       const response = await api.login(username, password);

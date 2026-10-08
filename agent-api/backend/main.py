@@ -51,7 +51,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_API_PATHS = {"/health", "/api/auth/login", "/api/product"}
+PUBLIC_LOGIN_PATHS = {"/api/auth/login", "/api/auth/passkeys/login/options", "/api/auth/passkeys/login/verify"}
+PUBLIC_API_PATHS = {"/health", "/api/product"} | PUBLIC_LOGIN_PATHS
 MONITOR_ONLY = os.getenv("ROBOTERSTEVE_MONITOR_ONLY", "0") == "1"
 
 
@@ -63,7 +64,7 @@ async def require_api_auth(request, call_next):
             user_from_request(request)
         except Exception as exc:
             return JSONResponse({"detail": getattr(exc, "detail", "Nicht angemeldet.")}, status_code=getattr(exc, "status_code", 401))
-    if MONITOR_ONLY and path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and path not in {"/api/auth/login", "/api/home-hub/chat", "/api/home-hub/conversation"}:
+    if MONITOR_ONLY and path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and path not in PUBLIC_LOGIN_PATHS | {"/api/home-hub/chat", "/api/home-hub/conversation"}:
         return JSONResponse({"detail": "Beobachtungsmodus: Aktionen sind deaktiviert."}, status_code=403)
     return await call_next(request)
 

@@ -6105,3 +6105,16 @@ button.market-insight-card:hover {
     text-align: left;
   }
 }
+
+/* Touch-friendly passkey controls, including narrow iPad split-screen views. */
+.passkey-login-button { width: 100%; min-height: 48px; white-space: normal; }
+.passkey-settings { min-width: 0; }
+.passkey-form { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; }
+.passkey-form label { display: grid; gap: 8px; flex: 1 1 220px; min-width: 0; }
+.passkey-form input { width: 100%; min-height: 48px; font-size: 16px; }
+.passkey-settings .button { min-height: 44px; white-space: normal; }
+.passkey-list { list-style: none; margin: 0; padding: 0; }
+.passkey-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); }
+.passkey-list li > div { min-width: 0; overflow-wrap: anywhere; }
+.passkey-list p { margin: 4px 0 0; }
+.passkey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
