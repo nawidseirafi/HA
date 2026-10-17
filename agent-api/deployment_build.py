@@ -26,6 +26,7 @@ COPY_ITEMS = [
     "frontend/dist",
     "requirements.txt",
     "agent-api.service",
+    "music-agent.service",
     "main.py",
     "version.json",
 ]

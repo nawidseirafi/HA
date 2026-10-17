@@ -1,0 +1,23 @@
+[Unit]
+Description=RoboterSteve Music Light Worker
+After=network-online.target
+Wants=network-online.target
+PartOf=agent-api.service
+
+[Service]
+Type=simple
+# Must match the existing agent-api service user and its installation directory.
+WorkingDirectory=/opt/roboterSteve
+# On the server, add Environment="HA_URL=..." and Environment="HA_TOKEN=..."
+# with the same values as agent-api.service. Do not commit credentials.
+Environment=HA_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI3ZTEzNGQ3MTg0MDY0OGVjODI1MTZiMzE5YTI5ZGMzNyIsImlhdCI6MTc3NzcwMDAwOCwiZXhwIjoyMDkzMDYwMDA4fQ.10lZSyvgqa5bNU26YfPQ2IXiGTzbf9wb5heevOGdNVc
+Environment=HA_URL=http://homeassistant.local:8123
+ExecStart=/opt/roboterSteve/venv/bin/python -m backend.agents.music.runtime
+Restart=on-failure
+RestartSec=3
+UMask=0077
+TimeoutStopSec=120
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

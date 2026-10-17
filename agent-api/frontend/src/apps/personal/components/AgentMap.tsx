@@ -23,6 +23,7 @@ import {
   LineChart,
   Mail,
   MessageCircle,
+  Music,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -33,6 +34,7 @@ import {
 import { api, type AgentManifest, type KnownDashboardRoute, type OrchestratorMapData, type OrchestratorMapNode } from '@shared/api/client';
 import type { Route } from '../App';
 import { AgentNode } from './AgentNode';
+import { positionsForNodes } from './agentMapLayout';
 import type { AgentMapNodeData, AgentMapServiceDetail, AgentMapStatus } from '@shared/types/agentMap';
 
 interface Props {
@@ -51,6 +53,7 @@ const dashboardRouteMap: Record<KnownDashboardRoute, Route> = {
   schedulerDashboard: { name: 'schedulerDashboard' },
   gardenDashboard: { name: 'gardenDashboard' },
   telegramDashboard: { name: 'telegramDashboard' },
+  musicDashboard: { name: 'wall', section: 'music' },
 };
 
 const iconMap: Record<string, LucideIcon> = {
@@ -69,6 +72,7 @@ const iconMap: Record<string, LucideIcon> = {
   LineChart,
   Mail,
   MessageCircle,
+  Music,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -196,7 +200,8 @@ export function AgentMap({ navigate, chrome = true, interactive = true }: Props)
 function useAgentMapElements(mapData: OrchestratorMapData | null) {
   return useMemo(() => {
     if (!mapData) return { nodes: [], edges: [] as Edge[] };
-    const nodes = mapData.nodes.map((mapNode, index) => agentNodeFromMap(mapNode, index));
+    const positions = positionsForNodes(mapData.nodes);
+    const nodes = mapData.nodes.map(mapNode => agentNodeFromMap(mapNode, positions[mapNode.id]));
     const edges = mapData.edges.map((edge) => ({
       id: edge.id,
       source: edge.from,
@@ -209,11 +214,11 @@ function useAgentMapElements(mapData: OrchestratorMapData | null) {
   }, [mapData]);
 }
 
-function agentNodeFromMap(mapNode: OrchestratorMapNode, index: number): Node<AgentMapNodeData> {
+function agentNodeFromMap(mapNode: OrchestratorMapNode, position: {x: number; y: number}): Node<AgentMapNodeData> {
   return {
     id: mapNode.id,
     type: 'agentNode',
-    position: positionForNode(mapNode, index),
+    position,
     data: {
       id: mapNode.id,
       label: mapNode.label,
@@ -226,28 +231,6 @@ function agentNodeFromMap(mapNode: OrchestratorMapNode, index: number): Node<Age
       kind: nodeKind(mapNode),
     },
   };
-}
-
-function positionForNode(node: OrchestratorMapNode, index: number) {
-  const fixed: Record<string, { x: number; y: number }> = {
-    orchestrator: { x: 525, y: 20 },
-    scheduler: { x: 240, y: 190 },
-    messaging: { x: 600, y: 190 },
-    household: { x: 960, y: 190 },
-    market: { x: -120, y: 390 },
-    invoices: { x: 150, y: 390 },
-    vacation: { x: 420, y: 390 },
-    telegram: { x: 690, y: 390 },
-    mywellness: { x: 960, y: 390 },
-    garden: { x: 1230, y: 390 },
-    openai: { x: -80, y: 620 },
-    database: { x: 420, y: 620 },
-    homeassistant: { x: 920, y: 620 },
-  };
-  if (fixed[node.id]) return fixed[node.id];
-  if (node.kind === 'agent') return { x: 20 + (index % 4) * 290, y: 220 + Math.floor(index / 4) * 140 };
-  if (node.kind === 'service') return { x: -150 + (index % 3) * 460, y: 430 };
-  return { x: 310, y: 20 };
 }
 
 function nodeKind(node: OrchestratorMapNode): AgentMapNodeData['kind'] {

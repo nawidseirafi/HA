@@ -200,3 +200,53 @@ Wenn ausnahmsweise nur das lokale Deployment ohne Update-ZIP gebaut werden soll:
 ```bash
 ../venv/bin/python deployment_build.py --no-zip
 ```
+
+## Musiklicht V1
+
+Vor Installation darf kein offenes Music-Journal existieren. Die Anwendung verweigert
+sonst das Update und fordert Stop/Wiederherstellung an. Der zusätzliche Worker wird
+über `music-agent.service` mit `PartOf=agent-api.service` an den Steve-Restart gekoppelt.
+Installation, Grenzen und Abnahme: [MUSIC_AGENT.md](MUSIC_AGENT.md).
+
+### Backup-Laufzeit verbessert (2026-10-17)
+
+Der lokale Updatepfad sichert weiterhin Konfiguration, `.env`, `data`, `settings`
+und Agentendateien vor der Installation. Große Nutzdaten bleiben daher ein möglicher
+Laufzeitfaktor. Eine Servermessung liegt noch nicht vor.
+
+`BackupEngine` vermeidet jetzt das erneute Lesen der Konfiguration pro Datei:
+Backup-Ausschlussverzeichnisse werden einmal pro Sicherung und Archiv-Basispfade
+pro Quellverzeichnis bestimmt. Ausgeschlossene Verzeichnisse werden beim Traversieren
+abgeschnitten, statt zunächst ihren gesamten Inhalt aufzulisten. Sowohl das
+konfigurierte Backupverzeichnis als auch `data/backups/updates` werden ausgeschlossen;
+dies verhindert auch das Einpacken von Backups beim Berechtigungs-Fallback.
+Gzip-Stufe 1 reduziert CPU-Arbeit bei möglicherweise größeren Archiven. Die
+Backup-Metadaten im Update-Ergebnis enthalten nun `duration_seconds`.
+Keine Nutzdaten wurden gelöscht, keine bestehenden Backups entfernt. Änderungen
+wirken erst, wenn der laufende Update-Dienst den neuen Code geladen hat; das
+Update, das diese Änderung installiert, verwendet noch den alten Backup-Code.
+Regressionstest prüft Ausschlüsse, enthaltene Nutzdaten/Konfiguration und einmalige
+Ermittlung des Backupverzeichnisses. Reale Laufzeit/Archivgröße auf dem Mini-PC
+müssen noch verglichen werden.
+
+### Drei Update-Backups behalten (2026-10-17)
+
+Nach jeder vollständig erstellten Sicherung behält BackupEngine die neue Sicherung
+und die zwei zuletzt geänderten bisherigen `backup-*.tar.gz` im tatsächlich
+verwendeten Backupverzeichnis. Ältere passende reguläre Dateien werden gelöscht;
+Symlinks, Unterverzeichnisse und anders benannte Archive bleiben unberührt.
+Dies gilt auch beim Ausweichen auf `data/backups/updates`.
+
+Neue Archive werden zunächst als private `.partial`-Dateien geschrieben, geschlossen
+und synchronisiert und anschließend atomar auf den endgültigen Namen umbenannt.
+Mikrosekunden im Namen vermeiden Überschreiben bei schnellen Folgebackups.
+Erst danach beginnt die Bereinigung. Fehlgeschlagene Sicherungen entfernen nur
+ihre temporäre Datei; bestehende Archive bleiben erhalten. Fehler beim Löschen
+alter Archive werden im Backup-Ergebnis als `retention_warning` gemeldet;
+`removed_backups` zählt erfolgreiche Löschungen. In diesem Fehlerfall können
+vorübergehend mehr als drei Archive bestehen bleiben.
+
+Die Bereinigung erfolgt nach Deployment beim nächsten erfolgreich erstellten
+Update-Backup, nicht rückwirkend auf dem Server durch diese lokale Codeänderung.
+Tests prüfen die Dreiergrenze, unveränderte sonstige Dateien und den Erhalt alter
+Archive bei einem fehlgeschlagenen Backup.

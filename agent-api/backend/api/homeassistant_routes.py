@@ -205,6 +205,11 @@ def call_homeassistant_service(payload: ServicePayload):
     if payload.entity_id:
         data["entity_id"] = payload.entity_id
     try:
+        if payload.domain == "light":
+            from backend.agents.music.service import music_service
+            targets = data.get("entity_id", [])
+            targets = [targets] if isinstance(targets, str) else targets
+            music_service.release(targets)
         return ha_service.call_service(payload.domain, payload.service, data)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

@@ -1,6 +1,6 @@
 export type Route =
   | { name: 'homeHub' }
-  | { name: 'wall' }
+  | { name: 'wall'; section?: 'music' }
   | { name: 'contextDashboard' }
   | { name: 'agents' }
   | { name: 'agentList' }

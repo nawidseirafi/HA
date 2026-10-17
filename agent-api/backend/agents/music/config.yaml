@@ -1,0 +1,3 @@
+music:
+  enabled: true
+  # Discovery enabled; output still requires saved selection and explicit start.

@@ -1,0 +1,14 @@
+id: music
+name: Musiklicht
+description: Lokale iPad-Audioanalyse und begrenzte Lichtsteuerung über Home Assistant.
+status: active
+api:
+  prefix: /api/music
+  route_module: backend.agents.music.routes
+runtime:
+  service_object: music_service
+ui:
+  icon: Music
+  dashboard_route: musicDashboard
+settings:
+  role: music_lighting

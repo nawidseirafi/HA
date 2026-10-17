@@ -2,6 +2,7 @@ import {Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useS
 import type {DragEvent, ErrorInfo, PointerEvent, ReactNode} from 'react';
 import {
     Activity,
+    Music,
     Settings2,
     X,
     ArrowDown,
@@ -70,10 +71,12 @@ import {WallMowerCard} from '../components/wall/WallMowerCard';
 import {WallVacuumCard} from '../components/wall/WallVacuumCard';
 import {AgentMap} from '../components/AgentMap';
 import '@shared/styles/wall.css';
+import {WallMusicSection} from '../components/wall/WallMusicSection';
+import {useMusicSession} from '../features/music/useMusicSession';
 
 const WallEnergyChart = lazy(() => import('../components/wall/WallEnergyChart'));
 
-type WallSection = 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries' | 'energy';
+type WallSection = 'music' | 'home' | 'lights' | 'climate' | 'security' | 'openings' | 'agents' | 'floor' | 'room' | 'batteries' | 'energy';
 type BatteryBadge = { level: number | null; charging?: boolean };
 type EnergyPowerPoint = { timestamp: string; value: number };
 type OutletPower = { watts: number; label: string };
@@ -420,6 +423,7 @@ function avg(values: number[]) {
 
 function WallDashboardContent() {
     const [data, setData] = useState<WallDashboardData | null>(null);
+    const music = useMusicSession();
     const [section, setSection] = useState<WallSection>(() => initialWallSection());
     const [selectedFloor, setSelectedFloor] = useState('Alle Etagen');
     const [floorView, setFloorView] = useState('');
@@ -990,6 +994,7 @@ function WallDashboardContent() {
                         aria-label="Etagen"><Layers3 size={24}/></button>
                 <button className={section === 'lights' ? 'active' : ''} onClick={openLights} aria-label="Lampen">
                     <Lightbulb size={24}/></button>
+                <button className={section === 'music' ? 'active' : ''} onClick={() => goSection('music')} aria-label="Musiklicht"><Music size={24}/></button>
                 <button className={section === 'climate' ? 'active' : ''} onClick={() => goSection('climate')}
                         aria-label="Klima"><Thermometer size={24}/></button>
                 <button className={section === 'energy' ? 'active' : ''} onClick={() => goSection('energy')}
@@ -1012,6 +1017,7 @@ function WallDashboardContent() {
                     </div>
                     <div className="wall-header-side">
                         <strong>{formatClock(now)}</strong>
+                        {(music.status?.is_running || music.busy || music.microphone) && <button className="music-stop" onClick={() => void music.stop()}>Musiklicht stoppen</button>}
                         <button className={`wall-message-button ${unreadMessages ? 'has-unread' : ''}`} type="button" onClick={openMessageCenter} aria-label="Nachrichten">
                             <Bell size={18}/>
                             {unreadMessages > 0 && <span>{unreadMessages > 99 ? '99+' : unreadMessages}</span>}
@@ -1025,6 +1031,7 @@ function WallDashboardContent() {
                     <MessageCenter messages={messages} onDeleteAll={deleteAllMessages} />
                 )}
 
+                {section === 'music' && <WallMusicSection music={music}/>}
                 {error && <section className="wall-error">{error}</section>}
                 {runtimeError && <section className="wall-error">Browserfehler: {runtimeError}</section>}
                 {!data && !error && <section className="wall-loading">Lade Home Assistant...</section>}
@@ -3775,6 +3782,7 @@ function findEntityName(entities: WallEntity[], needles: string[]) {
 }
 
 function titleFor(section: WallSection) {
+    if (section === 'music') return 'Musiklicht';
     if (section === 'lights') return 'Lampen';
     if (section === 'climate') return 'Klima';
     if (section === 'energy') return 'Energie';
@@ -3788,11 +3796,12 @@ function titleFor(section: WallSection) {
 function initialWallSection(): WallSection {
     if (typeof window === 'undefined') return 'home';
     const raw = new URLSearchParams(window.location.search).get('section') || '';
-    const allowed: WallSection[] = ['home', 'lights', 'climate', 'security', 'openings', 'agents', 'floor', 'batteries', 'energy'];
+    const allowed: WallSection[] = ['music', 'home', 'lights', 'climate', 'security', 'openings', 'agents', 'floor', 'batteries', 'energy'];
     return allowed.includes(raw as WallSection) ? raw as WallSection : 'home';
 }
 
 function iconFor(section: WallSection): ReactNode {
+    if (section === 'music') return <Music size={30}/>;
     if (section === 'lights') return <Lightbulb size={30}/>;
     if (section === 'climate') return <Thermometer size={30}/>;
     if (section === 'energy') return <Zap size={30}/>;
@@ -3806,6 +3815,7 @@ function iconFor(section: WallSection): ReactNode {
 }
 
 function subtitleFor(section: WallSection, activeLights: number, totalLights: number, problemCount: number, data?: WallDashboardData | null) {
+    if (section === 'music') return 'Musik hören · Licht erleben';
     if (section === 'lights') return `${activeLights} von ${totalLights} aktiv`;
     if (section === 'floor') return 'Etage wählen und Räume öffnen';
     if (section === 'room') return 'Geräte in diesem Raum';

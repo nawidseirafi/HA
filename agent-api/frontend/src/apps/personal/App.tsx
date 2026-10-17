@@ -36,7 +36,7 @@ export type { Route } from './routes/routes';
 function parseRoute(): Route {
   const parts = window.location.pathname.split('/').filter(Boolean);
   if (parts[0] === 'home-hub') return { name: 'homeHub' };
-  if (parts[0] === 'wall') return { name: 'wall' };
+  if (parts[0] === 'wall') return { name: 'wall', section: new URLSearchParams(window.location.search).get('section') === 'music' ? 'music' : undefined };
   if (parts[0] === 'context' || parts[0] === 'steve-context') return { name: 'contextDashboard' };
   if (parts[0] === 'invoices' && parts[1] === 'years' && parts[2] && parts[3] === 'months' && parts[4]) {
     return { name: 'month', year: Number(parts[2]), month: Number(parts[4]) };
@@ -159,7 +159,7 @@ function AppContent() {
 
 function routeToPath(route: Route) {
   if (route.name === 'homeHub') return '/home-hub';
-  if (route.name === 'wall') return '/wall';
+  if (route.name === 'wall') return route.section === 'music' ? '/wall?section=music' : '/wall';
   if (route.name === 'contextDashboard') return '/context';
   if (route.name === 'agents') return '/agents';
   if (route.name === 'agentList') return '/agents/list';

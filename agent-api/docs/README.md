@@ -30,3 +30,5 @@ Update-Server Upload = build/updates/robotersteve/stable/
 ```
 
 Docker-Updates verwenden `docker compose up -d --build`. `docker restart` ist kein Standard-Updatepfad.
+
+- `MUSIC_AGENT.md`: Musiklicht V1, Wall-Bedienung, Sicherheit, separater systemd-Worker und Abnahme.

@@ -275,7 +275,7 @@ export type UpdateCheckResult = {
   error?: string;
 };
 
-export type KnownDashboardRoute = 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard' | 'gardenDashboard' | 'telegramDashboard';
+export type KnownDashboardRoute = 'musicDashboard' | 'invoiceDashboard' | 'mywellnessDashboard' | 'marketDashboard' | 'vacationDashboard' | 'schedulerDashboard' | 'gardenDashboard' | 'telegramDashboard';
 
 export type GardenEntityBinding = {
   entity_id: string | null;
@@ -1313,7 +1313,7 @@ function normalizeApiBase(value: string) {
   return trimmed;
 }
 
-function apiUrl(path: string) {
+export function apiUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   if (!API_BASE) return normalizedPath;
   try {

@@ -469,3 +469,10 @@ ping robotersteve.local
 ```
 
 Falls es weiter nicht geht, pruefe Router, VLAN/Gastnetz und Firewall.
+
+## Optionaler Musiklicht-Worker
+
+Musiklicht V1 verwendet einen separaten systemd-Prozess und einen privaten Unix-Socket.
+Die Vorlage `music-agent.service` muss denselben Benutzer, dieselbe Python-Umgebung
+und dasselbe Datenverzeichnis wie Steve verwenden. Anleitung und iPad-Abnahme:
+[MUSIC_AGENT.md](MUSIC_AGENT.md). Kein zusätzlicher öffentlich erreichbarer Port nötig.

@@ -1,0 +1,56 @@
+.wall-music{--studio-muted:#a7adc4;max-width:1200px;margin:0 auto;padding:clamp(20px,3vw,40px);border:1px solid #ffffff12;border-radius:30px;background:radial-gradient(ellipse at 95% 0%,#742ea51a,transparent 42%),#101119;color:#f4f3ff;box-shadow:0 24px 80px #0003;color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif}
+.wall-music *{box-sizing:border-box}.wall-music-summary,.music-buttons{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.wall-music .studio-eyebrow{display:flex;align-items:center;gap:8px;color:#baa5ff;font-size:11px;letter-spacing:.2em;font-weight:700}.wall-music h2{font-size:clamp(34px,4vw,52px);letter-spacing:-.055em;line-height:1.1;margin:14px 0 8px;color:#f4f3ff}.wall-music h2>span{color:#b18bff}.wall-music p{color:var(--studio-muted);font-size:14px;line-height:1.6}.wall-music .studio-status{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #ffffff15;border-radius:24px;font-size:12px;color:#b9bfd1;background:#ffffff04}.studio-status i{width:6px;height:6px;border-radius:50%;background:#8790a9}.studio-status.is-live i{background:#73efd0;box-shadow:0 0 12px #73efd0}
+.wall-music .studio-stage{overflow:hidden;margin:25px 0;border:1px solid #ad8bff30;border-radius:22px;background:radial-gradient(ellipse at 50% 55%,#713fe325,transparent 70%),#0b0c13}.studio-stage-top{display:flex;justify-content:space-between;gap:12px;padding:22px 24px 0;color:#a4aac4;font-size:10px;letter-spacing:.12em}.studio-stage-top>span:first-child{display:flex;align-items:center;gap:8px}.studio-spectrum{padding:18px 28px 25px}.studio-bars{height:clamp(150px,22vw,240px);display:flex;align-items:end;gap:clamp(3px,.6vw,8px);padding:10px 0}.studio-bars i{flex:1;height:100%;border-radius:5px 5px 2px 2px;transform-origin:bottom;background:linear-gradient(0deg,#7959ff,#df6bff 68%,#b9fcf0);box-shadow:0 0 14px #bd57ff35;transition:transform 90ms linear}.studio-bars i:nth-child(-n+16){background:linear-gradient(0deg,#365deb,#5cdbf2 75%,#a9fff0)}.studio-bars i:nth-child(n+33){background:linear-gradient(0deg,#963fea,#f16acb 75%,#ffd1f0)}.studio-frequency{display:flex;justify-content:space-between;color:#929ab5;font-size:9px;letter-spacing:.14em;padding-top:14px;border-top:1px solid #ffffff0d}.studio-transport{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px 24px;border-top:1px solid #ffffff10;background:#ffffff03}.studio-transport strong{display:block;font-size:15px;font-weight:600}.studio-transport>div>span{display:block;color:var(--studio-muted);margin-top:6px;font-size:12px;line-height:1.5}
+.wall-music fieldset{min-width:0;border:1px solid #ffffff14;border-radius:20px;padding:22px;margin:26px 0;background:#ffffff02}.wall-music legend{padding:0 10px;font-size:15px;font-weight:600;color:#e4e3f5}.wall-music legend svg{vertical-align:middle;margin-right:6px;color:#b69aff}.wall-music label:not(.music-light){display:grid;gap:12px;margin:12px 0;color:#bfc3d6;font-size:13px}.wall-music select,.wall-music button,.wall-music-shortcut{min-height:48px;padding:12px 18px;border-radius:12px;border:1px solid #ffffff20;font:inherit;background:#20212f;color:#eaeafa}.wall-music button{display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;font-size:13px;font-weight:600;transition:background .2s,border-color .2s}.wall-music select{width:100%;font-size:14px}.wall-music button:hover:not(:disabled){background:#303047;border-color:#b399ff80}.wall-music button:disabled,.wall-music fieldset:disabled{opacity:.5;cursor:default}.wall-music fieldset:disabled button:disabled{opacity:1}.wall-music :is(button,select,input):focus-visible{outline:2px solid #9cf5ed;outline-offset:4px}.wall-music .music-start{background:#b7a0ff;border-color:#c6b4ff;color:#161027;box-shadow:0 0 24px #ae7dff30}.wall-music .music-start:hover:not(:disabled){background:#cbbbff}.music-stop{min-height:48px;padding:12px 18px;border-radius:12px;border:1px solid #f1839a55;background:#391e2b;color:#ffb1c2;font:inherit;font-weight:600}.wall-music .music-stop{border-color:#f1839a40;background:#311d29;color:#ffb1c2}
+.wall-music .studio-profiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}.wall-music .studio-profile{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:20px;background:#171821;border-color:#ffffff10;text-align:left}.studio-profile strong{font-size:16px}.studio-profile span{font-size:11px;color:var(--studio-muted);font-weight:400}.studio-profile svg{color:#8ce6ec}.profile-dynamic svg{color:#b59bff}.profile-party svg{color:#f68bd3}.wall-music .studio-profile[aria-pressed=true]{border-color:#b193ff;background:linear-gradient(135deg,#a57aff22,#a57aff08);box-shadow:inset 0 0 20px #b193ff08}.wall-music input[type=range]{width:100%;min-height:44px;accent-color:#bb9fff;cursor:pointer}.studio-count{margin-left:8px;padding:3px 8px;border-radius:8px;background:#b193ff20;color:#c9b5ff;font-size:12px}
+.music-room{margin-top:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.wall-music .music-room h3{grid-column:1/-1;font-size:11px;font-weight:600;letter-spacing:.08em;color:#aab1c9;margin:0 0 6px}.wall-music .music-light{display:flex;align-items:center;gap:12px;min-height:58px;padding:12px;border:1px solid #ffffff0c;border-radius:12px;background:#ffffff03;font-size:13px;overflow-wrap:anywhere}.music-light:has(input:checked){border-color:#b193ff65;background:#aa87ff0e}.music-light input{width:22px;height:22px;flex-shrink:0;accent-color:#b69aff}.music-light small{display:block;color:#aab1c9;margin-top:4px;font-size:11px}.wall-music .wall-error{border:1px solid #e7a26340;background:#a66b2015;color:#f3c79d;border-radius:12px;padding:14px 18px}.wall-music .studio-note{font-size:12px;color:#a0a7be}.wall-music-shortcut{display:block;width:100%;text-align:left;margin-bottom:16px;background:linear-gradient(110deg,#191a2d,#302044);border-color:#ad8bff40;color:#ece5ff}
+@media(max-width:800px){.studio-transport{flex-direction:column;align-items:stretch}.studio-transport .music-buttons{justify-content:flex-start}}@media(max-width:520px){.wall-music{padding:16px;border-radius:20px}.wall-music fieldset{padding:14px}.wall-music .studio-profiles{gap:6px}.wall-music .studio-profile{padding:12px 8px}.studio-profile strong{font-size:13px}.studio-profile span{font-size:10px}.music-room{grid-template-columns:1fr}.studio-stage-top{padding:18px 14px 0;font-size:9px}.studio-spectrum{padding:14px}.studio-transport{padding:18px 14px}}@media(prefers-reduced-motion:reduce){.wall-music *{transition:none!important;animation:none!important}}
+
+/* Compact room selection; individual lamps are disclosed on demand. */
+.wall-music .studio-lights-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.wall-music .studio-lights-toolbar > label { flex: 1; max-width: 320px; min-width: 180px; }
+.studio-lights-toolbar > div { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.studio-lights-toolbar strong { color: #ece5ff; font-size: 13px; }
+.wall-music .studio-clear { background: transparent; border-color: transparent; color: #c6b4ff; padding: 8px 0; }
+.wall-music .studio-selection-hint { margin: 6px 0 18px; font-size: 12px; }
+.studio-room-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.studio-room-card { min-width: 0; padding: 16px; border: 1px solid #ffffff18; border-radius: 16px; background: #191a25; }
+.studio-room-card.has-selection { border-color: #b193ff80; background: linear-gradient(135deg, #a57aff14, #191a25); }
+.studio-room-heading { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-bottom: 14px; }
+.studio-room-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; color: #c6adff; background: #b193ff15; }
+.studio-room-heading strong { display: block; color: #f4f0ff; font-size: 15px; overflow-wrap: anywhere; }
+.studio-room-heading div > span { display: block; color: #b0b5cc; font-size: 11px; line-height: 1.5; margin-top: 5px; }
+.wall-music .studio-room-select { width: 100%; background: #ffffff06; }
+.wall-music .studio-room-select[aria-pressed=true] { color: #dacaff; background: #a57aff1a; border-color: #b193ff60; }
+.studio-room-details summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin-top: 5px; color: #bfc2d6; font-size: 12px; cursor: pointer; list-style: none; }
+.studio-room-details summary::-webkit-details-marker { display: none; }
+.studio-room-details[open] summary svg { transform: rotate(180deg); }
+.studio-room-details summary:focus-visible { outline: 2px solid #9cf5ed; outline-offset: 2px; border-radius: 6px; }
+.studio-room-lamps { display: grid; gap: 6px; border-top: 1px solid #ffffff12; padding-top: 10px; }
+.wall-music .studio-lightstage label.music-light, .wall-music .studio-lightstage label.music-light > span { color: #eceafa; }
+.wall-music .studio-lightstage .music-light { min-height: 48px; margin: 0; padding: 10px; }
+@media (max-width: 600px) {
+    .studio-room-grid { grid-template-columns: 1fr; }
+    .studio-lights-toolbar > div { align-items: flex-start; }
+}
+
+/* Reuse the Wall's pill switch for show membership, not live power state. */
+.wall-music .studio-lightstage button.music-light {
+    width: 100%;
+    justify-content: space-between;
+    text-align: left;
+    color: #eceafa;
+    font-weight: 400;
+}
+.wall-music .music-light[aria-pressed=true] {
+    border-color: #b193ff65;
+    background: #aa87ff0e;
+}
+.wall-music .music-light .wall-switch { flex-shrink: 0; }
+.wall-music .music-light .wall-switch.on { background: #a88aef; }

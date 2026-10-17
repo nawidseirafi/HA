@@ -11,6 +11,7 @@ import subprocess
 import tarfile
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -536,14 +537,16 @@ class UpdateCheckService(UpdateConfigMixin):
 
 class BackupEngine(UpdateConfigMixin):
     def create_backup(self, version: dict[str, Any]) -> dict[str, Any]:
+        started = time.monotonic()
         backup_dir = self.backup_dir()
+        excluded_roots = {backup_dir.resolve(), (self.paths.api_dir / "data" / "backups" / "updates").resolve()}
         try:
             backup_dir.mkdir(parents=True, exist_ok=True)
         except PermissionError:
             fallback = self.paths.api_dir / "data" / "backups" / "updates"
             fallback.mkdir(parents=True, exist_ok=True)
             backup_dir = fallback
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         target = backup_dir / f"backup-{stamp}.tar.gz"
         metadata = {
             "version": version.get("app_version") or version.get("version"),
@@ -552,19 +555,44 @@ class BackupEngine(UpdateConfigMixin):
             "execution_mode": self.execution_mode(),
         }
         include_paths = self._backup_sources()
-        with tarfile.open(target, "w:gz") as archive:
-            metadata_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
-            info = tarfile.TarInfo("backup_metadata.json")
-            info.size = len(metadata_bytes)
-            archive.addfile(info, fileobj=BytesIO(metadata_bytes))
-            for path in include_paths:
-                self._add_path(archive, path)
+        descriptor, name = tempfile.mkstemp(prefix=".backup-", suffix=".partial", dir=backup_dir)
+        os.close(descriptor)  # mkstemp creates the private file with mode 0600.
+        partial = Path(name)
+        try:
+            with tarfile.open(partial, "w:gz", compresslevel=1) as archive:
+                metadata_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+                info = tarfile.TarInfo("backup_metadata.json")
+                info.size = len(metadata_bytes)
+                archive.addfile(info, fileobj=BytesIO(metadata_bytes))
+                for path in include_paths:
+                    self._add_path(archive, path, excluded_roots)
+            with partial.open("rb") as handle:
+                os.fsync(handle.fileno())
+            partial.replace(target)
+        finally:
+            partial.unlink(missing_ok=True)
         size = target.stat().st_size
-        metadata.update({"path": str(target), "size": size, "size_human": _human_size(size)})
+        metadata.update({"path": str(target), "size": size, "size_human": _human_size(size),
+                         "duration_seconds": round(time.monotonic() - started, 2)})
         try:
             target.chmod(0o600)
         except OSError:
             pass
+        # Only prune after the new archive was fully closed and published.
+        removed = 0
+        try:
+            previous = sorted(
+                (item for item in backup_dir.glob("backup-*.tar.gz")
+                 if item != target and item.is_file() and not item.is_symlink()),
+                key=lambda item: (item.stat().st_mtime_ns, item.name), reverse=True,
+            )
+            for old in previous[2:]:
+                old.unlink()
+                removed += 1
+        except OSError:
+            # A cleanup problem must not invalidate the completed backup.
+            metadata["retention_warning"] = "Alte Backups konnten nicht vollständig entfernt werden."
+        metadata["removed_backups"] = removed
         return metadata
 
     def latest_backup(self) -> Path | None:
@@ -622,15 +650,31 @@ class BackupEngine(UpdateConfigMixin):
             self.paths.api_dir / "backend" / "agents",
         ]
 
-    def _add_path(self, archive: tarfile.TarFile, path: Path) -> None:
-        if not path.exists():
+    def _add_path(self, archive: tarfile.TarFile, path: Path, excluded_roots: set[Path] | None = None) -> None:
+        if excluded_roots is None:
+            excluded_roots = {self.backup_dir().resolve(), (self.paths.api_dir / "data" / "backups" / "updates").resolve()}
+        if not path.exists() or self._skip(path, excluded_roots):
             return
+        deployment_root = self.deployment_dir()
+
+        def arcname(child: Path) -> str:
+            for root in (deployment_root, self.paths.api_dir):
+                try:
+                    return str(child.relative_to(root))
+                except ValueError:
+                    continue
+            return child.name
+
         if path.is_file():
-            archive.add(path, arcname=self._arcname(path))
+            archive.add(path, arcname=arcname(path))
             return
-        for child in path.rglob("*"):
-            if child.is_file() and not self._skip(child):
-                archive.add(child, arcname=self._arcname(child))
+        for directory, dirs, files in os.walk(path):
+            root = Path(directory)
+            dirs[:] = [name for name in dirs if not self._skip(root / name, excluded_roots)]
+            for name in files:
+                child = root / name
+                if child.is_file() and not self._skip(child, excluded_roots):
+                    archive.add(child, arcname=arcname(child))
 
     def _arcname(self, path: Path) -> str:
         try:
@@ -642,14 +686,17 @@ class BackupEngine(UpdateConfigMixin):
         except ValueError:
             return path.name
 
-    def _skip(self, path: Path) -> bool:
+    def _skip(self, path: Path, excluded_roots: set[Path] | None = None) -> bool:
         parts = set(path.parts)
         if "__pycache__" in parts or "node_modules" in parts or "logs" in parts:
             return True
         if path.suffix in {".pyc", ".pyo"}:
             return True
         try:
-            return self.backup_dir() in path.parents
+            if excluded_roots is None:
+                excluded_roots = {self.backup_dir().resolve()}
+            resolved = path.resolve()
+            return any(root == resolved or root in resolved.parents for root in excluded_roots)
         except RuntimeError:
             return False
 
@@ -1070,6 +1117,9 @@ class UpdateService(UpdateConfigMixin):
         }
 
     def install_update(self, username: str = "admin", layer: str = "auto") -> dict[str, Any]:
+        from backend.agents.music.store import Store as MusicStore
+        if MusicStore().read("journal", {}):
+            raise RuntimeError("Musiklicht zuerst stoppen und Wiederherstellung abschließen, bevor ein Update installiert wird.")
         if layer in {"", "auto", None}:
             layers: list[str] = []
         elif layer == "all":

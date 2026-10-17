@@ -1508,3 +1508,34 @@ Vacation Dashboard
 - keine automatische Anwesenheitssimulation
 - keine automatische Lampen-/Jalousie-/Geraetesteuerung durch Vacation
 - keine globale automatische Push-Auslieferung ueber Messaging Targets
+
+## Musiklicht V1
+
+Manifest-Agent `backend/agents/music` mit separatem Worker-Prozess. Wall analysiert
+Mikrofon-Audio lokal nach ausdrücklichem Start; ausschließlich aggregierte Kennwerte
+werden über authentifiziertes WSS übertragen. Die deterministische Engine und die
+HA-Ausgabe sind getrennt. Home Assistant bleibt die Geräteschnittstelle; direkte Hue
+Entertainment-Ausgabe ist noch nicht implementiert. Betrieb, Grenzen und Tests:
+[MUSIC_AGENT.md](MUSIC_AGENT.md).
+
+### Update-Backup (2026-10-17)
+
+Die BackupEngine des Update-Service sichert vor der Installation weiterhin die
+bestehenden persistenten Daten. Verzeichnisausschlüsse werden jetzt beim Durchlaufen
+angewendet, Konfigurationspfade nicht mehr pro Datei geladen und gzip-Stufe 1
+verwendet. Backupdauer wird als `duration_seconds` im Ergebnis erfasst.
+Details und Auswirkungen: `docs/UPDATE_SYSTEM.md`, Abschnitt Backup-Laufzeit.
+
+### Aufbewahrung von Update-Backups (2026-10-17)
+
+Nach erfolgreicher Sicherung bleiben im verwendeten Backupverzeichnis drei
+Update-Archive: die neue Sicherung und die zwei neuesten bisherigen Backups.
+Fehlgeschlagene Sicherungen löschen keine vorhandenen Backups. Neue Archive
+werden vor der Bereinigung atomar veröffentlicht. Details: `docs/UPDATE_SYSTEM.md`.
+
+### Music Light Engine: Raumpegel (2026-10-17)
+
+Die deterministische Light Engine verstärkt niedrige Audiosignalwerte für Dynamic
+und Party mit einer stetigen Kennlinie und reagiert schneller auf Änderungen.
+Ambient bleibt sanft. Ausgabegrenzen, Stopplogik und Befehlsrate bleiben erhalten.
+Parameter, Beispiel und Tests sind in `docs/MUSIC_AGENT.md` dokumentiert.

@@ -7,10 +7,62 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.services.update_service import UpdatePaths, UpdateService, compare_versions
+from backend.services.update_service import BackupEngine, UpdatePaths, UpdateService, compare_versions
 
 
 class UpdateServiceTests(unittest.TestCase):
+    def test_backup_retains_three_and_leaves_other_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = BackupEngine(self._paths(tmp))
+            with patch.object(engine, 'execution_mode', return_value='local_systemd'):
+                results = [engine.create_backup({'version': str(i)}) for i in range(5)]
+            directory = Path(results[-1]['path']).parent
+            self.assertEqual(set(directory.glob('backup-*.tar.gz')), {Path(r['path']) for r in results[-3:]})
+            self.assertEqual(results[-1]['removed_backups'], 1)
+            unrelated = directory / 'manual.tar.gz'
+            unrelated.write_text('keep')
+            with patch.object(engine, 'execution_mode', return_value='local_systemd'):
+                engine.create_backup({'version': 'next'})
+            self.assertTrue(unrelated.exists())
+            self.assertEqual(len(list(directory.glob('backup-*.tar.gz'))), 3)
+
+    def test_failed_backup_keeps_previous_archives(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = BackupEngine(self._paths(tmp))
+            with patch.object(engine, 'execution_mode', return_value='local_systemd'):
+                result = engine.create_backup({'version': 'old'})
+                directory = Path(result['path']).parent
+                before = {p.name: p.read_bytes() for p in directory.iterdir()}
+                with patch.object(engine, '_add_path', side_effect=OSError('disk full')):
+                    with self.assertRaises(OSError):
+                        engine.create_backup({'version': 'new'})
+                self.assertEqual({p.name: p.read_bytes() for p in directory.iterdir()}, before)
+
+    def test_backup_prunes_archives_and_preserves_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._paths(tmp)
+            for relative in ['data/records/keep.json', 'data/backups/updates/old.tar.gz',
+                             'data/custom-backups/old.tar.gz', 'data/logs/skip.txt',
+                             'backend/agents/__pycache__/skip.pyc', 'backend/agents/keep.py']:
+                path = Path(tmp) / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('test')
+            paths.config_path.write_text('updates: {}')
+            paths.env_path.write_text('TEST=value')
+            engine = BackupEngine(paths)
+            with patch.object(engine, 'backup_dir', return_value=Path(tmp) / 'data/custom-backups') as directory, \
+                 patch.object(engine, 'execution_mode', return_value='local_systemd'):
+                result = engine.create_backup({'version': 'test'})
+            self.assertEqual(directory.call_count, 1)
+            with tarfile.open(result['path'], 'r:gz') as archive:
+                names = archive.getnames()
+                self.assertIn('data/records/keep.json', names)
+                self.assertIn('backend/agents/keep.py', names)
+                self.assertIn('config.yaml', names)
+                self.assertIn('.env', names)
+                self.assertFalse(any('backups/' in name or 'skip' in name for name in names))
+            self.assertGreaterEqual(result['duration_seconds'], 0)
+
     def test_systemd_restart_command_omits_sudo_for_root(self):
         with tempfile.TemporaryDirectory() as tmp:
             service = UpdateService(self._paths(tmp))

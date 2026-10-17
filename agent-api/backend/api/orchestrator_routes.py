@@ -122,6 +122,16 @@ def orchestrator_map(live: bool = Query(default=False)) -> dict[str, Any]:
             "active": _is_active(mywellness["status"]),
             "status": mywellness["status"],
         })
+    if "music" in agent_ids and "homeassistant" in {service["id"] for service in services}:
+        music = next(agent for agent in agents if agent["id"] == "music")
+        edges.append({
+            "id": "music-homeassistant",
+            "from": "music",
+            "to": "homeassistant",
+            "kind": "secondary",
+            "active": _is_active(music["status"]),
+            "status": music["status"],
+        })
     if "garden" in agent_ids:
         garden = next(agent for agent in agents if agent["id"] == "garden")
         edges.append({
@@ -262,11 +272,11 @@ def _primary_edges(agents: list[dict[str, Any]], services: list[dict[str, Any]],
                 "active": _is_active(agent["status"]),
                 "status": agent["status"],
             })
-        elif agent["id"] == "telegram":
+        elif agent["id"] != "scheduler":
             edges.append({
-                "id": "orchestrator-telegram",
+                "id": f"orchestrator-{agent['id']}",
                 "from": "orchestrator",
-                "to": "telegram",
+                "to": agent["id"],
                 "kind": "primary",
                 "active": _is_active(agent["status"]),
                 "status": agent["status"],
