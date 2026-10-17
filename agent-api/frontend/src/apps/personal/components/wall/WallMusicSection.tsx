@@ -28,6 +28,8 @@ export function WallMusicSection({music}: {music: Session}) {
     const [settings, setSettings] = useState<MusicSettings>(defaults);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [retrySave, setRetrySave] = useState(0);
     const [filter, setFilter] = useState('Alle Etagen');
     const [loaded, setLoaded] = useState(false);
     useEffect(() => {
@@ -39,15 +41,27 @@ export function WallMusicSection({music}: {music: Session}) {
         if (!dirty && music.status?.settings?.lights) setSettings(music.status.settings);
     }, [music.status, dirty]);
     const locked = !!music.status?.is_running || saving || music.busy || music.status?.status === 'recovery_pending';
-    const change = (patch: Partial<MusicSettings>) => { setSettings(s => ({...s, ...patch})); setDirty(true); };
+    const change = (patch: Partial<MusicSettings>) => { setSettings(s => ({...s, ...patch})); setSaveError(''); setDirty(true); };
     const visible = inventory.lights.filter(l => filter === 'Alle Etagen' || l.floor === filter);
     const rooms = [...new Set(visible.map(l => `${l.floor} · ${l.area}`))];
-    const save = async () => {
-        setSaving(true); music.setError('');
-        try { await musicControl('run', {action: 'configure', ...settings}); setDirty(false); await music.refresh(); }
-        catch (e) { music.setError(String(e)); }
-        finally { setSaving(false); }
-    };
+    const refresh = music.refresh;
+    useEffect(() => {
+        if (!dirty || settings.lights.length > 50 || music.status?.status !== 'idle') return;
+        let active = true;
+        const timer = window.setTimeout(async () => {
+            setSaving(true);
+            try {
+                await musicControl('run', {action: 'configure', ...settings});
+                await refresh();
+                if (active) { setDirty(false); setSaveError(''); }
+            } catch (e) {
+                if (active) setSaveError(e instanceof Error ? e.message : String(e));
+            } finally {
+                if (active) setSaving(false);
+            }
+        }, 350);
+        return () => { active = false; window.clearTimeout(timer); setSaving(false); };
+    }, [dirty, settings, music.status?.status, retrySave, refresh]);
     return <section className="wall-music" aria-label="Musiklicht">
         <div className="wall-music-summary">
             <div><span className="studio-eyebrow"><AudioLines size={16}/> STEVE MUSIC LAB</span><h2>DJ Studio<span>.</span></h2><p>Dein Sound. Dein Licht. Dein Moment.</p></div>
@@ -57,7 +71,7 @@ export function WallMusicSection({music}: {music: Session}) {
             <div className="studio-stage-top"><span><Mic size={14}/>{music.microphone ? 'MIKROFON LIVE' : 'AUDIO STANDBY'}</span><span>{settings.profile.toUpperCase()} / {Math.round(settings.intensity * 100)} %</span></div>
             <Spectrum music={music}/>
             <div className="studio-transport">
-                <div><strong>{music.microphone ? 'Der Raum wird zur Bühne.' : 'Bereit für deinen nächsten Track?'}</strong><span>{music.microphone ? 'Die Lichtshow folgt der Musik im Raum.' : 'Player und Lampen wählen. Speichern. Show starten.'}</span></div>
+                <div><strong>{music.microphone ? 'Der Raum wird zur Bühne.' : 'Bereit für deinen nächsten Track?'}</strong><span>{music.microphone ? 'Die Lichtshow folgt der Musik im Raum.' : 'Player und Lampen wählen. Show starten.'}</span></div>
                 <div className="music-buttons"><button className="music-start" onClick={() => void music.start()} disabled={locked || dirty || !settings.lights.length || !settings.player || music.status?.status !== 'idle'}><Play size={18}/>{music.busy ? 'Verbinden …' : 'Show starten'}</button><button className="music-stop" onClick={() => void music.stop()} disabled={!music.status?.is_running && !music.busy && !music.microphone}><Square size={16}/>Stoppen</button></div>
             </div>
         </div>
@@ -101,11 +115,8 @@ export function WallMusicSection({music}: {music: Session}) {
             })}</div>
             {settings.lights.filter(id => !inventory.lights.some(l => l.entity_id === id)).map(id => <button type="button" className="music-light" key={id} aria-pressed={true} aria-label={id + ' aus der Lichtshow entfernen'} onClick={() => change({lights: settings.lights.filter(l => l !== id)})}><span>{id}<small>Nicht mehr im Bestand</small></span><i className="wall-switch on" aria-hidden="true"/></button>)}
         </fieldset>
-        <div className="music-buttons">
-            <button onClick={() => void save()} disabled={locked || !dirty || settings.lights.length > 50}>Auswahl speichern</button>
-
-        </div>
-        {dirty && <p>Änderungen vor dem Start speichern.</p>}
+        <p className="studio-note" role="status">{saveError ? 'Änderungen konnten nicht gespeichert werden.' : saving ? 'Wird gespeichert …' : dirty ? 'Änderungen noch nicht gespeichert …' : 'Einstellungen werden automatisch gespeichert.'}</p>
+        {saveError && <div role="alert"><p>{saveError}</p><button disabled={locked || music.status?.status !== 'idle'} onClick={() => { setSaveError(''); setRetrySave(value => value + 1); }}>Erneut versuchen</button></div>}
         {settings.lights.length > 50 && <p role="alert">V1 unterstützt maximal 50 ausgewählte Lampen.</p>}
         {!!music.status?.released.length && <p>{music.status.released.length} Lampe(n) wurden manuell übernommen und bleiben unverändert.</p>}
         <p className="studio-note">Das Mikrofon startet nur nach deinem Tippen auf „Show starten“. Keine Aufnahme, nur lokale Analyse; übertragen werden ausschließlich Rhythmus- und Lautstärkewerte.</p>

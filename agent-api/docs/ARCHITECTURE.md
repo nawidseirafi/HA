@@ -1539,3 +1539,10 @@ Die deterministische Light Engine verstärkt niedrige Audiosignalwerte für Dyna
 und Party mit einer stetigen Kennlinie und reagiert schneller auf Änderungen.
 Ambient bleibt sanft. Ausgabegrenzen, Stopplogik und Befehlsrate bleiben erhalten.
 Parameter, Beispiel und Tests sind in `docs/MUSIC_AGENT.md` dokumentiert.
+
+### Music-Einstellungen: Autosave (2026-10-17)
+
+Die Wall-Musikseite speichert Konfigurationsänderungen automatisch nach 350 ms
+Eingabepause über den bestehenden Configure-Endpunkt. Ungespeicherte Änderungen
+sperren den Showstart; Speicherfehler bleiben sichtbar und können erneut versucht
+werden. Details: `docs/MUSIC_AGENT.md`.

@@ -376,3 +376,22 @@ Regressionstests prüfen niedrige Raumpegel, verbleibenden Dynamikbereich,
 Beat-Kontrast, Ambient-Verhalten, Intensität und Ausgabegrenzen. Nach Deployment
 Music-Dienst neu starten; keine zusätzlichen Pakete erforderlich. Die visuelle
 Wirkung muss auf dem iPad mit der echten Lampe geprüft werden.
+
+### Einstellungen automatisch speichern (2026-10-17)
+
+Player, Profil, Intensität und Lampenauswahl werden in der Wall jetzt automatisch
+350 ms nach der letzten Änderung gespeichert. Der bisherige Speicherknopf und der
+Hinweis „Änderungen vor dem Start speichern“ entfallen. Schnelle Eingaben werden
+zu einem Schreibvorgang zusammengefasst; während der Anfrage sind die Einstellungen
+gesperrt. Der Start bleibt bei ungespeicherten Änderungen gesperrt. Erst nach
+erfolgreicher Speicherung und Statusaktualisierung wird er wieder freigegeben.
+Bei Fehlern bleiben die lokalen Änderungen erhalten; ein Fehlerhinweis und
+„Erneut versuchen“ ermöglichen eine erneute Speicherung. Es gibt keine endlose
+automatische Fehlerschleife. Über 50 Lampen wird nicht gespeichert. Während einer
+laufenden Show bleiben Änderungen wie bisher gesperrt. Beim Verlassen der Seite
+wird ein noch nicht gestarteter Speichertimer abgebrochen.
+
+Datei: `frontend/src/apps/personal/components/wall/WallMusicSection.tsx`.
+Prüfung: TypeScript-/Vite-Produktionsbuild. Keine neuen Abhängigkeiten oder
+Backendänderungen erforderlich. Frühere Anleitungen zum manuellen Speichern
+sind für diese Oberfläche damit überholt.
